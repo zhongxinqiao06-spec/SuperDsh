@@ -1,0 +1,17 @@
+<?xml version="1.0" encoding="utf-8"?>
+<data-extraction-rules>
+    <cloud-backup>
+        <exclude domain="sharedpref" path="agents_anywhere_auth.xml" />
+        <exclude domain="sharedpref" path="superdsh_auth_secure.xml" />
+        <exclude
+            domain="sharedpref"
+            path="auth.xml" />
+    </cloud-backup>
+    <device-transfer>
+        <exclude domain="sharedpref" path="agents_anywhere_auth.xml" />
+        <exclude domain="sharedpref" path="superdsh_auth_secure.xml" />
+        <exclude
+            domain="sharedpref"
+            path="auth.xml" />
+    </device-transfer>
+</data-extraction-rules>

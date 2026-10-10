@@ -1,0 +1,189 @@
+diff --git a/lib/bundled-connector/connector/core/runtime_owner.py b/lib/bundled-connector/connector/core/runtime_owner.py
+index ef9f47f..08bfeeb 100644
+--- a/lib/bundled-connector/connector/core/runtime_owner.py
++++ b/lib/bundled-connector/connector/core/runtime_owner.py
+@@ -75,6 +75,33 @@ def _claim_state_lock(port: int, deadline: float) -> socket.socket:
+ @contextmanager
+ def state_lock(path: Path, timeout: float = 5) -> Iterator[None]:
+     path.parent.mkdir(parents=True, exist_ok=True, mode=0o700)
++    # SuperDsh: a byte lock avoids reserved Windows TCP ranges.
++    if sys.platform == "win32":
++        import msvcrt
++
++        with path.with_name(path.name + ".lock").open("a+b") as record:
++            record.seek(0, 2)
++            if record.tell() == 0:
++                record.write(b"\0")
++                record.flush()
++            deadline = time.monotonic() + timeout
++            while True:
++                record.seek(0)
++                try:
++                    msvcrt.locking(record.fileno(), msvcrt.LK_NBLCK, 1)
++                    break
++                except OSError as exc:
++                    if exc.errno not in {errno.EACCES, errno.EAGAIN, errno.EDEADLK}:
++                        raise
++                    if time.monotonic() >= deadline:
++                        raise RuntimeError("The local Connector record is busy. Please retry.") from exc
++                    time.sleep(0.02)
++            try:
++                yield
++            finally:
++                record.seek(0)
++                msvcrt.locking(record.fileno(), msvcrt.LK_UNLCK, 1)
++        return
+     lease = _claim_state_lock(state_lock_port(path), time.monotonic() + timeout)
+     try:
+         yield
+diff --git a/lib/index.d.ts b/lib/index.d.ts
+index 216a14f..6ea94aa 100644
+--- a/lib/index.d.ts
++++ b/lib/index.d.ts
+@@ -14,5 +14,6 @@ declare const Config: z<Config>;
+ declare const name = "agents-anywhere-bridge-next";
+ declare function apply(ctx: Context, config: Config): void;
+ //#endregion
+-export { Config, apply, name };
++declare function applyRuntime(ctx: Context, config: Config): void;
++export { Config, apply, applyRuntime, name };
+ //# sourceMappingURL=index.d.ts.map
+\ No newline at end of file
+diff --git a/lib/index.js b/lib/index.js
+index f7d4269..e21cd40 100644
+--- a/lib/index.js
++++ b/lib/index.js
+@@ -527,23 +527,28 @@ async function acquireManagerLock(path, onCompromised) {
+ 	});
+ 	const directory = await realpath(dirname(path));
+ 	const identity = process.platform === "win32" ? directory.toLowerCase() : directory;
+-	const port = 49152 + createHash("sha256").update(identity).digest().readUInt16BE(0) % 16384;
+-	const lease = createServer((socket) => socket.destroy());
+-	try {
+-		await new Promise((resolve, reject) => {
+-			lease.once("error", reject);
+-			lease.listen({
+-				host: "127.0.0.1",
+-				port,
+-				exclusive: true
+-			}, () => {
+-				lease.off("error", reject);
+-				resolve();
++	const startPort = createHash("sha256").update(identity).digest().readUInt16BE(0) % 16384;
++	let lease;
++	// Windows reserves dynamic TCP ranges for Hyper-V/WSL. Keep one deterministic
++	// sequence per lock identity, and never bypass an address another owner holds.
++	const attempts = process.platform === "win32" ? 32 : 1;
++	for (let attempt = 0; attempt < attempts; attempt++) {
++		const port = 49152 + (startPort + attempt * 257) % 16384;
++		lease = createServer((socket) => socket.destroy());
++		try {
++			await new Promise((resolve, reject) => {
++				lease.once("error", reject);
++				lease.listen({ host: "127.0.0.1", port, exclusive: true }, () => {
++					lease.off("error", reject);
++					resolve();
++				});
+ 			});
+-		});
+-	} catch (error) {
+-		if (hasCode(error, "EADDRINUSE")) throw new Error(`另一个插件实例正在管理本机设备，或本机管理端口 ${port} 已被占用。请关闭该实例后重试。`);
+-		throw error;
++			break;
++		} catch (error) {
++			if (hasCode(error, "EADDRINUSE")) throw new Error(`另一个插件实例正在管理本机设备，或本机管理端口 ${port} 已被占用。请关闭该实例后重试。`);
++			if (process.platform === "win32" && hasCode(error, "EACCES") && attempt + 1 < attempts) continue;
++			throw error;
++		}
+ 	}
+ 	lease.unref();
+ 	let released = false;
+@@ -1018,6 +1023,14 @@ var ConnectorLogs = class {
+ };
+ //#endregion
+ //#region src/host/connector/process.ts
++/** httpx requires bare IPv6 in NO_PROXY; keep undici's bracketed bypass in the parent. */
++function connectorEnvironment(environment) {
++	const result = { ...environment };
++	for (const key of ["no_proxy", "NO_PROXY"]) {
++		if (typeof result[key] === "string") result[key] = result[key].split(",").map((entry) => entry.trim() === "[::1]" ? "::1" : entry).join(",");
++	}
++	return result;
++}
+ const runFile = promisify(execFile);
+ const MAX_FRAME = 1048576;
+ /**
+@@ -1174,7 +1187,7 @@ var SourceConnector = class {
+ 			windowsHide: true,
+ 			detached: process.platform !== "win32",
+ 			env: {
+-				...process.env,
++				...connectorEnvironment(process.env),
+ 				AA_CONNECTOR_OWNER_KIND: "dsh-plugin",
+ 				...this.config.dshHome ? { DSH_HOME: this.config.dshHome } : {},
+ 				AGENT_CONNECTOR_DATA_DIR: dataDir,
+@@ -1318,6 +1331,12 @@ var SourceConnector = class {
+ 			this.buffer = this.buffer.slice(newline + 1);
+ 			try {
+ 				const frame = JSON.parse(line);
++				if (frame.method === "connector/log" && frame.id === void 0) {
++					const log = frame.params;
++					if (typeof log?.message === "string") this.logs.append(`[connector] ${typeof log.level === "string" ? log.level : "INFO"}: ${log.message}`);
++					if (typeof log?.exception === "string") this.logs.append(log.exception);
++					continue;
++				}
+ 				if (frame.method === "connector/state" && frame.id === void 0) {
+ 					this.updateState(frame.params);
+ 					continue;
+@@ -3053,7 +3072,8 @@ function contentHash(item) {
+ 		type: item.type,
+ 		status: item.status,
+ 		role: item.role,
+-		content: item.content
++		// Hash the JSON sent over the bridge: undefined object fields are omitted.
++		content: json(item.content)
+ 	}))}`;
+ }
+ //#endregion
+@@ -3624,8 +3644,13 @@ function createProjection(externalId, platformId, fingerprint = false) {
+ 			drafts.delete(key);
+ 		} else if (event.type === "tool/call") tool(event.data.callId, event.data.name, event.data.arguments, event);
+ 		else if (event.type === "tool/result") {
+-			const value = event.data.message.content[0];
+-			result(value.toolCallId, value.content, value.isError === true || Boolean(event.data.error), event, event.data.meta, event.data.error);
++			const message = record(event.data.message);
++			const source = record(message.source);
++			const nested = record(Array.isArray(message.content) ? message.content[0] : undefined);
++			const direct = nested.type !== "tool-result" && (message.role === "tool" || typeof message.toolCallId === "string" || source.kind === "tool");
++			const value = direct ? message : nested;
++			const callId = value.toolCallId ?? (direct ? source.callId : undefined);
++			result(callId, value.content, value.isError === true || Boolean(event.data.error), event, event.data.meta, event.data.error);
+ 		} else if (eventType === "tool/code-dispatch-start" || eventType === "tool/code-dispatch") {
+ 			if (typeof data.subCallId !== "string" || typeof data.name !== "string") return;
+ 			const item = tool(data.subCallId, data.name, data.arguments, event);
+@@ -3987,7 +4012,7 @@ var InteractionStream = class {
+ 			const run = async () => {
+ 				while (!abort.signal.aborted) {
+ 					try {
+-						const stream = await ready.typertGateway.wireStream.open("$events", { args: {} }, abort.signal);
++						const stream = await ready.typertGateway.wireStream.open("$events", { args: {} }, (async function* () {})(), undefined, abort.signal);
+ 						for await (const value of stream) {
+ 							if (abort.signal.aborted) break;
+ 							const frame = record(value);
+@@ -6584,10 +6609,14 @@ var DshRuntimeService = class extends Service {
+ //#region src/host/index.ts
+ const name = "agents-anywhere-bridge-next";
+ function apply(ctx, config) {
++	if (process.env.SUPERDSH_PLATFORM_MANAGED === "1") return;
+ 	ctx.plugin(DshRuntimeService, config);
+ 	ctx.plugin(OnboardingService, config);
+ }
+ //#endregion
+-export { Config, apply, name };
++function applyRuntime(ctx, config) {
++	ctx.plugin(DshRuntimeService, config);
++}
++export { Config, apply, applyRuntime, name };
+ 
+ //# sourceMappingURL=index.js.map
+\ No newline at end of file

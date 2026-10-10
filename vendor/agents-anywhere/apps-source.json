@@ -1,0 +1,28 @@
+{
+  "schemaVersion": 1,
+  "repository": "https://github.com/anywhere-labs/Agents-Anywhere.git",
+  "commit": "f9129757c3ee6071fd845c9de067443f694bad61",
+  "applications": [
+    {
+      "path": "apps/admin",
+      "upstreamPath": "web-next",
+      "upstreamTree": "81f71bbd1c87b304ff3842433cfab0f8bfa57514"
+    },
+    {
+      "path": "apps/server",
+      "upstreamPath": "server",
+      "upstreamTree": "f5128aecd2ad15c0281e14ff570f931ffa7ec900"
+    },
+    {
+      "path": "apps/android",
+      "upstreamPath": "android",
+      "upstreamTree": "497738e7b319b6f89ca1a1bf552df28ab330538a"
+    }
+  ],
+  "excludedUpstreamDirectories": [
+    "web-next",
+    "server",
+    "android"
+  ],
+  "license": "Upstream README declares MIT; preserve bundled third-party LICENSE and NOTICE files."
+}

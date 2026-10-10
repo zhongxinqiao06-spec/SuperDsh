@@ -1,0 +1,772 @@
+'use client'
+
+import * as React from 'react'
+import { toast } from 'sonner'
+import { copyText } from '@/lib/clipboard'
+import ReactMarkdown, { type Components } from 'react-markdown'
+import remarkGfm from 'remark-gfm'
+import remarkMath from 'remark-math'
+import { MermaidPreview } from '@/components/mermaid-preview'
+import rehypeKatex from 'rehype-katex'
+import { remarkStandaloneDisplayMath } from '@/lib/markdown-math'
+import { Copy, Check, ExternalLink, GitBranch, Maximize2 } from 'lucide-react'
+
+import { Badge } from '@/components/ui/badge'
+import { ScrollArea, ScrollBar } from '@/components/ui/scroll-area'
+import { Dialog, DialogContent, DialogTitle } from '@/components/ui/dialog'
+import {
+  type OpenSessionFilePreview,
+  useSessionFilePreviewOpener,
+} from '@/components/session/session-file-preview-context'
+import { cn } from '@/lib/utils'
+import { highlightCode } from '@/lib/code-highlight'
+import { openNativeFilePreviewWindow } from '@/lib/file-preview-window'
+import type { SessionView } from '@/features/dashboard/types'
+import { useTranslations } from 'next-intl'
+
+export function MarkdownText({
+  text,
+  token,
+  session,
+  inverted,
+}: {
+  text: string
+  token?: string
+  session?: SessionView
+  inverted?: boolean
+}) {
+  return (
+    <MarkdownBody
+      text={text}
+      token={token}
+      session={session}
+      inverted={inverted}
+    />
+  )
+}
+
+// Keep the component identity stable while streamed message text changes.
+const MarkdownPre: Components['pre'] = ({ node, children, ...props }) => {
+  const block = node?.children[0]
+  if (block?.type !== 'element' || block.tagName !== 'code') {
+    return <pre {...props}>{children}</pre>
+  }
+  const classes = block.properties.className
+  const language =
+    (Array.isArray(classes)
+      ? classes.map(String)
+      : String(classes ?? '').split(/\s+/)
+    )
+      .find((name) => name.startsWith('language-'))
+      ?.slice(9) || 'text'
+  const code = block.children
+    .map((child) => (child.type === 'text' ? child.value : ''))
+    .join('')
+    .replace(/\n$/, '')
+  return <MarkdownCodeBlock code={code} language={language} />
+}
+
+// Module-level so streamed text updates don't remount the table and drop its expanded state.
+const MarkdownTable: Components['table'] = ({
+  node: _node,
+  children,
+  ...props
+}) => <MarkdownTableBlock {...props}>{children}</MarkdownTableBlock>
+
+function MarkdownTableBlock({
+  children,
+  ...props
+}: React.ComponentProps<'table'>) {
+  const tSession = useTranslations('dashboard.session')
+  const [fullscreen, setFullscreen] = React.useState(false)
+  const label = tSession('tableFullscreen')
+
+  return (
+    <div className="relative my-3 min-w-0 max-w-full">
+      <ScrollArea
+        contentWide
+        className="min-w-0 max-w-full rounded-xl border border-border"
+      >
+        <table className="w-full min-w-max border-collapse text-sm" {...props}>
+          {children}
+        </table>
+        <ScrollBar orientation="horizontal" />
+      </ScrollArea>
+      <button
+        type="button"
+        onClick={() => setFullscreen(true)}
+        aria-label={label}
+        title={label}
+        className="absolute top-1.5 right-1.5 z-10 rounded-md border border-border/60 bg-background/90 p-1 text-muted-foreground opacity-70 shadow-sm transition hover:bg-accent hover:text-foreground hover:opacity-100 focus-visible:opacity-100 supports-backdrop-filter:backdrop-blur-sm"
+      >
+        <Maximize2 className="size-3.5" />
+      </button>
+      <Dialog open={fullscreen} onOpenChange={setFullscreen}>
+        <DialogContent
+          aria-describedby={undefined}
+          className="top-0 left-0 flex h-dvh w-screen max-w-none translate-x-0 translate-y-0 flex-col gap-0 overflow-hidden rounded-none p-0 sm:max-w-none"
+        >
+          <DialogTitle className="flex h-12 shrink-0 items-center border-b border-border px-4 text-sm font-medium">
+            {label}
+          </DialogTitle>
+          <div className="min-h-0 flex-1 overflow-auto p-4">
+            <div className="w-max min-w-full overflow-hidden rounded-xl border border-border">
+              <table className="w-full min-w-max border-collapse text-sm">
+                {children}
+              </table>
+            </div>
+          </div>
+        </DialogContent>
+      </Dialog>
+    </div>
+  )
+}
+
+function MarkdownBody({
+  text,
+  token,
+  session,
+  inverted,
+}: {
+  text: string
+  token?: string
+  session?: SessionView
+  inverted?: boolean
+}) {
+  const openFilePreview = useSessionFilePreviewOpener()
+
+  return (
+    <div
+      className={cn(
+        'markdown-body min-w-0 space-y-3 text-sm leading-relaxed [&_a]:underline [&_blockquote]:border-l [&_blockquote]:pl-3 [&_code]:text-[1em] [&_li]:ml-5 [&_ol]:list-decimal [&_pre]:m-0 [&_ul]:list-disc',
+        inverted
+          ? '[&_pre]:border-primary-foreground/15'
+          : '[&_pre]:border-border',
+      )}
+    >
+      <ReactMarkdown
+        remarkPlugins={[
+          remarkGfm,
+          remarkMath,
+          remarkStandaloneDisplayMath,
+          remarkGitDirectiveBadges,
+        ]}
+        rehypePlugins={[rehypeKatex]}
+        components={{
+          pre: MarkdownPre,
+          code({ className, children, node: _node, ...props }) {
+            const previewPath =
+              typeof children === 'string' ? parseInlineFileRef(children) : null
+            if (previewPath && token && session) {
+              return (
+                <span
+                  role="button"
+                  tabIndex={0}
+                  className="inline-flex max-w-full items-baseline gap-0.5 rounded-none bg-transparent p-0 align-baseline text-[1em] text-inherit underline underline-offset-2 hover:text-foreground"
+                  onClick={() =>
+                    openSessionFilePreview(
+                      token,
+                      session,
+                      previewPath,
+                      openFilePreview,
+                    )
+                  }
+                  onKeyDown={(event) => {
+                    if (event.key === 'Enter' || event.key === ' ') {
+                      openSessionFilePreview(
+                        token,
+                        session,
+                        previewPath,
+                        openFilePreview,
+                      )
+                    }
+                  }}
+                >
+                  <span className="min-w-0 truncate">{children}</span>
+                  <ExternalLink className="relative -top-0.5 size-3 shrink-0" />
+                </span>
+              )
+            }
+            return (
+              <code
+                className={cn(
+                  className,
+                  'rounded-md bg-secondary px-1.5 py-0.5 text-secondary-foreground',
+                )}
+                {...props}
+              >
+                {children}
+              </code>
+            )
+          },
+          a({ href, children, node: _node, ...props }) {
+            const childText = textFromReactChildren(children)
+            const path =
+              href && isMarkdownFilePath(href)
+                ? stripLineSuffix(href)
+                : parseInlineFileRef(childText)
+            if (!path || !token || !session) {
+              return (
+                <a href={href} target="_blank" rel="noreferrer" {...props}>
+                  {children}
+                </a>
+              )
+            }
+            return (
+              <span
+                role="button"
+                tabIndex={0}
+                className="inline-flex max-w-full items-baseline gap-0.5 align-baseline text-left underline underline-offset-2 hover:text-foreground"
+                onClick={() =>
+                  openSessionFilePreview(token, session, path, openFilePreview)
+                }
+                onKeyDown={(event) => {
+                  if (event.key === 'Enter' || event.key === ' ') {
+                    openSessionFilePreview(
+                      token,
+                      session,
+                      path,
+                      openFilePreview,
+                    )
+                  }
+                }}
+              >
+                <span className="min-w-0 truncate">{children}</span>
+                <ExternalLink className="relative -top-0.5 size-3 shrink-0" />
+              </span>
+            )
+          },
+          table: MarkdownTable,
+          thead({ children, ...props }) {
+            return (
+              <thead className="border-b border-border bg-muted/40" {...props}>
+                {children}
+              </thead>
+            )
+          },
+          tbody({ children, ...props }) {
+            return (
+              <tbody className="divide-y divide-border" {...props}>
+                {children}
+              </tbody>
+            )
+          },
+          tr({ children, ...props }) {
+            return (
+              <tr className="transition-colors hover:bg-muted/25" {...props}>
+                {children}
+              </tr>
+            )
+          },
+          th({ children, ...props }) {
+            return (
+              <th
+                className="border-r border-border px-3 py-2 text-left font-medium text-foreground last:border-r-0"
+                {...props}
+              >
+                {children}
+              </th>
+            )
+          },
+          td({ children, ...props }) {
+            return (
+              <td
+                className="border-r border-border px-3 py-2 align-top text-foreground/90 last:border-r-0"
+                {...props}
+              >
+                {children}
+              </td>
+            )
+          },
+          span({ children, ...props }) {
+            const directiveProps =
+              props as React.HTMLAttributes<HTMLSpanElement> & {
+                'data-git-actions'?: string
+                'data-git-directive'?: string
+              }
+            if (directiveProps['data-git-directive'] === 'true') {
+              return (
+                <GitDirectiveBadge
+                  actions={directiveProps['data-git-actions']}
+                />
+              )
+            }
+            return <span {...props}>{children}</span>
+          },
+        }}
+      >
+        {text}
+      </ReactMarkdown>
+    </div>
+  )
+}
+
+const GIT_DIRECTIVE_ACTIONS = [
+  'stage',
+  'commit',
+  'create-branch',
+  'push',
+  'create-pr',
+] as const
+
+type GitDirectiveAction = (typeof GIT_DIRECTIVE_ACTIONS)[number]
+
+type GitDirective = {
+  action: GitDirectiveAction
+  attrs: Record<string, string>
+}
+
+const gitDirectivePattern = new RegExp(
+  `::git-(${GIT_DIRECTIVE_ACTIONS.join('|')})\\{([^}]*)\\}`,
+  'g',
+)
+
+type MarkdownAstNode = {
+  type: string
+  value?: string
+  children?: MarkdownAstNode[]
+  data?: {
+    hName?: string
+    hProperties?: Record<string, string>
+  }
+}
+
+function remarkGitDirectiveBadges() {
+  return (tree: MarkdownAstNode) => {
+    replaceGitDirectivesInTextChildren(tree)
+    mergeAdjacentGitDirectiveNodes(tree)
+  }
+}
+
+function replaceGitDirectivesInTextChildren(node: MarkdownAstNode) {
+  if (!node.children) return
+
+  const nextChildren: MarkdownAstNode[] = []
+  for (const child of node.children) {
+    if (child.type === 'text' && typeof child.value === 'string') {
+      nextChildren.push(...splitGitDirectiveTextNode(child.value))
+      continue
+    }
+    replaceGitDirectivesInTextChildren(child)
+    nextChildren.push(child)
+  }
+  node.children = nextChildren
+}
+
+function splitGitDirectiveTextNode(text: string): MarkdownAstNode[] {
+  const matches = Array.from(text.matchAll(gitDirectivePattern))
+  if (matches.length === 0) return [{ type: 'text', value: text }]
+
+  const nodes: MarkdownAstNode[] = []
+  let cursor = 0
+  let pendingDirectives: GitDirective[] = []
+
+  const flushDirectives = () => {
+    if (pendingDirectives.length === 0) return
+    nodes.push(gitDirectiveNode(pendingDirectives))
+    pendingDirectives = []
+  }
+
+  for (const match of matches) {
+    const start = match.index ?? 0
+    const before = text.slice(cursor, start)
+    if (before) {
+      if (before.trim()) flushDirectives()
+      nodes.push({ type: 'text', value: before })
+    }
+    const action = gitDirectiveAction(match[1])
+    if (!action) continue
+    const directive: GitDirective = {
+      action,
+      attrs: parseDirectiveAttributes(match[2] ?? ''),
+    }
+    pendingDirectives.push(directive)
+    cursor = start + match[0].length
+  }
+
+  const after = text.slice(cursor)
+  if (after) {
+    if (after.trim()) flushDirectives()
+    nodes.push({ type: 'text', value: after })
+  }
+  flushDirectives()
+  return nodes
+}
+
+function gitDirectiveNode(directives: GitDirective[]): MarkdownAstNode {
+  return {
+    type: 'gitDirective',
+    data: {
+      hName: 'span',
+      hProperties: {
+        'data-git-directive': 'true',
+        'data-git-actions': serializeGitDirectives(directives),
+      },
+    },
+  }
+}
+
+function mergeAdjacentGitDirectiveNodes(node: MarkdownAstNode) {
+  if (!node.children) return
+
+  for (const child of node.children) mergeAdjacentGitDirectiveNodes(child)
+  node.children = mergeInlineGitDirectiveNodes(node.children)
+  node.children = mergeGitDirectiveOnlyParagraphs(node.children)
+}
+
+function mergeInlineGitDirectiveNodes(
+  children: MarkdownAstNode[],
+): MarkdownAstNode[] {
+  const merged: MarkdownAstNode[] = []
+  let pendingDirectives: GitDirective[] = []
+  let pendingSeparators: MarkdownAstNode[] = []
+
+  const flushDirectives = () => {
+    if (pendingDirectives.length === 0) return
+    merged.push(gitDirectiveNode(pendingDirectives))
+    pendingDirectives = []
+    pendingSeparators = []
+  }
+
+  const flushSeparators = () => {
+    if (pendingSeparators.length === 0) return
+    merged.push(...pendingSeparators)
+    pendingSeparators = []
+  }
+
+  for (const child of children) {
+    const directives = gitDirectivesFromNode(child)
+    if (directives) {
+      pendingDirectives.push(...directives)
+      pendingSeparators = []
+      continue
+    }
+
+    if (pendingDirectives.length > 0 && isGitDirectiveSeparator(child)) {
+      pendingSeparators.push(child)
+      continue
+    }
+
+    flushDirectives()
+    flushSeparators()
+    merged.push(child)
+  }
+
+  flushDirectives()
+  flushSeparators()
+  return merged
+}
+
+function mergeGitDirectiveOnlyParagraphs(
+  children: MarkdownAstNode[],
+): MarkdownAstNode[] {
+  const merged: MarkdownAstNode[] = []
+  let pendingDirectives: GitDirective[] = []
+
+  const flushDirectives = () => {
+    if (pendingDirectives.length === 0) return
+    merged.push({
+      type: 'paragraph',
+      children: [gitDirectiveNode(pendingDirectives)],
+    })
+    pendingDirectives = []
+  }
+
+  for (const child of children) {
+    const directives = gitDirectivesFromDirectiveOnlyParagraph(child)
+    if (directives) {
+      pendingDirectives.push(...directives)
+      continue
+    }
+
+    flushDirectives()
+    merged.push(child)
+  }
+
+  flushDirectives()
+  return merged
+}
+
+function gitDirectivesFromDirectiveOnlyParagraph(
+  node: MarkdownAstNode,
+): GitDirective[] | null {
+  if (node.type !== 'paragraph' || !node.children) return null
+
+  const directives: GitDirective[] = []
+  for (const child of node.children) {
+    const childDirectives = gitDirectivesFromNode(child)
+    if (childDirectives) {
+      directives.push(...childDirectives)
+      continue
+    }
+    if (isGitDirectiveSeparator(child)) continue
+    return null
+  }
+
+  return directives.length > 0 ? directives : null
+}
+
+function gitDirectivesFromNode(node: MarkdownAstNode): GitDirective[] | null {
+  const actions = node.data?.hProperties?.['data-git-actions']
+  if (node.type !== 'gitDirective' || typeof actions !== 'string') return null
+
+  const directives = parseGitDirectives(actions)
+  return directives.length > 0 ? directives : null
+}
+
+function isGitDirectiveSeparator(node: MarkdownAstNode): boolean {
+  if (node.type === 'break' || (node.type === 'html' && node.value === '\n'))
+    return true
+  if (node.type !== 'text') return false
+  return !node.value || node.value.trim().length === 0
+}
+
+function serializeGitDirectives(directives: GitDirective[]): string {
+  return JSON.stringify(directives)
+}
+
+function parseGitDirectives(input?: string): GitDirective[] {
+  if (!input) return []
+  try {
+    const values: unknown = JSON.parse(input)
+    if (!Array.isArray(values)) return []
+    return values.flatMap((value): GitDirective[] => {
+      if (!isRecord(value)) return []
+      const action = gitDirectiveAction(value.action)
+      if (!action || !isRecord(value.attrs)) return []
+      const attrs = Object.fromEntries(
+        Object.entries(value.attrs).filter(
+          (entry): entry is [string, string] => typeof entry[1] === 'string',
+        ),
+      )
+      return [{ action, attrs }]
+    })
+  } catch {
+    return []
+  }
+}
+
+function gitDirectiveAction(action: unknown): GitDirectiveAction | null {
+  if (typeof action !== 'string') return null
+  return GIT_DIRECTIVE_ACTIONS.find((candidate) => candidate === action) ?? null
+}
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === 'object' && value !== null && !Array.isArray(value)
+}
+
+function parseDirectiveAttributes(input: string): Record<string, string> {
+  const attrs: Record<string, string> = {}
+  for (const match of input.matchAll(/([A-Za-z_][A-Za-z0-9_]*)="([^"]*)"/g)) {
+    const key = match[1]
+    if (key) attrs[key] = match[2] ?? ''
+  }
+  return attrs
+}
+
+function GitDirectiveBadge({ actions }: { actions?: string }) {
+  const tSession = useTranslations('dashboard.session')
+  const directives = parseGitDirectives(actions)
+  if (directives.length === 0) return null
+  return (
+    <Badge
+      variant="secondary"
+      className="mx-0.5 inline-flex h-6 gap-1.5 rounded-full px-2.5 align-baseline font-normal"
+    >
+      <GitBranch data-icon="inline-start" />
+      <span className="inline-flex items-center gap-1">
+        {directives.map((directive, index) => (
+          <React.Fragment key={`${directive.action}-${index}`}>
+            {index > 0 ? <span aria-hidden="true">·</span> : null}
+            <GitDirectiveLabel directive={directive} tSession={tSession} />
+          </React.Fragment>
+        ))}
+      </span>
+    </Badge>
+  )
+}
+
+function GitDirectiveLabel({
+  directive,
+  tSession,
+}: {
+  directive: GitDirective
+  tSession: (key: string, values?: Record<string, string | number>) => string
+}) {
+  const label = gitDirectiveLabel(directive, tSession)
+  const url =
+    directive.action === 'create-pr'
+      ? safeExternalUrl(directive.attrs.url)
+      : null
+  if (!url) return label
+  return (
+    <a
+      href={url}
+      target="_blank"
+      rel="noreferrer"
+      className="underline underline-offset-2"
+    >
+      {label}
+    </a>
+  )
+}
+
+function gitDirectiveLabel(
+  directive: GitDirective,
+  tSession: (key: string, values?: Record<string, string | number>) => string,
+): string {
+  if (directive.action === 'stage') return tSession('gitOperationStaged')
+  if (directive.action === 'commit') return tSession('gitOperationCommitted')
+  const branch = directive.attrs.branch
+  if (directive.action === 'create-branch') {
+    return branch
+      ? tSession('gitOperationCreatedBranchNamed', { branch })
+      : tSession('gitOperationCreatedBranch')
+  }
+  if (directive.action === 'push') {
+    return branch
+      ? tSession('gitOperationPushedBranch', { branch })
+      : tSession('gitOperationPushed')
+  }
+  const isDraft = directive.attrs.isDraft === 'true'
+  if (isDraft) {
+    return branch
+      ? tSession('gitOperationCreatedDraftPrForBranch', { branch })
+      : tSession('gitOperationCreatedDraftPr')
+  }
+  return branch
+    ? tSession('gitOperationCreatedPrForBranch', { branch })
+    : tSession('gitOperationCreatedPr')
+}
+
+function safeExternalUrl(value?: string): string | null {
+  if (!value) return null
+  try {
+    const url = new URL(value)
+    return url.protocol === 'http:' || url.protocol === 'https:'
+      ? url.href
+      : null
+  } catch {
+    return null
+  }
+}
+
+function MarkdownCodeBlock({
+  code,
+  language,
+}: {
+  code: string
+  language: string
+}) {
+  const tSession = useTranslations('dashboard.session')
+  const tCommon = useTranslations('common')
+  const [copied, setCopied] = React.useState(false)
+  const source = (
+    <ScrollArea
+      contentWide
+      className="min-w-0 max-w-full overflow-hidden"
+      viewportProps={{ className: 'max-h-96' }}
+    >
+      <pre className="w-max min-w-full p-3 text-sm leading-relaxed">
+        <code>{highlightCode(code, language)}</code>
+      </pre>
+      <ScrollBar orientation="horizontal" />
+    </ScrollArea>
+  )
+  return (
+    <div className="my-3 min-w-0 max-w-full overflow-hidden rounded-xl border border-border bg-background">
+      <div className="flex h-9 items-center justify-between border-b bg-muted/25 px-3">
+        <span className="text-xs text-muted-foreground">
+          {language || 'text'}
+        </span>
+        <button
+          type="button"
+          className="rounded-md p-1 text-muted-foreground hover:bg-accent hover:text-foreground"
+          onClick={async () => {
+            setCopied(false)
+            try {
+              await copyText(code)
+              setCopied(true)
+              setTimeout(() => setCopied(false), 1200)
+            } catch {
+              toast.error(tCommon('copyFailed'))
+            }
+          }}
+          aria-label={copied ? tCommon('copied') : tSession('copyCode')}
+        >
+          {copied ? (
+            <Check className="size-3.5" />
+          ) : (
+            <Copy className="size-3.5" />
+          )}
+        </button>
+      </div>
+      {language.toLowerCase() === 'mermaid' ? (
+        <MermaidPreview code={code}>{source}</MermaidPreview>
+      ) : (
+        source
+      )}
+    </div>
+  )
+}
+
+function stripLineSuffix(path: string) {
+  return path.replace(/:\d+(?::\d+)?$/, '')
+}
+
+function parseInlineFileRef(text: string): string | null {
+  if (!text || text.includes(' ') || text.includes('://')) return null
+  if (!text.includes('/')) return null
+  if (!/\.[a-zA-Z0-9]+(?::\d+(?::\d+)?)?$/.test(text)) return null
+  return stripLineSuffix(text)
+}
+
+function textFromReactChildren(children: React.ReactNode): string {
+  if (typeof children === 'string' || typeof children === 'number')
+    return String(children)
+  if (Array.isArray(children))
+    return children.map(textFromReactChildren).join('')
+  return ''
+}
+
+function isMarkdownFilePath(href: string): boolean {
+  if (!href) return false
+  if (
+    href.startsWith('http://') ||
+    href.startsWith('https://') ||
+    href.startsWith('mailto:') ||
+    href.startsWith('#') ||
+    href.startsWith('//')
+  ) {
+    return false
+  }
+  return true
+}
+
+export function openSessionFilePreview(
+  token: string,
+  session: SessionView,
+  path: string,
+  openFilePreview?: OpenSessionFilePreview | null,
+) {
+  const file = { name: fileNameFromPath(path), path }
+  if (openFilePreview) {
+    openFilePreview({
+      ...file,
+      source: 'workspace',
+      root: session.cwd || '.',
+    })
+    return
+  }
+  openNativeFilePreviewWindow({
+    token,
+    connectorId: session.connectorId,
+    root: session.cwd || '.',
+    file,
+  })
+}
+
+function fileNameFromPath(path: string) {
+  const normalized = path.replace(/\\/g, '/').replace(/\/+$/, '')
+  return normalized.split('/').pop() || path
+}

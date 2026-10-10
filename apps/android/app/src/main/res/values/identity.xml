@@ -1,0 +1,17 @@
+<resources>
+    <string name="identity_reset_title">Set your own password</string>
+    <string name="identity_reset_hint">This account has an initial password. Set a new password with at least 8 characters before using your devices. You will need to sign in again.</string>
+    <string name="identity_new_password">New password</string>
+    <string name="identity_confirm_password">Confirm password</string>
+    <string name="identity_change_and_sign_in">Save and sign in again</string>
+    <string name="identity_sign_out">Sign out</string>
+    <string name="identity_permission_denied">Your account does not have permission to use this feature.</string>
+    <string name="identity_back_home">Back to my workspace</string>
+    <string name="identity_account_login">Account and password</string>
+    <string name="identity_web_login">Continue with web authorization</string>
+    <string name="identity_identifier">Username or verified email</string>
+    <string name="identity_password">Password</string>
+    <string name="identity_server">Server URL</string>
+    <string name="identity_sign_in">Sign in</string>
+    <string name="identity_login_hint">Use your username if your email has not been verified. For password recovery, continue with web authorization.</string>
+</resources>

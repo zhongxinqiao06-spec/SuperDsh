@@ -1,0 +1,17 @@
+{
+  "extends": "../../../tsconfig.browser.json",
+  "compilerOptions": {
+    "types": ["node", "react", "react-dom", "vite/client"],
+    "allowJs": true,
+    "checkJs": false,
+    "resolveJsonModule": true,
+    "typeRoots": ["./node_modules/@types"]
+  },
+  "include": [
+    "src/**/*.ts",
+    "src/**/*.tsx",
+    "scripts/**/*.ts",
+    "build/**/*.ts",
+    "*.config.ts"
+  ]
+}

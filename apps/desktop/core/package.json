@@ -1,0 +1,506 @@
+{
+  "name": "@superdsh/core",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "build": "node node_modules/tsdown/dist/run.mjs",
+    "typecheck": "node node_modules/typescript/bin/tsc --noEmit && node node_modules/typescript/bin/tsc --noEmit -p tsconfig.preload.json && node node_modules/typescript/bin/tsc --noEmit -p tsconfig.client.json",
+    "test": "node node_modules/vitest/vitest.mjs run",
+    "check": "yarn build && yarn typecheck && yarn test",
+    "verify:host": "node scripts/verify-host.mjs",
+    "verify:agent-flow": "node scripts/verify-agent-flow.mjs"
+  },
+  "dependencies": {
+    "@superdsh/harness": "workspace:*",
+    "yaml": "^2.9.0"
+  },
+  "devDependencies": {
+    "@deepseek-ai/cordis": "4.0.4",
+    "@deepseek-ai/dsh-client-ui-sidebar-browser": "0.1.7-alpha.2",
+    "@deepseek-ai/dsh-host-webserver": "0.1.7-alpha.2",
+    "@deepseek-ai/dsh-storage-domain": "0.1.7-alpha.2",
+    "@types/node": "^22.20.0",
+    "@types/semver": "^7.7.1",
+    "ajv": "^8.20.0",
+    "ajv-formats": "^3.0.1",
+    "electron": "44.0.0",
+    "selfsigned": "5.5.0",
+    "semver": "^7.7.3",
+    "sharp": "0.35.3",
+    "tsdown": "0.22.2",
+    "typescript": "6.0.3",
+    "vitest": "4.1.8",
+    "zod": "^4.4.3"
+  },
+  "exports": {
+    "./client/native-model-initialization": {
+      "types": "./src/client/native-model-initialization.ts",
+      "default": "./lib/client/native-model-initialization.js"
+    },
+    "./client/conversation": {
+      "types": "./src/client/conversation.ts",
+      "default": "./lib/client/conversation.js"
+    },
+    "./contracts/platform": {
+      "types": "./src/contracts/platform.ts",
+      "default": "./lib/contracts/platform.js"
+    },
+    "./client/platform": {
+      "types": "./src/client/platform.ts",
+      "default": "./lib/client/platform.js"
+    },
+    "./package.json": "./package.json",
+    "./backend/backend-controller": {
+      "types": "./src/backend/backend-controller.ts",
+      "default": "./lib/backend/backend-controller.js"
+    },
+    "./backend/desktop-contract": {
+      "types": "./src/contracts/desktop-contract.ts",
+      "default": "./lib/contracts/desktop-contract.js"
+    },
+    "./backend/desktop-preferences": {
+      "types": "./src/backend/desktop-preferences.ts",
+      "default": "./lib/backend/desktop-preferences.js"
+    },
+    "./backend/desktop-runtime": {
+      "types": "./src/backend/desktop-runtime.ts",
+      "default": "./lib/backend/desktop-runtime.js"
+    },
+    "./backend/diagnostics": {
+      "types": "./src/backend/diagnostics.ts",
+      "default": "./lib/backend/diagnostics.js"
+    },
+    "./backend/disposable-tree": {
+      "types": "./src/backend/disposable-tree.ts",
+      "default": "./lib/backend/disposable-tree.js"
+    },
+    "./backend/host-process": {
+      "types": "./src/backend/host-process.ts",
+      "default": "./lib/backend/host-process.js"
+    },
+    "./backend/host": {
+      "types": "./src/backend/host.ts",
+      "default": "./lib/backend/host.js"
+    },
+    "./backend/import/activity": {
+      "types": "./src/backend/import/activity.ts",
+      "default": "./lib/backend/import/activity.js"
+    },
+    "./backend/import/files": {
+      "types": "./src/backend/import/files.ts",
+      "default": "./lib/backend/import/files.js"
+    },
+    "./backend/import/index": {
+      "types": "./src/backend/import/index.ts",
+      "default": "./lib/backend/import/index.js"
+    },
+    "./backend/import/profiles": {
+      "types": "./src/backend/import/profiles.ts",
+      "default": "./lib/backend/import/profiles.js"
+    },
+    "./backend/import/types": {
+      "types": "./src/contracts/import-types.ts",
+      "default": "./lib/contracts/import-types.js"
+    },
+    "./backend/index": {
+      "types": "./src/backend/index.ts",
+      "default": "./lib/backend/index.js"
+    },
+    "./backend/lan-https-certificate": {
+      "types": "./src/backend/lan-https-certificate.ts",
+      "default": "./lib/backend/lan-https-certificate.js"
+    },
+    "./backend/lan-https-ingress": {
+      "types": "./src/backend/lan-https-ingress.ts",
+      "default": "./lib/backend/lan-https-ingress.js"
+    },
+    "./backend/lan-https-runtime": {
+      "types": "./src/backend/lan-https-runtime.ts",
+      "default": "./lib/backend/lan-https-runtime.js"
+    },
+    "./backend/mask-secrets": {
+      "types": "./src/backend/mask-secrets.ts",
+      "default": "./lib/backend/mask-secrets.js"
+    },
+    "./backend/node-environment": {
+      "types": "./src/backend/node-environment.ts",
+      "default": "./lib/backend/node-environment.js"
+    },
+    "./backend/notifications": {
+      "types": "./src/backend/notifications.ts",
+      "default": "./lib/backend/notifications.js"
+    },
+    "./backend/permissions": {
+      "types": "./src/contracts/permissions.ts",
+      "default": "./lib/contracts/permissions.js"
+    },
+    "./backend/private-files": {
+      "types": "./src/backend/private-files.ts",
+      "default": "./lib/backend/private-files.js"
+    },
+    "./backend/profile-install": {
+      "types": "./src/backend/profile-install.ts",
+      "default": "./lib/backend/profile-install.js"
+    },
+    "./backend/profiles": {
+      "types": "./src/backend/profiles.ts",
+      "default": "./lib/backend/profiles.js"
+    },
+    "./backend/recovery": {
+      "types": "./src/backend/recovery.ts",
+      "default": "./lib/backend/recovery.js"
+    },
+    "./backend/startup-error": {
+      "types": "./src/backend/startup-error.ts",
+      "default": "./lib/backend/startup-error.js"
+    },
+    "./backend/system-proxy": {
+      "types": "./src/backend/system-proxy.ts",
+      "default": "./lib/backend/system-proxy.js"
+    },
+    "./backend/web-auth": {
+      "types": "./src/backend/web-auth.ts",
+      "default": "./lib/backend/web-auth.js"
+    },
+    "./contracts/desktop-contract": {
+      "types": "./src/contracts/desktop-contract.ts",
+      "default": "./lib/contracts/desktop-contract.js"
+    },
+    "./contracts/index": {
+      "types": "./src/contracts/index.ts",
+      "default": "./lib/contracts/index.js"
+    },
+    "./contracts/lan": {
+      "types": "./src/contracts/lan.ts",
+      "default": "./lib/contracts/lan.js"
+    },
+    "./contracts/permissions": {
+      "types": "./src/contracts/permissions.ts",
+      "default": "./lib/contracts/permissions.js"
+    },
+    "./contracts/preferences": {
+      "types": "./src/contracts/preferences.ts",
+      "default": "./lib/contracts/preferences.js"
+    },
+    "./contracts/profiles": {
+      "types": "./src/contracts/profiles.ts",
+      "default": "./lib/contracts/profiles.js"
+    },
+    "./contracts/update-state": {
+      "types": "./src/contracts/update-state.ts",
+      "default": "./lib/contracts/update-state.js"
+    },
+    "./main/asar-archive-policy": {
+      "types": "./src/main/asar-archive-policy.ts",
+      "default": "./lib/main/asar-archive-policy.js"
+    },
+    "./main/backend-controller": {
+      "types": "./src/backend/backend-controller.ts",
+      "default": "./lib/backend/backend-controller.js"
+    },
+    "./main/browser-guests": {
+      "types": "./src/main/browser-guests.ts",
+      "default": "./lib/main/browser-guests.js"
+    },
+    "./main/data-directory": {
+      "types": "./src/main/data-directory.ts",
+      "default": "./lib/main/data-directory.js"
+    },
+    "./main/data-import": {
+      "types": "./src/main/data-import.ts",
+      "default": "./lib/main/data-import.js"
+    },
+    "./main/desktop-browser-access": {
+      "types": "./src/main/desktop-browser-access.ts",
+      "default": "./lib/main/desktop-browser-access.js"
+    },
+    "./main/desktop-cli": {
+      "types": "./src/main/desktop-cli.ts",
+      "default": "./lib/main/desktop-cli.js"
+    },
+    "./main/desktop-contract": {
+      "types": "./src/contracts/desktop-contract.ts",
+      "default": "./lib/contracts/desktop-contract.js"
+    },
+    "./main/desktop-menu": {
+      "types": "./src/main/desktop-menu.ts",
+      "default": "./lib/main/desktop-menu.js"
+    },
+    "./main/desktop-preferences": {
+      "types": "./src/backend/desktop-preferences.ts",
+      "default": "./lib/backend/desktop-preferences.js"
+    },
+    "./main/desktop-runtime": {
+      "types": "./src/backend/desktop-runtime.ts",
+      "default": "./lib/backend/desktop-runtime.js"
+    },
+    "./main/desktop-terminal": {
+      "types": "./src/main/desktop-terminal.ts",
+      "default": "./lib/main/desktop-terminal.js"
+    },
+    "./main/diagnostics": {
+      "types": "./src/backend/diagnostics.ts",
+      "default": "./lib/backend/diagnostics.js"
+    },
+    "./main/electron-permissions": {
+      "types": "./src/main/electron-permissions.ts",
+      "default": "./lib/main/electron-permissions.js"
+    },
+    "./main/extensions": {
+      "types": "./src/main/extensions.ts",
+      "default": "./lib/main/extensions.js"
+    },
+    "./main/frontend-development": {
+      "types": "./src/main/frontend-development.ts",
+      "default": "./lib/main/frontend-development.js"
+    },
+    "./main/host/index": {
+      "types": "./src/main/host/index.ts",
+      "default": "./lib/main/host/index.js"
+    },
+    "./main/host/platform-login": {
+      "types": "./src/main/host/platform-login.ts",
+      "default": "./lib/main/host/platform-login.js"
+    },
+    "./main/host-permissions": {
+      "types": "./src/main/host-permissions.ts",
+      "default": "./lib/main/host-permissions.js"
+    },
+    "./main/host-process": {
+      "types": "./src/backend/host-process.ts",
+      "default": "./lib/backend/host-process.js"
+    },
+    "./main/import-contract": {
+      "types": "./src/contracts/import-contract.ts",
+      "default": "./lib/contracts/import-contract.js"
+    },
+    "./main/index": {
+      "types": "./src/main/index.ts",
+      "default": "./lib/main/index.js"
+    },
+    "./main/ipc": {
+      "types": "./src/main/ipc.ts",
+      "default": "./lib/main/ipc.js"
+    },
+    "./main/lan-addresses": {
+      "types": "./src/main/lan-addresses.ts",
+      "default": "./lib/main/lan-addresses.js"
+    },
+    "./main/lan-https-certificate": {
+      "types": "./src/backend/lan-https-certificate.ts",
+      "default": "./lib/backend/lan-https-certificate.js"
+    },
+    "./main/lan-https-ingress": {
+      "types": "./src/backend/lan-https-ingress.ts",
+      "default": "./lib/backend/lan-https-ingress.js"
+    },
+    "./main/lan-https-runtime": {
+      "types": "./src/backend/lan-https-runtime.ts",
+      "default": "./lib/backend/lan-https-runtime.js"
+    },
+    "./main/mac-update-feed": {
+      "types": "./src/main/mac-update-feed.ts",
+      "default": "./lib/main/mac-update-feed.js"
+    },
+    "./main/main": {
+      "types": "./src/main/main.ts",
+      "default": "./lib/main/main.js"
+    },
+    "./main/mask-secrets": {
+      "types": "./src/backend/mask-secrets.ts",
+      "default": "./lib/backend/mask-secrets.js"
+    },
+    "./main/menu-locale": {
+      "types": "./src/main/menu-locale.ts",
+      "default": "./lib/main/menu-locale.js"
+    },
+    "./main/native-desktop": {
+      "types": "./src/main/native-desktop.ts",
+      "default": "./lib/main/native-desktop.js"
+    },
+    "./main/native-locale": {
+      "types": "./src/main/native-locale.ts",
+      "default": "./lib/main/native-locale.js"
+    },
+    "./main/native-permissions": {
+      "types": "./src/main/native-permissions.ts",
+      "default": "./lib/main/native-permissions.js"
+    },
+    "./main/node-environment": {
+      "types": "./src/backend/node-environment.ts",
+      "default": "./lib/backend/node-environment.js"
+    },
+    "./main/notifications": {
+      "types": "./src/backend/notifications.ts",
+      "default": "./lib/backend/notifications.js"
+    },
+    "./main/permissions": {
+      "types": "./src/contracts/permissions.ts",
+      "default": "./lib/contracts/permissions.js"
+    },
+    "./main/platform-login-window": {
+      "types": "./src/main/platform-login-window.ts",
+      "default": "./lib/main/platform-login-window.js"
+    },
+    "./main/plugin-cli": {
+      "types": "./src/main/plugin-cli.ts",
+      "default": "./lib/main/plugin-cli.js"
+    },
+    "./main/pnpm-policy": {
+      "types": "./src/main/pnpm-policy.ts",
+      "default": "./lib/main/pnpm-policy.js"
+    },
+    "./main/private-files": {
+      "types": "./src/backend/private-files.ts",
+      "default": "./lib/backend/private-files.js"
+    },
+    "./main/profile-computer-use": {
+      "types": "./src/main/profile-computer-use.ts",
+      "default": "./lib/main/profile-computer-use.js"
+    },
+    "./main/profiles": {
+      "types": "./src/main/profiles.ts",
+      "default": "./lib/main/profiles.js"
+    },
+    "./main/recovery-support": {
+      "types": "./src/contracts/recovery-support.ts",
+      "default": "./lib/contracts/recovery-support.js"
+    },
+    "./main/recovery": {
+      "types": "./src/backend/recovery.ts",
+      "default": "./lib/backend/recovery.js"
+    },
+    "./main/relaunch": {
+      "types": "./src/main/relaunch.ts",
+      "default": "./lib/main/relaunch.js"
+    },
+    "./main/single-instance": {
+      "types": "./src/main/single-instance.ts",
+      "default": "./lib/main/single-instance.js"
+    },
+    "./main/startup-error": {
+      "types": "./src/backend/startup-error.ts",
+      "default": "./lib/backend/startup-error.js"
+    },
+    "./main/system-proxy": {
+      "types": "./src/backend/system-proxy.ts",
+      "default": "./lib/backend/system-proxy.js"
+    },
+    "./main/update-configuration": {
+      "types": "./src/main/update-configuration.ts",
+      "default": "./lib/main/update-configuration.js"
+    },
+    "./main/update-installer": {
+      "types": "./src/main/update-installer.ts",
+      "default": "./lib/main/update-installer.js"
+    },
+    "./main/update-state": {
+      "types": "./src/contracts/update-state.ts",
+      "default": "./lib/contracts/update-state.js"
+    },
+    "./main/update-transport": {
+      "types": "./src/main/update-transport.ts",
+      "default": "./lib/main/update-transport.js"
+    },
+    "./main/updates": {
+      "types": "./src/main/updates.ts",
+      "default": "./lib/main/updates.js"
+    },
+    "./main/web-document": {
+      "types": "./src/main/web-document.ts",
+      "default": "./lib/main/web-document.js"
+    },
+    "./main/webserver": {
+      "types": "./src/main/webserver.ts",
+      "default": "./lib/main/webserver.js"
+    },
+    "./main/window-material": {
+      "types": "./src/main/window-material.ts",
+      "default": "./lib/main/window-material.js"
+    },
+    "./main/windows-layout": {
+      "types": "./src/main/windows-layout.ts",
+      "default": "./lib/main/windows-layout.js"
+    },
+    "./platform/shared/auxiliary-window-options": {
+      "types": "./src/platform/shared/auxiliary-window-options.ts",
+      "default": "./lib/platform/shared/auxiliary-window-options.js"
+    },
+    "./platform/shared/desktop-installation-id": {
+      "types": "./src/platform/shared/desktop-installation-id.ts",
+      "default": "./lib/platform/shared/desktop-installation-id.js"
+    },
+    "./platform/shared/desktop-installer-quit": {
+      "types": "./src/platform/shared/desktop-installer-quit.ts",
+      "default": "./lib/platform/shared/desktop-installer-quit.js"
+    },
+    "./platform/shared/disposable-tree": {
+      "types": "./src/platform/shared/disposable-tree.ts",
+      "default": "./lib/platform/shared/disposable-tree.js"
+    },
+    "./platform/shared/update-checker": {
+      "types": "./src/platform/shared/update-checker.ts",
+      "default": "./lib/platform/shared/update-checker.js"
+    },
+    "./platform/shared/update-download": {
+      "types": "./src/platform/shared/update-download.ts",
+      "default": "./lib/platform/shared/update-download.js"
+    },
+    "./platform/shared/window-chrome": {
+      "types": "./src/platform/shared/window-chrome.ts",
+      "default": "./lib/platform/shared/window-chrome.js"
+    },
+    "./backend/import": {
+      "types": "./src/backend/import/index.ts",
+      "default": "./lib/backend/import.js"
+    },
+    "./preload/preload-app": "./lib/preload/preload-app.cjs",
+    "./preload/preload-shell": "./lib/preload/preload-shell.cjs",
+    "./preload/preload-extension": "./lib/preload/preload-extension.cjs",
+    "./contracts/import-contract": {
+      "types": "./src/contracts/import-contract.ts",
+      "default": "./lib/contracts/import-contract.js"
+    },
+    "./contracts/recovery-support": {
+      "types": "./src/contracts/recovery-support.ts",
+      "default": "./lib/contracts/recovery-support.js"
+    },
+    "./contracts/desktop-ui": {
+      "types": "./src/contracts/desktop-ui.ts",
+      "default": "./lib/contracts/desktop-ui.js"
+    },
+    "./contracts/*": {
+      "types": "./src/contracts/*.ts",
+      "default": "./lib/contracts/*.js"
+    },
+    "./main/*": {
+      "types": "./src/main/*.ts",
+      "default": "./lib/main/*.js"
+    },
+    "./backend/*": {
+      "types": "./src/backend/*.ts",
+      "default": "./lib/backend/*.js"
+    },
+    "./client/desktop-settings-api": {
+      "types": "./src/client/desktop-settings-api.ts",
+      "default": "./lib/client/desktop-settings-api.js"
+    },
+    "./client/desktop-settings-model": {
+      "types": "./src/client/desktop-settings-model.ts",
+      "default": "./lib/client/desktop-settings-model.js"
+    },
+    "./contracts/desktop-settings": {
+      "types": "./src/contracts/desktop-settings.ts",
+      "default": "./lib/contracts/desktop-settings.js"
+    },
+    "./client/desktop-settings-operations": {
+      "types": "./src/client/desktop-settings-operations.ts",
+      "default": "./lib/client/desktop-settings-operations.js"
+    }
+  },
+  "files": [
+    "lib",
+    "package.json"
+  ]
+}

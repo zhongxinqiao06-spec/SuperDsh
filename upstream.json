@@ -1,0 +1,13 @@
+{
+  "repository": "https://github.com/deepseek-ai/deepseek-harness.git",
+  "activeChannel": "stable",
+  "channels": {
+    "stable": {
+      "commit": "00102833dfaee1da9f48a3a8eae9d34005a75218",
+      "sourceVersion": "0.1.7-alpha.2",
+      "runtimePackageVersion": "0.1.7-alpha.2",
+      "runtimeSource": "vendor/dsh-runtime/0.1.7-alpha.2/manifest.json",
+      "package": "dsh-plugin-desktop"
+    }
+  }
+}

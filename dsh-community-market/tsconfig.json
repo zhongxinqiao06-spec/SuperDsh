@@ -1,0 +1,22 @@
+{
+  "compilerOptions": {
+    "jsx": "react-jsx",
+    "rootDir": "../apps/desktop/core/src",
+    "outDir": "lib",
+    "declaration": true,
+    "esModuleInterop": true,
+    "exactOptionalPropertyTypes": true,
+    "noFallthroughCasesInSwitch": true,
+    "noImplicitOverride": true,
+    "noUnusedLocals": true,
+    "noUnusedParameters": true,
+    "noEmit": false,
+    "allowImportingTsExtensions": false
+  },
+  "include": [
+    "../apps/desktop/core/src/services/community-market/**/*.ts",
+    "../apps/desktop/core/src/contracts/community-market/**/*.ts"
+  ],
+  "exclude": [],
+  "extends": "../tsconfig.node.json"
+}

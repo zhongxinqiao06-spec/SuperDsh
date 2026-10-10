@@ -1,0 +1,69 @@
+{
+  "description": "Unmodified Fontsource Latin WOFF2 distributions. Build and runtime use only these local files.",
+  "fonts": [
+    {
+      "family": "Geist",
+      "package": "@fontsource-variable/geist",
+      "version": "5.3.0",
+      "tarball": "https://registry.npmjs.org/@fontsource-variable/geist/-/geist-5.3.0.tgz",
+      "integrity": "sha512-j0m+vLQuG5XAYoHtGCVu0spvlGreR3EzpECUVzkFmI1mTVnAO38l/NEPDCFgZ177JxzYJCLSmTQibIiYPilGrA==",
+      "license": "OFL-1.1",
+      "licenseFile": "geist/LICENSE.txt",
+      "assets": [
+        {
+          "path": "geist/geist-latin-wght-normal.woff2",
+          "sha256": "19f9c92546aa300c312235e3125af1b81394d8db9a4bc4a425cd5b641d2d54e1"
+        }
+      ]
+    },
+    {
+      "family": "Geist Mono",
+      "package": "@fontsource-variable/geist-mono",
+      "version": "5.3.0",
+      "tarball": "https://registry.npmjs.org/@fontsource-variable/geist-mono/-/geist-mono-5.3.0.tgz",
+      "integrity": "sha512-vBbuwDEo9AkrqADMXOrlAR3DFcJi4/JxeuU43FoiQERnNwsfXNnvxvReZG02cQKmyk4DZkZdBZX3oTDvy2zBAw==",
+      "license": "OFL-1.1",
+      "licenseFile": "geist-mono/LICENSE.txt",
+      "assets": [
+        {
+          "path": "geist-mono/geist-mono-latin-wght-normal.woff2",
+          "sha256": "684ad5b531f81d43c1e8c7038262d5db7cdc1f68006e04d6c7769efa8d33c8cc"
+        }
+      ]
+    },
+    {
+      "family": "Caveat",
+      "package": "@fontsource-variable/caveat",
+      "version": "5.3.0",
+      "tarball": "https://registry.npmjs.org/@fontsource-variable/caveat/-/caveat-5.3.0.tgz",
+      "integrity": "sha512-Q3mjghoYIlXgwqBPJKZ4q6f3zu921Gq7UU76r9Z+NAmhapHfX130GIFpOCYf8vt2SIcgCi9RHDT7anfJKg/kiA==",
+      "license": "OFL-1.1",
+      "licenseFile": "caveat/LICENSE.txt",
+      "assets": [
+        {
+          "path": "caveat/caveat-latin-wght-normal.woff2",
+          "sha256": "891951df5e8b5b0f0bc760d31375405e795c666b5add70437de12d4a6482b33f"
+        }
+      ]
+    },
+    {
+      "family": "Instrument Serif",
+      "package": "@fontsource/instrument-serif",
+      "version": "5.3.0",
+      "tarball": "https://registry.npmjs.org/@fontsource/instrument-serif/-/instrument-serif-5.3.0.tgz",
+      "integrity": "sha512-mDiaIg0u67sYV59fie92Wz4sM8UiVlbL7fLxnFPCKkX15DMASEnQTREbaP5S5/3DCcsoAOcQ0sV9E4AeY4QqYQ==",
+      "license": "OFL-1.1",
+      "licenseFile": "instrument-serif/LICENSE.txt",
+      "assets": [
+        {
+          "path": "instrument-serif/instrument-serif-latin-400-normal.woff2",
+          "sha256": "5eb09b5ac0e28b67c2f041c8ba6d244604ca0c0980d65912ab2d47fed84ddc31"
+        },
+        {
+          "path": "instrument-serif/instrument-serif-latin-400-italic.woff2",
+          "sha256": "5a51946dfffa82972bc98745359c46761515641fda557c25116459a9f83da4a7"
+        }
+      ]
+    }
+  ]
+}

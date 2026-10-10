@@ -1,0 +1,9 @@
+{
+  "electronFuses": {
+    "enableEmbeddedAsarIntegrityValidation": false,
+    "onlyLoadAppFromAsar": false,
+    "resetAdHocDarwinSignature": true,
+    "runAsNode": true
+  },
+  "x64ArchFiles": "**/node_modules/{@deepseek-ai/node-addon-system-darwin-*/**,node-pty/prebuilds/darwin-*/**,fs-ext/prebuilds/darwin-*/**,node-addon-require-builtin-darwin-*/**,@vscode/ripgrep-darwin-*/**,@img/sharp-darwin-*/**,@img/sharp-libvips-darwin-*/**,@koromix/koffi-darwin-*/**,@dataiku/uv-darwin-*/**,@deepseek-ai/libreoffice-kit-darwin-*/**,sherpa-onnx-darwin-*/**}"
+}

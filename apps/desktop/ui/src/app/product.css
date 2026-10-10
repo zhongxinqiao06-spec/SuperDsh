@@ -1,0 +1,37 @@
+.superdshBoot {
+  box-sizing: border-box;
+  display: grid;
+  align-content: center;
+  justify-items: center;
+  gap: 12px;
+  height: 100%;
+  min-height: 300px;
+  padding: 32px;
+  color: var(--dsw-alias-label-primary, #18212b);
+  background: var(--dsw-alias-bg-base, #fff);
+  font:
+    14px/1.5 system-ui,
+    sans-serif;
+}
+.superdshBoot h1,
+.superdshBoot p {
+  margin: 0;
+}
+.superdshBoot p {
+  max-width: 760px;
+  overflow-wrap: anywhere;
+}
+.superdshBoot button {
+  border: 1px solid currentColor;
+  border-radius: 8px;
+  background: none;
+  color: inherit;
+  padding: 8px 16px;
+  cursor: pointer;
+}
+@media (prefers-color-scheme: dark) {
+  .superdshBoot {
+    color: var(--dsw-alias-label-primary, #e7e9ee);
+    background: var(--dsw-alias-bg-base, #17191d);
+  }
+}

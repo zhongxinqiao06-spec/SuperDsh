@@ -1,0 +1,8 @@
+<?xml version="1.0" encoding="utf-8"?>
+<full-backup-content>
+    <exclude domain="sharedpref" path="agents_anywhere_auth.xml" />
+    <exclude domain="sharedpref" path="superdsh_auth_secure.xml" />
+    <exclude
+        domain="sharedpref"
+        path="auth.xml" />
+</full-backup-content>

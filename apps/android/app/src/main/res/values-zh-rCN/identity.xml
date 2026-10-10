@@ -1,0 +1,17 @@
+<resources>
+    <string name="identity_reset_title">设置你自己的密码</string>
+    <string name="identity_reset_hint">此账号正在使用初始密码。请设置至少 8 位的新密码后使用设备，保存后需要重新登录。</string>
+    <string name="identity_new_password">新密码</string>
+    <string name="identity_confirm_password">确认新密码</string>
+    <string name="identity_change_and_sign_in">保存并重新登录</string>
+    <string name="identity_sign_out">退出登录</string>
+    <string name="identity_permission_denied">当前账号没有使用此功能的权限。</string>
+    <string name="identity_back_home">返回个人工作台</string>
+    <string name="identity_account_login">账号密码登录</string>
+    <string name="identity_web_login">继续网页授权</string>
+    <string name="identity_identifier">用户名或已验证邮箱</string>
+    <string name="identity_password">密码</string>
+    <string name="identity_server">服务器地址</string>
+    <string name="identity_sign_in">登录</string>
+    <string name="identity_login_hint">邮箱尚未验证时请使用用户名。忘记密码可继续网页授权，使用本人恢复码或已验证邮箱恢复。</string>
+</resources>

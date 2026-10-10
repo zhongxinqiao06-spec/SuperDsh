@@ -1,0 +1,3 @@
+- insert:
+    - id: superdsh-desktop-client
+      name: '@superdsh/desktop'

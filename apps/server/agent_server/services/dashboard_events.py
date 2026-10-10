@@ -1,0 +1,31 @@
+from __future__ import annotations
+
+from agent_server.core.utc import utc_now
+from agent_server.infra.timeline_broker import TimelineBroker
+from agent_server.services.repository_ports import DashboardEventRepository
+
+
+async def publish_dashboard_changed(
+    store: DashboardEventRepository,
+    broker: TimelineBroker,
+    *,
+    connector_id: str | None = None,
+    session_id: str | None = None,
+    user_id: str | None = None,
+    reason: str = "changed",
+) -> None:
+    if user_id is None and connector_id is not None:
+        try:
+            user_id = (await store.get_connector(connector_id)).userId
+        except KeyError:
+            return
+    if user_id is None and session_id is not None:
+        try:
+            user_id = await store.get_session_user_id(session_id)
+        except KeyError:
+            return
+    if user_id is None:
+        return
+    _ = reason
+    payload = {"type": "dashboard.changed", "serverTime": utc_now()}
+    await broker.publish_dashboard(user_id, payload)

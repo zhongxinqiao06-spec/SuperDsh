@@ -1,0 +1,468 @@
+package com.agentsanywhere.app.api
+
+import org.json.JSONArray
+import org.json.JSONObject
+import okhttp3.MediaType.Companion.toMediaType
+import okhttp3.FormBody
+import okhttp3.OkHttpClient
+import okhttp3.Request
+import okhttp3.RequestBody
+import okhttp3.RequestBody.Companion.toRequestBody
+import java.io.IOException
+import java.net.HttpURLConnection
+import java.net.URL
+import java.util.concurrent.TimeUnit
+import org.json.JSONException
+import com.agentsanywhere.app.feature.auth.SessionTokenCoordinator
+
+class ApiClient(
+    private val onUnauthorized: (accessToken: String) -> Unit = {},
+    private val sessionTokens: SessionTokenCoordinator? = null,
+) {
+    fun requireHtmlDocument(
+        serverUrl: String,
+        path: String = "/",
+    ) {
+        try {
+            val origin = requireNotNull(normalizeServerOrigin(serverUrl)) {
+                "Server URL must be an HTTP(S) origin."
+            }
+            val normalizedPath = if (path.startsWith('/')) path else "/$path"
+            val request = Request.Builder()
+                .url("$origin$normalizedPath")
+                .header("Accept", "text/html")
+                .header("ngrok-skip-browser-warning", "true")
+                .get()
+                .build()
+
+            JSON_HTTP_CLIENT.newCall(request).execute().use { response ->
+                val contentType = response.header("Content-Type").orEmpty()
+                if (!response.isSuccessful || !contentType.contains("text/html", ignoreCase = true)) {
+                    throw ApiException(
+                        message = "The web login is unavailable at $origin. Check the server's web login deployment.",
+                        statusCode = response.code,
+                    )
+                }
+            }
+        } catch (exc: ApiException) {
+            throw exc
+        } catch (exc: IllegalArgumentException) {
+            throw ApiException("The server URL is invalid.", cause = exc)
+        } catch (exc: IOException) {
+            throw ApiException("Could not reach the server. Check the URL and network.", cause = exc)
+        }
+    }
+
+    fun getJson(
+        serverUrl: String,
+        path: String,
+        authorizationToken: String? = null,
+    ): JSONObject {
+        return requestJson(
+            serverUrl = serverUrl,
+            path = path,
+            method = "GET",
+            bodyText = null,
+            authorizationToken = authorizationToken,
+        )
+    }
+
+    fun postJson(
+        serverUrl: String,
+        path: String,
+        body: JSONObject,
+        authorizationToken: String? = null,
+        readTimeoutSeconds: Long? = null,
+    ): JSONObject {
+        return requestJson(
+            serverUrl = serverUrl,
+            path = path,
+            method = "POST",
+            bodyText = body.toString(),
+            authorizationToken = authorizationToken,
+            readTimeoutSeconds = readTimeoutSeconds,
+        )
+    }
+
+    fun postForm(
+        serverUrl: String,
+        path: String,
+        fields: Map<String, String>,
+    ): JSONObject {
+        val body = FormBody.Builder().apply {
+            fields.forEach { (name, value) -> add(name, value) }
+        }.build()
+        return requestJson(
+            serverUrl = serverUrl,
+            path = path,
+            method = "POST",
+            bodyText = null,
+            authorizationToken = null,
+            requestBody = body,
+        )
+    }
+
+    fun postJson(
+        serverUrl: String,
+        path: String,
+        body: JSONArray,
+        authorizationToken: String? = null,
+    ): JSONObject {
+        return requestJson(
+            serverUrl = serverUrl,
+            path = path,
+            method = "POST",
+            bodyText = body.toString(),
+            authorizationToken = authorizationToken,
+        )
+    }
+
+    fun postJson(
+        serverUrl: String,
+        path: String,
+        authorizationToken: String? = null,
+    ): JSONObject {
+        return requestJson(
+            serverUrl = serverUrl,
+            path = path,
+            method = "POST",
+            bodyText = null,
+            authorizationToken = authorizationToken,
+        )
+    }
+
+    fun patchJson(
+        serverUrl: String,
+        path: String,
+        body: JSONObject,
+        authorizationToken: String? = null,
+    ): JSONObject {
+        return requestJson(
+            serverUrl = serverUrl,
+            path = path,
+            method = "PATCH",
+            bodyText = body.toString(),
+            authorizationToken = authorizationToken,
+        )
+    }
+
+    fun putJson(
+        serverUrl: String,
+        path: String,
+        body: JSONObject,
+        authorizationToken: String? = null,
+    ): JSONObject {
+        return requestJson(
+            serverUrl = serverUrl,
+            path = path,
+            method = "PUT",
+            bodyText = body.toString(),
+            authorizationToken = authorizationToken,
+        )
+    }
+
+    fun deleteJson(
+        serverUrl: String,
+        path: String,
+        authorizationToken: String? = null,
+    ): JSONObject {
+        return requestJson(
+            serverUrl = serverUrl,
+            path = path,
+            method = "DELETE",
+            bodyText = null,
+            authorizationToken = authorizationToken,
+        )
+    }
+
+    fun postMultipart(
+        serverUrl: String,
+        path: String,
+        files: List<UploadFilePart>,
+        authorizationToken: String? = null,
+    ): JSONObject {
+        return withSession(serverUrl, authorizationToken) { token ->
+            postMultipartOnce(serverUrl, path, files, token)
+        }
+    }
+
+    private fun postMultipartOnce(
+        serverUrl: String,
+        path: String,
+        files: List<UploadFilePart>,
+        authorizationToken: String?,
+    ): JSONObject {
+        return try {
+            val endpoint = URL(apiUrl(serverUrl, path))
+            val boundary = "AA-${System.currentTimeMillis()}"
+            val connection = (endpoint.openConnection() as HttpURLConnection).apply {
+                requestMethod = "POST"
+                connectTimeout = 10_000
+                readTimeout = 60_000
+                doOutput = true
+                instanceFollowRedirects = false
+                setRequestProperty("Accept", "application/json")
+                setRequestProperty("Content-Type", "multipart/form-data; boundary=$boundary")
+                setRequestProperty("ngrok-skip-browser-warning", "true")
+                if (!authorizationToken.isNullOrBlank()) {
+                    setRequestProperty("Authorization", "Bearer $authorizationToken")
+                }
+            }
+            try {
+                connection.outputStream.use { output ->
+                    files.forEach { file ->
+                        output.write("--$boundary\r\n".toByteArray(Charsets.UTF_8))
+                        output.write(
+                            "Content-Disposition: form-data; name=\"files\"; filename=\"${file.name.httpQuoted()}\"\r\n"
+                                .toByteArray(Charsets.UTF_8),
+                        )
+                        output.write("Content-Type: ${file.mediaType.ifBlank { "application/octet-stream" }}\r\n\r\n".toByteArray(Charsets.UTF_8))
+                        output.write(file.bytes)
+                        output.write("\r\n".toByteArray(Charsets.UTF_8))
+                    }
+                    output.write("--$boundary--\r\n".toByteArray(Charsets.UTF_8))
+                }
+                val responseCode = connection.responseCode
+                val responseText = readResponseText(connection, responseCode)
+                if (responseCode !in 200..299) {
+                    throw ApiException(
+                        message = parseErrorMessage(responseText) ?: defaultErrorMessage(responseCode),
+                        statusCode = responseCode,
+                        errorCode = parseErrorCode(responseText),
+                    )
+                }
+                if (responseText.isBlank()) JSONObject() else JSONObject(responseText)
+            } finally {
+                connection.disconnect()
+            }
+        } catch (exc: ApiException) {
+            throw exc
+        } catch (exc: IOException) {
+            throw ApiException("Could not reach the server. Check the URL and network.", cause = exc)
+        }
+    }
+
+    private fun requestJson(
+        serverUrl: String,
+        path: String,
+        method: String,
+        bodyText: String?,
+        authorizationToken: String?,
+        readTimeoutSeconds: Long? = null,
+        requestBody: RequestBody? = null,
+    ): JSONObject {
+        return withSession(serverUrl, authorizationToken) { token ->
+            requestJsonOnce(serverUrl, path, method, bodyText, token, readTimeoutSeconds, requestBody)
+        }
+    }
+
+    private fun requestJsonOnce(
+        serverUrl: String,
+        path: String,
+        method: String,
+        bodyText: String?,
+        authorizationToken: String?,
+        readTimeoutSeconds: Long?,
+        requestBody: RequestBody?,
+    ): JSONObject {
+        return try {
+            val resolvedRequestBody = requestBody ?: when {
+                bodyText != null -> bodyText.toRequestBody(JSON_MEDIA_TYPE)
+                method == "POST" || method == "PUT" || method == "PATCH" -> EMPTY_JSON_BODY
+                else -> null
+            }
+            val httpClient = if (readTimeoutSeconds == null) {
+                JSON_HTTP_CLIENT
+            } else {
+                JSON_HTTP_CLIENT.newBuilder()
+                    .readTimeout(readTimeoutSeconds, TimeUnit.SECONDS)
+                    .build()
+            }
+
+            val candidates = apiUrlCandidates(serverUrl, path)
+            candidates.forEachIndexed { index, url ->
+                val request = Request.Builder()
+                    .url(url)
+                    .header("Accept", "application/json")
+                    .header("ngrok-skip-browser-warning", "true")
+                    .method(method, resolvedRequestBody)
+                    .apply {
+                        if (!authorizationToken.isNullOrBlank()) {
+                            header("Authorization", "Bearer $authorizationToken")
+                        }
+                    }
+                    .build()
+
+                httpClient.newCall(request).execute().use { response ->
+                    val responseText = response.body?.string().orEmpty()
+                    val contentType = response.header("Content-Type").orEmpty()
+                    val canTryLegacy = index < candidates.lastIndex &&
+                        shouldTryLegacyApi(response.code, response.isSuccessful, contentType, responseText)
+                    if (canTryLegacy) return@forEachIndexed
+
+                    if (!response.isSuccessful) {
+                        throw ApiException(
+                            message = parseErrorMessage(responseText) ?: defaultErrorMessage(response.code),
+                            statusCode = response.code,
+                            errorCode = parseErrorCode(responseText),
+                        )
+                    }
+
+                    val json = parseJsonResponse(responseText)
+                    rememberApiUrl(serverUrl, url)
+                    return json
+                }
+            }
+            throw ApiException("The server returned an invalid response.")
+        } catch (exc: ApiException) {
+            throw exc
+        } catch (exc: IllegalArgumentException) {
+            throw ApiException("The server URL is invalid.", cause = exc)
+        } catch (exc: IOException) {
+            throw ApiException("Could not reach the server. Check the URL and network.", cause = exc)
+        }
+    }
+
+    internal fun notifyUnauthorized(statusCode: Int, authorizationToken: String?) {
+        if (!shouldNotifyUnauthorized(statusCode, authorizationToken)) return
+        runCatching { onUnauthorized(authorizationToken.orEmpty()) }
+    }
+
+    private fun <T> withSession(serverUrl: String, token: String?, action: (String?) -> T): T {
+        val expected = token?.let { sessionTokens?.match(normalizeServerOrigin(serverUrl).orEmpty(), it) }
+        var activeToken = expected?.accessToken ?: token
+        if (expected != null && expected.refreshToken.isNotBlank() && expected.expiresAt > 0 &&
+            expected.expiresAt <= System.currentTimeMillis() + 30_000L) {
+            activeToken = sessionTokens?.recover(expected) ?: activeToken
+        }
+        if (expected != null && sessionTokens?.snapshot()?.generation != expected.generation) {
+            throw ApiException("The account session changed. Try again.", statusCode = 409)
+        }
+        try {
+            return action(activeToken).also {
+                if (expected != null && sessionTokens?.snapshot()?.generation != expected.generation) {
+                    throw ApiException("The account session changed. Try again.", statusCode = 409)
+                }
+            }
+        } catch (error: ApiException) {
+            if (error.statusCode != 401) throw error
+            val latest = sessionTokens?.snapshot()
+            if (expected != null && latest != null && latest.generation == expected.generation) {
+                val replacement = if (latest.accessToken != activeToken) latest.accessToken else sessionTokens.recover(latest)
+                if (!replacement.isNullOrBlank()) {
+                    try {
+                        return action(replacement).also {
+                            if (sessionTokens.snapshot()?.generation != expected.generation) {
+                                throw ApiException("The account session changed. Try again.", statusCode = 409)
+                            }
+                        }
+                    } catch (retryError: ApiException) {
+                        if (retryError.statusCode == 401) notifyUnauthorized(401, replacement)
+                        throw retryError
+                    }
+                }
+            }
+            notifyUnauthorized(401, activeToken)
+            throw error
+        }
+    }
+
+    private companion object {
+        val JSON_MEDIA_TYPE = "application/json; charset=utf-8".toMediaType()
+        val EMPTY_JSON_BODY = ByteArray(0).toRequestBody(JSON_MEDIA_TYPE)
+        val JSON_HTTP_CLIENT: OkHttpClient = OkHttpClient.Builder()
+            .followRedirects(false)
+            .followSslRedirects(false)
+            .connectTimeout(10, TimeUnit.SECONDS)
+            .readTimeout(15, TimeUnit.SECONDS)
+            .build()
+    }
+
+    private fun readResponseText(connection: HttpURLConnection, responseCode: Int): String {
+        val stream = if (responseCode in 200..299) {
+            connection.inputStream
+        } else {
+            connection.errorStream
+        }
+        return stream?.bufferedReader(Charsets.UTF_8)?.use { it.readText() }.orEmpty()
+    }
+
+    private fun parseErrorCode(responseText: String): String? = runCatching {
+        val body = JSONObject(responseText)
+        (body.optJSONObject("detail") ?: body).optString("code").takeIf(String::isNotBlank)
+    }.getOrNull()
+
+    private fun parseErrorMessage(responseText: String): String? {
+        return runCatching {
+            val detail = JSONObject(responseText).opt("detail")
+            when (detail) {
+                is String -> detail.takeIf { it.isNotBlank() }
+                is JSONObject -> detail.optString("message")
+                    .ifBlank { detail.optString("code") }
+                    .takeIf { it.isNotBlank() }
+                is JSONArray -> detail.optJSONObject(0)
+                    ?.optString("msg")
+                    ?.takeIf { it.isNotBlank() }
+                else -> detail?.toString()?.takeIf { it.isNotBlank() }
+            }
+        }.getOrNull()
+    }
+
+    private fun parseJsonResponse(responseText: String): JSONObject {
+        if (responseText.isBlank()) return JSONObject()
+        return try {
+            JSONObject(responseText)
+        } catch (exc: JSONException) {
+            throw ApiException("The server returned an invalid response.", cause = exc)
+        }
+    }
+
+    private fun shouldTryLegacyApi(
+        statusCode: Int,
+        successful: Boolean,
+        contentType: String,
+        responseText: String,
+    ): Boolean {
+        if (statusCode == 405) return true
+        if (contentType.isJsonContentType()) return false
+        if (statusCode == 404) return true
+        val looksLikeHtml = contentType.contains("text/html", ignoreCase = true) ||
+            responseText.trimStart().startsWith("<!DOCTYPE", ignoreCase = true) ||
+            responseText.trimStart().startsWith("<html", ignoreCase = true)
+        return successful && looksLikeHtml
+    }
+
+    private fun defaultErrorMessage(statusCode: Int): String {
+        return when (statusCode) {
+            401 -> "Unauthorized request."
+            404 -> "Endpoint was not found on this server."
+            else -> "Request failed with status $statusCode."
+        }
+    }
+
+    private fun String.httpQuoted(): String {
+        return replace("\\", "\\\\").replace("\"", "\\\"").replace("\r", "").replace("\n", "")
+    }
+
+    private fun String.isJsonContentType(): Boolean {
+        return contains("application/json", ignoreCase = true) ||
+            contains("+json", ignoreCase = true)
+    }
+}
+
+internal fun shouldNotifyUnauthorized(statusCode: Int, authorizationToken: String?): Boolean {
+    return statusCode == 401 && !authorizationToken.isNullOrBlank()
+}
+
+data class UploadFilePart(
+    val name: String,
+    val mediaType: String,
+    val bytes: ByteArray,
+)
+
+class ApiException(
+    override val message: String,
+    val statusCode: Int? = null,
+    cause: Throwable? = null,
+    val errorCode: String? = null,
+) : Exception(message, cause)

@@ -1,0 +1,266 @@
+/** Check the owned Web build, plugin compatibility and sandboxed preloads without a GUI. */
+import assert from 'node:assert/strict'
+import { readFileSync } from 'node:fs'
+import { createRequire } from 'node:module'
+import { dirname, join } from 'node:path'
+import { fileURLToPath } from 'node:url'
+import { runInNewContext } from 'node:vm'
+import { serveWebDocument } from '../lib/web-document.js'
+
+const root = fileURLToPath(new URL('..', import.meta.url))
+const require = createRequire(import.meta.url)
+const harnessRequire = createRequire(
+  require.resolve('@superdsh/harness/package.json'),
+)
+const webRoot = dirname(require.resolve('@superdsh/ui/dist/index.html'))
+const ownedPage = readFileSync(join(webRoot, 'index.html'), 'utf8')
+const frontendRoot = dirname(webRoot)
+const artifactManifest = JSON.parse(
+  readFileSync(require.resolve('@superdsh/ui/client-manifest.json'), 'utf8'),
+)
+const buildSources = JSON.parse(
+  readFileSync(join(frontendRoot, artifactManifest.buildSources), 'utf8'),
+)
+assert.equal(artifactManifest.schemaVersion, 1)
+assert.equal(artifactManifest.sourceDigest, buildSources.sourceDigest)
+assert.ok(
+  Object.keys(artifactManifest.modules).length > 50,
+  'The owned frontend must include the actual dynamic UI',
+)
+for (const [id, inputs] of Object.entries(buildSources.modules)) {
+  assert.ok(
+    inputs.some((input) => input.startsWith('src/')),
+    `${id} must contain owned browser source`,
+  )
+  assert.ok(
+    inputs.every(
+      (input) =>
+        !input.includes('/deepseek-harness/') &&
+        !/node_modules\/@deepseek-ai\/dsh-/.test(input),
+    ),
+    `${id} cannot use vendor UI artifacts`,
+  )
+}
+assert.ok(
+  buildSources.modules['@superdsh/ui/static'].includes(
+    'src/components/primitives/index.ts',
+  ),
+)
+const local = await serveWebDocument(new Request('dsh-app://app/'), webRoot)
+const html = await local.text()
+assert.equal(local.status, 200)
+assert.equal(
+  html.replace(
+    '<script>globalThis.__DSH_BOOT_READY__ = Promise.withResolvers()</script>',
+    '',
+  ),
+  ownedPage,
+)
+assert.ok(
+  html.includes('/assets/'),
+  'Owned production frontend must carry built assets',
+)
+assert.ok(html.includes('<title>SuperDsh</title>'))
+
+// Market client bundles resolve primitives from the owned static platform. A
+// removed export can blank the entire settings section without breaking build.
+const marketClient = readFileSync(
+  harnessRequire.resolve('dshmarket/client'),
+  'utf8',
+)
+const platform = JSON.parse(
+  readFileSync(join(webRoot, 'platform-contract.json'), 'utf8'),
+)
+assert.equal(
+  new Set(platform.modules).size,
+  platform.modules.length,
+  'The static platform cannot duplicate module identities',
+)
+const exported = new Set(
+  platform.exports['@deepseek-ai/dsh-client-ui-primitives'],
+)
+assert.ok(exported.size > 0, 'Cannot inspect built owned UI primitive exports')
+const directReferences = [
+  ...marketClient.matchAll(/_deepseek_ai_dsh_client_ui_primitives\.(\w+)/g),
+].map((match) => match[1])
+const iconAliases = [...marketClient.matchAll(/pickIcon\("(\w+)", "(\w+)"\)/g)]
+assert.ok(
+  directReferences.length > 0 && iconAliases.length > 0,
+  'Market bundle must resolve host primitives and icon aliases',
+)
+for (const name of directReferences)
+  assert.ok(
+    exported.has(name),
+    `Market references missing UI primitive ${name}`,
+  )
+for (const [, newer, older] of iconAliases) {
+  assert.ok(
+    exported.has(newer) || exported.has(older),
+    `Market icon ${newer}/${older} is unavailable`,
+  )
+}
+
+for (const platform of ['darwin', 'win32', 'linux']) {
+  const exposed = new Map()
+  const dataset = {}
+  const invocations = []
+  const userActivation = { isActive: false }
+  for (const [entry, hostname] of [
+    ['preload-app.cjs', 'app'],
+    ['preload-shell.cjs', 'shell'],
+  ]) {
+    const listeners = new Map()
+    // The shared map answers the per-platform assertions below; this one records a single entry,
+    // so the shell can be held to what it exposes on its own rather than what the app left behind.
+    const own = new Map()
+    let requestedPage = 'general'
+    runInNewContext(
+      readFileSync(join(root, 'lib', entry), 'utf8'),
+      {
+        require: (name) => {
+          assert.equal(
+            name,
+            'electron',
+            'Sandboxed preloads may not require local chunks or Node modules',
+          )
+          return {
+            contextBridge: {
+              exposeInMainWorld: (name, api) => {
+                exposed.set(name, api)
+                own.set(name, api)
+              },
+            },
+            ipcRenderer: {
+              invoke: (...args) => {
+                invocations.push(args)
+                if (args[0] === 'dsh-next:settings-take')
+                  return Promise.resolve(requestedPage)
+                if (args[0] === 'dsh-next:browser-acquire')
+                  return Promise.resolve({
+                    lease: 'lease-1',
+                    partition: 'partition-1',
+                  })
+                return Promise.resolve(undefined)
+              },
+              send() {},
+              on: (channel, listener) => listeners.set(channel, listener),
+              removeListener: (channel) => listeners.delete(channel),
+            },
+          }
+        },
+        process: { platform },
+        location: { protocol: 'dsh-app:', hostname },
+        document: {
+          readyState: 'loading',
+          documentElement: { dataset, style: { setProperty() {} } },
+        },
+        window: { addEventListener() {} },
+        console,
+        navigator: { userActivation },
+      },
+      { filename: entry },
+    )
+    if (hostname === 'app') {
+      // dsh 0.1.7 drives the native Sidebar browser itself off this carrier.
+      const browser = exposed.get('dshDesktop').browser
+      assert.deepEqual(await browser.acquire('/workspace/one'), {
+        lease: 'lease-1',
+        partition: 'partition-1',
+      })
+      assert.deepEqual(
+        [...invocations.at(-1)],
+        ['dsh-next:browser-acquire', '/workspace/one'],
+      )
+      const opened = []
+      const stopBrowser = browser.onOpenRequested('lease-1', (url) =>
+        opened.push(url),
+      )
+      const deliver = listeners.get('dsh-next:browser-open-requested')
+      deliver(
+        { privilegedEvent: true },
+        { lease: 'lease-1', url: 'https://example.com/' },
+      )
+      assert.deepEqual(
+        opened,
+        ['https://example.com/'],
+        'An approved guest link reaches its own lease',
+      )
+      deliver(
+        { privilegedEvent: true },
+        { lease: 'lease-2', url: 'https://example.com/other' },
+      )
+      deliver({ privilegedEvent: true }, { lease: 'lease-1', url: 42 })
+      assert.deepEqual(
+        opened,
+        ['https://example.com/'],
+        'Foreign leases and malformed requests are ignored',
+      )
+      stopBrowser()
+      deliver(
+        { privilegedEvent: true },
+        { lease: 'lease-1', url: 'https://example.com/after' },
+      )
+      assert.deepEqual(
+        opened,
+        ['https://example.com/'],
+        'Unsubscribing stops delivery',
+      )
+      await browser.release('lease-1')
+      assert.deepEqual(
+        [...invocations.at(-1)],
+        ['dsh-next:browser-release', 'lease-1'],
+      )
+      const received = []
+      const stop = exposed
+        .get('desktopNext')
+        .onOpenSettings((page) => received.push(page))
+      await new Promise((resolve) => setTimeout(resolve, 0))
+      assert.deepEqual(
+        received,
+        ['general'],
+        'A request made before the client mounts must be delivered',
+      )
+      requestedPage = 'permissions'
+      listeners.get('dsh-next:settings-open')()
+      await new Promise((resolve) => setTimeout(resolve, 0))
+      assert.deepEqual(received, ['general', 'permissions'])
+      requestedPage = 'unsupported'
+      listeners.get('dsh-next:settings-open')()
+      await new Promise((resolve) => setTimeout(resolve, 0))
+      assert.deepEqual(received, ['general', 'permissions'])
+      stop()
+      assert.equal(listeners.has('dsh-next:settings-open'), false)
+    } else {
+      assert.equal(own.get('desktopNext').onOpenSettings, undefined)
+      assert.equal(
+        own.has('dshDesktop'),
+        false,
+        'Only the application document may reach guest browsers',
+      )
+    }
+  }
+  assert.equal(dataset.platform, platform)
+  assert.equal(exposed.get('dshDesktop')?.protocolVersion, 1)
+  assert.equal(typeof exposed.get('dshDesktopBoot')?.ready, 'function')
+  assert.equal(typeof exposed.get('__DSH_DIRECTORY_PICKER__')?.pick, 'function')
+  assert.equal(typeof exposed.get('desktopNext')?.command, 'function')
+  assert.equal(typeof exposed.get('desktopNext')?.browserLinks, 'function')
+  const permissions = exposed.get('desktopNext').permissions
+  await permissions.query('microphone')
+  assert.equal(invocations.at(-1)[0], 'dsh-next:permission-query')
+  await assert.rejects(permissions.request('microphone'), /user gesture/)
+  userActivation.isActive = true
+  await permissions.request('microphone')
+  assert.deepEqual(
+    [...invocations.at(-1)],
+    ['dsh-next:permission-request', 'microphone'],
+  )
+  await permissions.openSettings('screen')
+  assert.deepEqual(
+    [...invocations.at(-1)],
+    ['dsh-next:permission-settings', 'screen'],
+  )
+}
+console.log(
+  'SuperDsh frontend check passed: owned browser source, compatible platform exports and independent sandboxed preloads for macOS, Windows and Linux.',
+)

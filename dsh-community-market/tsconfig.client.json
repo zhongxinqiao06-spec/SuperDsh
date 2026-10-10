@@ -1,0 +1,13 @@
+{
+  "extends": "./tsconfig.json",
+  "compilerOptions": {
+    "rootDir": "../apps/desktop",
+    "outDir": "lib/types",
+    "skipLibCheck": true
+  },
+  "exclude": [],
+  "include": [
+    "../apps/desktop/ui/src/features/community-market/**/*.ts",
+    "../apps/desktop/ui/src/features/community-market/**/*.tsx"
+  ]
+}

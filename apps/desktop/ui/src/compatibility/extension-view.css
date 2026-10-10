@@ -1,0 +1,59 @@
+.superdshCompatibility {
+  position: fixed;
+  inset: 0;
+  z-index: 2147483640;
+  pointer-events: none;
+}
+.superdshCompatibilityToolbar {
+  box-sizing: border-box;
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  height: 48px;
+  padding: 0 16px;
+  background: var(--dsw-alias-bg-base, #fff);
+  color: var(--dsw-alias-label-primary, #181a20);
+  border-bottom: 1px solid var(--dsw-alias-border-l2, #ddd);
+  font:
+    13px/1.4 system-ui,
+    sans-serif;
+  pointer-events: auto;
+  -webkit-app-region: drag;
+}
+.superdshCompatibilityToolbar strong {
+  flex: 1;
+}
+.superdshCompatibilityToolbar button {
+  padding: 5px 12px;
+  color: inherit;
+  background: transparent;
+  border: 1px solid var(--dsw-alias-border-l2, #aaa);
+  border-radius: 6px;
+  cursor: pointer;
+  -webkit-app-region: no-drag;
+}
+.superdshCompatibilityToolbar [role='alert'] {
+  max-width: 50%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.superdshCompatibilityNotice {
+  position: absolute;
+  top: 56px;
+  right: 16px;
+  max-width: 400px;
+  padding: 12px 16px;
+  pointer-events: auto;
+  border: 1px solid var(--dsw-alias-border-l2, #aaa);
+  border-radius: 8px;
+  background: var(--dsw-alias-bg-base, #fff);
+  color: var(--dsw-alias-label-primary, #181a20);
+  font:
+    13px/1.5 system-ui,
+    sans-serif;
+}
+.superdshCompatibilityNotice button {
+  font: inherit;
+  cursor: pointer;
+}

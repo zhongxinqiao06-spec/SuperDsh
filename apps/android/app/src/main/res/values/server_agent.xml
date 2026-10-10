@@ -1,0 +1,33 @@
+<resources>
+    <string name="server_agent_title">Server Agent</string>
+    <string name="server_agent_desktop">My computer</string>
+    <string name="server_agent_description">Chat using the full server Agent without connecting a computer. Tasks keep running when your phone disconnects.</string>
+    <string name="server_agent_preparing">Preparing the Agent and waiting for its connection…</string>
+    <string name="server_agent_workspace">Server workspace</string>
+    <string name="server_agent_no_models">Choose a model or configure a personal provider</string>
+    <string name="server_agent_personal_source">Personal</string>
+    <string name="server_agent_platform_source">Platform</string>
+    <string name="server_agent_offline">Platform disconnected. Loaded history and drafts remain available. Reconnect and send manually.</string>
+    <string name="personal_models_title">Personal models</string>
+    <string name="personal_models_description">Configure your personal models on the server. API keys are encrypted there, are never returned, and are not saved on your phone.</string>
+    <string name="personal_models_refresh">Refresh</string>
+    <string name="personal_models_add">Add provider</string>
+    <string name="personal_models_edit">Edit</string>
+    <string name="personal_models_verify">Verify</string>
+    <string name="personal_models_verified">Provider verified.</string>
+    <string name="personal_models_delete">Delete</string>
+    <string name="personal_models_delete_hint">Delete %1$s? Sessions using it will require a new model selection.</string>
+    <string name="personal_models_default">Default</string>
+    <string name="personal_models_set_default">Set default</string>
+    <string name="personal_models_use_platform">Use platform default for new sessions</string>
+    <string name="personal_models_name">Provider name</string>
+    <string name="personal_models_protocol">Protocol</string>
+    <string name="personal_models_url">API base URL</string>
+    <string name="personal_models_ids">Model IDs (one per line)</string>
+    <string name="personal_models_key">API key</string>
+    <string name="personal_models_key_hint">Leave blank when editing to keep the existing key.</string>
+    <string name="personal_models_enabled">Enabled</string>
+    <string name="personal_models_key_configured">API key configured</string>
+    <string name="personal_models_key_missing">No API key configured</string>
+    <string name="personal_models_save">Save</string>
+</resources>

@@ -1,0 +1,221 @@
+{
+  "name": "@superdsh/desktop",
+  "version": "2.0.14",
+  "private": true,
+  "description": "SuperDsh desktop application",
+  "license": "MIT",
+  "type": "module",
+  "main": "lib/main.js",
+  "engines": {
+    "node": "^22.19.0 || >=24.0.0"
+  },
+  "scripts": {
+    "build": "node scripts/build.mjs",
+    "typecheck": "node node_modules/typescript/bin/tsc -p tsconfig.packaging.json --noEmit",
+    "test": "node node_modules/vitest/vitest.mjs run",
+    "verify:host": "node scripts/verify-host.mjs",
+    "verify:host:electron": "node scripts/verify-host.mjs --electron",
+    "verify:frontend": "node scripts/verify-frontend.mjs",
+    "verify:window-controls": "node scripts/verify-window-controls.mjs",
+    "verify:onboarding": "node scripts/verify-onboarding.mjs",
+    "verify:protocol": "node node_modules/electron/cli.js scripts/verify-protocol.mjs",
+    "verify:sidebar-browser": "node node_modules/electron/cli.js scripts/verify-sidebar-browser.mjs",
+    "check": "yarn build && yarn typecheck && yarn test && yarn verify:frontend && yarn verify:host && yarn verify:desktop-runtime && yarn verify:safe-cleanup",
+    "dev": "yarn build && node scripts/start.mjs",
+    "start": "node scripts/start.mjs",
+    "verify:desktop-runtime": "node scripts/verify-desktop-runtime.mjs",
+    "verify:safe-cleanup": "node scripts/verify-safe-cleanup.mjs",
+    "icons:export": "node ../../scripts/export-app-icons.mjs",
+    "package:dir": "node scripts/package.ts dir",
+    "dist:mac": "node scripts/package.ts mac",
+    "dist:mac-smoke": "node scripts/package.ts mac-smoke",
+    "dist:win": "node scripts/package.ts win",
+    "dist:linux": "node scripts/package.ts linux",
+    "check:mac-package": "yarn check",
+    "check:win-package": "yarn check",
+    "verify:product-shell": "node scripts/verify-product-shell.mjs"
+  },
+  "dependencies": {
+    "@superdsh/core": "workspace:*",
+    "@superdsh/harness": "workspace:*",
+    "@superdsh/ui": "workspace:*"
+  },
+  "devDependencies": {
+    "@agents-anywhere/dsh-bridge-next": "file:../../vendor/agents-anywhere/agents-anywhere-dsh-bridge-next-0.1.0-dev.0.desktop.cf9129757c3ee.rb6b952cb.tgz",
+    "@deepseek-ai/cordis": "4.0.4",
+    "@deepseek-ai/dsh-llm": "0.1.7-alpha.2",
+    "@deepseek-ai/dsh-session": "0.1.7-alpha.2",
+    "@deepseek-ai/dsh-typert-protocol": "0.1.7-alpha.2",
+    "@deepseek-ai/schemastery": "^3.18.4",
+    "@electron/asar": "3.4.1",
+    "@electron/fuses": "1.8.0",
+    "@types/node": "^22.20.0",
+    "builder-util": "26.15.3",
+    "electron": "44.0.0",
+    "electron-builder": "26.15.7",
+    "playwright": "1.63.0",
+    "react": "18.3.1",
+    "sharp": "0.35.3",
+    "typescript": "6.0.3",
+    "vitest": "4.1.8"
+  },
+  "exports": {
+    ".": "./lib/index.js",
+    "./client": "./lib/client.js",
+    "./extensions": "./lib/extensions.js",
+    "./permissions": {
+      "types": "./core/src/main/permissions.ts",
+      "default": "./lib/permissions.js"
+    },
+    "./package.json": "./package.json",
+    "./webserver": "./lib/webserver.js"
+  },
+  "dsh": {
+    "client": {
+      "platform": "web",
+      "inject": [
+        "@deepseek-ai/dsh-client-locale",
+        "@deepseek-ai/dsh-client-ui-layout",
+        "@deepseek-ai/dsh-client-ui-renderer"
+      ]
+    },
+    "bundle": {
+      "patch": "./cordis.patch.yml"
+    },
+    "optionalBundles": [
+      "dsh-community-market",
+      "dshmarket",
+      "@agents-anywhere/dsh-bridge-next"
+    ],
+    "exclusiveBundles": [
+      [
+        "dsh-community-market",
+        "dshmarket"
+      ]
+    ]
+  },
+  "build": {
+    "appId": "com.superdsh.desktop",
+    "productName": "SuperDsh",
+    "asar": false,
+    "npmRebuild": false,
+    "afterPack": "./scripts/verify-packaged.ts",
+    "afterAllArtifactBuild": "./scripts/verify-fuses.ts",
+    "electronFuses": {
+      "enableEmbeddedAsarIntegrityValidation": false,
+      "onlyLoadAppFromAsar": false,
+      "resetAdHocDarwinSignature": true,
+      "runAsNode": true
+    },
+    "directories": {
+      "output": "dist",
+      "buildResources": "build"
+    },
+    "toolsets": {
+      "nsis": "1.2.1"
+    },
+    "files": [
+      "assets/**",
+      "build/app-icon.ico",
+      "build/app-icon.png",
+      "build/app-icon-mac.png",
+      "cordis.patch.yml",
+      "lib/**",
+      "package.json",
+      "scripts/node-bin/**",
+      "!node_modules/node-pty/build/**",
+      "!node_modules/fs-ext/build/**",
+      "product-update.json",
+      "LICENSE",
+      "LICENSE.upstream"
+    ],
+    "mac": {
+      "artifactName": "SuperDsh-${version}-${arch}.${ext}",
+      "target": [
+        "dir"
+      ],
+      "category": "public.app-category.developer-tools",
+      "extendInfo": {
+        "CFBundleAllowMixedLocalizations": true,
+        "CFBundleDevelopmentRegion": "en",
+        "CFBundleLocalizations": [
+          "en",
+          "zh_CN"
+        ],
+        "NSMicrophoneUsageDescription": "SuperDsh uses the microphone when you enable a feature that records audio.",
+        "NSAudioCaptureUsageDescription": "SuperDsh captures screen audio when you request it.",
+        "NSLocalNetworkUsageDescription": "SuperDsh connects to devices on your local network when you enable network access.",
+        "NSAppTransportSecurity": {
+          "NSAllowsLocalNetworking": true
+        }
+      },
+      "hardenedRuntime": true,
+      "icon": "build/app-icon.icon",
+      "mergeASARs": false,
+      "notarize": true,
+      "signIgnore": [
+        "\\.(?:pak|dat|wasm)$"
+      ],
+      "x64ArchFiles": "**/node_modules/{@deepseek-ai/node-addon-system-darwin-*/**,node-pty/prebuilds/darwin-*/**,fs-ext/prebuilds/darwin-*/**,node-addon-require-builtin-darwin-*/**,@vscode/ripgrep-darwin-*/**,@img/sharp-darwin-*/**,@img/sharp-libvips-darwin-*/**,@koromix/koffi-darwin-*/**,@dataiku/uv-darwin-*/**,@deepseek-ai/libreoffice-kit-darwin-*/**,sherpa-onnx-darwin-*/**,@trycua/cua-driver-darwin-*/**,@ubjs/node-darwin-*/**}",
+      "asar": false
+    },
+    "win": {
+      "compression": "normal",
+      "target": [
+        {
+          "target": "nsis",
+          "arch": [
+            "x64"
+          ]
+        }
+      ],
+      "artifactName": "SuperDsh-${version}-${arch}-Portable.${ext}",
+      "icon": "build/app-icon.ico",
+      "asar": false
+    },
+    "nsis": {
+      "oneClick": false,
+      "perMachine": false,
+      "allowElevation": true,
+      "allowToChangeInstallationDirectory": true,
+      "createDesktopShortcut": true,
+      "createStartMenuShortcut": true,
+      "differentialPackage": false,
+      "shortcutName": "SuperDsh",
+      "useZip": false,
+      "artifactName": "SuperDsh-${version}-${arch}-Setup.${ext}",
+      "installerIcon": "build/app-icon.ico",
+      "uninstallerIcon": "build/app-icon.ico",
+      "include": "build/installer.nsh"
+    },
+    "linux": {
+      "target": [
+        "dir"
+      ],
+      "icon": "build/app-icon.png",
+      "asar": false,
+      "executableName": "superdsh"
+    },
+    "dmg": {
+      "icon": "build/app-icon.icns"
+    }
+  },
+  "files": [
+    "assets",
+    "build",
+    "cordis.patch.yml",
+    "lib",
+    "package.json",
+    "scripts/node-bin",
+    "product-update.json",
+    "LICENSE",
+    "LICENSE.upstream"
+  ],
+  "superdsh": {
+    "runtimeAssets": {
+      "frontendIndex": "@superdsh/ui/dist/index.html",
+      "frontendManifest": "@superdsh/ui/client-manifest.json",
+      "nativeIndex": "@superdsh/ui/native-ui/index.html"
+    }
+  }
+}

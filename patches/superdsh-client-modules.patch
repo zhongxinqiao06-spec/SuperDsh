@@ -1,0 +1,72 @@
+diff --git a/lib/index.js b/lib/index.js
+index b948b1bd0f..570739966d 100644
+--- a/lib/index.js
++++ b/lib/index.js
+@@ -1,7 +1,7 @@
+ import { createRequire } from "node:module";
+ import { createHash } from "node:crypto";
+ import { existsSync, readFileSync, statSync } from "node:fs";
+-import { dirname, isAbsolute, join } from "node:path";
++import { dirname, isAbsolute, join, relative, resolve } from "node:path";
+ import { fileURLToPath, pathToFileURL } from "node:url";
+ import { Service } from "@deepseek-ai/cordis";
+ //#region lib/types/client/manifest.js
+@@ -283,7 +283,7 @@ function readSourceMap(clientPath) {
+ /** Count generated lines while assembling indexed-map section offsets. */
+ function newlineCount(value) {
+ 	let count = 0;
+-	for (const char of value) if (char === "\n") count += 1;
++	for (let offset = value.indexOf("\n"); offset !== -1; offset = value.indexOf("\n", offset + 1)) count += 1;
+ 	return count;
+ }
+ /** Resolve section sources against their original per-plugin map URL before combo relocation. */
+@@ -503,7 +503,29 @@ window.__ModuleLoader__={
+ * already-loaded entries aggregates into one loud throw (FAILED fiber; the
+ * boot activation audit reports it).
+ */
++
++/** Product-owned browser artifacts; Host faces and unknown plugins keep their original resolution. */
++export const superdshClientArtifactManifestVersion = 1;
++function readClientArtifactManifest(file) {
++  if (file === void 0) return new Map();
++  if (typeof file !== "string" || !isAbsolute(file)) throw new Error("client-modules: clientArtifactManifest must be an absolute path");
++  const manifest = JSON.parse(readFileSync(file, "utf8"));
++  if (manifest === null || typeof manifest !== "object" || manifest.schemaVersion !== 1 || manifest.harnessVersion !== "0.1.7-alpha.2" || manifest.modules === null || typeof manifest.modules !== "object" || Array.isArray(manifest.modules)) throw new Error("client-modules: incompatible product client artifact manifest");
++  const entries = new Map();
++  for (const [id, row] of Object.entries(manifest.modules)) {
++    if (row === null || typeof row !== "object" || typeof row.path !== "string" || !row.path || isAbsolute(row.path)) throw new Error("client-modules: invalid product client artifact for " + id);
++    const clientPath = resolve(dirname(file), row.path);
++    const local = relative(dirname(file), clientPath);
++    if (local === ".." || local.startsWith("../") || local.startsWith("..\\") || isAbsolute(local)) throw new Error("client-modules: product client artifact escapes its manifest directory: " + id);
++    if (!statSync(clientPath).isFile()) throw new Error("client-modules: product client artifact is not a file: " + id);
++    const declaration = parseDshClient(id, { platform: "web", inject: row.inject, external: row.external, immediately: row.immediately });
++    entries.set(id, { clientPath, ...(declaration.inject !== void 0 ? { inject: declaration.inject } : {}), external: declaration.external ?? [], immediately: declaration.immediately === true });
++  }
++  return entries;
++}
++
+ var ClientModuleRegistry = class extends Service {
++	clientArtifactModules;
+ 	static inject = ["loader"];
+ 	table = /* @__PURE__ */ new Map();
+ 	sources = /* @__PURE__ */ new Map();
+@@ -522,8 +544,9 @@ var ClientModuleRegistry = class extends Service {
+ 	* Bundle routes follow the optional Web carrier's injected lifecycle.
+ 	* @param ctx - plugin context carrying Loader and an optional Web carrier.
+ 	*/
+-	constructor(ctx) {
++	constructor(ctx, config = {}) {
+ 		super(ctx, "clientModules");
++		this.clientArtifactModules = readClientArtifactManifest(config.clientArtifactManifest);
+ 		ctx.on("internal/plugin", (fiber) => {
+ 			const entryName = fiber.entry?.options.name;
+ 			if (entryName === void 0) return;
+@@ -719,7 +742,7 @@ var ClientModuleRegistry = class extends Service {
+ 		if (clientRel === void 0) throw new Error(`client-modules: ${packageName} declares dsh.client but exports no "./client" bundle`);
+ 		const resolved = {
+ 			packageName,
+-			meta: {
++			meta: this.clientArtifactModules.get(packageName) ?? {
+ 				clientPath: join(dirname(pkgPath), clientRel),
+ 				...decl.inject !== void 0 ? { inject: decl.inject } : {},
+ 				external: decl.external ?? [],

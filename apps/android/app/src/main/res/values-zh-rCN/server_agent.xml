@@ -1,0 +1,33 @@
+<resources>
+    <string name="server_agent_title">服务端 Agent</string>
+    <string name="server_agent_desktop">我的电脑</string>
+    <string name="server_agent_description">无需连接电脑，使用服务端完整 Agent 聊天。手机离线后，服务端任务继续运行。</string>
+    <string name="server_agent_preparing">正在准备 Agent 并等待连接…</string>
+    <string name="server_agent_workspace">服务端工作区</string>
+    <string name="server_agent_no_models">请选择模型或配置个人供应商</string>
+    <string name="server_agent_personal_source">个人</string>
+    <string name="server_agent_platform_source">平台</string>
+    <string name="server_agent_offline">平台已断开。仍可查看已加载的历史并保存草稿，重连后请手动发送。</string>
+    <string name="personal_models_title">个人模型</string>
+    <string name="personal_models_description">配置保存在服务端的个人模型。API Key 在服务器加密保存，不会返回，也不保存在手机。</string>
+    <string name="personal_models_refresh">刷新</string>
+    <string name="personal_models_add">添加供应商</string>
+    <string name="personal_models_edit">编辑</string>
+    <string name="personal_models_verify">验证</string>
+    <string name="personal_models_verified">供应商验证成功。</string>
+    <string name="personal_models_delete">删除</string>
+    <string name="personal_models_delete_hint">删除 %1$s？使用该供应商的会话需要重新选择模型。</string>
+    <string name="personal_models_default">默认模型</string>
+    <string name="personal_models_set_default">设为默认</string>
+    <string name="personal_models_use_platform">新会话使用平台默认模型</string>
+    <string name="personal_models_name">供应商名称</string>
+    <string name="personal_models_protocol">接口协议</string>
+    <string name="personal_models_url">API 地址</string>
+    <string name="personal_models_ids">模型 ID（每行一个）</string>
+    <string name="personal_models_key">API Key</string>
+    <string name="personal_models_key_hint">编辑时留空可保留已有 Key。</string>
+    <string name="personal_models_enabled">启用</string>
+    <string name="personal_models_key_configured">已配置 API Key</string>
+    <string name="personal_models_key_missing">未配置 API Key</string>
+    <string name="personal_models_save">保存</string>
+</resources>
