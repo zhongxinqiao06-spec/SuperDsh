@@ -4,6 +4,8 @@ import {
   existsSync,
   mkdirSync,
   readFileSync,
+  renameSync,
+  unlinkSync,
   writeFileSync,
 } from 'node:fs'
 import { dirname, join, resolve } from 'node:path'
@@ -53,6 +55,42 @@ export function prepareDevelopmentAgentEnv(root, environment = process.env) {
     )
   }
   return developmentEnvironment(root, environment)
+}
+
+export function persistDevelopmentPorts(
+  root,
+  ports,
+  environment = process.env,
+) {
+  const file = developmentEnvFile(root, environment)
+  const original = readFileSync(file, 'utf8')
+  let updated = original
+  const newline = original.includes('\r\n') ? '\r\n' : '\n'
+  for (const name of ['SUPERDSH_DEV_PG_PORT', 'SUPERDSH_DEV_REDIS_PORT']) {
+    const value = port(ports[name], name)
+    const entry = new RegExp(
+      `^([ \\t]*(?:export[ \\t]+)?${name}[ \\t]*=)[^\\r\\n]*`,
+      'gm',
+    )
+    if (entry.test(updated))
+      updated = updated.replace(entry, (_match, prefix) => `${prefix}${value}`)
+    else
+      updated += `${updated.endsWith('\n') ? '' : newline}${name}=${value}${newline}`
+  }
+  if (updated === original) return file
+  // Replace atomically so a failed write cannot truncate persisted credentials.
+  const temporary = `${file}.${randomBytes(8).toString('hex')}.tmp`
+  try {
+    writeFileSync(temporary, updated, {
+      encoding: 'utf8',
+      mode: 0o600,
+      flag: 'wx',
+    })
+    renameSync(temporary, file)
+  } finally {
+    if (existsSync(temporary)) unlinkSync(temporary)
+  }
+  return file
 }
 
 function port(value, name) {
@@ -105,6 +143,8 @@ export function developmentEnvironment(root, environment = process.env) {
     )
   return {
     ...settings,
+    SUPERDSH_DEV_PG_PORT: pgPort,
+    SUPERDSH_DEV_REDIS_PORT: redisPort,
     // Only the database created by our local dependency command gets a known
     // development login. An explicit database URL may point at real user data.
     SUPERDSH_BOOTSTRAP_DEV_ADMIN: settings.AGENT_SERVER_DB_URL ? '0' : '1',

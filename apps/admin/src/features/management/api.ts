@@ -39,12 +39,28 @@ export type LoginSession = {
   expiresAt: string
   current: boolean
 }
+export type ListPagination = {
+  total: number
+  page: number
+  pageSize: number
+}
+export type DeviceInventoryResponse = ListPagination & {
+  devices: DeviceInventory[]
+}
+export type AuditResponse = ListPagination & { events: AuditEvent[] }
+export type LoginSessionsResponse = ListPagination & {
+  sessions: LoginSession[]
+}
+
+function pageQuery(page?: number, search?: string, pageSize?: number) {
+  return { page, search, pageSize }
+}
 
 const id = encodeURIComponent
 export const managementApi = {
-  users: (page: number, search: string) =>
+  users: (page: number, search: string, pageSize = 25) =>
     apiClient.get<AdminUserListResponse>('/admin/users', {
-      query: { page, pageSize: 25, search },
+      query: pageQuery(page, search, pageSize),
     }),
   createUser: (body: {
     username: string
@@ -76,14 +92,22 @@ export const managementApi = {
       : apiClient.post<PlatformRole>('/admin/roles', body),
   deleteRole: (roleId: string) =>
     apiClient.delete(`/admin/roles/${id(roleId)}`),
-  devices: () =>
-    apiClient.get<{ devices: DeviceInventory[] }>('/admin/devices'),
+  devices: (page?: number, search?: string, pageSize?: number) =>
+    apiClient.get<DeviceInventoryResponse>('/admin/devices', {
+      query: pageQuery(page, search, pageSize),
+    }),
   blockDevice: (deviceId: string, reason: string) =>
     apiClient.post(`/admin/devices/${id(deviceId)}/block`, { reason }),
   resumeDevice: (deviceId: string) =>
     apiClient.post(`/admin/devices/${id(deviceId)}/resume`, {}),
-  audit: () => apiClient.get<{ events: AuditEvent[] }>('/admin/audit'),
-  sessions: () => apiClient.get<{ sessions: LoginSession[] }>('/auth/sessions'),
+  audit: (page?: number, search?: string, pageSize?: number) =>
+    apiClient.get<AuditResponse>('/admin/audit', {
+      query: pageQuery(page, search, pageSize),
+    }),
+  sessions: (page?: number, search?: string, pageSize?: number) =>
+    apiClient.get<LoginSessionsResponse>('/auth/sessions', {
+      query: pageQuery(page, search, pageSize),
+    }),
   revokeSession: (sessionId: string) =>
     apiClient.delete(`/auth/sessions/${id(sessionId)}`),
   revokeAll: () => apiClient.post('/auth/logout-all', {}),

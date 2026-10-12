@@ -13,17 +13,20 @@ router = APIRouter(prefix="/admin/devices", tags=["device-operations"])
 @router.get("")
 async def devices(
     request: Request,
+    page: int | None = None,
+    pageSize: int | None = None,
+    search: str = "",
     user: UserView = Depends(require_permission("devices.inventory.read")),
     db: Store = Depends(get_store),
 ) -> dict:
-    inventory = await db.device_inventory()
-    for device in inventory:
+    result = await db.management_devices(page=page, page_size=pageSize, search=search)
+    for device in result["devices"]:
         device["status"] = (
             "online"
             if await request.app.state.rpc.is_online(device["id"])
             else "offline"
         )
-    return {"devices": inventory}
+    return result
 
 
 class BlockRequest(BaseModel):

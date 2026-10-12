@@ -44,6 +44,7 @@ import { dashboardApi } from '@/features/dashboard/api'
 import { ServerAgentControl } from '@/components/server-agent-control'
 import { serverAgentDefaultModel } from '@/features/dashboard/server-agent-model'
 import { loadStoredSession } from '@/features/auth/session'
+import { useWorkbenchState, workbenchCell } from '@/features/workbench/memory'
 import { createClientId } from '@/lib/id'
 import { apiClient } from '@/lib/api'
 import { cn } from '@/lib/utils'
@@ -175,7 +176,7 @@ export function TaskComposer() {
 
 function ScopedTaskComposer() {
   const toolSidebarStore = useSessionToolSidebarStore()
-  const { session: authSession } = useAuth()
+  const { session: authSession, can } = useAuth()
   const { isMobile, state: sidebarState } = useSidebar()
   const {
     addOptimisticMessage,
@@ -188,6 +189,7 @@ function ScopedTaskComposer() {
     openSession,
     projects,
     refreshData,
+    isLoading: workspaceLoading,
     resolveProject,
     sidebarShowsSessions,
     updateProject,
@@ -299,7 +301,8 @@ function ScopedTaskComposer() {
   )
   const hasOnlineDevice = deviceOptions.length > 0
 
-  const [selectedDevice, setSelectedDevice] = React.useState(
+  const [selectedDevice, setSelectedDevice] = useWorkbenchState(
+    'new-session/device',
     deviceOptions[0]?.id ?? '',
   )
   const [requestedServerConnector, setRequestedServerConnector] =
@@ -337,7 +340,8 @@ function ScopedTaskComposer() {
     [runtimeInventory, selectedConnector],
   )
 
-  const [selectedAgent, setSelectedAgent] = React.useState(
+  const [selectedAgent, setSelectedAgent] = useWorkbenchState(
+    'new-session/runtime',
     agentOptions[0]?.id ?? '',
   )
   const selectedRuntime =
@@ -350,12 +354,20 @@ function ScopedTaskComposer() {
         runtimeType: selectedRuntime.runtimeType,
       }
     : undefined
-  const [selectedModel, setSelectedModel] = React.useState('')
-  const [selectedReasoning, setSelectedReasoning] = React.useState('')
-  const [selectedPermissionMode, setSelectedPermissionMode] = React.useState('')
-  const [workspace, setWorkspace] = React.useState<WorkspaceSelection | null>(
-    null,
+  const [selectedModel, setSelectedModel] = useWorkbenchState(
+    'new-session/model',
+    '',
   )
+  const [selectedReasoning, setSelectedReasoning] = useWorkbenchState(
+    'new-session/reasoning',
+    '',
+  )
+  const [selectedPermissionMode, setSelectedPermissionMode] = useWorkbenchState(
+    'new-session/permission',
+    '',
+  )
+  const [workspace, setWorkspace] =
+    useWorkbenchState<WorkspaceSelection | null>('new-session/workspace', null)
   React.useEffect(() => {
     if (!isServerAgent) return
     const project = projects.find(
@@ -376,7 +388,7 @@ function ScopedTaskComposer() {
   }, [isServerAgent, projects, selectedConnectorId])
   const [projectEditor, setProjectEditor] =
     React.useState<ProjectEditorState>(null)
-  const [prompt, setPrompt] = React.useState('')
+  const [prompt, setPrompt] = useWorkbenchState('new-session/prompt', '')
   const [modelCatalog, setModelCatalog] =
     React.useState<ProtocolModelCatalog | null>(null)
   const [managedDefault, setManagedDefault] = React.useState<string | null>(
@@ -388,8 +400,13 @@ function ScopedTaskComposer() {
   const [runtimeCapabilities, setRuntimeCapabilities] =
     React.useState<ProtocolCapabilitySet | null>(null)
   const [catalogsLoading, setCatalogsLoading] = React.useState(false)
-  const [creating, setCreating] = React.useState(false)
-  const creatingRef = React.useRef(false)
+  const [creating, setCreating] = useWorkbenchState(
+    'new-session/creating',
+    false,
+  )
+  const creatingCell = workbenchCell('new-session/creating', false)
+  const creatingRef = React.useRef(creating)
+  creatingRef.current = creating
   const [createTick, setCreateTick] = React.useState(0)
   const [preferenceLoaded, setPreferenceLoaded] = React.useState(false)
   const [preference, setPreference] =
@@ -490,7 +507,7 @@ function ScopedTaskComposer() {
   }, [deviceOptions, newSessionProject, selectedDevice])
 
   React.useEffect(() => {
-    if (newSessionProject) return
+    if (newSessionProject || workspaceLoading || runtimeInventoryLoading) return
     const nextDevice = preferredAvailableOptionId(
       deviceOptions,
       selectedDevice,
@@ -508,6 +525,7 @@ function ScopedTaskComposer() {
   ])
 
   React.useEffect(() => {
+    if (workspaceLoading || runtimeInventoryLoading) return
     setWorkspace((current) => {
       if (!current) return current
       if (current.connectorId && current.connectorId !== selectedConnectorId)
@@ -523,9 +541,10 @@ function ScopedTaskComposer() {
         return null
       return current
     })
-  }, [projects, selectedConnectorId])
+  }, [projects, selectedConnectorId, workspaceLoading, runtimeInventoryLoading])
 
   React.useEffect(() => {
+    if (workspaceLoading || runtimeInventoryLoading) return
     const connectorId = selectedConnectorId
     const preferredAgent =
       preferenceLoaded && preference?.connectorId === connectorId
@@ -683,7 +702,11 @@ function ScopedTaskComposer() {
     onDrop,
     attachmentsAllowed,
     attachmentError,
-  } = useAttachments({ enabled: canUseAttachments, allowedMimeTypes })
+  } = useAttachments({
+    enabled: canUseAttachments,
+    allowedMimeTypes,
+    memoryKey: 'new-session/attachments',
+  })
 
   const models = React.useMemo(
     () =>
@@ -737,6 +760,7 @@ function ScopedTaskComposer() {
   )
 
   React.useEffect(() => {
+    if (!modelCatalog) return
     const nextModel = isServerAgent
       ? (models.find(
           (option) => option.enabled && option.selectionId === managedDefault,
@@ -753,6 +777,7 @@ function ScopedTaskComposer() {
   }, [models, isServerAgent, managedDefault])
 
   React.useEffect(() => {
+    if (!permissionCatalog) return
     const nextPermissionMode =
       permissionOptions.find((option) => option.default && option.enabled)
         ?.id ??
@@ -769,6 +794,7 @@ function ScopedTaskComposer() {
   }, [permissionOptions])
 
   React.useEffect(() => {
+    if (!modelCatalog) return
     const nextEffort =
       reasoningOptions.find((option) => option.default && option.enabled)?.id ??
       reasoningOptions.find((option) => option.enabled)?.id ??
@@ -782,6 +808,7 @@ function ScopedTaskComposer() {
   }, [reasoningOptions])
 
   React.useEffect(() => {
+    if (!modelCatalog) return
     setSelectedReasoning((current) => {
       if (!current) return current
       return reasoningOptions.some(
@@ -989,6 +1016,7 @@ function ScopedTaskComposer() {
     const identityMatches = () => {
       const current = loadStoredSession()
       return (
+        creatingCell.current() &&
         current?.userId === authSession?.userId &&
         current?.authzVersion === authSession?.authzVersion
       )
@@ -1030,12 +1058,16 @@ function ScopedTaskComposer() {
             'Server workspace is not ready. Please retry.',
           ),
         )
-      if (!identityMatches()) return
+      if (!identityMatches()) {
+        creatingRef.current = false
+        setCreating(false)
+        return
+      }
     } catch (error) {
-      if (!identityMatches()) return
-      toast.error(error instanceof Error ? error.message : t('createFailed'))
       creatingRef.current = false
       setCreating(false)
+      if (!identityMatches()) return
+      toast.error(error instanceof Error ? error.message : t('createFailed'))
       return
     }
     const localSessionId = createClientId('session')
@@ -1114,7 +1146,7 @@ function ScopedTaskComposer() {
         nextSeq: 0,
       }),
     })
-    clear()
+    clear({ revokePreviews: false })
     setPrompt('')
     openSession(localSessionId)
     try {
@@ -1200,15 +1232,15 @@ function ScopedTaskComposer() {
           <button
             type="button"
             onClick={goHome}
-            className="aa-wordmark text-xl leading-none text-foreground transition-colors hover:text-primary"
+            className="text-base font-semibold leading-none text-foreground transition-colors hover:text-primary"
           >
-            Agents Anywhere
+            {tr('Agent 工作台', 'Agent workspace')}
           </button>
         </div>
       ) : null}
 
       <div className="w-full max-w-3xl">
-        {authSession && (
+        {authSession && can('devices.manage') && can('models.use') && (
           <ServerAgentControl
             key={authSession.userId}
             onAvailable={refreshData}
@@ -1686,10 +1718,14 @@ function useTypewriterTitle(titles: string[], paused: boolean) {
   return typedTitle
 }
 
+function newSessionPreferenceKey() {
+  return `${NEW_SESSION_PREFERENCE_KEY}:${encodeURIComponent(loadStoredSession()?.userId ?? 'signed-out')}`
+}
+
 function readNewSessionPreference(): NewSessionPreference | null {
   if (typeof window === 'undefined') return null
   try {
-    const raw = window.localStorage.getItem(NEW_SESSION_PREFERENCE_KEY)
+    const raw = window.localStorage.getItem(newSessionPreferenceKey())
     if (!raw) return null
     const parsed = JSON.parse(raw) as Partial<NewSessionPreference>
     if (
@@ -1745,7 +1781,7 @@ function writeNewSessionPreference(preference: NewSessionPreference) {
   if (typeof window === 'undefined') return
   try {
     window.localStorage.setItem(
-      NEW_SESSION_PREFERENCE_KEY,
+      newSessionPreferenceKey(),
       JSON.stringify(preference),
     )
   } catch {

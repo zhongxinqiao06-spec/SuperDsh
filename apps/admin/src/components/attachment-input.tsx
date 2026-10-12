@@ -25,6 +25,7 @@ import type { UploadedAttachment } from '@/features/dashboard/types'
 import { cn } from '@/lib/utils'
 import { attachmentMimeAllowed } from '@/components/session/capabilities'
 import { useTranslations } from 'next-intl'
+import { useWorkbenchState } from '@/features/workbench/memory'
 
 const MAX_ATTACHMENT_FILES = 5
 const MAX_ATTACHMENT_BYTES = 25 * 1024 * 1024
@@ -69,6 +70,7 @@ type UseAttachmentsOptions = {
   allowedMimeTypes?: readonly string[]
   sessionId?: string
   token?: string
+  memoryKey?: string
 }
 
 type ClearAttachmentsOptions = {
@@ -149,33 +151,34 @@ function formatBytes(size: number): string {
 
 export function useAttachments(options: UseAttachmentsOptions = {}) {
   const { sessionId, token, enabled = true, allowedMimeTypes } = options
+  const memoryKey =
+    options.memoryKey ?? `session/${sessionId ?? 'new'}/attachments`
   const t = useTranslations('dashboard.new')
   const [rejectedTypes, setRejectedTypes] = useState(false)
-  const [attachments, setAttachments] = useState<AttachedFile[]>([])
+  const [attachments, setAttachments] = useWorkbenchState<AttachedFile[]>(
+    memoryKey,
+    [],
+  )
   const [isDragging, setIsDragging] = useState(false)
   const dragCounter = useRef(0)
   const attachmentsRef = useRef<AttachedFile[]>([])
-  const sessionIdRef = useRef(sessionId)
 
   useEffect(() => {
     attachmentsRef.current = attachments
   }, [attachments])
 
-  const clear = useCallback((options: ClearAttachmentsOptions = {}) => {
-    const revoke = options.revokePreviews ?? true
-    setRejectedTypes(false)
-    setAttachments((prev) => {
-      if (revoke) revokePreviews(prev)
-      attachmentsRef.current = []
-      return []
-    })
-  }, [])
-
-  useEffect(() => {
-    if (sessionIdRef.current === sessionId) return
-    sessionIdRef.current = sessionId
-    clear()
-  }, [clear, sessionId])
+  const clear = useCallback(
+    (options: ClearAttachmentsOptions = {}) => {
+      const revoke = options.revokePreviews ?? true
+      setRejectedTypes(false)
+      setAttachments((prev) => {
+        if (revoke) revokePreviews(prev)
+        attachmentsRef.current = []
+        return []
+      })
+    },
+    [setAttachments],
+  )
 
   const upload = useCallback(
     (attachment: AttachedFile) => {
@@ -219,7 +222,7 @@ export function useAttachments(options: UseAttachmentsOptions = {}) {
           })
         })
     },
-    [sessionId, token],
+    [sessionId, token, setAttachments],
   )
 
   const add = useCallback(
@@ -241,20 +244,40 @@ export function useAttachments(options: UseAttachmentsOptions = {}) {
       setAttachments(result.next)
       if (uploadImmediately) result.accepted.forEach(upload)
     },
-    [sessionId, token, upload, enabled, allowedMimeTypes],
+    [sessionId, token, upload, enabled, allowedMimeTypes, setAttachments],
   )
 
-  const remove = useCallback((id: string) => {
-    setAttachments((prev) => {
-      const target = prev.find((file) => file.id === id)
-      if (target) revokePreview(target)
-      const next = prev.filter((file) => file.id !== id)
-      attachmentsRef.current = next
-      return next
-    })
-  }, [])
+  const remove = useCallback(
+    (id: string) => {
+      setAttachments((prev) => {
+        const target = prev.find((file) => file.id === id)
+        if (target) revokePreview(target)
+        const next = prev.filter((file) => file.id !== id)
+        attachmentsRef.current = next
+        return next
+      })
+    },
+    [setAttachments],
+  )
 
-  useEffect(() => () => revokePreviews(attachmentsRef.current), [])
+  const restore = useCallback(
+    (files: AttachedFile[]) => {
+      setAttachments((current) => {
+        const next = [...current]
+        for (const file of files) {
+          if (
+            next.length < MAX_ATTACHMENT_FILES &&
+            !next.some((item) => item.id === file.id || sameFile(item, file))
+          )
+            next.push(file)
+        }
+        return next
+      })
+    },
+    [setAttachments],
+  )
+
+  // Draft previews belong to account memory and survive module unmount.
 
   // Global paste handler
   useEffect(() => {
@@ -335,6 +358,7 @@ export function useAttachments(options: UseAttachmentsOptions = {}) {
     add,
     remove,
     clear,
+    restore,
     onDragEnter,
     onDragLeave,
     onDragOver,

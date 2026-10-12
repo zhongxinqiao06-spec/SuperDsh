@@ -40,6 +40,8 @@ import type { SessionReviewTarget } from '@/components/session/session-review-mo
 type ElementBounds = {
   left: number
   width: number
+  top: number
+  height: number
 }
 
 export function SessionView() {
@@ -279,6 +281,7 @@ export function SessionView() {
                 onOpenFilePreview={handleOpenFilePreview}
               >
                 <SessionDetail
+                  key={detailSessionId ?? session.id}
                   token={token}
                   sessionId={detailSessionId ?? session.id}
                   fallbackSession={activeSessionFallback}
@@ -318,6 +321,8 @@ function useElementBounds(
   const [bounds, setBounds] = React.useState<ElementBounds>({
     left: 0,
     width: 0,
+    top: 0,
+    height: 0,
   })
 
   React.useLayoutEffect(() => {
@@ -334,8 +339,13 @@ function useElementBounds(
           const next = {
             left: Math.round(rect.left),
             width: Math.round(rect.width),
+            top: Math.round(rect.top),
+            height: Math.round(rect.height),
           }
-          return current.left === next.left && current.width === next.width
+          return current.left === next.left &&
+            current.width === next.width &&
+            current.top === next.top &&
+            current.height === next.height
             ? current
             : next
         })

@@ -4,13 +4,15 @@ import { useEffect, useState } from 'react'
 import { useTranslations } from 'next-intl'
 import { toast } from 'sonner'
 import { useAuth } from '@/components/auth/auth-context'
+import { useManagementText } from '@/components/management/controls'
+import { ManagementDialog } from '@/components/management/presentation'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import {
   Card,
   CardContent,
+  CardAction,
   CardDescription,
-  CardFooter,
   CardHeader,
   CardTitle,
 } from '@/components/ui/card'
@@ -39,18 +41,24 @@ export function ServiceEmailCard({
   onSaved: (settings: InstanceSettings) => void
 }) {
   const t = useTranslations('pages.service.email')
+  const tr = useManagementText()
   const { refreshConfig } = useAuth()
   const [enabled, setEnabled] = useState(settings.enabled)
   const [fromAddress, setFromAddress] = useState(settings.fromAddress)
   const [apiKey, setApiKey] = useState('')
   const [clearApiKey, setClearApiKey] = useState(false)
   const [saving, setSaving] = useState(false)
+  const [open, setOpen] = useState(false)
+  const [error, setError] = useState('')
   useEffect(() => {
     setEnabled(settings.enabled)
     setFromAddress(settings.fromAddress)
     setApiKey('')
     setClearApiKey(false)
   }, [settings])
+  useEffect(() => {
+    if (!open) setApiKey('')
+  }, [open])
   const dirty =
     enabled !== settings.enabled ||
     fromAddress.trim() !== settings.fromAddress ||
@@ -59,6 +67,7 @@ export function ServiceEmailCard({
   const save = async () => {
     if (saving || !isAdmin || !token) return
     setSaving(true)
+    setError('')
     try {
       const updated = await authApi.updateSettings(token, {
         email: {
@@ -69,21 +78,88 @@ export function ServiceEmailCard({
         },
       })
       onSaved(updated)
-      await refreshConfig()
+      setOpen(false)
       toast.success(t('saved'))
+      void refreshConfig().catch(() => undefined)
     } catch (err) {
-      toast.error(err instanceof Error ? err.message : t('failed'))
+      setError(err instanceof Error ? err.message : t('failed'))
     } finally {
       setSaving(false)
     }
   }
   return (
-    <Card>
-      <CardHeader>
-        <CardTitle>{t('title')}</CardTitle>
-        <CardDescription>{t('description')}</CardDescription>
-      </CardHeader>
-      <CardContent>
+    <>
+      <Card>
+        <CardHeader>
+          <CardTitle>{t('title')}</CardTitle>
+          <CardDescription>{t('description')}</CardDescription>
+          <CardAction>
+            <Button
+              variant="outline"
+              disabled={!isAdmin}
+              onClick={() => {
+                setEnabled(settings.enabled)
+                setFromAddress(settings.fromAddress)
+                setApiKey('')
+                setClearApiKey(false)
+                setError('')
+                setOpen(true)
+              }}
+            >
+              {tr('编辑配置', 'Edit settings')}
+            </Button>
+          </CardAction>
+        </CardHeader>
+        <CardContent className="flex flex-wrap items-center gap-3 text-sm">
+          <Badge variant="secondary">
+            {tr(
+              settings.enabled ? '已启用' : '未启用',
+              settings.enabled ? 'Enabled' : 'Disabled',
+            )}
+          </Badge>
+          <span className="break-all text-muted-foreground">
+            {settings.fromAddress ||
+              tr('未设置发件人', 'Sender not configured')}
+          </span>
+          <Badge variant="outline">
+            {t(settings.apiKeyConfigured ? 'configured' : 'notConfigured')}
+          </Badge>
+        </CardContent>
+      </Card>
+      <ManagementDialog
+        open={open}
+        onOpenChange={setOpen}
+        title={t('title')}
+        description={t('description')}
+        busy={saving}
+        error={error}
+        footer={
+          <>
+            <Button
+              variant="outline"
+              disabled={saving}
+              onClick={() => setOpen(false)}
+            >
+              {tr('取消', 'Cancel')}
+            </Button>
+            <Button
+              type="button"
+              disabled={
+                !isAdmin ||
+                saving ||
+                !dirty ||
+                (enabled &&
+                  (!fromAddress.trim() ||
+                    (!apiKey.trim() && !settings.apiKeyConfigured)))
+              }
+              onClick={() => void save()}
+            >
+              {saving ? <Spinner data-icon="inline-start" /> : null}
+              {t('save')}
+            </Button>
+          </>
+        }
+      >
         <FieldGroup>
           <Field orientation="horizontal" data-disabled={!isAdmin || saving}>
             <FieldContent>
@@ -151,24 +227,7 @@ export function ServiceEmailCard({
             </Field>
           ) : null}
         </FieldGroup>
-      </CardContent>
-      <CardFooter>
-        <Button
-          type="button"
-          disabled={
-            !isAdmin ||
-            saving ||
-            !dirty ||
-            (enabled &&
-              (!fromAddress.trim() ||
-                (!apiKey.trim() && !settings.apiKeyConfigured)))
-          }
-          onClick={() => void save()}
-        >
-          {saving ? <Spinner data-icon="inline-start" /> : null}
-          {t('save')}
-        </Button>
-      </CardFooter>
-    </Card>
+      </ManagementDialog>
+    </>
   )
 }

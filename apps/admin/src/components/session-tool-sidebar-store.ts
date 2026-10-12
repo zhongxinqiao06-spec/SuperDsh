@@ -18,6 +18,8 @@ export type SessionToolSidebarContext = {
 export type SessionToolSidebarHostBounds = {
   left: number
   width: number
+  top?: number
+  height?: number
 }
 
 export type SessionReviewTimelineSnapshot = {
@@ -302,7 +304,12 @@ export function createSessionToolSidebarStore(
     },
 
     setHostBounds(next: SessionToolSidebarHostBounds) {
-      if (hostBounds.left === next.left && hostBounds.width === next.width)
+      if (
+        hostBounds.left === next.left &&
+        hostBounds.width === next.width &&
+        hostBounds.top === next.top &&
+        hostBounds.height === next.height
+      )
         return
       hostBounds = next
       hostBoundsListeners.forEach((listener) => listener())

@@ -15,7 +15,7 @@ import {
   PluginOAuthFlow,
 } from './mobile-oauth-page'
 import { PluginOnboardingPage } from '@/components/onboarding/plugin-onboarding-page'
-import { Demo } from '@/components/demo'
+import { ConsoleShell } from '@/components/console/console-shell'
 import { FilePreviewPage } from '@/components/file-preview-page'
 import { LoadingState } from '@/components/loading-state'
 import { AnnouncementGate } from '@/components/announcements/announcement-gate'
@@ -28,7 +28,8 @@ function AuthRouterInner() {
   }
   if (screen === 'bootstrap') return <BootstrapScreen />
   if (isAuthenticated && me?.resetRequired) return <RequiredPasswordChange />
-  if (screen === 'app') return isAuthenticated ? <Demo /> : <LoginScreen />
+  if (screen === 'app')
+    return isAuthenticated ? <ConsoleShell /> : <LoginScreen />
   if (screen === 'signed-out') return <SignedOutScreen />
   if (screen === 'register') return <RegisterScreen />
   if (screen === 'oauth-new-user') return <OAuthNewUserScreen />

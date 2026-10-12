@@ -15,14 +15,10 @@ import { WorkspaceSidebarControl } from '@/components/workspace-sidebar-control'
 import { AppSidebar } from '@/components/app-sidebar'
 import { TaskComposer } from '@/components/task-composer'
 import { SessionView } from '@/components/session-view'
-import { SettingsPage } from '@/components/pages/settings-page'
-import { DashboardPage } from '@/components/pages/dashboard-page'
-import { ManagementPage } from '@/components/pages/management-page'
-import { canManagePlatform } from '@/features/management/permissions'
 import { useManagementText } from '@/components/management/controls'
-import { ServicePage } from '@/components/pages/service-page'
+import { ArchivedSessionsTab } from '@/components/settings/archived-sessions-tab'
+import { WorkbenchAgentLifecycle } from '@/features/workbench/agent-lifecycle'
 import { DevicePage } from '@/components/pages/device-page'
-import { MobileConnectionsPage } from '@/components/pages/mobile-connections-page'
 import { WorkspaceProvider, useWorkspace } from '@/components/workspace-context'
 import { LoadingState } from '@/components/loading-state'
 import { PairDeviceDialog } from '@/components/pair-device-dialog'
@@ -58,10 +54,11 @@ const DESKTOP_SIDEBAR_MIN_WIDTH = 224
 export function Demo() {
   const { session } = useAuth()
   return (
-    <WorkspaceProvider>
+    <WorkspaceProvider key={session?.userId ?? 'signed-out'}>
+      <WorkbenchAgentLifecycle />
       <AgentSetupProvider>
         <SessionToolSidebarStateProvider key={session?.userId ?? 'signed-out'}>
-          <SidebarProvider>
+          <SidebarProvider className="h-full min-h-0">
             <DashboardShell />
             <SessionToolSidebarsHost />
           </SidebarProvider>
@@ -78,7 +75,7 @@ function DashboardShell() {
     return (
       <>
         <AppSidebar />
-        <SidebarInset className="h-svh min-h-0 overflow-hidden overscroll-none bg-background">
+        <SidebarInset className="h-full min-h-0 overflow-hidden overscroll-none bg-background">
           <WorkspaceSidebarControl>
             <WorkspaceMain />
           </WorkspaceSidebarControl>
@@ -197,7 +194,7 @@ function DesktopResizableShell() {
     <DashboardSidebarControlsContext.Provider value={sidebarControls}>
       <div
         ref={desktopShellRef}
-        className="flex h-svh min-h-0 w-full flex-col overflow-hidden overscroll-none bg-background"
+        className="flex h-full min-h-0 w-full flex-col overflow-hidden overscroll-none bg-background"
         style={
           {
             '--desktop-sidebar-width': `${Math.max(sidebarWidth, DESKTOP_SIDEBAR_MIN_WIDTH)}px`,
@@ -281,11 +278,12 @@ function DesktopResizableShell() {
   )
 }
 
-function WorkspaceMain() {
-  const { me, can } = useAuth()
+export function WorkspaceMain() {
+  const { session, can } = useAuth()
   const tr = useManagementText()
   const {
     page,
+    settingsTab,
     isLoading,
     routeReady,
     firstDevicePromptOpen,
@@ -294,51 +292,57 @@ function WorkspaceMain() {
     openPairDeviceDialog,
     closePairDeviceDialog,
     refreshData,
+    projects,
+    sessions,
+    openSession,
+    upsertSession,
   } = useWorkspace()
   const t = useTranslations('dashboard.firstDevice')
-  const isNewSession = page === 'home'
-  if (!routeReady || (!isNewSession && isLoading)) {
+  const needsWorkspaceData = page === 'session' || page === 'device'
+  if (!routeReady || (needsWorkspaceData && isLoading)) {
     return <LoadingState className="h-full bg-background" />
   }
+  if (
+    !['home', 'session', 'device', 'settings'].includes(page) ||
+    (page === 'settings' && settingsTab !== 'archived-sessions')
+  )
+    return null
   const denied =
-    (page === 'dashboard' && !can('settings.manage')) ||
-    (page === 'team' && !can('users.read')) ||
-    (page === 'service' && !can('settings.manage')) ||
     (page === 'device' && !can('devices.read')) ||
-    (page === 'session' && !can('sessions.read')) ||
-    (page === 'management' && !canManagePlatform(me?.permissions))
-  const effectivePage = denied ? 'home' : page
-  const content =
-    effectivePage === 'settings' ? (
-      <SettingsPage />
-    ) : effectivePage === 'dashboard' ? (
-      <DashboardPage />
-    ) : effectivePage === 'team' ? (
-      <ManagementPage initialTab="users" />
-    ) : effectivePage === 'management' ? (
-      <ManagementPage />
-    ) : effectivePage === 'service' ? (
-      <ServicePage />
-    ) : effectivePage === 'mobile-connections' ? (
-      <MobileConnectionsPage />
-    ) : effectivePage === 'session' ? (
-      <SessionView />
-    ) : effectivePage === 'device' ? (
-      <DevicePage />
-    ) : !can('sessions.run') ? (
-      canManagePlatform(me?.permissions) ? (
-        <ManagementPage />
-      ) : (
-        <p className="p-8 text-sm text-muted-foreground">
-          {tr(
-            '当前账号没有创建会话的权限。可从账号菜单查看个人设置。',
-            'This account cannot create sessions. Open the account menu to view your settings.',
-          )}
-        </p>
-      )
-    ) : (
-      <TaskComposer />
-    )
+    ((page === 'session' || page === 'settings') && !can('sessions.read'))
+  const content = denied ? (
+    <p role="alert" className="p-8 text-sm text-muted-foreground">
+      {tr(
+        '403 · 当前账号无权访问此工作台页面。',
+        '403 · You do not have permission to access this workspace page.',
+      )}
+    </p>
+  ) : page === 'session' ? (
+    <SessionView />
+  ) : page === 'device' ? (
+    <DevicePage />
+  ) : page === 'settings' ? (
+    <div className="h-full overflow-auto p-6">
+      <ArchivedSessionsTab
+        token={session?.accessToken ?? ''}
+        projects={projects}
+        sessions={sessions}
+        loading={isLoading}
+        onOpenSession={openSession}
+        onSessionUpdated={upsertSession}
+        onWorkspaceRefresh={refreshData}
+      />
+    </div>
+  ) : !can('sessions.run') ? (
+    <p className="p-8 text-sm text-muted-foreground">
+      {tr(
+        '当前账号没有创建会话的权限。',
+        'This account cannot create sessions.',
+      )}
+    </p>
+  ) : (
+    <TaskComposer />
+  )
   return (
     <>
       {content}

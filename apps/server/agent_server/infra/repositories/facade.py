@@ -23,12 +23,16 @@ from agent_server.infra.repositories.store_support import *
 from agent_server.infra.repositories.timeline import TimelineRepositoryMixin
 from agent_server.infra.repositories.users import UserRepositoryMixin
 from agent_server.infra.repositories.identity import IdentityRepositoryMixin
+from agent_server.infra.repositories.navigation import NavigationRepositoryMixin
+from agent_server.infra.repositories.management_lists import ManagementListRepositoryMixin
 
 _MAX_TRACKED_LOCKS = 4096
 _TRACKED_LOCK_IDLE_SECONDS = 900.0
 
 
 class Store(
+    ManagementListRepositoryMixin,
+    NavigationRepositoryMixin,
     IdentityRepositoryMixin,
     DeviceRuntimeRepositoryMixin,
     ProtocolCatalogRepositoryMixin,

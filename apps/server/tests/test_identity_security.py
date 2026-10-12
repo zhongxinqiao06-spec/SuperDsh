@@ -4,6 +4,7 @@ import asyncio
 import time
 import uuid
 
+import pytest
 from test_auth import admin_token, bearer, make_client
 
 from agent_server.core.auth import create_user_access_token, user_access_claims
@@ -267,6 +268,102 @@ def test_custom_role_union_and_no_delegated_privilege_escalation(tmp_path):
     )
     assert (
         client.delete("/admin/roles/member", headers=bearer(admin)).status_code == 409
+    )
+
+
+@pytest.mark.parametrize("role_id", ["admin", "member"])
+@pytest.mark.parametrize("operation", ["name", "description", "permissions", "delete"])
+def test_builtin_roles_reject_mutations_without_invalidating_users(
+    tmp_path, role_id, operation
+):
+    client = make_client(tmp_path)
+    admin = admin_token(client)
+    member(client, admin)
+    member_token = sign_in(client)["accessToken"]
+    tokens = [admin, member_token]
+    users_before = [
+        client.get("/auth/me", headers=bearer(token)).json() for token in tokens
+    ]
+    catalog_before = client.get("/admin/roles", headers=bearer(admin)).json()
+    role = next(item for item in catalog_before["roles"] if item["id"] == role_id)
+    assert role["builtin"] is True
+
+    if operation == "delete":
+        response = client.delete(f"/admin/roles/{role_id}", headers=bearer(admin))
+        expected_error = "builtin roles cannot be deleted"
+    else:
+        payload = {key: role[key] for key in ("name", "description", "permissions")}
+        payload[operation] = [] if operation == "permissions" else "Changed"
+        response = client.patch(
+            f"/admin/roles/{role_id}", headers=bearer(admin), json=payload
+        )
+        expected_error = "builtin roles cannot be edited"
+
+    assert response.status_code == 409, response.text
+    assert response.json() == {"detail": expected_error}
+    assert client.get("/admin/roles", headers=bearer(admin)).json() == catalog_before
+    for token, previous in zip(tokens, users_before, strict=True):
+        current = client.get("/auth/me", headers=bearer(token))
+        assert current.status_code == 200, current.text
+        for key in ("authzVersion", "roles", "permissions"):
+            assert current.json()[key] == previous[key]
+
+
+def test_custom_role_edit_invalidates_grants_and_delete_requires_unassignment(tmp_path):
+    client = make_client(tmp_path)
+    admin = admin_token(client)
+    user = member(client, admin)
+    created = client.post(
+        "/admin/roles",
+        headers=bearer(admin),
+        json={"name": "Auditor", "description": "Original", "permissions": []},
+    )
+    assert created.status_code == 201, created.text
+    role_id = created.json()["id"]
+    assert created.json()["builtin"] is False
+    assigned = client.patch(
+        f"/admin/users/{user['userId']}",
+        headers=bearer(admin),
+        json={"roles": ["member", role_id]},
+    )
+    assert assigned.status_code == 200, assigned.text
+    login = sign_in(client)
+    updated = client.patch(
+        f"/admin/roles/{role_id}",
+        headers=bearer(admin),
+        json={
+            "name": "User auditor",
+            "description": "Read user accounts",
+            "permissions": ["users.read"],
+        },
+    )
+    assert updated.status_code == 200, updated.text
+    assert updated.json() == {
+        "id": role_id,
+        "name": "User auditor",
+        "description": "Read user accounts",
+        "builtin": False,
+        "permissions": ["users.read"],
+    }
+    assert (
+        client.get("/auth/me", headers=bearer(login["accessToken"])).status_code == 401
+    )
+    fresh = sign_in(client)
+    assert fresh["authzVersion"] == login["authzVersion"] + 1
+    assert "users.read" in fresh["permissions"]
+    assert (
+        client.delete(f"/admin/roles/{role_id}", headers=bearer(admin)).status_code
+        == 409
+    )
+    unassigned = client.patch(
+        f"/admin/users/{user['userId']}",
+        headers=bearer(admin),
+        json={"roles": ["member"]},
+    )
+    assert unassigned.status_code == 200, unassigned.text
+    assert (
+        client.delete(f"/admin/roles/{role_id}", headers=bearer(admin)).status_code
+        == 204
     )
 
 

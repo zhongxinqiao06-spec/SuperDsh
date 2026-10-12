@@ -12,6 +12,11 @@ import {
   serverAgentApi,
   type ServerAgent,
 } from '@/features/dashboard/server-agent'
+import { useWorkbenchState } from '@/features/workbench/memory'
+import {
+  INITIAL_PREPARATION,
+  prepareWorkbenchAgent,
+} from '@/features/workbench/agent-lifecycle'
 
 export function ServerAgentControl({
   onReady,
@@ -43,6 +48,10 @@ function ScopedServerAgentControl({
   onAvailable?: () => void
 }) {
   const tr = useManagementText()
+  const [preparation] = useWorkbenchState(
+    'agent-preparation',
+    INITIAL_PREPARATION,
+  )
   const resource = useManagementResource('server-agent', serverAgentApi.get, {
     autoRefreshMs: 2000,
   })
@@ -60,7 +69,7 @@ function ScopedServerAgentControl({
     if (target && announcedTarget.current !== target) onAvailable?.()
     announcedTarget.current = target
   }, [agent, onAvailable, ready])
-  const diagnostic = resource.error || agent?.error
+  const diagnostic = resource.error || agent?.error || preparation.error
   const unconfigured =
     agent?.status === 'stopped' &&
     agent.error === 'server Agent supervisor is not configured'
@@ -80,7 +89,7 @@ function ScopedServerAgentControl({
       resource.reload()
       return
     }
-    void resource.perform(serverAgentApi.prepare)
+    void resource.perform(() => prepareWorkbenchAgent(true))
   }
   return (
     <div className="mb-4 flex flex-wrap items-center justify-between gap-3 rounded-xl border bg-card p-3 text-sm">

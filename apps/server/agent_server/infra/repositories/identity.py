@@ -577,8 +577,6 @@ class IdentityRepositoryMixin:
         actor: UserView,
     ) -> dict:
         permissions = validate_permissions(permissions)
-        if role_id == "admin":
-            raise ValueError("system administrator role is immutable")
         if not set(permissions).issubset(actor.permissions):
             raise ValueError("cannot grant permissions you do not hold")
         if not name.strip():
@@ -593,6 +591,8 @@ class IdentityRepositoryMixin:
                 )
                 if not old:
                     raise KeyError(role_id)
+                if old["builtin"]:
+                    raise ValueError("builtin roles cannot be edited")
                 if not set(json.loads(old["permissions_json"])).issubset(
                     actor.permissions
                 ):

@@ -55,7 +55,6 @@ import {
   TableHeader,
   TableRow,
 } from '@/components/ui/table'
-import { useWorkspace } from '@/components/workspace-context'
 import { dashboardApi } from '@/features/dashboard/api'
 import type {
   AdminDashboardBreakdownItem,
@@ -100,8 +99,7 @@ const navItems: {
   { id: 'agents', icon: SlidersHorizontal, labelKey: 'agents' },
 ]
 
-export function DashboardPage() {
-  const { navigate } = useWorkspace()
+export function DashboardPage({ onBack }: { onBack?: () => void } = {}) {
   const { session } = useAuth()
   const t = useTranslations('pages.opsDashboard')
   const [tab, setTab] = React.useState<DashboardTab>('overview')
@@ -178,11 +176,11 @@ export function DashboardPage() {
 
   return (
     <div className="flex h-full flex-col bg-background">
-      <div className="px-5 pb-0 pt-14 sm:px-8">
+      <div className="px-5 pb-0 pt-6 sm:px-8">
         <PageHeader
           title={t('title')}
           description={t('description')}
-          onBack={() => navigate('home')}
+          onBack={onBack}
         >
           <DateField
             label={t('from')}

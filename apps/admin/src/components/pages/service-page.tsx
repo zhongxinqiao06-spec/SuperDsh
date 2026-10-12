@@ -15,6 +15,9 @@ import { useTranslations } from 'next-intl'
 import { toast } from 'sonner'
 
 import { useAuth } from '@/components/auth/auth-context'
+import { useManagementText } from '@/components/management/controls'
+import { ManagementDialog } from '@/components/management/presentation'
+import { Badge } from '@/components/ui/badge'
 import { PageHeader } from '@/components/pages/page-header'
 import { ServiceEmailCard } from '@/components/pages/service-email-card'
 import { ServiceAnnouncementCard } from '@/components/pages/service-announcement-card'
@@ -25,7 +28,6 @@ import {
   CardAction,
   CardContent,
   CardDescription,
-  CardFooter,
   CardHeader,
   CardTitle,
 } from '@/components/ui/card'
@@ -44,8 +46,8 @@ import { Separator } from '@/components/ui/separator'
 import { Spinner } from '@/components/ui/spinner'
 import { Switch } from '@/components/ui/switch'
 import { ToggleGroup, ToggleGroupItem } from '@/components/ui/toggle-group'
-import { useWorkspace } from '@/components/workspace-context'
 import { authApi } from '@/features/auth/api'
+import { apiPath } from '@/lib/api'
 import type {
   InstanceSettings,
   OAuthProviderConfig,
@@ -97,8 +99,8 @@ function browserPublicUrl(fallback: string): string {
   return window.location.origin.replace(/\/$/, '') || fallback
 }
 
-function webOAuthRedirectUrl(publicUrl: string): string {
-  return `${publicUrl.replace(/\/$/, '')}/auth/oauth/callback`
+export function webOAuthRedirectUrl(publicUrl: string): string {
+  return `${publicUrl.replace(/\/$/, '')}${apiPath('/auth/oauth/callback')}`
 }
 
 function normalizeBaseUrl(value: string): string {
@@ -202,11 +204,11 @@ const oauthTemplates: Record<OAuthTemplateKey, OAuthTemplate> = {
   },
 }
 
-export function ServicePage() {
-  const { navigate } = useWorkspace()
+export function ServicePage({ onBack }: { onBack?: () => void } = {}) {
   const { session, me } = useAuth()
   const t = useTranslations('pages.service')
   const tCommon = useTranslations('common')
+  const tr = useManagementText()
   const [serviceInfo, setServiceInfo] = React.useState<ServiceInfo | null>(null)
   const [settings, setSettings] = React.useState<InstanceSettings | null>(null)
   const [oauthDraft, setOauthDraft] = React.useState<OAuthProviderConfigUpdate>(
@@ -217,7 +219,14 @@ export function ServicePage() {
   const [oauthBaseUrl, setOauthBaseUrl] = React.useState('')
   const [loading, setLoading] = React.useState(true)
   const [error, setError] = React.useState<string | null>(null)
-  const [togglePending, setTogglePending] = React.useState<string | null>(null)
+  const [accessOpen, setAccessOpen] = React.useState(false)
+  const [accessSaving, setAccessSaving] = React.useState(false)
+  const [accessDraft, setAccessDraft] = React.useState({
+    registrationOpen: false,
+    oauthRegistrationOpen: false,
+  })
+  const [accessError, setAccessError] = React.useState('')
+  const [oauthError, setOauthError] = React.useState('')
   const [oauthSaving, setOauthSaving] = React.useState(false)
   const [copied, setCopied] = React.useState<CopyKey | null>(null)
   const isAdmin = Boolean(me?.permissions?.includes('settings.manage'))
@@ -301,34 +310,26 @@ export function ServicePage() {
     [oauthTemplate, updateOAuthDraft],
   )
 
-  const handleSettingToggle = React.useCallback(
-    async (
-      key: 'registrationOpen' | 'oauthRegistrationOpen',
-      value: boolean,
-    ) => {
-      if (!settings || !session?.accessToken || togglePending) return
-      const previous = settings
-      setTogglePending(key)
-      setError(null)
-      setSettings({ ...settings, [key]: value })
-      try {
-        setSettings(
-          await authApi.updateSettings(session.accessToken, { [key]: value }),
-        )
-      } catch (err) {
-        setSettings(previous)
-        toast.error(err instanceof Error ? err.message : t('updateFailed'))
-      } finally {
-        setTogglePending(null)
-      }
-    },
-    [session?.accessToken, settings, t, togglePending],
-  )
+  const saveAccess = React.useCallback(async () => {
+    if (!settings || !session?.accessToken || accessSaving) return
+    setAccessSaving(true)
+    setAccessError('')
+    try {
+      setSettings(
+        await authApi.updateSettings(session.accessToken, accessDraft),
+      )
+      setAccessOpen(false)
+    } catch (err) {
+      setAccessError(err instanceof Error ? err.message : t('updateFailed'))
+    } finally {
+      setAccessSaving(false)
+    }
+  }, [session?.accessToken, settings, t, accessDraft, accessSaving])
 
   const saveOAuthProvider = React.useCallback(async () => {
-    if (!settings || !session?.accessToken || oauthSaving) return
+    if (!settings || !session?.accessToken || oauthSaving) return false
     setOauthSaving(true)
-    setError(null)
+    setOauthError('')
     try {
       const updated = await authApi.updateSettings(session.accessToken, {
         oauth: oauthUpdatePayload(oauthDraft),
@@ -337,8 +338,10 @@ export function ServicePage() {
       setOauthDraft(oauthDraftFromConfig(updated.oauth))
       setOauthTemplate('custom')
       setOauthBaseUrl('')
+      return true
     } catch (err) {
-      toast.error(err instanceof Error ? err.message : t('oauthUpdateFailed'))
+      setOauthError(err instanceof Error ? err.message : t('oauthUpdateFailed'))
+      return false
     } finally {
       setOauthSaving(false)
     }
@@ -348,8 +351,14 @@ export function ServicePage() {
 
   if (error && (!serviceInfo || !settings)) {
     return (
-      <div className="flex h-full items-center justify-center px-8 text-center text-sm text-destructive">
-        {error}
+      <div className="flex h-full flex-col items-center justify-center gap-4 px-8 text-center text-sm">
+        <p role="alert" className="text-destructive">
+          {error}
+        </p>
+        <Button type="button" variant="outline" onClick={() => load()}>
+          <RefreshCw data-icon="inline-start" />
+          {t('refresh')}
+        </Button>
       </div>
     )
   }
@@ -366,11 +375,11 @@ export function ServicePage() {
 
   return (
     <ScrollArea className="@container/page h-full w-full bg-background">
-      <div className="mx-auto flex w-full max-w-5xl flex-col gap-6 px-8 pb-16 pt-14 @min-[68rem]/page:pt-8">
+      <div className="mx-auto flex w-full max-w-6xl flex-col gap-6 p-4 pb-16 sm:p-8">
         <PageHeader
           title={t('title')}
           description={t('description')}
-          onBack={() => navigate('home')}
+          onBack={onBack}
         >
           <Button
             type="button"
@@ -394,32 +403,104 @@ export function ServicePage() {
           <CardHeader>
             <CardTitle>{t('access')}</CardTitle>
             <CardDescription>{t('accessDescription')}</CardDescription>
+            <CardAction>
+              <Button
+                variant="outline"
+                disabled={!isAdmin}
+                onClick={() => {
+                  setAccessDraft({
+                    registrationOpen: settings.registrationOpen,
+                    oauthRegistrationOpen: settings.oauthRegistrationOpen,
+                  })
+                  setAccessError('')
+                  setAccessOpen(true)
+                }}
+              >
+                {tr('编辑配置', 'Edit settings')}
+              </Button>
+            </CardAction>
           </CardHeader>
           <CardContent>
-            <FieldGroup>
-              <SettingSwitchField
-                label={t('openRegistration')}
-                description={t('openRegistrationDescription')}
-                checked={settings.registrationOpen}
-                disabled={!isAdmin || togglePending === 'registrationOpen'}
-                pending={togglePending === 'registrationOpen'}
-                onCheckedChange={(value) =>
-                  void handleSettingToggle('registrationOpen', value)
-                }
-              />
-              <SettingSwitchField
-                label={t('oauthRegistration')}
-                description={t('oauthRegistrationDescription')}
-                checked={settings.oauthRegistrationOpen}
-                disabled={!isAdmin || togglePending === 'oauthRegistrationOpen'}
-                pending={togglePending === 'oauthRegistrationOpen'}
-                onCheckedChange={(value) =>
-                  void handleSettingToggle('oauthRegistrationOpen', value)
-                }
-              />
-            </FieldGroup>
+            <dl className="space-y-3 text-sm">
+              {(['registrationOpen', 'oauthRegistrationOpen'] as const).map(
+                (key) => (
+                  <div
+                    key={key}
+                    className="flex flex-wrap items-center justify-between gap-3"
+                  >
+                    <dt>
+                      {t(
+                        key === 'registrationOpen'
+                          ? 'openRegistration'
+                          : 'oauthRegistration',
+                      )}
+                    </dt>
+                    <dd>
+                      <Badge variant="secondary">
+                        {tr(
+                          settings[key] ? '已开放' : '已关闭',
+                          settings[key] ? 'Open' : 'Closed',
+                        )}
+                      </Badge>
+                    </dd>
+                  </div>
+                ),
+              )}
+            </dl>
           </CardContent>
         </Card>
+        <ManagementDialog
+          open={accessOpen}
+          onOpenChange={setAccessOpen}
+          title={t('access')}
+          description={t('accessDescription')}
+          busy={accessSaving}
+          error={accessError}
+          footer={
+            <>
+              <Button
+                variant="outline"
+                disabled={accessSaving}
+                onClick={() => setAccessOpen(false)}
+              >
+                {tr('取消', 'Cancel')}
+              </Button>
+              <Button disabled={accessSaving} onClick={() => void saveAccess()}>
+                {accessSaving && <Spinner />}
+                {tr('保存', 'Save')}
+              </Button>
+            </>
+          }
+        >
+          <FieldGroup>
+            <SettingSwitchField
+              label={t('openRegistration')}
+              description={t('openRegistrationDescription')}
+              checked={accessDraft.registrationOpen}
+              disabled={!isAdmin || accessSaving}
+              pending={false}
+              onCheckedChange={(value) =>
+                setAccessDraft((current) => ({
+                  ...current,
+                  registrationOpen: value,
+                }))
+              }
+            />
+            <SettingSwitchField
+              label={t('oauthRegistration')}
+              description={t('oauthRegistrationDescription')}
+              checked={accessDraft.oauthRegistrationOpen}
+              disabled={!isAdmin || accessSaving}
+              pending={false}
+              onCheckedChange={(value) =>
+                setAccessDraft((current) => ({
+                  ...current,
+                  oauthRegistrationOpen: value,
+                }))
+              }
+            />
+          </FieldGroup>
+        </ManagementDialog>
 
         <ServiceEmailCard
           settings={settings.email}
@@ -434,6 +515,8 @@ export function ServicePage() {
 
         <OAuthProviderCard
           draft={oauthDraft}
+          savedConfig={settings.oauth}
+          error={oauthError}
           isExisting={Boolean(settings.oauth)}
           isAdmin={isAdmin}
           saving={oauthSaving}
@@ -443,11 +526,12 @@ export function ServicePage() {
           onTemplateChange={applyOAuthTemplate}
           onBaseUrlChange={updateOAuthBaseUrl}
           onReset={() => {
+            setOauthError('')
             setOauthDraft(oauthDraftFromConfig(settings.oauth))
             setOauthTemplate('custom')
             setOauthBaseUrl('')
           }}
-          onSave={() => void saveOAuthProvider()}
+          onSave={saveOAuthProvider}
         />
 
         <FirstPartyClientsCard
@@ -628,6 +712,8 @@ function SettingSwitchField({
 
 function OAuthProviderCard({
   draft,
+  savedConfig,
+  error,
   isExisting,
   isAdmin,
   saving,
@@ -640,6 +726,8 @@ function OAuthProviderCard({
   onSave,
 }: {
   draft: OAuthProviderConfigUpdate
+  savedConfig: OAuthProviderConfig | null
+  error: string
   isExisting: boolean
   isAdmin: boolean
   saving: boolean
@@ -649,22 +737,82 @@ function OAuthProviderCard({
   onTemplateChange: (key: OAuthTemplateKey, baseUrl?: string) => void
   onBaseUrlChange: (value: string) => void
   onReset: () => void
-  onSave: () => void
+  onSave: () => Promise<boolean>
 }) {
   const t = useTranslations('pages.service')
+  const tr = useManagementText()
+  const [open, setOpen] = React.useState(false)
+  React.useEffect(() => {
+    if (!open) onDraftChange({ clientSecret: '' })
+  }, [open, onDraftChange])
   const disabled = !isAdmin || saving
   const showCustomFields = template === 'custom'
 
   return (
-    <Card>
-      <CardHeader>
-        <CardTitle>{t('oauthProvider')}</CardTitle>
-        <CardDescription>{t('enableOauthDescription')}</CardDescription>
-        <CardAction>
-          <KeyRound />
-        </CardAction>
-      </CardHeader>
-      <CardContent>
+    <>
+      <Card>
+        <CardHeader>
+          <CardTitle>{t('oauthProvider')}</CardTitle>
+          <CardDescription>{t('enableOauthDescription')}</CardDescription>
+          <CardAction>
+            <Button
+              variant="outline"
+              disabled={!isAdmin}
+              onClick={() => {
+                onReset()
+                setOpen(true)
+              }}
+            >
+              <KeyRound data-icon="inline-start" />
+              {tr('编辑配置', 'Edit settings')}
+            </Button>
+          </CardAction>
+        </CardHeader>
+        <CardContent className="flex flex-wrap items-center gap-3 text-sm">
+          <Badge variant="secondary">
+            {tr(
+              savedConfig?.enabled ? '已启用' : '未启用',
+              savedConfig?.enabled ? 'Enabled' : 'Disabled',
+            )}
+          </Badge>
+          <span className="text-muted-foreground">
+            {savedConfig?.label ||
+              tr('未配置登录供应商', 'No sign-in provider configured')}
+          </span>
+        </CardContent>
+      </Card>
+      <ManagementDialog
+        open={open}
+        onOpenChange={setOpen}
+        title={t('oauthProvider')}
+        description={t('enableOauthDescription')}
+        busy={saving}
+        error={error}
+        className="sm:max-w-2xl"
+        footer={
+          <>
+            <Button
+              variant="outline"
+              disabled={disabled}
+              onClick={() => setOpen(false)}
+            >
+              {tr('取消', 'Cancel')}
+            </Button>
+            <Button variant="outline" onClick={onReset} disabled={disabled}>
+              {t('reset')}
+            </Button>
+            <Button
+              disabled={disabled}
+              onClick={async () => {
+                if (await onSave()) setOpen(false)
+              }}
+            >
+              {saving && <Spinner />}
+              {saving ? t('saving') : t('saveProvider')}
+            </Button>
+          </>
+        }
+      >
         <FieldGroup>
           <Field orientation="horizontal" data-disabled={disabled}>
             <FieldContent>
@@ -835,22 +983,8 @@ function OAuthProviderCard({
             </div>
           </FieldSet>
         </FieldGroup>
-      </CardContent>
-      <CardFooter className="justify-end gap-2 border-t">
-        <Button
-          type="button"
-          variant="outline"
-          onClick={onReset}
-          disabled={disabled}
-        >
-          {t('reset')}
-        </Button>
-        <Button type="button" onClick={onSave} disabled={disabled}>
-          {saving && <Spinner data-icon="inline-start" />}
-          {saving ? t('saving') : t('saveProvider')}
-        </Button>
-      </CardFooter>
-    </Card>
+      </ManagementDialog>
+    </>
   )
 }
 

@@ -230,6 +230,8 @@ test('admin edits, previews and publishes Markdown, with empty enabled content r
     }),
   )
   await render(t, h(ServiceAnnouncementCard, { token: 'admin-token' }))
+  assert.equal(document.querySelector('textarea'), null)
+  await click(button('编辑公告'))
   await click(document.querySelector('[role="switch"]'))
   assert.equal(button('保存公告').disabled, true)
   const textarea = document.querySelector('textarea')
@@ -247,5 +249,37 @@ test('admin edits, previews and publishes Markdown, with empty enabled content r
     'admin-token',
     { enabled: true, markdown: '## 公告预览' },
   ])
-  assert.equal(button('保存公告').disabled, true)
+  assert.equal(document.querySelector('[role="dialog"]'), null)
+  assert.ok(button('编辑公告'))
+})
+
+test('announcement save failure preserves the draft in the dialog and can be retried', async (t) => {
+  t.mock.method(announcementsApi, 'settings', async () => ({
+    enabled: true,
+    markdown: 'Existing',
+    publishedAt: null,
+  }))
+  let fails = true
+  const save = t.mock.method(announcementsApi, 'save', async (_token, body) => {
+    if (fails) throw new Error('save failed')
+    return { ...body, publishedAt: publication().publishedAt }
+  })
+  await render(t, h(ServiceAnnouncementCard, { token: 'admin-token' }))
+  await click(button('编辑公告'))
+  const textarea = document.querySelector('textarea')
+  await act(async () => {
+    Object.getOwnPropertyDescriptor(
+      HTMLTextAreaElement.prototype,
+      'value',
+    ).set.call(textarea, 'My pending draft')
+    textarea.dispatchEvent(new Event('input', { bubbles: true }))
+  })
+  await click(button('保存公告'))
+  assert.ok(document.querySelector('[role="dialog"] [role="alert"]'))
+  assert.equal(document.querySelector('textarea').value, 'My pending draft')
+  fails = false
+  await click(button('保存公告'))
+  assert.equal(document.querySelector('[role="dialog"]'), null)
+  assert.equal(save.mock.callCount(), 2)
+  assert.match(document.body.textContent, /My pending draft/)
 })

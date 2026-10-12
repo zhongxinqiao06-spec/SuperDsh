@@ -15,6 +15,8 @@ PERMISSIONS = {
     "users.read": "View accounts",
     "users.manage": "Manage accounts",
     "roles.manage": "Manage roles and assignments",
+    "menus.read": "View navigation configuration",
+    "menus.manage": "Configure product navigation",
     "devices.inventory.read": "View platform device inventory",
     "devices.connection.manage": "Block and restore platform device connections",
     "settings.manage": "Manage platform settings",

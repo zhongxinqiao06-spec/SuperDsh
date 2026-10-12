@@ -35,6 +35,7 @@ test('quality checks include owned nested workspaces and exclude generated/runti
   ]
   const excluded = [
     'apps/admin/.next/server/main.js',
+    'apps/admin/.next-console-validation/server/main.js',
     'apps/admin/out/assets/main.js',
     'apps/admin/src/generated/protocol/v1/event.ts',
     'apps/admin/next-env.d.ts',

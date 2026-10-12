@@ -121,7 +121,10 @@ async def request_reset(
 
 @router.get("/audit")
 async def audit(
+    page: int | None = None,
+    pageSize: int | None = None,
+    search: str = "",
     user: UserView = Depends(require_permission("audit.read")),
     db: Store = Depends(get_store),
 ) -> dict:
-    return {"events": await db.list_audit()}
+    return await db.management_audit(page=page, page_size=pageSize, search=search)

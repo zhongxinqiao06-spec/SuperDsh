@@ -3,7 +3,8 @@
 import * as React from 'react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
-import { managementApi } from '@/features/management/api'
+import { managementApi, type AuditEvent } from '@/features/management/api'
+import { ManagementDialog, ManagementPagination } from './presentation'
 import {
   dateLabel,
   ResourceState,
@@ -14,17 +15,31 @@ import {
 
 export function AuditPanel() {
   const tr = useManagementText()
-  const resource = useManagementResource('audit', managementApi.audit)
   const [search, setSearch] = React.useState('')
-  const events =
-    resource.data?.events.filter((event) =>
-      `${event.actorId} ${event.action} ${event.targetId}`
-        .toLowerCase()
-        .includes(search.toLowerCase()),
-    ) ?? []
+  const [filter, setFilter] = React.useState('')
+  const [page, setPage] = React.useState(1)
+  const [pageSize, setPageSize] = React.useState(25)
+  const [selected, setSelected] = React.useState<AuditEvent | null>(null)
+  const resource = useManagementResource(
+    `audit:${page}:${pageSize}:${filter}`,
+    () => managementApi.audit(page, filter, pageSize),
+  )
+  const events = resource.data?.events ?? []
+  const total = resource.data?.total ?? events.length
+  React.useEffect(() => {
+    if (resource.data && page > Math.max(1, Math.ceil(total / pageSize)))
+      setPage(Math.max(1, Math.ceil(total / pageSize)))
+  }, [resource.data, page, pageSize, total])
   return (
     <div className="space-y-4">
-      <div className="flex flex-wrap gap-2">
+      <form
+        className="flex flex-wrap items-center gap-2 rounded-xl border p-4"
+        onSubmit={(event) => {
+          event.preventDefault()
+          setFilter(search.trim())
+          setPage(1)
+        }}
+      >
         <Input
           className="max-w-sm"
           aria-label={tr('筛选审计日志', 'Filter audit events')}
@@ -35,14 +50,28 @@ export function AuditPanel() {
           value={search}
           onChange={(event) => setSearch(event.target.value)}
         />
-        <Button variant="outline" onClick={resource.reload}>
+        <Button
+          type="submit"
+          size="sm"
+          variant="outline"
+          disabled={resource.loading}
+        >
+          {tr('搜索', 'Search')}
+        </Button>
+        <Button
+          type="button"
+          size="sm"
+          variant="outline"
+          onClick={resource.reload}
+          disabled={resource.loading}
+        >
           {tr('刷新', 'Refresh')}
         </Button>
-      </div>
+      </form>
       <p className="text-sm text-muted-foreground">
         {tr(
-          '显示最近的管理操作记录，不包含聊天内容或密钥。',
-          'Recent administrative operations, without conversation content or credentials.',
+          '分页查询管理操作记录，不包含聊天内容或密钥。',
+          'Browse administrative operations, without conversation content or credentials.',
         )}
       </p>
       <ResourceState {...resource} onRetry={resource.reload} />
@@ -67,9 +96,13 @@ export function AuditPanel() {
                 <td>{event.action}</td>
                 <td>{event.targetId || '—'}</td>
                 <td>
-                  <pre className="max-w-sm whitespace-pre-wrap break-words text-xs">
-                    {event.detail ? JSON.stringify(event.detail, null, 2) : '—'}
-                  </pre>
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    onClick={() => setSelected(event)}
+                  >
+                    {tr('查看详情', 'View details')}
+                  </Button>
                 </td>
               </tr>
             ))}
@@ -81,6 +114,40 @@ export function AuditPanel() {
           </p>
         )}
       </div>
+      <ManagementPagination
+        page={page}
+        pageSize={pageSize}
+        total={total}
+        onPageChange={setPage}
+        onPageSizeChange={(size) => {
+          setPageSize(size)
+          setPage(1)
+        }}
+        loading={resource.loading}
+      />
+      <ManagementDialog
+        open={Boolean(selected)}
+        onOpenChange={(open) => !open && setSelected(null)}
+        title={tr('审计详情', 'Audit details')}
+        description={selected ? dateLabel(selected.createdAt) : undefined}
+        footer={
+          <Button variant="outline" onClick={() => setSelected(null)}>
+            {tr('关闭', 'Close')}
+          </Button>
+        }
+      >
+        <dl className="grid grid-cols-[auto_1fr] gap-3 text-sm">
+          <dt>{tr('操作者', 'Actor')}</dt>
+          <dd className="break-all">{selected?.actorId || '—'}</dd>
+          <dt>{tr('操作', 'Action')}</dt>
+          <dd>{selected?.action}</dd>
+          <dt>{tr('目标', 'Target')}</dt>
+          <dd className="break-all">{selected?.targetId || '—'}</dd>
+        </dl>
+        <pre className="whitespace-pre-wrap break-words rounded-lg bg-muted/40 p-3 text-xs">
+          {selected?.detail ? JSON.stringify(selected.detail, null, 2) : '—'}
+        </pre>
+      </ManagementDialog>
     </div>
   )
 }

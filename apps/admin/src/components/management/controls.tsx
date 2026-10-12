@@ -187,7 +187,7 @@ export function FieldLabel({
 }
 
 export const tableClass =
-  'w-full text-left text-sm [&_th]:p-3 [&_th]:font-medium [&_th]:text-muted-foreground [&_td]:p-3 [&_td]:align-top [&_tr]:border-b'
+  'w-full min-w-[640px] text-left text-sm [&_th]:whitespace-nowrap [&_th]:p-3 [&_th]:font-medium [&_th]:text-muted-foreground [&_td]:p-3 [&_td]:align-top [&_tr]:border-b'
 
 export function dateLabel(value: string | null | undefined): string {
   if (!value) return '—'

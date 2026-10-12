@@ -4,6 +4,8 @@
 负责账号、设备配对、远程请求中转和会话同步。任务可以在所属电脑上执行，也可以在每个用户独立的服务端 Harness 容器中执行。
 管理与登录界面在 [`../admin`](../admin)，Docker 将其静态页面与 API 放在同一服务中。
 
+部署到服务器直接阅读[从 Git 拉取到 Docker 启动](docker/README.md#服务器首次部署)：包含 Linux / CentOS 前提、首次构建与启动、管理员初始化、HTTPS、升级、停止和备份。
+
 ## 从哪里改
 
 | 内容                          | 目录                          |
@@ -24,11 +26,13 @@
 
 显式设置 `AGENT_SERVER_DB_URL` 时不自动创建开发管理员；外部空库使用 API 终端输出的 setup token 在网页初始化，自行设置用户名和密码。`GET /api/v2/health/ready` 同时检查数据库版本、Redis 和实时订阅；仅检查端口不能证明服务就绪。
 
-开发依赖使用独立项目 `superdsh-dev`、独立卷及忽略的配置 `.superdsh-work/server-dev/aa-dev.env`；PostgreSQL 17 / Redis 8 仅监听 `127.0.0.1:15432` / `127.0.0.1:16379`。`server:dev` 自动读取配置，显式设置的 `AGENT_SERVER_DB_URL`、`AGENT_SERVER_REDIS_URL` 优先。使用已有 PostgreSQL / Redis 时，设置这两个变量即可跳过 `server:deps:up`，本机 API 不需要 Docker；数据库 URL 使用 `postgresql+asyncpg://`。
+开发依赖使用独立项目 `superdsh-dev`、独立卷及忽略的配置 `.superdsh-work/server-dev/aa-dev.env`；PostgreSQL 17 / Redis 8 默认监听 `127.0.0.1:15432` / `127.0.0.1:16379`。重复运行 `server:deps:up` 跳过健康容器、等待启动中容器，只启动缺失或停止的依赖。其他程序占用端口时自动选择并保存空闲端口，不接管其数据库或停止其容器；已有本项目容器则复用实际映射。终端显式设置的 `SUPERDSH_DEV_PG_PORT` / `SUPERDSH_DEV_REDIS_PORT` 冲突时提示修改，不静默覆盖。`server:dev` 自动读取保存的端口；已有 API 进程需要重启。
+
+显式设置的 `AGENT_SERVER_DB_URL`、`AGENT_SERVER_REDIS_URL` 优先。使用已有 PostgreSQL / Redis 时，设置这两个变量即可跳过 `server:deps:up`，本机 API 不需要 Docker；数据库 URL 使用 `postgresql+asyncpg://`。依赖命令检测到这两个外部地址时也跳过托管容器启动与默认管理员初始化。
 
 先对本机 API、网页分别按 `Ctrl+C`，再停止开发依赖：`server:deps:down` 会停止 Supervisor、转发容器和 `superdsh-dev` 的用户 Agent，保留全部卷；未停止的 API 可能重新调度 Agent。此流程不改动 `15174` 的完整 Docker 服务或其凭据。保留开发卷时也要保留其环境文件，不能重新生成数据库密码或加密密钥。
 
-`server:deps:up` 只启动 PostgreSQL / Redis；默认托管开发库下，`server:dev` 随后自动准备 Supervisor、nginx API relay 与 Harness 运行镜像。缺少运行镜像时首次自动构建，Supervisor 每次利用缓存构建；API 与网页仍在本机手动运行。登录及恢复登录会话后后台准备所属 Agent，不阻塞登录或切换当前聊天；失败显示诊断并允许重试。
+`server:deps:up` 只启动 PostgreSQL / Redis；默认托管开发库下，`server:dev` 随后自动准备 Supervisor、nginx API relay 与 Harness 运行镜像。缺少运行镜像时首次自动构建，Supervisor 每次利用缓存构建；API 与网页仍在本机手动运行。网页进入 Agent 工作台后准备所属 Agent；桌面、安卓登录及恢复会话仍在后台准备，不阻塞登录。失败显示诊断并允许重试。
 
 只需要平台开发与电脑 Connector 时，设置 `SUPERDSH_DEV_AGENT_ENABLED=0`。显式配置外部数据库不会自动启动这组开发 Agent 依赖。开发 relay 只转发 `/api/v2/`，通过 Docker Desktop 的 `host.docker.internal` 访问本机 `AGENT_SERVER_PORT`（默认 `8000`），保留 WebSocket 和流式转发；纯 Linux 主机的此路径尚未验证，可选完整 Docker 部署。
 
@@ -67,6 +71,8 @@ Windows 安全策略可能拦截第三方 Python 原生扩展；可使用隔离 
 
 API v2 的登录接受 `identifier`（用户名或邮箱），兼容旧 `email` 字段。内置角色为 `admin`、`member`，可创建自定义角色；权限并集仍需通过资源归属校验。管理员可查看设备运维信息和封锁连接，不能读取其他用户的会话、文件与终端。
 
+管理后台菜单使用 `GET /api/v2/navigation`、`GET/PUT /api/v2/admin/menus` 和 `POST /api/v2/admin/menus/reset`。页面目录固定在 `core/navigation.py`；配置采用版本检查并记录审计，菜单隐藏不替代接口授权。`v2_39` 初始化默认菜单并给内置管理员补齐 `menus.read`、`menus.manage`，保留既有账号、数据及角色。
+
 Access token 有效期 15 分钟；refresh token 有效期 30 天并轮换。网页使用 HttpOnly 刷新 Cookie，原生客户端接收刷新凭据并安全存储。退出、禁用、软删除及密码重置会撤销登录；授权版本变化影响已有 WebSocket、预览链接和后续请求。管理员只能发起密码重置，不能设置现有用户的新密码。
 
 增量迁移保留原用户 ID 和设备归属，将旧 `admin/member` 回填为内置角色。旧管理员别名通过现有 `AGENT_SERVER_LOGIN_ALIAS` / `AGENT_SERVER_LOGIN_EMAIL` 配置迁为正式用户名；冲突会停止迁移。旧无会话标识的用户令牌升级后需重新登录。测试使用临时库，不用于升级当前用户数据。
@@ -75,7 +81,7 @@ Access token 有效期 15 分钟；refresh token 有效期 30 天并轮换。网
 
 ## 服务端 Agent
 
-手机、网页、桌面用同一平台账号登录，后台自动准备所属“服务端 Agent”；恢复登录会话也会触发幂等准备，不抢占当前聊天。就绪后在主聊天选择，无需扫码、连接电脑或填写电脑路径；准备失败显示原因，用户可以显式重试。个人模型在三端的账号设置中配置，接口为 `/api/v2/models/personal/providers` 和 `/api/v2/models/personal/default`。设置个人默认后，新会话使用该模型，否则使用平台默认；已有会话保留原选择。
+手机、网页、桌面用同一平台账号访问所属“服务端 Agent”。网页认证使用 `X-SuperDsh-Agent-Preparation: deferred`，仅抑制自动准备；进入工作台调用准备接口。桌面、安卓保持登录及恢复会话后幂等准备，不抢占当前聊天。就绪后在主聊天选择，无需扫码、连接电脑或填写电脑路径；准备失败显示原因，用户可以显式重试。个人模型在三端的账号设置中配置，接口为 `/api/v2/models/personal/providers` 和 `/api/v2/models/personal/default`。设置个人默认后，新会话使用该模型，否则使用平台默认；已有会话保留原选择。
 
 `GET /api/v2/server-agent` 查询状态，`POST` 幂等准备真实 Connector、DSH Runtime 和 `/workspace` 工作区。消息、历史、流式事件、审批、取消、附件、文件和终端继续沿用 API v2。登录客户端退出不会停止服务端任务；封锁连接、禁用账号或撤销执行权限会影响运行和请求。手机离线只能查看已加载的缓存历史、保存草稿，重连后手动发送。
 

@@ -26,5 +26,6 @@ agents-anywhere/**
 dsh-community-fabric/**
 yarn.lock
 apps/admin/.next/**
+apps/admin/.next-*/**
 apps/admin/out/**
 apps/admin/next-env.d.ts

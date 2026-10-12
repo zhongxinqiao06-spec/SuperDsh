@@ -51,6 +51,7 @@ import {
   attachmentMimeTypes,
 } from '@/components/session/capabilities'
 import { useElementWidth } from '@/hooks/use-element-width'
+import { useWorkbenchState, workbenchCell } from '@/features/workbench/memory'
 import {
   sessionRuntimeId,
   sessionRuntimeType,
@@ -115,6 +116,10 @@ export function SessionComposer({
   const composerRef = React.useRef<HTMLDivElement | null>(null)
   const valueRef = React.useRef(value)
   valueRef.current = value
+  const draftCell = workbenchCell(`session/${session.id}/draft`, {
+    sessionId: session.id,
+    value: '',
+  })
   const composerWidth = useElementWidth(composerRef)
   const runtimeStatus = effectiveRuntimeStatus(runtimeState, session)
   const runtimeSelections = runtimeState?.selections ?? {}
@@ -195,11 +200,13 @@ export function SessionComposer({
     add,
     remove,
     clear,
+    restore,
     onDragEnter,
     onDragLeave,
     onDragOver,
     onDrop,
   } = useAttachments({
+    memoryKey: `session/${session.id}/attachments`,
     sessionId: creatingSession ? undefined : session.id,
     token,
     enabled: canUseAttachments,
@@ -226,9 +233,18 @@ export function SessionComposer({
   )
   const showInterrupt =
     !creatingSession && canUseInterrupt && activeSessionCanInterrupt
-  const [selectedPermissionMode, setSelectedPermissionMode] = React.useState('')
-  const [selectedModel, setSelectedModel] = React.useState('')
-  const [selectedReasoning, setSelectedReasoning] = React.useState('')
+  const [selectedPermissionMode, setSelectedPermissionMode] = useWorkbenchState(
+    `session/${session.id}/permission`,
+    '',
+  )
+  const [selectedModel, setSelectedModel] = useWorkbenchState(
+    `session/${session.id}/model`,
+    '',
+  )
+  const [selectedReasoning, setSelectedReasoning] = useWorkbenchState(
+    `session/${session.id}/reasoning`,
+    '',
+  )
   const permissionItems =
     permissionCatalog?.permissions.map((item) => ({
       id: item.id,
@@ -503,8 +519,10 @@ export function SessionComposer({
         ? { permission: selectedPermissionSelection }
         : {}),
     })
-    if (!sent && valueRef.current === '') {
-      updateValue(text)
+    if (!sent && draftCell.current()) {
+      restore(files)
+      if (draftCell.get().value === '' && valueRef.current === '')
+        updateValue(text)
     }
   }
 

@@ -110,23 +110,8 @@ function hashToScreen(hash: string): AuthScreen {
   }
   if (exactMap[path]) return exactMap[path]
 
-  // Any app sub-route -> app. Default bare hash "/" is also app.
-  const isAppRoute =
-    path === '' ||
-    path === 'app' ||
-    path.startsWith('session/') ||
-    path.startsWith('new-session/') ||
-    path.startsWith('settings') ||
-    path === 'dashboard' ||
-    path === 'team' ||
-    path === 'service' ||
-    path === 'management' ||
-    path === 'mobile-connections' ||
-    path.startsWith('device')
-
-  if (isAppRoute) return 'app'
-
-  return 'login'
+  // The console owns unknown internal routes and renders its 404 page.
+  return 'app'
 }
 
 function screenToHash(s: AuthScreen): string {
@@ -142,7 +127,7 @@ function screenToHash(s: AuthScreen): string {
     'plugin-oauth': '#/plugin-oauth',
     onboarding: '#/onboarding',
     preview: '#/preview',
-    app: '#/',
+    app: '#/overview',
   }
   return map[s] ?? '#/login'
 }
@@ -277,11 +262,15 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         const currentUser = await authApi.me(stored.accessToken)
         if (cancelled) return
         setMe(currentUser)
-        setScreenState(
-          nextScreen === 'login' || nextScreen === 'register'
-            ? 'app'
-            : nextScreen,
-        )
+        if (nextScreen === 'login' || nextScreen === 'register') {
+          const continuation =
+            takeAuthFlow(window.location.hash, window.sessionStorage) ??
+            '#/overview'
+          window.location.hash = continuation
+          setScreenState(hashToScreen(continuation))
+          return
+        }
+        setScreenState(nextScreen)
       } catch {
         clearStoredSession()
         if (cancelled) return
@@ -369,7 +358,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         setScreenState(hashToScreen(continuation))
         return
       }
-      window.location.hash = '#/'
+      window.location.hash = '#/overview'
       setScreenState('app')
     },
     [],

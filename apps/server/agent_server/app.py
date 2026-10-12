@@ -34,6 +34,7 @@ from agent_server.api import (
     dashboard_stream,
     error_handlers,
     identity,
+    navigation,
     oauth,
     pairing,
     personal_models,
@@ -364,6 +365,7 @@ def create_app(
 
     app.include_router(auth.router, prefix=API_V2_PREFIX)
     app.include_router(identity.router, prefix=API_V2_PREFIX)
+    app.include_router(navigation.router, prefix=API_V2_PREFIX)
     app.include_router(admin_rbac.router, prefix=API_V2_PREFIX)
     app.include_router(admin_devices.router, prefix=API_V2_PREFIX)
     app.include_router(personal_models.router, prefix=API_V2_PREFIX)

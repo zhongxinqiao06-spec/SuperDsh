@@ -249,17 +249,45 @@ test('revocation requires confirmation and only revokes the selected login sessi
   const revoke = t.mock.method(managementApi, 'revokeSession', async (id) => {
     sessions = sessions.filter((item) => item.id !== id)
   })
-  const confirmation = t.mock.method(window, 'confirm', () => false)
+  const confirmation = t.mock.method(window, 'confirm', () => {
+    throw new Error('Use the product confirmation dialog')
+  })
   const { container } = await render(t, { load: async () => ({ sessions }) })
   await until(() => rows(container).length === 1)
   await act(async () => button(container, '撤销登录').click())
   assert.equal(revoke.mock.callCount(), 0)
-  confirmation.mock.mockImplementation(() => true)
+  assert.ok(document.querySelector('[role="dialog"]'))
+  await act(async () => button(document.body, '取消').click())
+  assert.equal(document.querySelector('[role="dialog"]'), null)
   await act(async () => button(container, '撤销登录').click())
+  await act(async () => button(document.body, '确认撤销').click())
   await until(() => container.textContent.includes('暂无有效的手机登录会话'))
   assert.deepEqual(revoke.mock.calls[0].arguments, ['my-phone-login'])
   assert.equal(revoke.mock.callCount(), 1)
   assert.equal(loadStoredSession().userId, 'user1')
+  assert.equal(confirmation.mock.callCount(), 0)
+})
+
+test('mobile login pages include only mobile records and clamp after the last record is revoked', async (t) => {
+  let sessions = [
+    loginSession('web', 'Browser'),
+    ...Array.from({ length: 26 }, (_, i) =>
+      loginSession(`phone-${i}`, 'SuperDsh Android'),
+    ),
+  ]
+  t.mock.method(managementApi, 'revokeSession', async (id) => {
+    sessions = sessions.filter((item) => item.id !== id)
+  })
+  const { container } = await render(t, { load: async () => ({ sessions }) })
+  await until(() => rows(container).length === 25)
+  assert.match(container.textContent, /共 26 条/)
+  await act(async () => button(container, '下一页').click())
+  assert.equal(rows(container).length, 1)
+  assert.equal(rows(container)[0].dataset.mobileLoginSession, 'phone-25')
+  await act(async () => button(container, '撤销登录').click())
+  await act(async () => button(document.body, '确认撤销').click())
+  await until(() => rows(container).length === 25)
+  assert.match(container.textContent, /第 1 \/ 1 页/)
 })
 
 test('QR sign-in remains an optional dialog action', async (t) => {

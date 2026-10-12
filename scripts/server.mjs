@@ -16,8 +16,13 @@ import {
   developmentEnvironment,
   prepareDevelopmentEnv,
   prepareDevelopmentAgentEnv,
+  persistDevelopmentPorts,
   verifyDevelopmentDatabaseContainer,
 } from './server-development.mjs'
+import {
+  inspectDevelopmentContainers,
+  planDevelopmentDependencies,
+} from './server-dependencies.mjs'
 
 const repositoryRoot = resolve(dirname(fileURLToPath(import.meta.url)), '..')
 const serverRoot = join(repositoryRoot, 'apps/server')
@@ -106,6 +111,7 @@ function requireLinuxDocker() {
 }
 
 async function migrateDevelopmentDatabase(env) {
+  if (env.SUPERDSH_BOOTSTRAP_DEV_ADMIN === '1') verifyManagedDatabase(env)
   await run(
     uv,
     [
@@ -124,17 +130,7 @@ async function migrateDevelopmentDatabase(env) {
 
 async function bootstrapDevelopmentAdmin(env) {
   if (env.SUPERDSH_BOOTSTRAP_DEV_ADMIN !== '1') return
-  const inspection = spawnSync(
-    'docker',
-    ['inspect', 'superdsh-dev-postgres-1'],
-    { encoding: 'utf8', timeout: 10000, windowsHide: true },
-  )
-  if (inspection.error || inspection.status !== 0) {
-    throw new Error(
-      'Cannot verify the development PostgreSQL container; no default admin was created. Run server:deps:up first.',
-    )
-  }
-  verifyDevelopmentDatabaseContainer(JSON.parse(inspection.stdout)[0], env)
+  verifyManagedDatabase(env)
   await run(
     uv,
     [
@@ -151,6 +147,21 @@ async function bootstrapDevelopmentAdmin(env) {
   console.log(
     'Development admin is ready: username admin; initial password admin123 (existing accounts keep their current password).',
   )
+}
+
+function verifyManagedDatabase(env) {
+  const containers = inspectDevelopmentContainers().filter(
+    (container) =>
+      container.Config?.Labels?.['com.docker.compose.service'] === 'postgres' &&
+      String(
+        container.Config?.Labels?.['com.docker.compose.oneoff'],
+      ).toLowerCase() !== 'true',
+  )
+  if (containers.length !== 1)
+    throw new Error(
+      'Cannot identify the development PostgreSQL container; no database was changed. Run server:deps:up first.',
+    )
+  verifyDevelopmentDatabaseContainer(containers[0], env)
 }
 
 async function startDevelopmentAgents(env) {
@@ -428,21 +439,52 @@ async function main() {
           )
       }
       prepareDevelopmentEnv(repositoryRoot)
-      const env = developmentEnvironment(repositoryRoot)
-      await run(
-        'docker',
-        [
-          ...developmentComposeArgs(repositoryRoot, file),
-          'up',
-          '-d',
-          '--wait',
-          '--wait-timeout',
-          '60',
-          'postgres',
-          'redis',
-        ],
-        { cwd: repositoryRoot, env },
+      let env = developmentEnvironment(repositoryRoot)
+      if (env.SUPERDSH_BOOTSTRAP_DEV_ADMIN !== '1') {
+        console.log(
+          'External database URLs are configured; skipped managed PostgreSQL/Redis startup and admin initialization.',
+        )
+        return
+      }
+      const plan = await planDevelopmentDependencies(
+        inspectDevelopmentContainers(),
+        env,
+        {
+          explicitEnvironment: process.env,
+        },
       )
+      persistDevelopmentPorts(repositoryRoot, plan.ports)
+      for (const [name, value] of Object.entries(plan.ports)) {
+        if (value !== env[name])
+          console.log(
+            `${name}: ${env[name]} -> ${value} (saved to the development env file)`,
+          )
+      }
+      env = developmentEnvironment(repositoryRoot)
+      for (const service of plan.ready)
+        console.log(`${service} is already healthy; skipping startup.`)
+      // Never recreate a running dependency merely to wait for its healthcheck.
+      for (const [services, flags] of [
+        [plan.wait, ['--no-recreate']],
+        [plan.start, []],
+      ]) {
+        if (!services.length) continue
+        await run(
+          'docker',
+          [
+            ...developmentComposeArgs(repositoryRoot, file),
+            'up',
+            '-d',
+            '--no-deps',
+            ...flags,
+            '--wait',
+            '--wait-timeout',
+            '60',
+            ...services,
+          ],
+          { cwd: repositoryRoot, env },
+        )
+      }
       if (env.SUPERDSH_BOOTSTRAP_DEV_ADMIN === '1') {
         await migrateDevelopmentDatabase(env)
         await bootstrapDevelopmentAdmin(env)
@@ -452,7 +494,7 @@ async function main() {
         )
       }
       console.log(
-        'Development PostgreSQL and Redis are ready. Start server:dev and admin:dev in separate terminals.',
+        `Development PostgreSQL: 127.0.0.1:${env.SUPERDSH_DEV_PG_PORT}; Redis: 127.0.0.1:${env.SUPERDSH_DEV_REDIS_PORT}. Start server:dev and admin:dev in separate terminals.`,
       )
       return
     }

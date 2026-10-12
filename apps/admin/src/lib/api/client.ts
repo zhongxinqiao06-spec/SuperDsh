@@ -1,5 +1,10 @@
 import { ApiError, apiErrorKind, extractErrorPayload } from '@/lib/api/errors'
-import { loadStoredSession, refreshSession } from '@/features/auth/session'
+import {
+  loadStoredSession,
+  refreshSession,
+  sessionIdentityRevision,
+} from '@/features/auth/session'
+import { deferredAgentHeaders } from '@/features/auth/agent-preparation'
 
 export type ApiTokenProvider = () => string | null | undefined
 
@@ -82,8 +87,13 @@ export class ApiClient {
   }
 
   async request<T>(path: string, options: ApiRequestOptions = {}): Promise<T> {
+    const identity = sessionIdentityRevision()
     const url = this.buildUrl(path, options.query)
     const headers = new Headers(options.headers)
+    if (apiPath(path).startsWith(apiPath('/auth/'))) {
+      for (const [key, value] of Object.entries(deferredAgentHeaders))
+        headers.set(key, value)
+    }
     const body = normalizeBody(options.body)
     if (
       body != null &&
@@ -113,6 +123,7 @@ export class ApiClient {
       if (
         response.status === 401 &&
         options.auth !== false &&
+        identity === sessionIdentityRevision() &&
         !options.signal?.aborted
       ) {
         const active = loadStoredSession()
@@ -120,7 +131,11 @@ export class ApiClient {
           active?.accessToken && active.accessToken !== token
             ? active
             : await refreshSession(this.buildUrl('/auth/refresh'), this.fetcher)
-        if (renewed?.accessToken && !options.signal?.aborted) {
+        if (
+          renewed?.accessToken &&
+          identity === sessionIdentityRevision() &&
+          !options.signal?.aborted
+        ) {
           headers.set('authorization', `Bearer ${renewed.accessToken}`)
           response = await this.fetcher(url, {
             ...options,

@@ -64,7 +64,12 @@ def auth_payload(login: dict, *, native: bool) -> AuthResponse:
 
 
 def prepare_account_agent(request: Request | None, user_id: str) -> None:
-    if request is not None:
+    # The management web shell prepares its Agent only when the workbench opens.
+    # This is a side-effect preference, never an authentication/authorization gate.
+    if (
+        request is not None
+        and request.headers.get("X-SuperDsh-Agent-Preparation") != "deferred"
+    ):
         request.app.state.server_agent_login.ensure(user_id)
 
 
@@ -152,10 +157,15 @@ async def logout_all(
 @router.get("/sessions")
 async def sessions(
     request: Request,
+    page: int | None = None,
+    pageSize: int | None = None,
+    search: str = "",
     user: UserView = Depends(current_user),
     db: Store = Depends(get_store),
 ) -> dict:
-    return {"sessions": await db.login_sessions(user.userId, current_sid(request))}
+    return await db.management_login_sessions(
+        user.userId, current_sid(request), page=page, page_size=pageSize, search=search
+    )
 
 
 @router.delete("/sessions/{session_id}", status_code=204)

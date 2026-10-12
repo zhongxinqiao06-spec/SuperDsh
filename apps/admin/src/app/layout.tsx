@@ -7,9 +7,9 @@ import { I18nProvider } from '@/i18n/client-provider'
 import { sans, mono, serif, brand } from './fonts'
 
 export const metadata: Metadata = {
-  title: 'Agents Anywhere',
-  description: 'Remote control plane for coding agents',
-  applicationName: 'Agents Anywhere',
+  title: 'SuperDsh',
+  description: 'SuperDsh management console and Agent workspace',
+  applicationName: 'SuperDsh',
   manifest: '/site.webmanifest',
   icons: {
     icon: [
@@ -38,7 +38,7 @@ export const metadata: Metadata = {
   },
   appleWebApp: {
     capable: true,
-    title: 'Agents Anywhere',
+    title: 'SuperDsh',
     statusBarStyle: 'black-translucent',
   },
 }

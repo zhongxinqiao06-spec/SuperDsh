@@ -19,7 +19,7 @@ const excluded = new Set([
   'generated',
 ])
 const buildOutput =
-  /^(?:apps\/admin\/out|apps\/desktop(?:\/core|\/plugins\/harness)?\/(?:lib|dist)|apps\/desktop\/ui\/(?:client|dist|native-ui)|dsh-community-market\/(?:lib|dist))(?:\/|$)/u
+  /^(?:apps\/admin\/(?:out|\.next-[^/]+)|apps\/desktop(?:\/core|\/plugins\/harness)?\/(?:lib|dist)|apps\/desktop\/ui\/(?:client|dist|native-ui)|dsh-community-market\/(?:lib|dist))(?:\/|$)/u
 const generated =
   /(?:^|\/)(?:next-env\.d\.ts|api-catalog\.ts|slot-catalog\.ts|client-manifest\.json|build-sources\.json|source-manifest\.json|module-packages\.json|migration-paths\.json|tsconfig\.paths\.json)$/u
 const extensions = new Set([

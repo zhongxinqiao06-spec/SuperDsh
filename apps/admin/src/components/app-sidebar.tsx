@@ -1,7 +1,7 @@
 'use client'
 
 import * as React from 'react'
-import { Plus, Smartphone } from 'lucide-react'
+import { Plus } from 'lucide-react'
 import { toast } from 'sonner'
 
 import { useAuth } from '@/components/auth/auth-context'
@@ -27,7 +27,6 @@ import {
   selectRegularProjects,
   type ProjectSessionStatusFilter,
 } from '@/components/sidebar/sidebar-selectors'
-import { SidebarAccountFooter } from '@/components/sidebar/sidebar-account-footer'
 import { useProjectSidebarPreferences } from '@/components/sidebar/use-project-sidebar-preferences'
 import {
   Sidebar,
@@ -40,7 +39,6 @@ import {
 import { useWorkspace } from '@/components/workspace-context'
 import { dashboardApi } from '@/features/dashboard/api'
 import type { ProjectView } from '@/features/dashboard/types'
-import { useMobileConnectionsSidebarVisibility } from '@/features/mobile-connections/sidebar-visibility'
 import { useTranslations } from 'next-intl'
 import { useManagementText } from '@/components/management/controls'
 
@@ -57,7 +55,6 @@ export function AppSidebar({ contained = false }: { contained?: boolean }) {
     search,
     openSession,
     goHome,
-    navigate,
     navigateToDevice,
     startProjectSession,
     sidebarShowsSessions,
@@ -69,10 +66,8 @@ export function AppSidebar({ contained = false }: { contained?: boolean }) {
     renameSession,
     refreshData,
   } = useWorkspace()
-  const { signOut, me, session: authSession, can } = useAuth()
+  const { session: authSession, can } = useAuth()
   const allowed = (permission: string) => !authSession || can(permission)
-  const [mobileConnectionsSidebarVisible] =
-    useMobileConnectionsSidebarVisibility()
   const t = useTranslations('dashboard')
   const tr = useManagementText()
   const [pairOpen, setPairOpen] = React.useState(false)
@@ -253,9 +248,9 @@ export function AppSidebar({ contained = false }: { contained?: boolean }) {
           <button
             type="button"
             onClick={goHome}
-            className="aa-wordmark min-w-0 text-left text-xl"
+            className="min-w-0 text-left text-base font-semibold"
           >
-            Agents Anywhere
+            {tr('Agent 工作台', 'Agent workspace')}
           </button>
         </div>
 
@@ -272,18 +267,6 @@ export function AppSidebar({ contained = false }: { contained?: boolean }) {
               </SidebarMenuButton>
             </SidebarMenuItem>
           )}
-          {mobileConnectionsSidebarVisible ? (
-            <SidebarMenuItem>
-              <SidebarMenuButton
-                className="h-10 font-medium"
-                isActive={page === 'mobile-connections'}
-                onClick={() => navigate('mobile-connections')}
-              >
-                <Smartphone />
-                <span>{t('actions.mobileConnections')}</span>
-              </SidebarMenuButton>
-            </SidebarMenuItem>
-          ) : null}
         </SidebarMenu>
       </SidebarHeader>
 
@@ -364,8 +347,6 @@ export function AppSidebar({ contained = false }: { contained?: boolean }) {
           </>
         ) : null}
       </SidebarContent>
-
-      <SidebarAccountFooter me={me} navigate={navigate} signOut={signOut} />
 
       <PairDeviceDialog
         open={pairOpen}

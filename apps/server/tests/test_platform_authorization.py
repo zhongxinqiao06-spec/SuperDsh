@@ -30,7 +30,19 @@ def receive(ws):
 def test_idle_dashboard_socket_closes_after_shared_store_revocation(tmp_path, change):
     client = make_client(tmp_path)
     admin = admin_token(client)
-    user = member(client, admin)
+    role_id = None
+    if change == "roles":
+        created = client.post(
+            "/admin/roles",
+            headers=bearer(admin),
+            json={
+                "name": "Session observer",
+                "permissions": ["devices.read", "sessions.read"],
+            },
+        )
+        assert created.status_code == 201, created.text
+        role_id = created.json()["id"]
+    user = member(client, admin, roles=[role_id] if role_id else None)
     login = sign_in(client)
     headers = bearer(login["accessToken"])
     ticket = dashboard_ws_ticket(client, headers)
@@ -54,9 +66,9 @@ def test_idle_dashboard_socket_closes_after_shared_store_revocation(tmp_path, ch
         else:
             assert (
                 client.patch(
-                    "/admin/roles/member",
+                    f"/admin/roles/{role_id}",
                     headers=bearer(admin),
-                    json={"name": "Member", "permissions": ["devices.read"]},
+                    json={"name": "Session observer", "permissions": ["devices.read"]},
                 ).status_code
                 == 200
             )

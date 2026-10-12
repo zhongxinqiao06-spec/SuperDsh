@@ -2,7 +2,6 @@
 
 import * as React from 'react'
 import { useAuth } from '@/components/auth/auth-context'
-import { useWorkspace } from '@/components/workspace-context'
 import { PageHeader } from './page-header'
 import { Button } from '@/components/ui/button'
 import { UsersPanel } from '@/components/management/users-panel'
@@ -14,13 +13,17 @@ import { useManagementText } from '@/components/management/controls'
 
 export function ManagementPage({
   initialTab = 'users',
+  onBack,
+  onTabChange,
 }: {
   initialTab?: string
+  onBack?: () => void
+  onTabChange?: (tab: string) => void
 }) {
   const tr = useManagementText()
   const { can, me } = useAuth()
-  const { navigate } = useWorkspace()
   const [selected, setSelected] = React.useState(initialTab)
+  React.useEffect(() => setSelected(initialTab), [initialTab])
   const tabs = [
     { id: 'users', permission: 'users.read', title: tr('用户', 'Users') },
     {
@@ -54,7 +57,7 @@ export function ManagementPage({
             '管理账号、访问权限和平台服务。个人工作台中的内容仍按所属用户隔离。',
             'Manage accounts, permissions and platform services. Personal workspace content remains isolated by owner.',
           )}
-          onBack={() => navigate('home')}
+          onBack={onBack}
         />
         <nav
           aria-label={tr('管理分类', 'Management sections')}
@@ -65,7 +68,10 @@ export function ManagementPage({
               key={tab.id}
               variant={active === tab.id ? 'default' : 'outline'}
               aria-current={active === tab.id ? 'page' : undefined}
-              onClick={() => setSelected(tab.id)}
+              onClick={() => {
+                setSelected(tab.id)
+                onTabChange?.(tab.id)
+              }}
             >
               {tab.title}
             </Button>

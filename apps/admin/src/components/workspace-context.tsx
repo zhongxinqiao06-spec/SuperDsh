@@ -35,6 +35,12 @@ import {
 } from '@/components/session/optimistic-timeline'
 import { sortSessionViews } from '@/components/session/session-list-order'
 import { isApiError } from '@/lib/api/errors'
+import {
+  useWorkbenchState,
+  workbenchCell,
+  migrateWorkbenchSession,
+} from '@/features/workbench/memory'
+import { useWorkspaceSidebarPreference } from '@/features/console/workspace-preferences'
 
 // ─── Panel / page types ───────────────────────────────────────
 
@@ -99,11 +105,13 @@ type ParsedRoute =
   | { page: 'device'; connectorId: string }
 
 function parseHash(hash: string): ParsedRoute {
-  const path = hash.replace(/^#\/?/, '')
+  const path = hash.replace(/^#\/?/, '').replace(/^workspace(?:\/|$)/, '')
   if (!path || path === '/') return { page: 'home' }
 
   const parts = path.split('/')
   switch (parts[0]) {
+    case 'archived':
+      return { page: 'settings', tab: 'archived-sessions' }
     case 'new-session':
       return parts[1]
         ? { page: 'home', projectId: decodeURIComponent(parts[1]) }
@@ -138,24 +146,26 @@ function buildHash(route: ParsedRoute): string {
   switch (route.page) {
     case 'home':
       return route.projectId
-        ? `#/new-session/${encodeURIComponent(route.projectId)}`
-        : '#/'
+        ? `#/workspace/new-session/${encodeURIComponent(route.projectId)}`
+        : '#/workspace'
     case 'session':
-      return `#/session/${route.sessionId}`
+      return `#/workspace/session/${encodeURIComponent(route.sessionId)}`
     case 'settings':
-      return `#/settings/${route.tab}`
+      return route.tab === 'archived-sessions'
+        ? '#/workspace/archived'
+        : `#/account/${({ account: 'profile', 'personal-models': 'models' } as Record<string, string>)[route.tab] ?? route.tab}`
     case 'dashboard':
-      return '#/dashboard'
+      return '#/overview'
     case 'team':
-      return '#/team'
+      return '#/access/users'
     case 'service':
-      return '#/service'
+      return '#/system/service'
     case 'management':
-      return '#/management'
+      return '#/access/users'
     case 'mobile-connections':
-      return '#/mobile-connections'
+      return '#/account/mobile'
     case 'device':
-      return `#/device/${route.connectorId}`
+      return `#/workspace/device/${encodeURIComponent(route.connectorId)}`
   }
 }
 
@@ -399,7 +409,6 @@ const WorkspaceContext = React.createContext<WorkspaceState | null>(null)
 
 const FIRST_DEVICE_WIZARD_DISMISSED_KEY = 'aa-first-device-wizard-dismissed-v1'
 const PANEL_MODE_STORAGE_KEY = 'aa-session-runtime-panel-modes-v1'
-const SIDEBAR_SHOW_SESSIONS_STORAGE_KEY = 'aa-sidebar-show-sessions-v1'
 const SESSION_SEND_OPTIMISTIC_TOP_MS = 1_000
 const DEFAULT_PANEL_MODES: Record<PanelId, PanelMode> = {
   files: 'docked',
@@ -444,34 +453,11 @@ function writeStoredPanelModes(panels: Record<PanelId, PanelMode>) {
   }
 }
 
-function readStoredSidebarShowsSessions(): boolean {
-  if (typeof window === 'undefined') return false
-  try {
-    return (
-      window.localStorage.getItem(SIDEBAR_SHOW_SESSIONS_STORAGE_KEY) === '1'
-    )
-  } catch {
-    return false
-  }
-}
-
-function writeStoredSidebarShowsSessions(show: boolean) {
-  if (typeof window === 'undefined') return
-  try {
-    window.localStorage.setItem(
-      SIDEBAR_SHOW_SESSIONS_STORAGE_KEY,
-      show ? '1' : '0',
-    )
-  } catch {
-    // Persisting the sidebar preference is best-effort.
-  }
-}
-
 export function useWorkspace() {
-  const ctx = React.useContext(WorkspaceContext)
-  if (!ctx)
+  const context = React.useContext(WorkspaceContext)
+  if (!context)
     throw new Error('useWorkspace must be used within WorkspaceProvider')
-  return ctx
+  return context
 }
 
 // ─── Provider ─────────────────────────────────────────────────
@@ -482,6 +468,17 @@ export function WorkspaceProvider({ children }: { children: React.ReactNode }) {
   const readProjects = !authSession || can('projects.read')
   const readSessions = !authSession || can('sessions.read')
   const manageDevices = !authSession || can('devices.manage')
+  const canPrepareServerAgent = Boolean(
+    authSession && manageDevices && can('sessions.run') && can('models.use'),
+  )
+  const mountedRef = React.useRef(false)
+  const lastWorkbenchHash = workbenchCell('last-workbench-hash', '#/workspace')
+  React.useEffect(() => {
+    mountedRef.current = true
+    return () => {
+      mountedRef.current = false
+    }
+  }, [])
   const currentAccessTokenRef = React.useRef(authSession?.accessToken ?? null)
   currentAccessTokenRef.current = authSession?.accessToken ?? null
   const [connectors, setConnectors] = React.useState<ConnectorView[]>([])
@@ -519,6 +516,7 @@ export function WorkspaceProvider({ children }: { children: React.ReactNode }) {
         return
       }
       optimisticTopUntilRef.current.set(sessionId, until)
+      if (!mountedRef.current) return
       const timer = window.setTimeout(() => {
         if (optimisticTopUntilRef.current.get(sessionId) !== until) return
         optimisticTopUntilRef.current.delete(sessionId)
@@ -595,9 +593,8 @@ export function WorkspaceProvider({ children }: { children: React.ReactNode }) {
 
   const [filter, setFilter] = React.useState<FilterValue>(defaultFilter)
   const [search, setSearch] = React.useState('')
-  const [sidebarShowsSessions, setSidebarShowsSessionsState] = React.useState(
-    readStoredSidebarShowsSessions,
-  )
+  const [sidebarShowsSessions, setSidebarShowsSessions] =
+    useWorkspaceSidebarPreference()
   const [panels, setPanels] =
     React.useState<Record<PanelId, PanelMode>>(readStoredPanelModes)
   const [collapsed, setCollapsed] = React.useState<Record<PanelId, boolean>>({
@@ -610,12 +607,12 @@ export function WorkspaceProvider({ children }: { children: React.ReactNode }) {
   const [pairDeviceDialogOpen, setPairDeviceDialogOpen] = React.useState(false)
   const [composerInsertion, setComposerInsertion] =
     React.useState<ComposerInsertion | null>(null)
-  const [optimisticMessages, setOptimisticMessages] = React.useState<
+  const [optimisticMessages, setOptimisticMessages] = useWorkbenchState<
     OptimisticSessionMessage[]
-  >([])
-  const [sessionAliases, setSessionAliases] = React.useState<
+  >('optimistic-messages', [])
+  const [sessionAliases, setSessionAliases] = useWorkbenchState<
     Record<string, string>
-  >({})
+  >('session-aliases', {})
   const optimisticMessagesRef =
     React.useRef<OptimisticSessionMessage[]>(optimisticMessages)
   const sessionAliasesRef = React.useRef<Record<string, string>>(sessionAliases)
@@ -639,6 +636,7 @@ export function WorkspaceProvider({ children }: { children: React.ReactNode }) {
   } | null>(null)
 
   const refreshProjects = React.useCallback((): Promise<void> => {
+    if (!lastWorkbenchHash.current()) return Promise.resolve()
     const token = authSession?.accessToken
     if (!token || !readProjects) return Promise.resolve()
     const pending = projectRefreshInFlightRef.current
@@ -761,6 +759,7 @@ export function WorkspaceProvider({ children }: { children: React.ReactNode }) {
     promise: Promise<boolean>
   } | null>(null)
   const fetchData = React.useCallback((): Promise<boolean> => {
+    if (!lastWorkbenchHash.current()) return Promise.resolve(false)
     const token = authSession?.accessToken ?? null
     const pending = fetchDataInFlightRef.current
     if (pending?.token === token) return pending.promise
@@ -838,11 +837,6 @@ export function WorkspaceProvider({ children }: { children: React.ReactNode }) {
     readSessions,
     sortSessions,
   ])
-
-  const setSidebarShowsSessions = React.useCallback((show: boolean) => {
-    setSidebarShowsSessionsState(show)
-    writeStoredSidebarShowsSessions(show)
-  }, [])
 
   React.useEffect(() => {
     initialLoadDoneRef.current = false
@@ -973,11 +967,28 @@ export function WorkspaceProvider({ children }: { children: React.ReactNode }) {
   // ── Hash routing ──────────────────────────────────────────
   React.useEffect(() => {
     // Correct from hash immediately on mount, then keep in sync.
+    if (
+      window.location.hash === '#/workspace' &&
+      lastWorkbenchHash.get() !== '#/workspace'
+    ) {
+      window.history.replaceState(null, '', lastWorkbenchHash.get())
+      window.dispatchEvent(new window.HashChangeEvent('hashchange'))
+    }
+    if (
+      window.location.hash === '#/workspace' ||
+      window.location.hash.startsWith('#/workspace/')
+    )
+      lastWorkbenchHash.set(window.location.hash)
     const initialRoute = parseHash(window.location.hash)
     routeRef.current = initialRoute
     setRoute(initialRoute)
     setRouteReady(true)
     const handler = () => {
+      if (
+        window.location.hash === '#/workspace' ||
+        window.location.hash.startsWith('#/workspace/')
+      )
+        lastWorkbenchHash.set(window.location.hash)
       const nextRoute = parseHash(window.location.hash)
       routeRef.current = nextRoute
       React.startTransition(() => setRoute(nextRoute))
@@ -987,14 +998,22 @@ export function WorkspaceProvider({ children }: { children: React.ReactNode }) {
   }, [])
 
   const pushRoute = React.useCallback((r: ParsedRoute) => {
+    if (!mountedRef.current) return
     routeRef.current = r
-    window.location.hash = buildHash(r)
+    const hash = buildHash(r)
+    if (hash === '#/workspace' || hash.startsWith('#/workspace/'))
+      lastWorkbenchHash.set(hash)
+    window.location.hash = hash
     React.startTransition(() => setRoute(r))
   }, [])
 
   const replaceRoute = React.useCallback((r: ParsedRoute) => {
+    if (!mountedRef.current) return
     routeRef.current = r
-    window.history.replaceState(null, '', buildHash(r))
+    const hash = buildHash(r)
+    if (hash === '#/workspace' || hash.startsWith('#/workspace/'))
+      lastWorkbenchHash.set(hash)
+    window.history.replaceState(null, '', hash)
     React.startTransition(() => setRoute(r))
   }, [])
 
@@ -1074,6 +1093,7 @@ export function WorkspaceProvider({ children }: { children: React.ReactNode }) {
         pushRoute({ page: 'settings', tab: sub ?? 'account' })
       else if (page === 'dashboard') pushRoute({ page: 'dashboard' })
       else if (page === 'team') pushRoute({ page: 'team' })
+      else if (page === 'management') pushRoute({ page: 'management' })
       else if (page === 'service') pushRoute({ page: 'service' })
       else if (page === 'mobile-connections')
         pushRoute({ page: 'mobile-connections' })
@@ -1131,6 +1151,7 @@ export function WorkspaceProvider({ children }: { children: React.ReactNode }) {
     if (
       !routeReady ||
       !manageDevices ||
+      canPrepareServerAgent ||
       isLoading ||
       route.page !== 'home' ||
       firstDeviceWizardCheckedRef.current
@@ -1148,7 +1169,14 @@ export function WorkspaceProvider({ children }: { children: React.ReactNode }) {
       return
     }
     setFirstDevicePromptOpen(true)
-  }, [connectors.length, isLoading, manageDevices, route.page, routeReady])
+  }, [
+    connectors.length,
+    isLoading,
+    manageDevices,
+    canPrepareServerAgent,
+    route.page,
+    routeReady,
+  ])
 
   // ── Project mutation helpers ────────────────────────────
 
@@ -1167,9 +1195,13 @@ export function WorkspaceProvider({ children }: { children: React.ReactNode }) {
   const createProject = React.useCallback(
     async (payload: ProjectCreateRequest): Promise<ProjectView | null> => {
       const token = authSession?.accessToken
-      if (!token) return null
+      if (!token || !lastWorkbenchHash.current()) return null
       const response = await dashboardApi.createProject(token, payload)
-      if (currentAccessTokenRef.current !== token) return null
+      if (
+        !lastWorkbenchHash.current() ||
+        currentAccessTokenRef.current !== token
+      )
+        return null
       upsertProject(response.project)
       void refreshProjects().catch(() => undefined)
       return response.project
@@ -1183,14 +1215,18 @@ export function WorkspaceProvider({ children }: { children: React.ReactNode }) {
       patch: ProjectPatchRequest,
     ): Promise<ProjectView | null> => {
       const token = authSession?.accessToken
-      if (!token) return null
+      if (!token || !lastWorkbenchHash.current()) return null
       try {
         const response = await dashboardApi.updateProject(
           token,
           projectId,
           patch,
         )
-        if (currentAccessTokenRef.current !== token) return null
+        if (
+          !lastWorkbenchHash.current() ||
+          currentAccessTokenRef.current !== token
+        )
+          return null
         upsertProject(response.project)
         void refreshProjects().catch(() => undefined)
         return response.project
@@ -1209,6 +1245,10 @@ export function WorkspaceProvider({ children }: { children: React.ReactNode }) {
     ): Promise<ProjectView> => {
       const token = authSession?.accessToken
       if (!token) throw new Error('Authentication required')
+      const assertIdentity = () => {
+        if (!lastWorkbenchHash.current()) throw new Error('Account changed')
+      }
+      assertIdentity()
       let path = payload.workspacePath.trim()
       if (path.startsWith('~')) {
         const response = await dashboardApi.connectorFsList(
@@ -1216,6 +1256,7 @@ export function WorkspaceProvider({ children }: { children: React.ReactNode }) {
           payload.connectorId,
           { root: path, path: '.' },
         )
+        assertIdentity()
         if (!response.result.path || response.result.targetType === 'file')
           throw new Error('Could not resolve workspace directory')
         path = response.result.path
@@ -1227,10 +1268,20 @@ export function WorkspaceProvider({ children }: { children: React.ReactNode }) {
         deviceOs: connectors.find(
           (connector) => connector.id === payload.connectorId,
         )?.deviceOs,
-        list: async () => (await dashboardApi.listProjects(token)).projects,
-        create: async (body) =>
-          (await dashboardApi.createProject(token, body)).project,
+        list: async () => {
+          assertIdentity()
+          const response = await dashboardApi.listProjects(token)
+          assertIdentity()
+          return response.projects
+        },
+        create: async (body) => {
+          assertIdentity()
+          const response = await dashboardApi.createProject(token, body)
+          assertIdentity()
+          return response.project
+        },
       })
+      assertIdentity()
       upsertProject(project)
       return project
     },
@@ -1490,6 +1541,8 @@ export function WorkspaceProvider({ children }: { children: React.ReactNode }) {
       session: RealSessionView,
       attachments: AttachmentRef[] = [],
     ) => {
+      if (!lastWorkbenchHash.current()) return
+      migrateWorkbenchSession(localSessionId, session.id)
       // The local new-session row is not shown in the sidebar. Start the full
       // stability window when its canonical row first becomes sortable instead
       // of spending that window while create-and-start is still pending.

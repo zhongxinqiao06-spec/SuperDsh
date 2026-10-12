@@ -1,8 +1,10 @@
 import type { AuthResponse, StoredSession } from '@/features/auth/types'
+import { deferredAgentHeaders } from './agent-preparation'
 
 // Access credentials stay in this document; refresh is an HttpOnly cookie.
 let current: StoredSession | null = null
 let revision = 0
+let identityRevision = 0
 let refreshing: Promise<StoredSession | null> | null = null
 let signingOut: Promise<void> | null = null
 const listeners = new Set<() => void>()
@@ -24,7 +26,13 @@ export function loadStoredSession(): StoredSession | null {
   return current
 }
 
+/** Stable through token rotation; changes when the login identity is replaced. */
+export function sessionIdentityRevision(): number {
+  return identityRevision
+}
+
 export function saveStoredSession(session: StoredSession): void {
+  if (current?.userId !== session.userId) identityRevision += 1
   signedOut = false
   if (typeof window !== 'undefined') {
     try {
@@ -40,6 +48,7 @@ export function saveStoredSession(session: StoredSession): void {
 }
 
 export function clearStoredSession(): void {
+  identityRevision += 1
   revision += 1
   current = null
   discardLegacySession()
@@ -117,6 +126,7 @@ export function refreshSession(
       method: 'POST',
       credentials: 'same-origin',
       headers: {
+        ...deferredAgentHeaders,
         'content-type': 'application/json',
         accept: 'application/json',
       },

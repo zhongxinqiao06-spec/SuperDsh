@@ -53,6 +53,52 @@ const auth = (accessToken) => ({
   authzVersion: 4,
 })
 
+test('browser authentication defers Agent preparation without affecting workspace requests', async () => {
+  const requests = []
+  const client = new ApiClient({
+    fetcher: async (url, init) => {
+      requests.push({ url, headers: new Headers(init.headers) })
+      return response({ ok: true })
+    },
+  })
+  for (const path of [
+    '/auth/login',
+    '/auth/register',
+    '/auth/me',
+    '/auth/oauth/finalize',
+  ])
+    await client.post(path, {}, { auth: false })
+  await client.post('/server-agent', {}, { auth: false })
+  assert.ok(
+    requests
+      .slice(0, 4)
+      .every(
+        ({ headers }) =>
+          headers.get('X-SuperDsh-Agent-Preparation') === 'deferred',
+      ),
+  )
+  assert.equal(requests[4].headers.has('X-SuperDsh-Agent-Preparation'), false)
+})
+
+test('cookie refresh also defers Agent preparation', async () => {
+  saveStoredSession(auth('expired'))
+  try {
+    const session = await refreshSession(
+      '/api/v2/auth/refresh',
+      async (_url, init) => {
+        assert.equal(
+          new Headers(init.headers).get('X-SuperDsh-Agent-Preparation'),
+          'deferred',
+        )
+        return response(auth('renewed'))
+      },
+    )
+    assert.equal(session.accessToken, 'renewed')
+  } finally {
+    clearStoredSession()
+  }
+})
+
 test('concurrent unauthorized requests share one cookie refresh and retry with the new access token', async () => {
   saveStoredSession(auth('expired'))
   let refreshes = 0
@@ -141,6 +187,65 @@ test('logout fences an in-flight refresh and waits for its cookie response befor
     null,
   )
   assert.equal(called, false)
+})
+
+test('a stale write is never replayed using another account or a new login of the same account', async () => {
+  for (const nextUser of ['user-2', 'user-1']) {
+    saveStoredSession(auth('account-a'))
+    let release
+    const gate = new Promise((resolve) => {
+      release = resolve
+    })
+    const requests = []
+    const client = new ApiClient({
+      fetcher: async (url, init) => {
+        requests.push({ url, token: init.headers.get('authorization') })
+        await gate
+        return response({ detail: 'old login expired' }, 401)
+      },
+    })
+    const pending = client.post('/projects', { name: 'Old account draft' })
+    clearStoredSession()
+    saveStoredSession({ ...auth('account-b'), userId: nextUser })
+    release()
+    await assert.rejects(pending, (error) => error.status === 401)
+    assert.equal(requests.length, 1)
+    assert.equal(requests[0].token, 'Bearer account-a')
+    clearStoredSession()
+  }
+})
+
+test('switching accounts during refresh cannot replay the old write with the replacement identity', async () => {
+  saveStoredSession(auth('expired'))
+  let refreshStarted
+  let finishRefresh
+  const started = new Promise((resolve) => {
+    refreshStarted = resolve
+  })
+  const gate = new Promise((resolve) => {
+    finishRefresh = resolve
+  })
+  let writes = 0
+  const client = new ApiClient({
+    fetcher: async (url) => {
+      if (String(url).endsWith('/auth/refresh')) {
+        refreshStarted()
+        await gate
+        return response(auth('rotated-old-account'))
+      }
+      writes += 1
+      return response({ detail: 'expired' }, 401)
+    },
+  })
+  const pending = client.post('/projects', { name: 'Old account draft' })
+  await started
+  clearStoredSession()
+  saveStoredSession({ ...auth('new-account'), userId: 'user-2' })
+  finishRefresh()
+  await assert.rejects(pending, (error) => error.status === 401)
+  assert.equal(writes, 1)
+  assert.equal(loadStoredSession().userId, 'user-2')
+  clearStoredSession()
 })
 
 test('forbidden operations are not retried and do not rotate credentials', async () => {

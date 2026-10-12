@@ -13,8 +13,13 @@ for (const key of [
   'navigator',
   'HTMLElement',
   'HTMLInputElement',
+  'HTMLButtonElement',
+  'HTMLSelectElement',
   'Element',
   'Node',
+  'NodeFilter',
+  'MutationObserver',
+  'CustomEvent',
   'getComputedStyle',
 ])
   Object.defineProperty(globalThis, key, {
@@ -22,7 +27,7 @@ for (const key of [
     value: dom.window[key],
   })
 globalThis.IS_REACT_ACT_ENVIRONMENT = true
-const { createElement: h, act } = await import('react')
+const { createElement: h, act, useState } = await import('react')
 const { createRoot } = await import('react-dom/client')
 const { NextIntlClientProvider } = await import('next-intl')
 const hooks = registerSource()
@@ -30,6 +35,10 @@ const { ModelsPanel } =
   await import('../src/components/management/models-panel.tsx')
 const { RolesPanel } =
   await import('../src/components/management/roles-panel.tsx')
+const { UsersPanel } =
+  await import('../src/components/management/users-panel.tsx')
+const { AuthProvider } = await import('../src/components/auth/auth-context.tsx')
+const { authApi } = await import('../src/features/auth/api.ts')
 const { modelsApi, personalModelsApi } =
   await import('../src/features/management/models-api.ts')
 const { managementApi } = await import('../src/features/management/api.ts')
@@ -68,7 +77,7 @@ async function mount(t, component) {
     container.remove()
     clearStoredSession()
   })
-  return container
+  return document.body
 }
 
 async function click(container, label) {
@@ -298,7 +307,10 @@ test('a default selection failure keeps the created provider editable without cr
     container.querySelector('[role="alert"]').textContent,
     /Default selection failed/,
   )
-  assert.match(container.querySelector('form').textContent, /Edit provider/)
+  assert.match(
+    container.querySelector('[role="dialog"]').textContent,
+    /Edit provider/,
+  )
   assert.equal(container.querySelector('input[type="password"]').value, '')
   assert.equal(
     container.querySelector('input[type="password"]').required,
@@ -378,7 +390,10 @@ test('editing a configured provider never reveals or resubmits its stored key', 
   assert.equal(field(container, 'Name').value, provider.name)
   assert.equal(field(container, 'API base URL').value, provider.baseUrl)
   assert.equal(field(container, 'Model ID').value, 'model-one')
-  assert.equal(container.querySelectorAll('select').length, 1)
+  assert.equal(
+    container.querySelector('form').querySelectorAll('select').length,
+    1,
+  )
   assert.doesNotMatch(
     container.querySelector('form').textContent,
     /Set as default model/,
@@ -518,7 +533,7 @@ test('model-use permission alone never loads personal keys or displays managemen
   assert.equal(read.mock.callCount(), 0)
 })
 
-test('admin permissions are view-only while member and custom roles remain editable', async (t) => {
+test('all built-in roles are view-only while custom roles remain editable', async (t) => {
   t.mock.method(managementApi, 'roles', async () => ({
     roles: [
       {
@@ -535,21 +550,402 @@ test('admin permissions are view-only while member and custom roles remain edita
         description: '',
         permissions: [],
       },
+      {
+        id: 'role_custom',
+        name: 'Custom',
+        builtin: false,
+        description: '',
+        permissions: [],
+      },
     ],
     permissions: [{ id: 'users.manage', label: 'Manage users' }],
   }))
   const saved = t.mock.method(managementApi, 'saveRole', async () => ({}))
   const container = await mount(t, RolesPanel)
-  await click(container, 'View permissions')
-  assert.equal(container.querySelector('input[type="checkbox"]').disabled, true)
-  await click(container, 'Close')
+  for (const name of ['Administrator', 'Member']) {
+    const heading = [...container.querySelectorAll('h2')].find(
+      (item) => item.textContent === name,
+    )
+    const card = heading.parentElement.parentElement
+    assert.equal(card.querySelectorAll('button').length, 1)
+    await click(card, 'View permissions')
+    const form = container.querySelector('form')
+    assert.ok(
+      [...form.querySelectorAll('input')].every((input) => input.disabled),
+    )
+    assert.equal(form.querySelector('button[type="submit"]'), null)
+    await act(async () =>
+      form.dispatchEvent(
+        new window.Event('submit', { bubbles: true, cancelable: true }),
+      ),
+    )
+    assert.equal(saved.mock.callCount(), 0)
+    await click(container, 'Close')
+  }
   await click(container, 'Edit')
   const checkbox = container.querySelector('input[type="checkbox"]')
   assert.equal(checkbox.disabled, false)
   await act(async () => checkbox.click())
   await click(container, 'Save permissions')
   assert.deepEqual(saved.mock.calls[0].arguments, [
-    'member',
-    { name: 'Member', description: '', permissions: ['users.manage'] },
+    'role_custom',
+    { name: 'Custom', description: '', permissions: ['users.manage'] },
   ])
+  await click(container, 'Create role')
+  await fill(field(container, 'Role name'), 'New custom role')
+  await click(container, 'Save permissions')
+  assert.deepEqual(saved.mock.calls[1].arguments, [
+    null,
+    { name: 'New custom role', description: '', permissions: [] },
+  ])
+})
+
+test('provider removal requires dialog confirmation and failed removal stays recoverable', async (t) => {
+  mockModels(t)
+  const remove = t.mock.method(modelsApi, 'remove', async () => {
+    throw new Error('Provider is unavailable')
+  })
+  const container = await mount(t, ModelsPanel)
+  await click(container, 'Delete')
+  const dialog = container.querySelector('[role="dialog"]')
+  assert.match(dialog.textContent, /Delete provider/)
+  assert.equal(remove.mock.callCount(), 0)
+  await click(dialog, 'Cancel')
+  assert.equal(container.querySelector('[role="dialog"]'), null)
+  assert.equal(remove.mock.callCount(), 0)
+  await click(container, 'Delete')
+  await click(container.querySelector('[role="dialog"]'), 'Confirm delete')
+  assert.equal(remove.mock.callCount(), 1)
+  assert.match(
+    container.querySelector('[role="dialog"] [role="alert"]').textContent,
+    /Provider is unavailable/,
+  )
+})
+
+test('provider cards and model catalogs paginate without truncating the edit draft', async (t) => {
+  const models = Array.from({ length: 31 }, (_, index) => ({
+    modelId: `model-${index + 1}`,
+    name: `Model ${index + 1}`,
+    inputTypes: ['text'],
+  }))
+  const providers = Array.from({ length: 26 }, (_, index) => ({
+    ...provider,
+    providerId: `provider-${index + 1}`,
+    name: `Provider ${index + 1}`,
+    models: index === 0 ? models : [provider.models[0]],
+  }))
+  t.mock.method(modelsApi, 'providers', async () => ({ providers }))
+  t.mock.method(modelsApi, 'defaultSelection', async () => ({
+    selection: null,
+  }))
+  const save = t.mock.method(modelsApi, 'save', async () => providers[0])
+  const container = await mount(t, ModelsPanel)
+  assert.equal(container.querySelectorAll('section').length, 25)
+  const first = container.querySelector('section')
+  assert.equal(first.querySelectorAll('tbody tr').length, 25)
+  await click(first, 'Next')
+  assert.equal(first.querySelectorAll('tbody tr').length, 6)
+  assert.match(first.querySelector('tbody').textContent, /Model 31/)
+  await click(first, 'Edit')
+  assert.equal(
+    container.querySelectorAll('[role="dialog"] input[required]').length,
+    27,
+  )
+  await click(container.querySelector('[role="dialog"]'), 'Next')
+  assert.equal(
+    field(container.querySelector('[role="dialog"]'), 'Model ID').value,
+    'model-26',
+  )
+  await click(container.querySelector('[role="dialog"]'), 'Add model')
+  assert.equal(
+    field(container.querySelector('[role="dialog"]'), 'Model ID', 6).value,
+    '',
+  )
+  await fill(
+    field(container.querySelector('[role="dialog"]'), 'Model ID', 6),
+    'model-32',
+  )
+  await click(container.querySelector('[role="dialog"]'), 'Save')
+  assert.equal(save.mock.calls[0].arguments[1].models.length, 32)
+  assert.equal(save.mock.calls[0].arguments[1].models[31].modelId, 'model-32')
+  const providerPagination = [...container.querySelectorAll('nav')].at(-1)
+  await click(providerPagination, 'Next')
+  assert.equal(container.querySelectorAll('section').length, 1)
+  assert.match(container.querySelector('section').textContent, /Provider 26/)
+  await fill(
+    container.querySelector('input[aria-label="Search providers or models"]'),
+    'Provider 1',
+  )
+  assert.equal(container.querySelectorAll('section').length, 11)
+  assert.match(
+    [...container.querySelectorAll('nav')].at(-1).textContent,
+    /Page 1 \/ 1/,
+  )
+})
+
+test('role cards paginate and a failed edit keeps its values inside the dialog', async (t) => {
+  const roles = Array.from({ length: 26 }, (_, index) => ({
+    id: `role-${index + 1}`,
+    name: `Role ${index + 1}`,
+    description: 'Description',
+    builtin: false,
+    permissions: [],
+  }))
+  t.mock.method(managementApi, 'roles', async () => ({
+    roles,
+    permissions: [],
+  }))
+  const save = t.mock.method(managementApi, 'saveRole', async () => {
+    throw new Error('Role save failed')
+  })
+  const remove = t.mock.method(managementApi, 'deleteRole', async () => ({}))
+  const container = await mount(t, RolesPanel)
+  assert.equal(container.querySelectorAll('h2').length, 25)
+  await click(container, 'Next')
+  assert.equal(container.querySelectorAll('h2').length, 1)
+  assert.equal(container.querySelector('h2').textContent, 'Role 26')
+  await click(container, 'Edit')
+  await fill(field(container, 'Role name'), 'Updated role')
+  await click(container, 'Save permissions')
+  assert.equal(save.mock.callCount(), 1)
+  assert.equal(field(container, 'Role name').value, 'Updated role')
+  assert.match(
+    container.querySelector('[role="dialog"] [role="alert"]').textContent,
+    /Role save failed/,
+  )
+  await click(container.querySelector('[role="dialog"]'), 'Close')
+  await click(container, 'Delete')
+  assert.equal(remove.mock.callCount(), 0)
+  await click(container.querySelector('[role="dialog"]'), 'Cancel')
+  assert.equal(remove.mock.callCount(), 0)
+  await fill(
+    container.querySelector('input[aria-label="Search roles"]'),
+    'Role 1',
+  )
+  assert.equal(container.querySelectorAll('h2').length, 11)
+  assert.match(container.querySelector('nav').textContent, /Page 1 \/ 1/)
+})
+
+test('users use server pagination and dialog mutations preserve failures and require confirmation', async (t) => {
+  const account = {
+    userId: 'admin-owner',
+    role: 'admin',
+    roles: ['admin'],
+    permissions: ['users.read', 'users.manage', 'roles.manage'],
+    authzVersion: 1,
+  }
+  saveStoredSession({ ...account, accessToken: 'synthetic-user-test' })
+  t.mock.method(authApi, 'config', async () => ({
+    needsBootstrap: false,
+    registrationOpen: true,
+  }))
+  t.mock.method(authApi, 'me', async () => account)
+  t.mock.method(globalThis, 'fetch', async () => {
+    throw new Error('Unexpected network request')
+  })
+  const member = {
+    userId: 'member-id',
+    username: 'member',
+    displayName: 'Member',
+    email: null,
+    role: 'member',
+    roles: ['member'],
+    disabled: false,
+    deletedAt: null,
+  }
+  const users = t.mock.method(
+    managementApi,
+    'users',
+    async (page, search, pageSize) => ({
+      users: [member],
+      page,
+      pageSize,
+      total: search ? 1 : 51,
+    }),
+  )
+  t.mock.method(managementApi, 'roles', async () => ({
+    roles: [{ id: 'member', name: 'Member' }],
+    permissions: [],
+  }))
+  const create = t.mock.method(managementApi, 'createUser', async () => {
+    throw new Error('Username already exists')
+  })
+  const remove = t.mock.method(managementApi, 'deleteUser', async () => ({}))
+  const update = t.mock.method(managementApi, 'updateUser', async () => ({}))
+  const container = await mount(t, () => h(AuthProvider, null, h(UsersPanel)))
+  assert.deepEqual(users.mock.calls[0].arguments, [1, '', 25])
+  await click(container, 'Next')
+  assert.deepEqual(users.mock.calls.at(-1).arguments, [2, '', 25])
+  await select(container.querySelector('nav select'), '10')
+  assert.deepEqual(users.mock.calls.at(-1).arguments, [1, '', 10])
+  await fill(
+    container.querySelector('input[aria-label="Search users"]'),
+    'member',
+  )
+  await click(container, 'Search')
+  assert.deepEqual(users.mock.calls.at(-1).arguments, [1, 'member', 10])
+  await click(container, 'Create user')
+  let dialog = container.querySelector('[role="dialog"]')
+  await fill(field(dialog, 'Username'), 'new-user')
+  await fill(field(dialog, 'Display name'), 'New user')
+  await fill(field(dialog, 'Initial password'), 'synthetic-test-password')
+  await click(dialog, 'Save')
+  assert.equal(create.mock.callCount(), 1)
+  assert.match(
+    dialog.querySelector('[role="alert"]').textContent,
+    /Username already exists/,
+  )
+  assert.equal(field(dialog, 'Username').value, 'new-user')
+  await click(dialog, 'Cancel')
+  assert.equal(container.querySelector('input[type="password"]'), null)
+  await click(container, 'Disable')
+  dialog = container.querySelector('[role="dialog"]')
+  assert.equal(update.mock.callCount(), 0)
+  await click(dialog, 'Cancel')
+  assert.equal(update.mock.callCount(), 0)
+  await click(container, 'Delete')
+  dialog = container.querySelector('[role="dialog"]')
+  assert.equal(remove.mock.callCount(), 0)
+  await click(dialog, 'Confirm')
+  assert.deepEqual(remove.mock.calls[0].arguments, ['member-id'])
+  assert.equal(container.querySelector('[role="dialog"]'), null)
+})
+
+for (const transition of [
+  'account-change',
+  'same-user-relogin',
+  'leave-page',
+  'token-refresh',
+]) {
+  test(`delayed provider saves respect the ${transition} lifecycle transition`, async (t) => {
+    const session = (userId, accessToken = 'synthetic-before') => ({
+      userId,
+      accessToken,
+      role: 'member',
+      roles: ['member'],
+      authzVersion: 1,
+      permissions: ['models.personal.manage'],
+    })
+    saveStoredSession(session('first-owner'))
+    t.mock.method(personalModelsApi, 'providers', async () => ({
+      providers: [],
+    }))
+    t.mock.method(personalModelsApi, 'defaultSelection', async () => ({
+      selection: null,
+    }))
+    let finishSave
+    const save = t.mock.method(
+      personalModelsApi,
+      'save',
+      () =>
+        new Promise((resolve) => {
+          finishSave = resolve
+        }),
+    )
+    const setDefault = t.mock.method(
+      personalModelsApi,
+      'setDefault',
+      async () => ({}),
+    )
+    let leavePage
+    function Page() {
+      const [visible, setVisible] = useState(true)
+      leavePage = () => setVisible(false)
+      return visible
+        ? h(ModelsPanel, { scope: 'personal' })
+        : h('p', null, 'Another module')
+    }
+    const container = await mount(t, Page)
+    await click(container, 'Add provider')
+    await fill(
+      container.querySelector('input[type="password"]'),
+      'synthetic-delayed-key',
+    )
+    await click(container.querySelector('[role="dialog"]'), 'Save')
+    assert.equal(save.mock.callCount(), 1)
+    assert.equal(setDefault.mock.callCount(), 0)
+    await act(async () => {
+      if (transition === 'account-change')
+        saveStoredSession(session('second-owner'))
+      if (transition === 'same-user-relogin') {
+        clearStoredSession()
+        saveStoredSession(session('first-owner', 'synthetic-new-login'))
+      }
+      if (transition === 'leave-page') leavePage()
+      if (transition === 'token-refresh')
+        saveStoredSession(session('first-owner', 'synthetic-refreshed-token'))
+    })
+    await act(async () => finishSave(deepseekProvider))
+    assert.equal(
+      setDefault.mock.callCount(),
+      transition === 'token-refresh' ? 1 : 0,
+    )
+    if (transition === 'account-change' || transition === 'leave-page')
+      assert.equal(container.querySelector('[role="dialog"]'), null)
+  })
+}
+
+test('provider submission validates every model page and locates the first invalid row without losing the draft', async (t) => {
+  const models = Array.from({ length: 31 }, (_, index) => ({
+    modelId: `model-${index + 1}`,
+    name: `Model ${index + 1}`,
+    inputTypes: ['text'],
+  }))
+  const catalog = { ...provider, models }
+  t.mock.method(modelsApi, 'providers', async () => ({ providers: [catalog] }))
+  t.mock.method(modelsApi, 'defaultSelection', async () => ({
+    selection: null,
+  }))
+  const save = t.mock.method(modelsApi, 'save', async () => catalog)
+  const container = await mount(t, ModelsPanel)
+  await click(container, 'Edit')
+  const editor = container.querySelector('[role="dialog"]')
+  await fill(field(editor, 'Model ID'), '  ')
+  await click(editor, 'Next')
+  await click(editor, 'Save')
+  assert.equal(save.mock.callCount(), 0)
+  assert.match(
+    editor.querySelector('[role="alert"]').textContent,
+    /Model 1: Model ID is required/,
+  )
+  assert.match(editor.querySelector('nav').textContent, /Page 1 \/ 2/)
+  assert.equal(field(editor, 'Model ID').value, '  ')
+  await fill(field(editor, 'Model ID'), 'model-1')
+  await click(editor, 'Next')
+  await fill(field(editor, 'Model ID'), ' model-1 ')
+  await click(editor, 'Previous')
+  await click(editor, 'Save')
+  assert.equal(save.mock.callCount(), 0)
+  assert.match(
+    editor.querySelector('[role="alert"]').textContent,
+    /Model 26: Model ID model-1 is duplicated/,
+  )
+  assert.match(editor.querySelector('nav').textContent, /Page 2 \/ 2/)
+  assert.equal(field(editor, 'Model ID').value, ' model-1 ')
+  await fill(field(editor, 'Model ID'), ' model-26 ')
+  await fill(field(editor, 'Max output tokens (optional)'), '1.5')
+  await click(editor, 'Previous')
+  await click(editor, 'Save')
+  assert.equal(save.mock.callCount(), 0)
+  assert.match(
+    editor.querySelector('[role="alert"]').textContent,
+    /Model 26: Max output tokens must be a positive integer/,
+  )
+  await fill(field(editor, 'Max output tokens (optional)'), '128')
+  await fill(field(editor, 'Context window (optional)', 1), '0')
+  await click(editor, 'Previous')
+  await click(editor, 'Save')
+  assert.equal(save.mock.callCount(), 0)
+  assert.match(
+    editor.querySelector('[role="alert"]').textContent,
+    /Model 27: Context window must be a positive integer/,
+  )
+  await fill(field(editor, 'Context window (optional)', 1), '1024')
+  await click(editor, 'Save')
+  assert.equal(save.mock.callCount(), 1)
+  const submitted = save.mock.calls[0].arguments[1].models
+  assert.equal(submitted.length, 31)
+  assert.equal(submitted[25].modelId, 'model-26')
+  assert.equal(submitted[25].maxTokens, 128)
+  assert.equal(submitted[26].contextWindow, 1024)
 })

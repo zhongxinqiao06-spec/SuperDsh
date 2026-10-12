@@ -4,7 +4,8 @@ import * as React from 'react'
 import { useAuth } from '@/components/auth/auth-context'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
-import { managementApi } from '@/features/management/api'
+import { managementApi, type DeviceInventory } from '@/features/management/api'
+import { ManagementDialog, ManagementPagination } from './presentation'
 import {
   dateLabel,
   ResourceState,
@@ -16,15 +17,31 @@ import {
 export function DevicesPanel() {
   const tr = useManagementText()
   const { can } = useAuth()
-  const resource = useManagementResource('devices', managementApi.devices)
   const [search, setSearch] = React.useState('')
+  const [filter, setFilter] = React.useState('')
+  const [page, setPage] = React.useState(1)
+  const [pageSize, setPageSize] = React.useState(25)
+  const resource = useManagementResource(
+    `devices:${page}:${pageSize}:${filter}`,
+    () => managementApi.devices(page, filter, pageSize),
+  )
   const [reason, setReason] = React.useState('')
-  const devices =
-    resource.data?.devices.filter((device) =>
-      `${device.name} ${device.username} ${device.userId} ${device.deviceOs}`
-        .toLowerCase()
-        .includes(search.toLowerCase()),
-    ) ?? []
+  const [selected, setSelected] = React.useState<DeviceInventory | null>(null)
+  const devices = resource.data?.devices ?? []
+  const total = resource.data?.total ?? devices.length
+  React.useEffect(() => {
+    if (resource.data && page > Math.max(1, Math.ceil(total / pageSize)))
+      setPage(Math.max(1, Math.ceil(total / pageSize)))
+  }, [resource.data, page, pageSize, total])
+  const operate = async () => {
+    if (!selected || !can('devices.connection.manage') || resource.busy) return
+    const success = await resource.perform(() =>
+      selected.blockedAt
+        ? managementApi.resumeDevice(selected.id)
+        : managementApi.blockDevice(selected.id, reason.trim()),
+    )
+    if (success) setSelected(null)
+  }
   return (
     <div className="space-y-4">
       <p className="text-sm text-muted-foreground">
@@ -33,7 +50,14 @@ export function DevicesPanel() {
           'This inventory contains operational metadata. Sessions, files and terminals remain private to the device owner. Blocking disconnects the platform connection; resuming allows reconnection.',
         )}
       </p>
-      <div className="flex flex-wrap gap-2">
+      <form
+        className="flex flex-wrap items-center gap-2 rounded-xl border p-4"
+        onSubmit={(event) => {
+          event.preventDefault()
+          setFilter(search.trim())
+          setPage(1)
+        }}
+      >
         <Input
           className="max-w-sm"
           aria-label={tr('搜索设备', 'Search devices')}
@@ -41,19 +65,24 @@ export function DevicesPanel() {
           value={search}
           onChange={(event) => setSearch(event.target.value)}
         />
-        {can('devices.connection.manage') && (
-          <Input
-            className="max-w-sm"
-            aria-label={tr('阻断原因', 'Block reason')}
-            placeholder={tr('阻断原因（可选）', 'Block reason (optional)')}
-            value={reason}
-            onChange={(event) => setReason(event.target.value)}
-          />
-        )}
-        <Button variant="outline" onClick={resource.reload}>
+        <Button
+          type="submit"
+          size="sm"
+          variant="outline"
+          disabled={resource.loading}
+        >
+          {tr('搜索', 'Search')}
+        </Button>
+        <Button
+          type="button"
+          size="sm"
+          variant="outline"
+          onClick={resource.reload}
+          disabled={resource.loading}
+        >
           {tr('刷新', 'Refresh')}
         </Button>
-      </div>
+      </form>
       <ResourceState {...resource} onRetry={resource.reload} />
       <div className="overflow-x-auto rounded-xl border">
         <table className={tableClass}>
@@ -98,13 +127,10 @@ export function DevicesPanel() {
                       size="sm"
                       variant={device.blockedAt ? 'outline' : 'destructive'}
                       disabled={resource.busy}
-                      onClick={() =>
-                        void resource.perform(() =>
-                          device.blockedAt
-                            ? managementApi.resumeDevice(device.id)
-                            : managementApi.blockDevice(device.id, reason),
-                        )
-                      }
+                      onClick={() => {
+                        setSelected(device)
+                        setReason('')
+                      }}
                     >
                       {device.blockedAt
                         ? tr('恢复连接', 'Resume')
@@ -122,6 +148,73 @@ export function DevicesPanel() {
           </p>
         )}
       </div>
+      <ManagementPagination
+        page={page}
+        pageSize={pageSize}
+        total={total}
+        onPageChange={setPage}
+        onPageSizeChange={(size) => {
+          setPageSize(size)
+          setPage(1)
+        }}
+        loading={resource.loading || resource.busy}
+      />
+      <ManagementDialog
+        open={Boolean(selected)}
+        onOpenChange={(open) => !open && setSelected(null)}
+        title={
+          selected?.blockedAt
+            ? tr('恢复设备连接', 'Resume device connection')
+            : tr('阻断设备连接', 'Block device connection')
+        }
+        description={
+          selected?.blockedAt
+            ? tr(
+                '恢复后，此设备可重新连接平台。',
+                'This device will be allowed to reconnect.',
+              )
+            : tr(
+                '阻断会立即断开平台连接，并阻止自动重连；设备上的本地任务不会被终止。',
+                'Blocking disconnects the platform connection and prevents reconnection. Local tasks on the device are not stopped.',
+              )
+        }
+        busy={resource.busy}
+        error={resource.error}
+        footer={
+          <>
+            <Button
+              variant="outline"
+              disabled={resource.busy}
+              onClick={() => setSelected(null)}
+            >
+              {tr('取消', 'Cancel')}
+            </Button>
+            <Button
+              variant={selected?.blockedAt ? 'default' : 'destructive'}
+              disabled={resource.busy || !can('devices.connection.manage')}
+              onClick={() => void operate()}
+            >
+              {tr('确认', 'Confirm')}
+            </Button>
+          </>
+        }
+      >
+        <p className="text-sm font-medium">
+          {selected?.name} · {selected?.username || selected?.userId}
+        </p>
+        {!selected?.blockedAt && (
+          <label className="space-y-2 text-sm">
+            {tr('阻断原因（可选）', 'Block reason (optional)')}
+            <Input
+              aria-label={tr('阻断原因', 'Block reason')}
+              value={reason}
+              maxLength={500}
+              disabled={resource.busy}
+              onChange={(event) => setReason(event.target.value)}
+            />
+          </label>
+        )}
+      </ManagementDialog>
     </div>
   )
 }

@@ -22,14 +22,8 @@ import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { SettingsSection } from '@/components/settings/settings-section'
-import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogFooter,
-  DialogHeader,
-  DialogTitle,
-} from '@/components/ui/dialog'
+import { ManagementDialog } from '@/components/management/presentation'
+import { useManagementText } from '@/components/management/controls'
 import {
   Drawer,
   DrawerContent,
@@ -56,18 +50,17 @@ import { SecurityCard } from '@/components/management/security-card'
 import { ModelsPanel } from '@/components/management/models-panel'
 import { accountDisplayName } from '@/features/auth/account-profile'
 import { MobileConnectionDialog } from '@/components/pages/mobile-signin-panel'
-import { ArchivedSessionsTab } from '@/components/settings/archived-sessions-tab'
 import { PageHeader } from '@/components/pages/page-header'
 import { useAuth } from '@/components/auth/auth-context'
 import { LocaleSwitcher } from '@/components/locale-switcher'
 import { LoadingState } from '@/components/loading-state'
-import { useWorkspace } from '@/components/workspace-context'
+import { useWorkspaceSidebarPreference } from '@/features/console/workspace-preferences'
 import { authApi } from '@/features/auth/api'
 import type { AuthMe } from '@/features/auth/types'
 import { useMobileConnectionsSidebarVisibility } from '@/features/mobile-connections/sidebar-visibility'
 import { cn } from '@/lib/utils'
 
-type SettingsTab =
+export type SettingsTab =
   | 'account'
   | 'appearance'
   | 'mobile-connections'
@@ -96,25 +89,35 @@ const navItems: {
   { id: 'archived-sessions', labelKey: 'archivedSessions', icon: Archive },
 ]
 
-function AccountTab({
+export function AccountTab({
   me,
   token,
   onMeChange,
+  showSecurity = true,
 }: {
+  showSecurity?: boolean
   me: AuthMe
   token: string
   onMeChange: (me: AuthMe) => void
 }) {
   const t = useTranslations('pages.settings')
-  const [passwordOpen, setPasswordOpen] = React.useState(false)
+  const tr = useManagementText()
   const [avatarOpen, setAvatarOpen] = React.useState(false)
+  const [clearAvatarOpen, setClearAvatarOpen] = React.useState(false)
+  const [clearAvatarError, setClearAvatarError] = React.useState('')
   const [clearingAvatar, setClearingAvatar] = React.useState(false)
 
   const clearAvatar = async () => {
     if (!token || clearingAvatar) return
     setClearingAvatar(true)
+    setClearAvatarError('')
     try {
       onMeChange(await authApi.clearAvatar(token))
+      setClearAvatarOpen(false)
+    } catch (cause) {
+      setClearAvatarError(
+        cause instanceof Error ? cause.message : t('avatarUploadFailed'),
+      )
     } finally {
       setClearingAvatar(false)
     }
@@ -148,7 +151,10 @@ function AccountTab({
                 type="button"
                 variant="outline"
                 size="sm"
-                onClick={clearAvatar}
+                onClick={() => {
+                  setClearAvatarError('')
+                  setClearAvatarOpen(true)
+                }}
                 disabled={clearingAvatar}
               >
                 {clearingAvatar ? (
@@ -199,14 +205,61 @@ function AccountTab({
         </dl>
       </SettingsSection>
 
+      <AccountProfileCard me={me} token={token} onMeChange={onMeChange} />
+      {showSecurity && <AccountSecuritySection token={token} />}
+
+      <AvatarCropDialog
+        open={avatarOpen}
+        token={token}
+        userId={accountDisplayName(me)}
+        onMeChange={onMeChange}
+        onOpenChange={setAvatarOpen}
+      />
+      <ManagementDialog
+        open={clearAvatarOpen}
+        onOpenChange={setClearAvatarOpen}
+        title={t('removeAvatar')}
+        description={tr(
+          '移除后将显示默认头像，可以随时重新上传。',
+          'The default avatar will be shown. You can upload a new avatar at any time.',
+        )}
+        busy={clearingAvatar}
+        error={clearAvatarError}
+        footer={
+          <>
+            <Button
+              variant="outline"
+              disabled={clearingAvatar}
+              onClick={() => setClearAvatarOpen(false)}
+            >
+              {t('cancel')}
+            </Button>
+            <Button
+              variant="destructive"
+              disabled={clearingAvatar}
+              onClick={() => void clearAvatar()}
+            >
+              {t('removeAvatar')}
+            </Button>
+          </>
+        }
+      />
+    </div>
+  )
+}
+
+export function AccountSecuritySection({ token }: { token: string }) {
+  const t = useTranslations('pages.settings')
+  const [passwordOpen, setPasswordOpen] = React.useState(false)
+  return (
+    <div className="space-y-4">
       <SettingsSection
         title={t('password')}
         description={t('passwordDescription')}
         action={
           <Button
             type="button"
-            variant="destructive"
-            size="sm"
+            variant="outline"
             onClick={() => setPasswordOpen(true)}
           >
             <RotateCw data-icon="inline-start" />
@@ -214,21 +267,11 @@ function AccountTab({
           </Button>
         }
       />
-
-      <AccountProfileCard me={me} token={token} onMeChange={onMeChange} />
       <SecurityCard />
-
       <ResetPasswordDialog
         open={passwordOpen}
         token={token}
         onOpenChange={setPasswordOpen}
-      />
-      <AvatarCropDialog
-        open={avatarOpen}
-        token={token}
-        userId={accountDisplayName(me)}
-        onMeChange={onMeChange}
-        onOpenChange={setAvatarOpen}
       />
     </div>
   )
@@ -332,72 +375,81 @@ function ResetPasswordDialog({
       setConfirm('')
       signOut()
     } catch (err) {
-      toast.error(err instanceof Error ? err.message : t('passwordResetFailed'))
+      setError(err instanceof Error ? err.message : t('passwordResetFailed'))
     } finally {
       setSaving(false)
     }
   }
 
   return (
-    <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent>
-        <DialogHeader>
-          <DialogTitle>{t('resetPassword')}</DialogTitle>
-          <DialogDescription>{t('resetPasswordDescription')}</DialogDescription>
-        </DialogHeader>
-        <form onSubmit={submit} className="flex flex-col gap-6">
-          <FieldGroup>
-            <Field data-invalid={Boolean(error && password.length < 8)}>
-              <FieldLabel htmlFor="settings-new-password">
-                {t('newPassword')}
-              </FieldLabel>
-              <Input
-                id="settings-new-password"
-                type="password"
-                autoComplete="new-password"
-                value={password}
-                onChange={(event) => setPassword(event.currentTarget.value)}
-                aria-invalid={Boolean(error && password.length < 8)}
-              />
-              <FieldDescription>{t('newPasswordDescription')}</FieldDescription>
-            </Field>
-            <Field
-              data-invalid={Boolean(
+    <ManagementDialog
+      open={open}
+      onOpenChange={onOpenChange}
+      title={t('resetPassword')}
+      description={t('resetPasswordDescription')}
+      busy={saving}
+      error={error ?? undefined}
+      footer={
+        <>
+          <Button
+            type="button"
+            variant="outline"
+            disabled={saving}
+            onClick={() => onOpenChange(false)}
+          >
+            {t('cancel')}
+          </Button>
+          <Button type="submit" form="settings-password-form" disabled={saving}>
+            {saving ? <Spinner /> : <RotateCw data-icon="inline-start" />}
+            {t('savePassword')}
+          </Button>
+        </>
+      }
+    >
+      <form
+        id="settings-password-form"
+        onSubmit={submit}
+        className="flex flex-col gap-6"
+      >
+        <FieldGroup>
+          <Field data-invalid={Boolean(error && password.length < 8)}>
+            <FieldLabel htmlFor="settings-new-password">
+              {t('newPassword')}
+            </FieldLabel>
+            <Input
+              id="settings-new-password"
+              type="password"
+              disabled={saving}
+              autoComplete="new-password"
+              value={password}
+              onChange={(event) => setPassword(event.currentTarget.value)}
+              aria-invalid={Boolean(error && password.length < 8)}
+            />
+            <FieldDescription>{t('newPasswordDescription')}</FieldDescription>
+          </Field>
+          <Field
+            data-invalid={Boolean(
+              error && confirm.length > 0 && password !== confirm,
+            )}
+          >
+            <FieldLabel htmlFor="settings-confirm-password">
+              {t('confirmPassword')}
+            </FieldLabel>
+            <Input
+              id="settings-confirm-password"
+              type="password"
+              disabled={saving}
+              autoComplete="new-password"
+              value={confirm}
+              onChange={(event) => setConfirm(event.currentTarget.value)}
+              aria-invalid={Boolean(
                 error && confirm.length > 0 && password !== confirm,
               )}
-            >
-              <FieldLabel htmlFor="settings-confirm-password">
-                {t('confirmPassword')}
-              </FieldLabel>
-              <Input
-                id="settings-confirm-password"
-                type="password"
-                autoComplete="new-password"
-                value={confirm}
-                onChange={(event) => setConfirm(event.currentTarget.value)}
-                aria-invalid={Boolean(
-                  error && confirm.length > 0 && password !== confirm,
-                )}
-              />
-            </Field>
-          </FieldGroup>
-          {error ? <p className="text-sm text-destructive">{error}</p> : null}
-          <DialogFooter>
-            <Button
-              type="button"
-              variant="outline"
-              onClick={() => onOpenChange(false)}
-            >
-              {t('cancel')}
-            </Button>
-            <Button type="submit" disabled={saving}>
-              {saving ? <Spinner /> : <RotateCw data-icon="inline-start" />}
-              {t('savePassword')}
-            </Button>
-          </DialogFooter>
-        </form>
-      </DialogContent>
-    </Dialog>
+            />
+          </Field>
+        </FieldGroup>
+      </form>
+    </ManagementDialog>
   )
 }
 
@@ -468,7 +520,7 @@ function AvatarCropDialog({
       onMeChange(await authApi.updateAvatar(token, avatar))
       onOpenChange(false)
     } catch (err) {
-      toast.error(err instanceof Error ? err.message : t('avatarUploadFailed'))
+      setError(err instanceof Error ? err.message : t('avatarUploadFailed'))
     } finally {
       setSaving(false)
     }
@@ -486,79 +538,16 @@ function AvatarCropDialog({
   }
 
   return (
-    <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="sm:max-w-lg">
-        <DialogHeader>
-          <DialogTitle>{t('changeAvatar')}</DialogTitle>
-          <DialogDescription>{t('avatarDescription')}</DialogDescription>
-        </DialogHeader>
-        <div className="flex flex-col gap-5">
-          <Input
-            ref={fileInputRef}
-            className="sr-only"
-            type="file"
-            accept="image/*"
-            onChange={selectFile}
-            tabIndex={-1}
-          />
-          <div className="relative mx-auto size-64 overflow-hidden rounded-2xl border border-border bg-muted">
-            {source ? (
-              <Cropper
-                image={source}
-                crop={crop}
-                zoom={zoom}
-                aspect={1}
-                cropShape="round"
-                cropSize={{
-                  width: AVATAR_OUTPUT_SIZE,
-                  height: AVATAR_OUTPUT_SIZE,
-                }}
-                showGrid={false}
-                restrictPosition
-                objectFit="cover"
-                onCropChange={setCrop}
-                onZoomChange={setZoom}
-                onCropComplete={(_croppedArea, nextAreaPixels) =>
-                  setCroppedAreaPixels(nextAreaPixels)
-                }
-                mediaProps={{ alt: t('avatarPreviewAlt', { userId }) }}
-                style={{
-                  cropAreaStyle: {
-                    border: '2px solid rgba(255, 255, 255, 0.95)',
-                    borderRadius: '9999px',
-                    boxShadow:
-                      '0 0 0 1px rgba(0, 0, 0, 0.35), 0 0 0 9999px rgba(0, 0, 0, 0.48)',
-                  },
-                }}
-              />
-            ) : (
-              <button
-                type="button"
-                onClick={() => fileInputRef.current?.click()}
-                className="flex size-full flex-col items-center justify-center gap-3 text-muted-foreground transition-colors hover:bg-accent/50 hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
-              >
-                <Camera className="size-8" />
-                <span className="text-sm font-medium">{t('avatarEmpty')}</span>
-                <span className="text-xs">{t('avatarClickHint')}</span>
-              </button>
-            )}
-          </div>
-          <FieldGroup>
-            <Field data-disabled={!source}>
-              <FieldLabel>{t('avatarZoom')}</FieldLabel>
-              <Slider
-                value={[zoom]}
-                min={1}
-                max={3}
-                step={0.01}
-                disabled={!source}
-                onValueChange={(value: number[]) => setZoom(value[0] ?? 1)}
-              />
-            </Field>
-          </FieldGroup>
-          {error ? <p className="text-sm text-destructive">{error}</p> : null}
-        </div>
-        <DialogFooter>
+    <ManagementDialog
+      open={open}
+      onOpenChange={onOpenChange}
+      title={t('changeAvatar')}
+      description={t('avatarDescription')}
+      busy={saving}
+      error={error ?? undefined}
+      className="sm:max-w-lg"
+      footer={
+        <>
           <Button
             type="button"
             variant="outline"
@@ -570,6 +559,7 @@ function AvatarCropDialog({
           <Button
             type="button"
             variant="outline"
+            disabled={saving}
             onClick={() => onOpenChange(false)}
           >
             {t('cancel')}
@@ -582,9 +572,75 @@ function AvatarCropDialog({
             {saving ? <Spinner /> : <Upload data-icon="inline-start" />}
             {t('uploadAvatar')}
           </Button>
-        </DialogFooter>
-      </DialogContent>
-    </Dialog>
+        </>
+      }
+    >
+      <div className="flex flex-col gap-5">
+        <Input
+          ref={fileInputRef}
+          className="sr-only"
+          type="file"
+          accept="image/*"
+          onChange={selectFile}
+          tabIndex={-1}
+        />
+        <div className="relative mx-auto size-64 overflow-hidden rounded-2xl border border-border bg-muted">
+          {source ? (
+            <Cropper
+              image={source}
+              crop={crop}
+              zoom={zoom}
+              aspect={1}
+              cropShape="round"
+              cropSize={{
+                width: AVATAR_OUTPUT_SIZE,
+                height: AVATAR_OUTPUT_SIZE,
+              }}
+              showGrid={false}
+              restrictPosition
+              objectFit="cover"
+              onCropChange={setCrop}
+              onZoomChange={setZoom}
+              onCropComplete={(_croppedArea, nextAreaPixels) =>
+                setCroppedAreaPixels(nextAreaPixels)
+              }
+              mediaProps={{ alt: t('avatarPreviewAlt', { userId }) }}
+              style={{
+                cropAreaStyle: {
+                  border: '2px solid rgba(255, 255, 255, 0.95)',
+                  borderRadius: '9999px',
+                  boxShadow:
+                    '0 0 0 1px rgba(0, 0, 0, 0.35), 0 0 0 9999px rgba(0, 0, 0, 0.48)',
+                },
+              }}
+            />
+          ) : (
+            <button
+              type="button"
+              onClick={() => fileInputRef.current?.click()}
+              className="flex size-full flex-col items-center justify-center gap-3 text-muted-foreground transition-colors hover:bg-accent/50 hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+            >
+              <Camera className="size-8" />
+              <span className="text-sm font-medium">{t('avatarEmpty')}</span>
+              <span className="text-xs">{t('avatarClickHint')}</span>
+            </button>
+          )}
+        </div>
+        <FieldGroup>
+          <Field data-disabled={!source}>
+            <FieldLabel>{t('avatarZoom')}</FieldLabel>
+            <Slider
+              value={[zoom]}
+              min={1}
+              max={3}
+              step={0.01}
+              disabled={!source}
+              onValueChange={(value: number[]) => setZoom(value[0] ?? 1)}
+            />
+          </Field>
+        </FieldGroup>
+      </div>
+    </ManagementDialog>
   )
 }
 
@@ -594,10 +650,11 @@ const themes: { id: AppearanceMode; labelKey: string; descKey: string }[] = [
   { id: 'auto', labelKey: 'auto', descKey: 'autoDescription' },
 ]
 
-function AppearanceTab() {
+export function AppearanceTab() {
   const t = useTranslations('pages.settings')
   const { theme, setTheme } = useTheme()
-  const { sidebarShowsSessions, setSidebarShowsSessions } = useWorkspace()
+  const [sidebarShowsSessions, setSidebarShowsSessions] =
+    useWorkspaceSidebarPreference()
   const selected: AppearanceMode =
     theme === 'light' || theme === 'dark' ? theme : 'auto'
 
@@ -672,17 +729,17 @@ function AppearanceTab() {
   )
 }
 
-export function SettingsPage() {
-  const {
-    navigate,
-    openSession,
-    projects,
-    sessions,
-    isLoading,
-    refreshData,
-    settingsTab,
-    upsertSession,
-  } = useWorkspace()
+export function SettingsPage({
+  initialTab: settingsTab = 'account',
+  onTabChange,
+  onBack,
+  archivedContent,
+}: {
+  initialTab?: SettingsTab
+  onTabChange?: (tab: SettingsTab) => void
+  onBack?: () => void
+  archivedContent?: React.ReactNode
+} = {}) {
   const { session, me: authMe, refreshMe, can } = useAuth()
   const managePersonalModels = !!session && can('models.personal.manage')
   const visibleNavItems = navItems.filter(
@@ -747,7 +804,7 @@ export function SettingsPage() {
   const handleTabChange = (newTab: SettingsTab) => {
     if (newTab === 'personal-models' && !managePersonalModels) return
     setTab(newTab)
-    navigate('settings', newTab)
+    onTabChange?.(newTab)
   }
 
   const handleMeChange = async (nextMe: AuthMe) => {
@@ -770,11 +827,11 @@ export function SettingsPage() {
 
   return (
     <div className="flex h-full flex-col bg-background">
-      <div className="px-5 pb-0 pt-14 sm:px-8">
+      <div className="px-5 pb-0 pt-6 sm:px-8">
         <PageHeader
           title={t('title')}
           description={t('description')}
-          onBack={() => navigate('home')}
+          onBack={onBack}
         />
         <SettingsCategoryDrawer
           tab={tab}
@@ -839,17 +896,7 @@ export function SettingsPage() {
               userId={mobileUserId}
             />
           )}
-          {tab === 'archived-sessions' && (
-            <ArchivedSessionsTab
-              sessions={sessions}
-              loading={isLoading}
-              token={session?.accessToken ?? ''}
-              projects={projects}
-              onOpenSession={openSession}
-              onSessionUpdated={upsertSession}
-              onWorkspaceRefresh={refreshData}
-            />
-          )}
+          {tab === 'archived-sessions' && archivedContent}
         </ScrollArea>
       </div>
     </div>

@@ -27,6 +27,7 @@ apps/desktop/ui/client-manifest.json
 apps/desktop/ui/build-sources.json
 
 apps/admin/.next/
+apps/admin/.next-*/
 apps/admin/out/
 apps/admin/.env*
 !apps/admin/.env.example

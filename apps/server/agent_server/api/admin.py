@@ -65,12 +65,8 @@ async def update_settings(
 
 @router.get("/users", response_model=AdminUserListResponse, dependencies=[Depends(require_permission("users.read"))])
 async def list_users(page: int = 1, pageSize: int = 50, search: str = "", db: Store = Depends(get_store)) -> AdminUserListResponse:
-    page = max(1, page)
-    pageSize = max(1, min(200, pageSize))
-    users = await db.list_users()
-    if search:
-        users = [user for user in users if search.lower() in f"{user.username} {user.email or ''} {user.displayName}".lower()]
-    return AdminUserListResponse(users=users[(page - 1) * pageSize:page * pageSize], total=len(users), page=page, pageSize=pageSize, serverTime=utc_now())
+    result = await db.management_users(page=page, page_size=pageSize, search=search)
+    return AdminUserListResponse(**result, serverTime=utc_now())
 
 
 @router.post("/users", response_model=UserView, status_code=201)

@@ -1,6 +1,6 @@
 # SuperDsh
 
-A desktop-first Agent development workspace with desktop, admin web, Python server, and Android applications. SuperDsh owns the product UI, accounts, and device coordination; DeepSeek Harness runs tasks as a required engine plugin.
+SuperDsh includes a desktop Agent app, unified management console, Python server, and Android app. The console organizes overview, permissions, models, devices, and system settings; chat is an Agent workspace module. DeepSeek Harness runs tasks as a required engine plugin.
 
 **Use this page for everyday development.** [中文](README.md) · [Origins](#upstream-foundations) · [Design](#design-principles) · [Progress](#current-progress) · [Code locations](#project-structure) · [Startup](#daily-development) · [Integration](#cross-client-development) · [Checks](#checks-and-packaging)
 
@@ -18,6 +18,7 @@ Harness is pinned to `0.1.7-alpha.2`; see [upstream.json](upstream.json). AA app
 
 - **Desktop first, with the product shell in control.** SuperDsh owns windows, navigation, accounts, devices, and state. DSH is the required internal execution plugin. Keep Harness queues rather than building another execution engine.
 - **Find code by responsibility.** Desktop views belong in UI, business and native capabilities in Core, and Harness integration in the plugin. Admin, server, and Android have separate development and build entry points.
+- **Separate console management from the workspace.** The console owns menus, permissions, and routes; chat loads only inside its module. Future Agent product management can register another module; publication, assignment, and version management are outside this change.
 - **One main chat, two execution targets.** Users choose their own computer or Server Agent. Mobile, web, and desktop reuse API v2 and the same owned session. Server execution does not require an online computer; Android does not embed Harness.
 - **Separate platform identity from model authorization.** Platform accounts manage resources and remote access; DeepSeek or personal keys authorize model calls. Desktop retains local Home and model settings; platform login neither restarts the app nor opens another chat window.
 - **Preserve ownership isolation and compatibility.** Administrator and member are the two built-in roles, with custom roles supported. Management permissions do not grant access to other users' content. Server instances are isolated per user; pinned protocols and third-party plugin compatibility remain.
@@ -26,19 +27,22 @@ This phase excludes organizations/tenants, device sharing, multiple engines, a s
 
 ## Current progress
 
-**As of 2026-10-10: the core architecture is implemented; feature integration and stability work continue. Release acceptance is incomplete.** The table separates implemented code from verification; historical tests do not certify the current version.
+**As of 2026-10-12: the core architecture and management console refactor are implemented; feature integration and stability work continue. Release acceptance is incomplete.** The table separates implemented code from verification; historical tests do not certify the current version.
 
-| Area                         | Status                                           | Evidence and remaining limits                                                                                                                                                                                                 |
-| ---------------------------- | ------------------------------------------------ | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Repository and desktop shell | Migrated and separated                           | Four apps under `apps`, desktop UI / Core / Harness responsibilities, retired desktop source removed; see the [migration record](docs/superdsh-migration-validation.md)                                                       |
-| Desktop login and main chat  | Implemented, stage validation                    | Inline password login, fixed local Home, automatic computer connection, device switching in the main chat; real Host / Connector and headless UI verified separately in the [record](docs/desktop-inline-login-validation.md) |
-| Platform identity and RBAC   | Implemented, stage validation                    | Multiple roles, login refresh/revocation, ownership checks, device blocking, and audit; see the [identity record](docs/platform-identity-validation.md), whose old account-space design is superseded by inline login         |
-| Server Agent                 | Implemented, integration ongoing                 | Per-user execution, automatic preparation after login, real Host / Connector online verification; [historical integration](docs/server-agent-validation.md) used local model fixtures, not complete real-client UI coverage   |
-| Personal and platform models | Implemented, partial verification                | Three protocols, encrypted keys, defaults, and DeepSeek presets; recent real-key connection verification passed, while complete chat replies and error feedback still need work                                               |
-| Android and shared sessions  | Implemented, current-client revalidation pending | Chinese UI, login, server entry, offline history/drafts have source and build records; [older emulator connectivity](docs/apps-migration-validation.md) does not certify the current physical-phone experience                |
-| Packaging and release        | Stage builds, not released                       | Windows Chinese-path, Docker, desktop directory, and Debug APK builds have records; latest full installer, clean OS, macOS/Linux, signing, and updates still need acceptance                                                  |
+| Area                         | Status                                           | Evidence and remaining limits                                                                                                                                                                                                                  |
+| ---------------------------- | ------------------------------------------------ | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Repository and desktop shell | Migrated and separated                           | Four apps under `apps`, desktop UI / Core / Harness responsibilities, retired desktop source removed; see the [migration record](docs/superdsh-migration-validation.md)                                                                        |
+| Desktop login and main chat  | Implemented, stage validation                    | Inline password login, fixed local Home, automatic computer connection, device switching in the main chat; real Host / Connector and headless UI verified separately in the [record](docs/desktop-inline-login-validation.md)                  |
+| Platform identity and RBAC   | Implemented, stage validation                    | Multiple roles, login refresh/revocation, ownership checks, device blocking, and audit; see the [identity record](docs/platform-identity-validation.md), whose old account-space design is superseded by inline login                          |
+| Management console           | Refactored, regression checked                   | Overview and seven navigation areas, persistent permission-filtered menus, workspace loaded on demand; future Agent publication and assignment are excluded                                                                                    |
+| Server Agent                 | Implemented, integration ongoing                 | Per-user execution, preparation upon web workspace entry or native login, real Host / Connector online verification; [historical integration](docs/server-agent-validation.md) used local model fixtures, not complete real-client UI coverage |
+| Personal and platform models | Implemented, partial verification                | Three protocols, encrypted keys, defaults, and DeepSeek presets; recent real-key connection verification passed, while complete chat replies and error feedback still need work                                                                |
+| Android and shared sessions  | Implemented, current-client revalidation pending | Chinese UI, login, server entry, offline history/drafts have source and build records; [older emulator connectivity](docs/apps-migration-validation.md) does not certify the current physical-phone experience                                 |
+| Packaging and release        | Stage builds, not released                       | Windows Chinese-path, Docker, desktop directory, and Debug APK builds have records; latest full installer, clean OS, macOS/Linux, signing, and updates still need acceptance                                                                   |
 
 **Next priorities:** investigate missing server chat replies and missing errors, improve empty-model guidance and selectable-model checks, then validate real DeepSeek and shared-session operation across mobile/web/desktop, reconnection, and target switching. Historical evidence is linked from the [documentation index](docs/README.en.md#validation-records).
+
+**Model center proposal (not implemented):** unify provider connections, the model catalog, and usage permissions, with simpler desktop presets. Evaluate a separate Docker gateway for 9router / Codex authorization, serving the three clients first and reserving an external API. Keep local, personal-account, and platform-provided sources distinct and isolate personal authorization by user. The current deployment does not include 9router or a Codex authorization shortcut.
 
 ## Project structure
 
@@ -56,6 +60,8 @@ This phase excludes organizations/tenants, device sharing, multiple engines, a s
 | Android UI, logic, networking, Chinese strings    | [apps/android](apps/android/): `ui`, `feature`, `api` under `app/src/main/java/com/agentsanywhere/app`; strings in `app/src/main/res/values-zh-rCN`; Kotlin / Compose |
 
 `apps/desktop` assembles and releases the product; UI and Core are its two main business packages. Pinned upstreams are in `deepseek-harness` and `agents-anywhere`. AA retains Connector, Bridge, shared protocols, and iOS reference source; iOS migration is outside this phase.
+
+Console development entry points: `apps/admin/src/components/console` contains the shell and menu editor; `src/features/console/modules.ts` registers pages, permissions, and loading entries; `src/features/console/routes.ts` owns Hash routing. Existing chat is assembled in `components/demo.tsx`; `features/workbench` holds account-scoped transient interaction state. Management modules do not depend on `WorkspaceProvider`.
 
 ## Prerequisites
 
@@ -109,12 +115,14 @@ Terminal two starts the web application:
 corepack.cmd yarn admin:dev
 ```
 
+Web login opens Overview. Permission-filtered navigation includes Users and permissions, Models, Device operations, Agent workspace, System, and Personal center. Configure two-level groups, order, and role visibility at `#/access/menus`; hiding a menu does not change authorization. Apply API migration `v2_39` before updating the web app; existing administrators receive menu permissions. Deployment updates remain manual.
+
 | Service                                                | Default address                                  |
 | ------------------------------------------------------ | ------------------------------------------------ |
 | Admin web                                              | [http://127.0.0.1:5174](http://127.0.0.1:5174)   |
 | API                                                    | `http://127.0.0.1:8000`                          |
 | API readiness                                          | `http://127.0.0.1:8000/api/v2/health/ready`      |
-| PostgreSQL / Redis (loopback only)                     | `127.0.0.1:15432` / `127.0.0.1:16379`            |
+| PostgreSQL / Redis (default, loopback only)            | `127.0.0.1:15432` / `127.0.0.1:16379`            |
 | Development Agent Supervisor (internal authentication) | `127.0.0.1:18090`                                |
 | Full Docker deployment (separate mode)                 | [http://127.0.0.1:15174](http://127.0.0.1:15174) |
 
@@ -123,6 +131,8 @@ The local `superdsh-dev` database automatically creates the administrator **`adm
 Development dependencies belong to the isolated `superdsh-dev` project. Credentials and model encryption keys live in the Git-ignored `.superdsh-work/server-dev/aa-dev.env`; keep this file with its volumes. Stop the native API and web application with `Ctrl+C` first, then use `corepack.cmd yarn server:deps:down` to stop databases, control services, and managed Agents while preserving all volumes. A running API may schedule Agents again.
 
 For computer-only development, set `$env:SUPERDSH_DEV_AGENT_ENABLED='0'` in the API terminal. Use `SUPERDSH_DEV_AGENT_PORT` to change the Supervisor port and `AGENT_SERVER_PORT` to change the API port. Development Agents reach the native API through Docker Desktop's `host.docker.internal`; this route is not yet verified on native Linux hosts, where full Docker deployment is available instead.
+
+Repeated `server:deps:up` calls skip healthy dependencies owned by this project. If another process occupies a port, the command selects a free port and saves it to `.superdsh-work/server-dev/aa-dev.env` for subsequent API startup. Use the actual ports printed by the command. Explicit shell port overrides are not changed automatically; restart any existing API process to load new ports.
 
 The web application proxies `/api/v2` to local port `8000` by default. Clear any previous `NEXT_OUTPUT=export` setting before development; use `AGENTS_ANYWHERE_API` to change the API target. To use existing databases, set both `AGENT_SERVER_DB_URL` and `AGENT_SERVER_REDIS_URL` in the API terminal and skip `server:deps:up`. An explicit database URL disables automatic development account creation; initialize an empty database with its setup token. See the [server guide](apps/server/README.md) for full configuration.
 
@@ -151,16 +161,16 @@ Execution target: your computer, or your Server Agent container
 
 Desktop also works independently with DeepSeek / a personal API key. Platform login, logout, and account switching keep the app and Harness running, using the existing local Home and main chat. Remote files and terminals always address the selected device. Switching accounts with running tasks requires confirmation to stop them; cancellation preserves the account and tasks. In-place login and development UI rebuilds have different lifecycle behavior.
 
-**Server Agent mode:** `server:dev` prepares runtime dependencies; login prepares your Agent in the background without blocking login or switching the active chat. Failures can be retried. Account settings → Personal models → Add provider preselects DeepSeek: enter a key and save. With no existing default, the default-model option is checked; custom providers remain available. **An online Agent or successful connection check does not prove model replies work.** Explicitly select the configured model in existing sessions before sending again.
+**Server Agent mode:** `server:dev` prepares runtime dependencies. Web login and management pages do not start an Agent; entering Agent workspace prepares or reuses the instance, with explicit retry after failure. Desktop and Android retain preparation after login. Personal center → Personal models → Add provider preselects DeepSeek: enter a key and save. With no existing default, the default-model option is checked; custom providers remain available. **An online Agent or successful connection check does not prove model replies work.** Explicitly select the configured model in existing sessions before sending again.
 
-To run both the admin web application and API in containers, use full deployment instead:
+To run both the admin web application and API in containers, follow the [Git-to-Docker server deployment guide](apps/server/docker/README.md#服务器首次部署) for first-time Linux / CentOS setup, administrator initialization, HTTPS, and updates. The following commands assume the environment and source are already prepared:
 
 ```powershell
 corepack.cmd yarn server:build
 corepack.cmd yarn server:up --no-build
 ```
 
-Open `15174` and sign all clients into that deployment; Agents are also prepared in the background. Stop the full deployment with `corepack.cmd yarn server:down`, retaining volumes and their environment file. Its database, accounts, and Agents are separate from development on port `8000`.
+Open `15174` and sign all clients into that deployment; web prepares its Agent upon entering the workspace. Stop the full deployment with `corepack.cmd yarn server:down`, retaining volumes and their environment file. Its database, accounts, and Agents are separate from development on port `8000`.
 
 | Integration target     | Platform login address   | Emulator mapping                  |
 | ---------------------- | ------------------------ | --------------------------------- |
@@ -172,6 +182,8 @@ The launcher sets the matching mapping for loopback addresses passed through `--
 Administrator and member are the only built-in roles; custom roles are supported. Administrative operations do not grant access to other users' chats, files, or terminals. Platform provider keys and server-side personal keys are encrypted and write-only. New server sessions prefer the personal default, then the platform default; existing sessions do not silently change model or billing source. Desktop personal models stay on that computer.
 
 Offline phones can read previously loaded history and save drafts, then send manually after reconnecting. Closing the phone client does not stop server tasks. Account and target switches must not mix history, subscriptions, or credentials.
+
+Switching web modules releases workspace subscriptions and polling while retaining the current account’s drafts, pending files, selections, and send results in memory. Leaving the workspace or signing out does not stop submitted tasks. Reloading the document loses transient files; logout or account switching clears memory state.
 
 ## Checks and packaging
 
@@ -215,7 +227,7 @@ Desktop packaging outputs to `apps/desktop/dist`; the Android APK is at `apps/an
 | First dependency install or web compilation runs out of memory | Retain diagnostics, free memory, and reduce concurrent work before retrying; unverified heap flags are not a universal fix                                                |
 | Android fails to open or still uses an old endpoint            | Build the APK first, then check SDK/AVD/signing, the saved app address, and the matching `adb reverse`                                                                    |
 
-This progress summary uses existing evidence; this documentation update did not rerun applications or integration checks. Static checks, model fixtures, real Host tests, headless UI, and physical-device verification have separate scopes and do not substitute for one another.
+This progress summary separates the current console regressions from historical cross-client integration evidence. Static checks, model fixtures, real Host tests, headless UI, and physical-device verification have separate scopes and do not substitute for one another.
 
 ## Further reading and license
 

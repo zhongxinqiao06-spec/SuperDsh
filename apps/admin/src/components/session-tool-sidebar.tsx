@@ -482,6 +482,8 @@ export function SessionToolSidebarsHost() {
           userId={authSession?.userId ?? null}
           hostLeft={hostBounds.left}
           hostWidth={hostBounds.width}
+          hostTop={hostBounds.top}
+          hostHeight={hostBounds.height}
           setPanelMode={setPanelMode}
         />
       ))}
@@ -496,6 +498,8 @@ function PersistentSessionToolSidebar({
   userId,
   hostLeft,
   hostWidth,
+  hostTop,
+  hostHeight,
   setPanelMode,
 }: {
   sessionId: string
@@ -504,6 +508,8 @@ function PersistentSessionToolSidebar({
   userId: string | null
   hostLeft: number
   hostWidth: number
+  hostTop?: number
+  hostHeight?: number
   setPanelMode: (id: PanelId, mode: 'docked' | 'floating' | 'closed') => void
 }) {
   const context = useStoredSessionToolSidebarContext(sessionId)
@@ -546,6 +552,8 @@ function PersistentSessionToolSidebar({
       presented={presented}
       hostLeft={hostLeft}
       hostWidth={hostWidth}
+      hostTop={hostTop}
+      hostHeight={hostHeight}
       width={width}
       motionEnabled={motionEnabled}
       token={token}
@@ -577,6 +585,8 @@ type SessionToolSidebarProps = {
   presented: boolean
   hostLeft: number
   hostWidth: number
+  hostTop?: number
+  hostHeight?: number
   width: number
   motionEnabled: boolean
   token: string | null
@@ -595,6 +605,8 @@ export function SessionToolSidebar({
   presented,
   hostLeft,
   hostWidth,
+  hostTop,
+  hostHeight,
   width,
   motionEnabled,
   token,
@@ -754,7 +766,12 @@ export function SessionToolSidebar({
           ? 'will-change-transform transition-transform duration-[220ms] ease-[cubic-bezier(0.16,1,0.3,1)] motion-reduce:transition-none'
           : 'transition-none',
       )}
-      style={panelStyle}
+      style={{
+        ...panelStyle,
+        top: hostTop ?? 0,
+        height: hostHeight,
+        bottom: hostHeight === undefined ? 0 : undefined,
+      }}
     >
       {controller.open && !fillsMain ? (
         <div

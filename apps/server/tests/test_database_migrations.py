@@ -1125,9 +1125,9 @@ def test_unversioned_runtime_schema_is_classified_by_actual_columns(
     )
 
 
-def test_current_schema_version_is_v2_38() -> None:
-    assert CURRENT_SCHEMA_REVISION == "v2_38"
-    assert CURRENT_SCHEMA_VERSION == "2.38"
+def test_current_schema_version_is_v2_39() -> None:
+    assert CURRENT_SCHEMA_REVISION == "v2_39"
+    assert CURRENT_SCHEMA_VERSION == "2.39"
 
 
 def test_v2_38_preserves_global_model_credentials_and_existing_device_identity(tmp_path, monkeypatch) -> None:

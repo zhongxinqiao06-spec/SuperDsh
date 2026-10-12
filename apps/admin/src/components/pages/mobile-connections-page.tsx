@@ -9,7 +9,13 @@ import { useAuth } from '@/components/auth/auth-context'
 import {
   dateLabel,
   useManagementResource,
+  useManagementText,
 } from '@/components/management/controls'
+import {
+  ManagementDialog,
+  ManagementPagination,
+  useClientPagination,
+} from '@/components/management/presentation'
 import { MobileConnectionDialog } from '@/components/pages/mobile-signin-panel'
 import { Button } from '@/components/ui/button'
 import {
@@ -27,27 +33,34 @@ import { useMobileConnectionsSidebarVisibility } from '@/features/mobile-connect
 
 export function MobileConnectionsPage() {
   const t = useTranslations('dashboard.mobileConnections')
+  const tr = useManagementText()
   const { session, me, navigate } = useAuth()
   const [sidebarVisible, setSidebarVisible] =
     useMobileConnectionsSidebarVisibility()
   const [dialogOpen, setDialogOpen] = React.useState(false)
+  const [pendingRevoke, setPendingRevoke] = React.useState<LoginSession | null>(
+    null,
+  )
   const resource = useManagementResource(
     'mobile-login-sessions',
     managementApi.sessions,
     { autoRefreshMs: 15000, enabled: Boolean(session?.userId) },
   )
   const mobileSessions = mobileLoginSessions(resource.data?.sessions ?? [])
+  const pagination = useClientPagination(mobileSessions, session?.userId ?? '')
 
   React.useEffect(() => {
     setDialogOpen(false)
+    setPendingRevoke(null)
   }, [session?.userId])
 
   const revokeSession = (loginSession: LoginSession) => {
-    if (!window.confirm(t('revokeConfirm'))) return
     void resource
       .perform(() => managementApi.revokeSession(loginSession.id))
       .then(async (revoked) => {
-        if (!revoked || !loginSession.current) return
+        if (!revoked) return
+        setPendingRevoke(null)
+        if (!loginSession.current) return
         await beginSessionSignOut()
         navigate('signed-out')
       })
@@ -61,7 +74,7 @@ export function MobileConnectionsPage() {
 
   return (
     <div className="h-full min-h-0 overflow-y-auto bg-background">
-      <div className="mx-auto flex w-full max-w-4xl flex-col gap-6 p-4 sm:p-8">
+      <div className="mx-auto flex w-full max-w-6xl flex-col gap-6 p-4 sm:p-8">
         <header className="flex flex-wrap items-start justify-between gap-4">
           <div className="space-y-2">
             <h1 className="text-xl font-semibold">{t('pageTitle')}</h1>
@@ -145,7 +158,7 @@ export function MobileConnectionsPage() {
                 )}
                 {mobileSessions.length > 0 && (
                   <ul className="divide-y divide-border">
-                    {mobileSessions.map((loginSession) => (
+                    {pagination.items.map((loginSession) => (
                       <li
                         key={loginSession.id}
                         data-mobile-login-session={loginSession.id}
@@ -189,7 +202,7 @@ export function MobileConnectionsPage() {
                           size="sm"
                           variant="outline"
                           disabled={resource.busy || resource.loading}
-                          onClick={() => revokeSession(loginSession)}
+                          onClick={() => setPendingRevoke(loginSession)}
                         >
                           {t('revoke')}
                         </Button>
@@ -212,7 +225,48 @@ export function MobileConnectionsPage() {
             )}
           </CardContent>
         </Card>
+        <ManagementPagination
+          page={pagination.page}
+          pageSize={pagination.pageSize}
+          total={pagination.total}
+          onPageChange={pagination.setPage}
+          onPageSizeChange={pagination.setPageSize}
+          loading={resource.loading || resource.busy}
+        />
       </div>
+
+      <ManagementDialog
+        open={pendingRevoke !== null}
+        onOpenChange={(open) => {
+          if (!open) setPendingRevoke(null)
+        }}
+        title={t('revoke')}
+        description={t('revokeConfirm')}
+        busy={resource.busy}
+        error={resource.error}
+        footer={
+          <>
+            <Button
+              variant="outline"
+              disabled={resource.busy}
+              onClick={() => setPendingRevoke(null)}
+            >
+              {tr('取消', 'Cancel')}
+            </Button>
+            <Button
+              variant="destructive"
+              disabled={resource.busy}
+              onClick={() => {
+                if (pendingRevoke) revokeSession(pendingRevoke)
+              }}
+            >
+              {tr('确认撤销', 'Confirm revocation')}
+            </Button>
+          </>
+        }
+      >
+        <p className="text-sm">{pendingRevoke?.clientName}</p>
+      </ManagementDialog>
 
       <MobileConnectionDialog
         token={session?.accessToken ?? ''}

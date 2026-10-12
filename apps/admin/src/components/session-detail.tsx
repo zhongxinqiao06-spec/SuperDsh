@@ -111,6 +111,7 @@ import {
   sessionRuntimeType,
 } from '@/features/dashboard/runtime-instances'
 import { useWorkspace } from '@/components/workspace-context'
+import { useWorkbenchState, workbenchCell } from '@/features/workbench/memory'
 
 type SessionDetailProps = {
   token: string
@@ -174,7 +175,6 @@ const INITIAL_SCROLL_LAYOUT_QUIET_MS = 120
 const INITIAL_SCROLL_LAYOUT_FALLBACK_MS = 900
 const SCROLL_TO_BOTTOM_PRUNE_CHECK_MS = 120
 const COMMAND_QUERY_DEBOUNCE_MS = 120
-const COMPOSER_DRAFT_STORAGE_PREFIX = 'agents-anywhere.sessionComposerDraft.v1.'
 type ComposerDraftState = {
   sessionId: string
   value: string
@@ -347,28 +347,6 @@ function runtimeStateWithSelectionRollback(
   return { ...nextState, selections }
 }
 
-function composerDraftStorageKey(sessionId: string): string {
-  return `${COMPOSER_DRAFT_STORAGE_PREFIX}${sessionId}`
-}
-
-function readComposerDraft(sessionId: string): string {
-  try {
-    return window.localStorage.getItem(composerDraftStorageKey(sessionId)) ?? ''
-  } catch {
-    return ''
-  }
-}
-
-function writeComposerDraft(sessionId: string, value: string) {
-  try {
-    const key = composerDraftStorageKey(sessionId)
-    if (value) window.localStorage.setItem(key, value)
-    else window.localStorage.removeItem(key)
-  } catch {
-    // Draft persistence is best-effort; private contexts can still use the composer.
-  }
-}
-
 export function SessionDetail({
   token,
   sessionId,
@@ -401,7 +379,11 @@ export function SessionDetail({
   )
   const [loading, setLoading] = React.useState(() => !initialOptimisticState)
   const [error, setError] = React.useState<string | null>(null)
-  const [sending, setSending] = React.useState(false)
+  const sendingCell = workbenchCell(`session/${sessionId}/sending`, false)
+  const [sending, setSending] = useWorkbenchState(
+    `session/${sessionId}/sending`,
+    false,
+  )
   const [interrupting, setInterrupting] = React.useState(false)
   const [takeoverBusy, setTakeoverBusy] = React.useState(false)
   const [resolvingNoticeId, setResolvingNoticeId] = React.useState<
@@ -436,9 +418,9 @@ export function SessionDetail({
     Record<string, boolean>
   >({})
   const [composerDraftState, setComposerDraftState] =
-    React.useState<ComposerDraftState>(() => ({
+    useWorkbenchState<ComposerDraftState>(`session/${sessionId}/draft`, () => ({
       sessionId,
-      value: readComposerDraft(sessionId),
+      value: '',
     }))
   const timelineRef = React.useRef<HTMLDivElement | null>(null)
   const timelineContentRef = React.useRef<HTMLDivElement | null>(null)
@@ -851,14 +833,6 @@ export function SessionDetail({
     sessionId,
   ])
 
-  React.useEffect(() => {
-    setComposerDraftState({ sessionId, value: readComposerDraft(sessionId) })
-  }, [sessionId])
-
-  React.useEffect(() => {
-    writeComposerDraft(composerDraftState.sessionId, composerDraftState.value)
-  }, [composerDraftState])
-
   const setComposerDraft = React.useCallback(
     (value: string) => {
       setComposerDraftState({ sessionId, value })
@@ -869,10 +843,7 @@ export function SessionDetail({
   React.useEffect(() => {
     if (!composerInsertion || composerInsertion.sessionId !== sessionId) return
     setComposerDraftState((current) => {
-      const currentValue =
-        current.sessionId === sessionId
-          ? current.value
-          : readComposerDraft(sessionId)
+      const currentValue = current.sessionId === sessionId ? current.value : ''
       const separator =
         currentValue.trim().length > 0 && !/\s$/.test(currentValue) ? ' ' : ''
       return {
@@ -1028,7 +999,6 @@ export function SessionDetail({
       window.clearTimeout(initialScrollFallbackTimerRef.current)
       initialScrollFallbackTimerRef.current = null
     }
-    setSending(false)
     setInterrupting(false)
     setError(null)
     const optimisticState = getOptimisticSessionStateRef.current(sessionId)
@@ -1382,7 +1352,13 @@ export function SessionDetail({
     attachments: AttachedFile[],
     selections: { model?: string; permission?: string },
   ): Promise<boolean> => {
-    if (!session || (!content.trim() && attachments.length === 0)) return false
+    if (
+      !session ||
+      sendingCell.get() ||
+      !sendingCell.current() ||
+      (!content.trim() && attachments.length === 0)
+    )
+      return false
     const uploadedAttachments = attachments.flatMap((attachment) =>
       attachment.uploaded ? [attachment.uploaded] : [],
     )
@@ -1442,6 +1418,7 @@ export function SessionDetail({
             : current,
         )
       }
+      if (!sendingCell.current()) return false
       await dashboardApi.sendSessionMessage(token, session.id, messageText, {
         attachments: uploadedAttachments.map((attachment) => ({
           fileId: attachment.fileId,
@@ -1450,6 +1427,7 @@ export function SessionDetail({
       })
       return true
     } catch (err) {
+      if (!sendingCell.current()) return false
       const nextSourceErrorCode = sessionSourceErrorCode(err)
       const message = nextSourceErrorCode
         ? sourceErrorMessage(
