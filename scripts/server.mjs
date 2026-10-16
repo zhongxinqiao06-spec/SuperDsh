@@ -18,6 +18,7 @@ import {
 
 const repositoryRoot = resolve(dirname(fileURLToPath(import.meta.url)), '..')
 const adminRoot = join(repositoryRoot, 'apps/admin')
+const coreRoot = join(repositoryRoot, 'apps/desktop/core')
 const harnessRoot = join(repositoryRoot, 'apps/desktop/plugins/harness')
 const action = process.argv[2]
 const extraArgs = process.argv.slice(3)
@@ -133,6 +134,12 @@ function productionEnvironment() {
   }
 }
 async function buildHarness() {
+  // Harness bundles public Core contracts. A clean clone has no Core lib yet.
+  await run(
+    process.execPath,
+    [join(coreRoot, 'node_modules/tsdown/dist/run.mjs')],
+    { cwd: coreRoot },
+  )
   await run(
     process.execPath,
     [join(harnessRoot, 'node_modules/tsdown/dist/run.mjs')],
@@ -226,6 +233,8 @@ async function main() {
         process.execPath,
         [
           '--test',
+          'deployment/bootstrap.test.mjs',
+          'deployment/init-config.test.mjs',
           'server/test/api-coverage.test.mjs',
           'server/test/auth-compatibility.test.mjs',
           'server/test/native-agent-manager.test.mjs',

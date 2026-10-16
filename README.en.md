@@ -2,6 +2,8 @@
 
 SuperDsh includes a desktop Agent application, a full-stack Next.js + Node.js management platform, and an Android application. The platform centers on overview, access, models, devices and system management; chat is its Agent Workbench module. DeepSeek Harness is a required engine plugin managed by the product.
 
+**Server deployment:** after cloning, run `docker compose up -d --build` at the repository root. Required configuration initializes automatically; open `http://SERVER_IP:5174`. Read the initial administrator password with `docker compose exec platform cat /data/config/initial-admin.txt`. See [Compose deployment and updates](apps/admin/deployment/README.md).
+
 **Use this page for daily development.** [中文](README.md) · [Origins](#upstream-foundations) · [Principles](#design-principles) · [Progress](#current-progress) · [Code](#project-structure) · [Startup](#daily-development) · [Integration](#three-client-integration) · [Checks](#checks-and-packaging)
 
 ## Upstream foundations
@@ -36,7 +38,7 @@ This is a **single-platform demo, not a complete enterprise multitenant system**
 | Node API and data          | Identity, RBAC, menus, devices, conversations, files, terminals, models and persistence moved to `apps/admin/server`; API v2 retained; empty databases and `v2_35` through `v2_42` upgrades supported |
 | Business Agents            | Real Node API, PG/Redis, Connector and full Host with a local tool-calling model fixture verified uploads, generation, downloads, knowledge citations and version retention after restart             |
 | Identity/management checks | Temporary PostgreSQL tests cover rotation, ownership, last administrator, concurrent menus and migration rollback; existing user databases were not used                                              |
-| Server Agent               | Native Node Connector + full Harness processes, per-user Home and runtime leases; neither development nor production uses Agent containers                                                            |
+| Server Agent               | Native Node Connector + full Harness processes, per-user Home and runtime leases; native and Compose deployments retain managed children without separate per-user Agent containers                   |
 | Models and clients         | Three protocols, personal/platform models and defaults implemented; paid providers, current Android UI and complete cross-client interactions require environment-specific revalidation               |
 | Release                    | Source and temporary-environment checks are not Windows installer, CentOS, macOS/Linux, signing or updater acceptance                                                                                 |
 
@@ -55,20 +57,20 @@ Separate checks passed: a headless Next browser with real API/Host for managemen
 | API, identity, RBAC, devices and database                     | [apps/admin/server](apps/admin/server/): `identity`, `management`, `devices`, `conversations`, `files`, `infrastructure`            |
 | Platform/personal models and server Agents                    | Server `models` and `runtime`: Node Connector, model gateway and full Host lifecycle                                                |
 | Business Agents, knowledge and Office artifacts               | `apps/admin/server/agents`; web `src/features/agents`, `components/management/agents-panel.tsx`; desktop `ui/src/features/platform` |
-| PG / Redis / Qdrant and deployment                            | [apps/admin/deployment](apps/admin/deployment/); only database dependencies use Docker                                              |
+| PG / Redis / Qdrant and deployment                            | [apps/admin/deployment](apps/admin/deployment/); root Compose deploys the complete platform                                         |
 | Android UI, network and Chinese localization                  | [apps/android](apps/android/): `app/src/main/java/com/agentsanywhere/app`; strings in `app/src/main/res/values-zh-rCN`              |
 
 `apps/desktop` assembles and publishes the desktop product. Web modules register in `src/features/console/modules.ts`; the server catalog is `server/management/navigation.ts`. Management modules do not depend on chat's `WorkspaceProvider`. Pinned upstreams remain in `deepseek-harness` and `agents-anywhere`; iOS remains upstream reference only.
 
 ## Environment preparation
 
-Run all commands from the **repository root**. Windows examples use `corepack.cmd`; use `corepack` on macOS/Linux.
+The following requirements apply to source development. Server-only deployment uses [Docker Compose](apps/admin/deployment/README.md), without host Node, Yarn or submodule initialization. Run development commands from the **repository root**. Windows examples use `corepack.cmd`; use `corepack` on macOS/Linux.
 
-| Area                 | Requirements                                                                                                |
-| -------------------- | ----------------------------------------------------------------------------------------------------------- |
-| Desktop and platform | Git, Node 24.x, Corepack, Yarn 4.18                                                                         |
-| Local database       | Docker Linux engine, only for PG / Redis / Qdrant; existing database endpoints can be configured explicitly |
-| Android              | JDK 17, Android SDK 36, Build Tools 34.0.0; emulator also needs Emulator, Platform Tools and an AVD         |
+| Area                 | Requirements                                                                                                      |
+| -------------------- | ----------------------------------------------------------------------------------------------------------------- |
+| Desktop and platform | Git, Node 24.x, Corepack, Yarn 4.18                                                                               |
+| Local database       | Docker Linux engine for development PG / Redis / Qdrant; existing database endpoints can be configured explicitly |
+| Android              | JDK 17, Android SDK 36, Build Tools 34.0.0; emulator also needs Emulator, Platform Tools and an AVD               |
 
 ```powershell
 git submodule update --init --recursive
@@ -107,7 +109,7 @@ corepack.cmd yarn server:dev
 | Readiness                                             | `http://127.0.0.1:5174/api/v2/health/ready`               |
 | PostgreSQL / Redis / Qdrant, loopback only            | `127.0.0.1:15432` / `127.0.0.1:16379` / `127.0.0.1:16333` |
 
-The empty managed `superdsh-dev` database gets **`admin` / `admin123`**; existing passwords and account state are unchanged. Explicit databases and empty production databases use the startup **setup token** to initialize an administrator; they have no default account. Web login opens the overview and prepares an Agent only on entering the workbench; native clients retain preparation after login.
+The empty managed `superdsh-dev` database gets **`admin` / `admin123`**; existing passwords and account state are unchanged. Explicit databases and empty production databases in native mode use the startup **setup token** to initialize an administrator. Default Compose initializes `admin` in an empty database and persists a random password; there is no shared default production password. Web login opens the overview and prepares an Agent only on entering the workbench; native clients retain preparation after login.
 
 Development configuration is Git-ignored at `.superdsh-work/server-dev/aa-dev.env`. Repeated `server:deps:up` skips healthy dependencies. If another program occupies a default port, the script selects and persists a free port; explicitly specified ports are not changed. Qdrant defaults to `http://127.0.0.1:16333`; override `SUPERDSH_DEV_QDRANT_PORT`, or connect an existing instance with `SUPERDSH_QDRANT_URL` / `SUPERDSH_QDRANT_API_KEY`. Follow command output. If volumes exist but configuration is lost, restore the original file instead of generating replacement keys.
 
@@ -148,7 +150,7 @@ Desktop can use local DeepSeek / API keys independently. Platform login/logout/s
 
 Web module switches retain account-scoped in-memory drafts, pending files and send results while releasing workbench subscriptions; reload/account switch clears temporary state. Android can view cached history and save drafts offline, with manual sending after reconnect.
 
-For production, obtain source with Git, build, set `SUPERDSH_SERVER_ENV` to the native service configuration, and run `server:start`. Web/API still defaults to `5174`. `server:up` aliases this command; the old `15174` container no longer starts automatically. See [server deployment](apps/admin/deployment/README.md#服务器首次部署).
+For production, clone with Git and run `docker compose up -d --build` at the repository root. Web, desktop and Android use port `5174`. Database connections, authentication/encryption keys and the first administrator initialize automatically and persist in dedicated volumes. For updates, run `git pull --ff-only origin main`, then the same Compose command. See [deployment and backups](apps/admin/deployment/README.md#服务器首次部署). Existing `SUPERDSH_SERVER_ENV` + `server:start` / systemd deployments remain documented in the [native guide](apps/admin/deployment/native.md).
 
 ## Agent demo and development entry
 
@@ -191,23 +193,23 @@ Root `dev/build/start/check` still targets desktop and does not replace other ap
 - UI imports only Core's public `client/*` and `contracts/*`; web components must not import server credentials, database or process implementations. Legacy third-party UI uses a separate compatibility container.
 - Two spaces, single quotes, no ordinary semicolons; PascalCase components and kebab-case modules, with Prettier authoritative. Owned work uses root Yarn. Do not edit generated types or pinned upstreams.
 - Desktop development Home defaults to `.superdsh/home`; installed Home is system application data `SuperDsh/home`. Account switching keeps Home while separating platform credentials, bindings and checkpoints by stable account.
-- Development Agent data is `.superdsh-work/server-dev/native`; production defaults to `.superdsh-work/server-native`, configurable with `SUPERDSH_SERVER_DATA_DIR`. Files retain `AGENT_SERVER_FILES_LOCAL_ROOT`. Old container Homes are not merged automatically.
+- Development Agent data is `.superdsh-work/server-dev/native`; Compose uses `/data/runtime` in its `platform-data` volume, while native production defaults to `.superdsh-work/server-native`, configurable with `SUPERDSH_SERVER_DATA_DIR`. Files retain `AGENT_SERVER_FILES_LOCAL_ROOT`. Old container Homes are not merged automatically.
 - Migrations preserve IDs, passwords, ownership and ciphertext. Product versions `v2_35` through `v2_42` are supported; `v2_40` adds Agent resources, definitions, conversation bindings and artifact records; `v2_41` adds independent knowledge-base, skill and tool configuration; `v2_42` groups the existing related menus under Agent management. Older databases must first upgrade using their original release, never by changing the version stamp.
 - Imports require empty targets and preserved sources/backups. Authorization, keys, environment variables, `.credentials.yaml` and device bindings are not copied. Back up database volumes together with authentication/encryption keys.
 - Native Agents share host OS permissions without container sandboxing. Model keys are not sent to clients, and operational admin rights do not bypass ownership. See [AGENTS.md](AGENTS.md).
 
 ## Troubleshooting and validation
 
-| Symptom                           | Check                                                                                                                                    |
-| --------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------- |
-| Missing Docker pipe               | Only database dependencies and temporary integration tests need Docker; confirm the Linux engine with `docker info`                      |
-| Web unreachable / port collision  | Run one `server:dev`; `5174` is web/API, `8000` compatibility API; do not wait for the old `15174` container                             |
-| Login failure                     | Confirm database and environment; development defaults do not replace existing passwords, production requires setup-token initialization |
-| Agent preparation fails           | Build Harness with `server:sync`, inspect diagnostics and directory permissions; do not start the retired Python/Supervisor              |
-| Online but no reply               | Check personal/platform models, conversation selection and execution errors; bundled model names do not imply authorization              |
-| Non-public provider address       | Check the exact origin in [server configuration](apps/admin/server/README.md#模型与网络); avoid broad allowlists                         |
-| Tool failures under Chinese paths | Use Node-based workspace entry points instead of encoding-sensitive batch wrappers                                                       |
-| Android still uses an old address | Check the saved address, signing and corresponding `adb reverse`; launcher flags do not overwrite the address                            |
+| Symptom                           | Check                                                                                                                                                                |
+| --------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Missing Docker pipe               | Compose deployment, development databases and temporary integration tests need Docker; confirm the Linux engine with `docker info`                                   |
+| Web unreachable / port collision  | Run one `server:dev`; `5174` is web/API, `8000` compatibility API; do not wait for the old `15174` container                                                         |
+| Login failure                     | Confirm database and environment; development defaults do not replace passwords; Compose stores the initial password, while native empty databases use a setup token |
+| Agent preparation fails           | Build Harness with `server:sync`, inspect diagnostics and directory permissions; do not start the retired Python/Supervisor                                          |
+| Online but no reply               | Check personal/platform models, conversation selection and execution errors; bundled model names do not imply authorization                                          |
+| Non-public provider address       | Check the exact origin in [server configuration](apps/admin/server/README.md#模型与网络); avoid broad allowlists                                                     |
+| Tool failures under Chinese paths | Use Node-based workspace entry points instead of encoding-sensitive batch wrappers                                                                                   |
+| Android still uses an old address | Check the saved address, signing and corresponding `adb reverse`; launcher flags do not overwrite the address                                                        |
 
 Source checks, temporary databases, fixture models, real Host, headless UI and physical phones are recorded separately. Historical reports keep their original paths and outcomes. Current signing, clean-system and real multi-client regressions need separate acceptance.
 

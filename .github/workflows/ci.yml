@@ -40,6 +40,8 @@ jobs:
       - run: yarn admin:check
       - run: yarn workspace @superdsh/desktop exec playwright install --with-deps chromium
       - run: yarn server:sync && yarn server:check && yarn server:test:integration
+      - name: Validate zero-configuration Compose deployment
+        run: docker compose config --quiet
       - name: Build unified Next and Node platform
         run: yarn server:build
       - name: Install Android build targets

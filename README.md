@@ -2,6 +2,8 @@
 
 SuperDsh 包含桌面 Agent 应用、Next.js + Node.js 全栈管理后台和安卓应用。后台以总览、权限、模型、设备和系统管理为主体，聊天是 Agent 工作台模块；DeepSeek Harness 是由产品调度的必需引擎插件。
 
+**服务器部署：** 拉取代码后在仓库根执行 `docker compose up -d --build`，默认配置自动初始化，访问 `http://服务器IP:5174`。首次管理员密码用 `docker compose exec platform cat /data/config/initial-admin.txt` 查看；完整步骤见[Compose 部署与更新](apps/admin/deployment/README.md)。
+
 **日常开发以本页为准。** [English](README.en.md) · [来源](#基于哪些项目改造) · [理念](#设计理念) · [进度](#目前完成进度) · [代码位置](#项目结构) · [启动](#日常开发) · [联调](#三端联调) · [检查](#检查与打包)
 
 ## 基于哪些项目改造
@@ -36,7 +38,7 @@ Harness 固定版本为 `0.1.7-alpha.2`，见 [upstream.json](upstream.json)；A
 | Node API 与数据 | 身份、RBAC、菜单、设备、会话、文件、终端、模型和数据库访问迁入 `apps/admin/server`，保留 API v2；支持空库及 `v2_35` 至 `v2_42` 增量迁移 |
 | 业务智能体      | 真实 Node API、PG/Redis、Connector、完整 Host 与本地工具调用测试模型完成上传、生成、下载、知识出处和重启后版本保留验证                  |
 | 身份与管理验证  | 临时 PostgreSQL 上完成登录轮换、归属、最后管理员、菜单并发和迁移回滚测试；不操作现有用户库                                              |
-| 服务端 Agent    | Node Connector + 完整 Harness 本机进程，按用户保存 Home 与运行租约；开发和生产均不使用 Agent 容器                                       |
+| 服务端 Agent    | Node Connector + 完整 Harness 本机进程，按用户保存 Home 与运行租约；原生及 Compose 部署均保留受管子进程，不单独创建每用户 Agent 容器    |
 | 模型与跨端      | 三种协议、个人/平台模型及默认选择已接入；真实付费模型、当前安卓界面和三端完整交互仍需对应环境复验                                       |
 | 发布            | 当前源码检查与临时环境测试不等于 Windows 安装包、CentOS、macOS/Linux、签名或更新验收                                                    |
 
@@ -55,19 +57,19 @@ Harness 固定版本为 `0.1.7-alpha.2`，见 [upstream.json](upstream.json)；A
 | API、鉴权、RBAC、设备与数据库   | [apps/admin/server](apps/admin/server/)：`identity`、`management`、`devices`、`conversations`、`files`、`infrastructure`          |
 | 平台/个人模型、服务端 Agent     | Server 的 `models`、`runtime`；Node Connector、模型网关与完整 Host 生命周期                                                       |
 | 业务智能体、知识与 Office 成果  | `apps/admin/server/agents`；网页 `src/features/agents`、`components/management/agents-panel.tsx`；桌面 `ui/src/features/platform` |
-| PG / Redis / Qdrant 与部署说明  | [apps/admin/deployment](apps/admin/deployment/)；只有数据库依赖使用 Docker                                                        |
+| PG / Redis / Qdrant 与部署说明  | [apps/admin/deployment](apps/admin/deployment/)；根 Compose 可一键部署完整平台                                                    |
 | 安卓页面、网络与中文            | [apps/android](apps/android/)：`app/src/main/java/com/agentsanywhere/app`；文案在 `app/src/main/res/values-zh-rCN`                |
 
 `apps/desktop` 负责桌面组装与发布。管理网页模块注册在 `src/features/console/modules.ts`，服务端权限目录在 `server/management/navigation.ts`；管理模块不依赖聊天 `WorkspaceProvider`。固定上游在 `deepseek-harness`、`agents-anywhere`，iOS 仅保留上游参考。
 
 ## 环境准备
 
-命令均在**仓库根目录**执行；Windows 使用 `corepack.cmd`，macOS/Linux 换成 `corepack`。
+以下为源码开发环境；只部署服务器使用 [Docker Compose](apps/admin/deployment/README.md)，宿主机无需 Node、Yarn 或子模块初始化。开发命令均在**仓库根目录**执行；Windows 使用 `corepack.cmd`，macOS/Linux 换成 `corepack`。
 
 | 内容       | 环境                                                                                 |
 | ---------- | ------------------------------------------------------------------------------------ |
 | 桌面与平台 | Git、Node 24.x、Corepack、Yarn 4.18                                                  |
-| 本地数据库 | Docker Linux 引擎，仅运行 PG / Redis / Qdrant；已有数据库可显式配置地址              |
+| 本地数据库 | Docker Linux 引擎运行开发 PG / Redis / Qdrant；已有数据库可显式配置地址              |
 | 安卓       | JDK 17、Android SDK 36、Build Tools 34.0.0；模拟器另需 Emulator、Platform Tools、AVD |
 
 ```powershell
@@ -107,7 +109,7 @@ corepack.cmd yarn server:dev
 | 就绪检查                              | `http://127.0.0.1:5174/api/v2/health/ready`               |
 | PostgreSQL / Redis / Qdrant（仅本机） | `127.0.0.1:15432` / `127.0.0.1:16379` / `127.0.0.1:16333` |
 
-默认 `superdsh-dev` 开发空库创建 **`admin` / `admin123`**；已有账号密码与状态不改。显式数据库和生产空库使用启动日志的 **setup token** 初始化管理员，无通用默认账号。登录进入总览，进入 Agent 工作台才准备网页 Agent；桌面、安卓沿用登录后准备。
+默认 `superdsh-dev` 开发空库创建 **`admin` / `admin123`**；已有账号密码与状态不改。原生模式的显式数据库和生产空库使用启动日志的 **setup token** 初始化管理员；默认 Compose 空库则自动创建 `admin` 并持久保存随机密码，无通用生产默认密码。登录进入总览，进入 Agent 工作台才准备网页 Agent；桌面、安卓沿用登录后准备。
 
 开发配置在被 Git 忽略的 `.superdsh-work/server-dev/aa-dev.env`。重复 `server:deps:up` 跳过健康依赖；其他程序占用默认端口时选择空闲端口并写回配置，显式指定的端口不自动修改，以输出为准。Qdrant 默认 `http://127.0.0.1:16333`，可通过 `SUPERDSH_DEV_QDRANT_PORT` 改端口，或用 `SUPERDSH_QDRANT_URL` / `SUPERDSH_QDRANT_API_KEY` 连接现有实例。已有数据卷而配置丢失时必须恢复原文件，不能生成新密钥覆盖。
 
@@ -148,7 +150,7 @@ corepack.cmd yarn android:start --server http://127.0.0.1:8000
 
 网页切模块保留当前账号内存草稿、待上传附件和发送结果，释放工作台订阅；刷新或换账号清理临时状态。手机离线可查看已缓存历史、保存草稿，恢复后手动发送。
 
-生产部署从 Git 获取源码，构建后用 `SUPERDSH_SERVER_ENV` 指定原生服务配置，再运行 `server:start`；默认同样是网页/API `5174`。`server:up` 是该命令的兼容别名，旧 `15174` 不再自动启动。完整步骤见[服务器部署](apps/admin/deployment/README.md#服务器首次部署)。
+生产部署从 Git 获取源码后，在仓库根运行 `docker compose up -d --build`，默认网页、桌面和安卓统一连接 `5174`。数据库连接、鉴权 / 加密密钥和首次管理员自动初始化并保存在独立持久卷；日常更新执行 `git pull --ff-only origin main` 后再次运行同一 Compose 命令。完整步骤与备份见[服务器部署](apps/admin/deployment/README.md#服务器首次部署)。原有 `SUPERDSH_SERVER_ENV` + `server:start` / systemd 方式继续见[原生部署](apps/admin/deployment/native.md)。
 
 ## 智能体演示与开发入口
 
@@ -191,23 +193,23 @@ corepack.cmd yarn android:start --server http://127.0.0.1:8000
 - UI 只导入 Core 的公开 `client/*`、`contracts/*`；网页组件不导入 `server` 的凭据、数据库和进程实现。第三方旧界面使用独立兼容容器。
 - 两空格、单引号、无普通行尾分号；组件 PascalCase，普通模块 kebab-case，以 Prettier 为准。自有工程用根 Yarn；不改生成类型或固定上游。
 - 桌面开发 Home 默认 `.superdsh/home`，安装版为系统应用数据目录 `SuperDsh/home`；账号切换不换 Home，平台凭据/绑定/检查点按稳定账号分别保存。
-- 平台开发 Agent 数据在 `.superdsh-work/server-dev/native`，生产默认 `.superdsh-work/server-native`，可设 `SUPERDSH_SERVER_DATA_DIR`；文件存储沿用 `AGENT_SERVER_FILES_LOCAL_ROOT`。旧容器 Home 不自动合并。
+- 平台开发 Agent 数据在 `.superdsh-work/server-dev/native`；Compose 使用 `platform-data` 卷的 `/data/runtime`，原生生产默认 `.superdsh-work/server-native`，可设 `SUPERDSH_SERVER_DATA_DIR`；文件存储沿用 `AGENT_SERVER_FILES_LOCAL_ROOT`。旧容器 Home 不自动合并。
 - 数据库迁移保留账号 ID、密码、归属和密文。支持本产品 `v2_35` 至 `v2_42`；`v2_40` 增加智能体资料、定义、会话绑定与成果记录，`v2_41` 增加独立知识库、技能和工具配置，`v2_42` 将已有相关菜单收拢到「智能体管理」分组；更早数据库需先用原版本升级，不能直接标记为新版本。
 - 数据导入只写空目标、保留源和备份；授权、Key、环境变量、`.credentials.yaml`、设备绑定不复制。数据库卷和配套鉴权/加密密钥必须一同备份。
 - 原生 Agent 共享宿主系统权限，不提供容器沙箱；模型密钥不下发客户端，管理员运维权限不能绕过账号内容隔离。细则见 [AGENTS.md](AGENTS.md)。
 
 ## 排障与验证边界
 
-| 现象                  | 检查                                                                                |
-| --------------------- | ----------------------------------------------------------------------------------- |
-| Docker 管道不存在     | 仅数据库依赖和临时集成测试需 Docker；先用 `docker info` 确认 Linux 引擎             |
-| 网页不可达 / 端口冲突 | 只运行一份 `server:dev`；`5174` 网页/API、`8000` 兼容 API，不再等待 `15174` 容器    |
-| 登录失败              | 核对数据库和环境地址；开发默认账号不覆盖已有密码，生产空库需 setup token            |
-| Agent 无法准备        | 先 `server:sync` 构建 Harness，查看诊断与目录权限；不要启动旧 Python/Supervisor     |
-| 在线却无回复          | 核对个人/平台模型、会话选择和执行错误；内置模型名称不等于已有授权                   |
-| 模型地址非公网        | 按[服务端配置](apps/admin/server/README.md#模型与网络)核对精确 origin，避免宽泛放行 |
-| 中文路径工具报错      | 用工作区脚本的 Node 入口，避免批处理包装器破坏编码                                  |
-| 安卓还连接旧地址      | 检查 App 保存的地址、签名和对应 `adb reverse`，启动参数不会自动改地址               |
+| 现象                  | 检查                                                                                                 |
+| --------------------- | ---------------------------------------------------------------------------------------------------- |
+| Docker 管道不存在     | Compose 部署、开发数据库和临时集成测试需 Docker；用 `docker info` 确认 Linux 引擎                    |
+| 网页不可达 / 端口冲突 | 只运行一份 `server:dev`；`5174` 网页/API、`8000` 兼容 API，不再等待 `15174` 容器                     |
+| 登录失败              | 核对数据库和环境地址；开发默认账号不覆盖已有密码；Compose 查看初始密码文件，原生空库使用 setup token |
+| Agent 无法准备        | 先 `server:sync` 构建 Harness，查看诊断与目录权限；不要启动旧 Python/Supervisor                      |
+| 在线却无回复          | 核对个人/平台模型、会话选择和执行错误；内置模型名称不等于已有授权                                    |
+| 模型地址非公网        | 按[服务端配置](apps/admin/server/README.md#模型与网络)核对精确 origin，避免宽泛放行                  |
+| 中文路径工具报错      | 用工作区脚本的 Node 入口，避免批处理包装器破坏编码                                                   |
+| 安卓还连接旧地址      | 检查 App 保存的地址、签名和对应 `adb reverse`，启动参数不会自动改地址                                |
 
 源码检查、临时数据库、测试模型、真实 Host、无头界面与手机实机分别记录。历史验收文档保留原路径和结果；当前版本的签名、干净系统和真实多端回归须另外验收。
 

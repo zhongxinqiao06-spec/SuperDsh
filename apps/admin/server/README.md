@@ -1,6 +1,6 @@
 # Node 服务端
 
-平台 API、数据库访问与服务端 Agent 在 `apps/admin/server`，与 Next.js 管理网页共用 Node 24 入口。`server:dev` 一次启动网页、API 与本机 Agent 管理；Docker 仅运行 PostgreSQL / Redis / Qdrant。启动命令见[主 README](../../../README.md#日常开发)，从 Git 获取到生产启动见[部署指南](../deployment/README.md)。
+平台 API、数据库访问与服务端 Agent 在 `apps/admin/server`，与 Next.js 管理网页共用 Node 24 入口。`server:dev` 一次启动网页、API 与本机 Agent 管理，开发依赖由单独的 Compose 提供。服务器部署可在仓库根目录执行 `docker compose up -d --build`，一起启动平台、PostgreSQL、Redis 和 Qdrant；服务端 Agent 仍由平台作为子进程管理。开发命令见[主 README](../../../README.md#日常开发)，默认配置、升级与备份见[部署指南](../deployment/README.md)。
 
 ## 模块职责
 
@@ -38,7 +38,7 @@ Next 网页 / 桌面 / 安卓
 
 `create-and-start` 按 `clientMessageId` 记录创建结果：已接受的重复请求返回原会话，明确拒绝返回原错误，正在处理或发送后结果未知返回 `409 / session_create_outcome_unknown`。断网、超时后先刷新会话并核对原消息，不能生成新请求自动重发。界面显示实际失败原因；明确未执行的请求允许恢复草稿后手动修改发送。
 
-**同一系统用户下的进程不提供操作系统安全隔离。** 目录与 API 所有权保护产品状态，不应视为容器、文件系统或终端沙箱。正式使用须按自身运行场景配置宿主权限。
+**同一系统用户下的进程不提供操作系统安全隔离。** 目录与 API 所有权保护产品状态；Compose 中的多个 Agent 与 API 共用一个平台容器，并非每个用户独立容器。正式使用须按自身运行场景配置宿主权限。
 
 ## 数据与升级
 

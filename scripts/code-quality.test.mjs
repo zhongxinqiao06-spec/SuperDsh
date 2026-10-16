@@ -32,6 +32,7 @@ test('quality checks include owned nested workspaces and exclude generated/runti
     'apps/admin/deployment/compose.dependencies.yml',
     'scripts/check.mjs',
     'tsconfig.base.json',
+    'compose.yml',
   ]
   const excluded = [
     'apps/admin/.next/server/main.js',

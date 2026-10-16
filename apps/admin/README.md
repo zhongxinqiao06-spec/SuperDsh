@@ -1,6 +1,6 @@
 # 星桥智能平台 Web 与管理端
 
-`apps/admin` 是 Next.js + React + TypeScript 官网、工作台、管理网页与 Node.js API 的统一应用。`src` 放界面，`server` 放身份、数据库、模型、设备和 Agent 生命周期，不再依赖独立 Python 后端。环境、启动和检查统一见根 [README](../../README.md#日常开发)，首次部署见[部署指南](deployment/README.md)，服务器拉取新代码见[常规更新](deployment/README.md#常规更新)。
+`apps/admin` 是 Next.js + React + TypeScript 官网、工作台、管理网页与 Node.js API 的统一应用。`src` 放界面，`server` 放身份、数据库、模型、设备和 Agent 生命周期，不再依赖独立 Python 后端。环境、开发和检查见根 [README](../../README.md#日常开发)。服务器部署在仓库根直接执行 `docker compose up -d --build`：镜像包含运行依赖，数据库连接与密钥自动配置，首次管理员密码持久保存。首次使用见[部署指南](deployment/README.md#服务器首次部署)，拉取新代码见[常规更新](deployment/README.md#常规更新)，已有 systemd 服务见[原生部署](deployment/native.md)。
 
 启动默认进入 `/` 星桥官网，`/website` 保留独立官网地址；「进入工作台」使用 `/#/login`，旧登录页和工作台 Hash 链接保持兼容。官网包含卖点、业务示例、平台架构及桌面 / 手机 Web 界面演示，图片随 Next 构建一起发布。
 
@@ -33,7 +33,7 @@
 
 用户、设备运维、审计和登录记录由 API 全量筛选后分页，返回 `total/page/pageSize`。角色、菜单和供应商完整目录在前端分页，默认 25 条，可选 10/25/50/100；旧客户端无分页参数调用保持兼容。
 
-统一 Node 入口同时提供 `5174` 网页/API 和 `8000` 兼容 API。`server:dev` 与 `admin:dev` 是同一启动方式，不要同时执行。界面热更新由 Next 处理；服务端 TypeScript 修改后重启统一进程，正常账号登录或模块切换不重启 Host。
+原生开发统一 Node 入口同时提供 `5174` 网页/API 和 `8000` 兼容 API。生产 Compose 默认只发布 `5174`，网页、桌面与安卓统一使用该平台地址。`server:dev` 与 `admin:dev` 是同一启动方式，不要同时执行。界面热更新由 Next 处理；服务端 TypeScript 修改后重启统一进程，正常账号登录或模块切换不重启 Host。
 
 浏览器组件不能导入服务端数据库、密钥或进程模块。服务端与浏览器分别类型检查，公共协议沿用 API v2。`protocol:generate` 只生成本包类型，固定 `agents-anywhere/contracts/protocol/1.0` 只读。字体及许可在 `src/app/fonts`，生产构建无需访问 Google Fonts。
 

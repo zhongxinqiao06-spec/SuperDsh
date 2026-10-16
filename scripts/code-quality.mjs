@@ -56,7 +56,7 @@ export function ownedCodeFiles(directory = root) {
   ].flatMap((path) => walk(join(directory, path)))
   for (const name of readdirSync(directory))
     if (
-      /^(?:tsconfig.*\.json|eslint\.config\.mjs|\.prettierrc\.json)$/u.test(
+      /^(?:tsconfig.*\.json|eslint\.config\.mjs|\.prettierrc\.json|compose\.yml)$/u.test(
         name,
       )
     )

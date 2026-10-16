@@ -3,7 +3,7 @@
 ## Product ownership
 
 - Product applications: `apps/desktop`, `apps/admin` (Next.js pages and Node.js API v2), and `apps/android` (Kotlin/Gradle). Admin inherits root Yarn; Android retains Gradle. The retired Python backend is not a runtime dependency or fallback.
-- Platform backend: `apps/admin/server`. HTTP/WebSocket, identity, RBAC, SQL repositories, models and native Agent supervision share a Node entry. Browser code must not import server implementation or credentials. `server:dev` starts Next.js and Node API together; Docker only runs PostgreSQL/Redis.
+- Platform backend: `apps/admin/server`. HTTP/WebSocket, identity, RBAC, SQL repositories, models and native Agent supervision share a Node entry. Browser code must not import server implementation or credentials. `server:dev` starts Next.js and Node API together on the host. Root `compose.yml` deploys the unified platform and its managed Harness child processes with PostgreSQL, Redis and Qdrant; the development dependency Compose remains database-only. Preserve persistent volumes and generated deployment secrets on updates.
 - Agent execution remains a managed child process with a per-user Home and workspace in development and production. PostgreSQL leases prevent duplicate ownership. Product ownership checks are not an operating-system sandbox; never describe same-user processes as container-equivalent isolation. Preserve Harness's existing queue and protocols.
 - Desktop product entry: `apps/desktop`. Its assembly manifest preserves `@superdsh/desktop` and selects runtime assets.
 - `apps/desktop/ui`: product root/navigation, components, features, theme and browser build. Own the product root; never let a DSH root slot choose it.

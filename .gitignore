@@ -12,6 +12,7 @@ node_modules/
 dsh-community-market/lib/
 
 .env.yarn
+.env
 apps/*/lib/
 apps/*/dist/
 .superdsh/
