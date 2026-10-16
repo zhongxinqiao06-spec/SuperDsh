@@ -25,11 +25,15 @@ import {
 const defaultPorts = {
   SUPERDSH_DEV_PG_PORT: '15432',
   SUPERDSH_DEV_REDIS_PORT: '16379',
+  SUPERDSH_DEV_QDRANT_PORT: '16333',
 }
 
 function container(service, options = {}) {
-  const port = service === 'postgres' ? '5432/tcp' : '6379/tcp'
-  const hostPort = service === 'postgres' ? '15432' : '16379'
+  const port =
+    { postgres: '5432/tcp', redis: '6379/tcp', qdrant: '6333/tcp' }[service] ||
+    '9999/tcp'
+  const hostPort =
+    { postgres: '15432', redis: '16379', qdrant: '16333' }[service] || '19999'
   return {
     Id: `container-${service}`,
     Config: {
@@ -68,7 +72,7 @@ function temporaryRepository(t) {
 
 test('healthy managed dependencies are reused without probing or restarting their ports', async () => {
   const result = await planDevelopmentDependencies(
-    [container('postgres'), container('redis')],
+    [container('postgres'), container('redis'), container('qdrant')],
     defaultPorts,
     {
       portAvailable: async () => {
@@ -77,7 +81,7 @@ test('healthy managed dependencies are reused without probing or restarting thei
     },
   )
   assert.deepEqual(result.ports, defaultPorts)
-  assert.deepEqual(result.ready.sort(), ['postgres', 'redis'])
+  assert.deepEqual(result.ready.sort(), ['postgres', 'qdrant', 'redis'])
   assert.deepEqual(result.start, [])
   assert.deepEqual(result.wait, [])
 })
@@ -85,7 +89,7 @@ test('healthy managed dependencies are reused without probing or restarting thei
 test('a healthy dependency keeps its actual port while only a missing service starts', async () => {
   const probed = []
   const result = await planDevelopmentDependencies(
-    [container('postgres', { hostPort: '25432' })],
+    [container('postgres', { hostPort: '25432' }), container('qdrant')],
     defaultPorts,
     {
       portAvailable: async (port) => {
@@ -96,7 +100,7 @@ test('a healthy dependency keeps its actual port while only a missing service st
   )
   assert.equal(result.ports.SUPERDSH_DEV_PG_PORT, '25432')
   assert.equal(result.ports.SUPERDSH_DEV_REDIS_PORT, '16379')
-  assert.deepEqual(result.ready, ['postgres'])
+  assert.deepEqual(result.ready, ['postgres', 'qdrant'])
   assert.deepEqual(result.start, ['redis'])
   assert.deepEqual(result.wait, [])
   assert.deepEqual(probed, ['16379'])
@@ -107,18 +111,21 @@ test('unrelated containers are never adopted and occupied ports receive independ
     [
       container('postgres', { project: 'predict-prototype' }),
       container('redis', { project: 'predict-prototype' }),
+      container('qdrant', { project: 'predict-prototype' }),
     ],
     defaultPorts,
     {
-      portAvailable: async (port) => !['15432', '16379'].includes(port),
+      portAvailable: async (port) =>
+        !['15432', '16379', '16333'].includes(port),
     },
   )
   assert.deepEqual(result.ready, [])
-  assert.deepEqual(result.start.sort(), ['postgres', 'redis'])
+  assert.deepEqual(result.start.sort(), ['postgres', 'qdrant', 'redis'])
   assert.deepEqual(result.wait, [])
   assert.deepEqual(result.ports, {
     SUPERDSH_DEV_PG_PORT: '15433',
     SUPERDSH_DEV_REDIS_PORT: '16380',
+    SUPERDSH_DEV_QDRANT_PORT: '16334',
   })
 })
 
@@ -131,6 +138,7 @@ test('starting managed dependencies are waited for without creating replacement 
           state: { Health: health },
         }),
         container('redis'),
+        container('qdrant'),
       ],
       defaultPorts,
       {
@@ -139,7 +147,7 @@ test('starting managed dependencies are waited for without creating replacement 
       },
     )
     assert.deepEqual(result.wait, ['postgres'])
-    assert.deepEqual(result.ready, ['redis'])
+    assert.deepEqual(result.ready, ['redis', 'qdrant'])
     assert.deepEqual(result.start, [])
     assert.equal(result.ports.SUPERDSH_DEV_PG_PORT, '25432')
   }
@@ -170,12 +178,13 @@ test('stopped containers are started using an available configured port, not sta
         state: { Running: false, Health: undefined },
       }),
       container('redis'),
+      container('qdrant'),
     ],
     defaultPorts,
     { portAvailable: async () => true },
   )
   assert.deepEqual(result.start, ['postgres'])
-  assert.deepEqual(result.ready, ['redis'])
+  assert.deepEqual(result.ready, ['redis', 'qdrant'])
   assert.equal(result.ports.SUPERDSH_DEV_PG_PORT, '15432')
 })
 
@@ -193,12 +202,17 @@ test('one-off compose tasks and unrelated services do not replace managed depend
   const oneoff = container('postgres', { hostPort: '25432' })
   oneoff.Config.Labels['com.docker.compose.oneoff'] = 'True'
   const result = await planDevelopmentDependencies(
-    [oneoff, container('agent-supervisor'), container('redis')],
+    [
+      oneoff,
+      container('agent-supervisor'),
+      container('redis'),
+      container('qdrant'),
+    ],
     defaultPorts,
     { portAvailable: async () => true },
   )
   assert.deepEqual(result.start, ['postgres'])
-  assert.deepEqual(result.ready, ['redis'])
+  assert.deepEqual(result.ready, ['redis', 'qdrant'])
   assert.equal(result.ports.SUPERDSH_DEV_PG_PORT, '15432')
 })
 
@@ -246,26 +260,31 @@ test('explicit shell ports cannot be silently replaced or disagree with a runnin
   assert.deepEqual(result.ports, defaultPorts)
 })
 
-test('two dependencies cannot receive the same host port', async () => {
+test('three dependencies cannot receive the same host port', async () => {
   const result = await planDevelopmentDependencies(
     [],
-    { SUPERDSH_DEV_PG_PORT: '16379', SUPERDSH_DEV_REDIS_PORT: '16379' },
+    {
+      SUPERDSH_DEV_PG_PORT: '16379',
+      SUPERDSH_DEV_REDIS_PORT: '16379',
+      SUPERDSH_DEV_QDRANT_PORT: '16379',
+    },
     { portAvailable: async () => true },
   )
   assert.equal(result.ports.SUPERDSH_DEV_PG_PORT, '16379')
   assert.equal(result.ports.SUPERDSH_DEV_REDIS_PORT, '16380')
+  assert.equal(result.ports.SUPERDSH_DEV_QDRANT_PORT, '16381')
 })
 
 test('a missing dependency cannot claim the other running dependency port', async () => {
   const result = await planDevelopmentDependencies(
-    [container('redis', { hostPort: '15432' })],
+    [container('redis', { hostPort: '15432' }), container('qdrant')],
     defaultPorts,
     { portAvailable: async () => true },
   )
   assert.equal(result.ports.SUPERDSH_DEV_PG_PORT, '15433')
   assert.equal(result.ports.SUPERDSH_DEV_REDIS_PORT, '15432')
   assert.deepEqual(result.start, ['postgres'])
-  assert.deepEqual(result.ready, ['redis'])
+  assert.deepEqual(result.ready, ['redis', 'qdrant'])
 })
 
 test('port discovery has a bounded failure when no candidate is available', async () => {
@@ -331,6 +350,7 @@ test('persisted alternative ports survive reload without changing persistent cre
   const ports = {
     SUPERDSH_DEV_PG_PORT: '15433',
     SUPERDSH_DEV_REDIS_PORT: '16380',
+    SUPERDSH_DEV_QDRANT_PORT: '16334',
   }
   assert.equal(persistDevelopmentPorts(root, ports, {}), file)
   const saved = parseEnv(readFileSync(file, 'utf8'))
@@ -340,6 +360,7 @@ test('persisted alternative ports survive reload without changing persistent cre
     env.AGENT_SERVER_DB_URL.endsWith('@127.0.0.1:15433/agents_anywhere'),
   )
   assert.equal(env.AGENT_SERVER_REDIS_URL, 'redis://127.0.0.1:16380/0')
+  assert.equal(env.SUPERDSH_QDRANT_URL, 'http://127.0.0.1:16334')
   const first = readFileSync(file, 'utf8')
   persistDevelopmentPorts(root, ports, {})
   assert.equal(readFileSync(file, 'utf8'), first)
@@ -354,6 +375,8 @@ test('port persistence preserves unrelated env bytes, comments, secrets and cust
     'SUPERDSH_DEV_PG_PORT=15432',
     'AGENT_SERVER_SECRET=unchanged-test-secret',
     'SUPERDSH_DEV_REDIS_PORT=16379',
+    'SUPERDSH_DEV_QDRANT_PORT=16333',
+    'SUPERDSH_QDRANT_API_KEY="keep-this-test-key"',
     'CUSTOM_OPTION="a=b # untouched"',
     '',
   ].join('\r\n')
@@ -361,6 +384,7 @@ test('port persistence preserves unrelated env bytes, comments, secrets and cust
   const ports = {
     SUPERDSH_DEV_PG_PORT: '25432',
     SUPERDSH_DEV_REDIS_PORT: '26379',
+    SUPERDSH_DEV_QDRANT_PORT: '26333',
   }
   assert.equal(
     persistDevelopmentPorts(root, ports, {
@@ -372,9 +396,10 @@ test('port persistence preserves unrelated env bytes, comments, secrets and cust
     readFileSync(file, 'utf8'),
     source
       .replace('SUPERDSH_DEV_PG_PORT=15432', 'SUPERDSH_DEV_PG_PORT=25432')
+      .replace('SUPERDSH_DEV_REDIS_PORT=16379', 'SUPERDSH_DEV_REDIS_PORT=26379')
       .replace(
-        'SUPERDSH_DEV_REDIS_PORT=16379',
-        'SUPERDSH_DEV_REDIS_PORT=26379',
+        'SUPERDSH_DEV_QDRANT_PORT=16333',
+        'SUPERDSH_DEV_QDRANT_PORT=26333',
       ),
   )
 })

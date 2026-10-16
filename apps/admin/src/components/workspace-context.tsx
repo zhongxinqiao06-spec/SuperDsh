@@ -1,6 +1,8 @@
 'use client'
 
 import * as React from 'react'
+import type { AttachedFile } from '@/components/attachment-input'
+import type { WorkspaceSelection } from '@/components/workspace-picker'
 import {
   defaultFilter,
   listConnectors as listMockConnectors,
@@ -89,6 +91,18 @@ export type OptimisticSessionMessage = {
   session?: RealSessionView
   state?: SessionRuntimeState
   localSessionId?: string
+  creationOutcome?: 'rejected' | 'unknown'
+  draft?: {
+    prompt: string
+    attachments: AttachedFile[]
+    device: string
+    runtime: string
+    model: string
+    agentDefinitionId?: string
+    reasoning: string
+    permission: string
+    workspace: WorkspaceSelection
+  }
 }
 
 // ─── Hash routing helpers ─────────────────────────────────────
@@ -399,7 +413,12 @@ export type WorkspaceState = {
   markOptimisticMessageFailed: (
     clientMessageId: string,
     message: string,
+    creationOutcome?: 'rejected' | 'unknown',
   ) => void
+  restoreFailedSessionDraft: (
+    sessionId: string,
+    overwrite?: boolean,
+  ) => 'restored' | 'conflict' | 'missing'
   appendPathToComposer: (path: string) => boolean
   consumeComposerInsertion: (id: number) => void
   refreshData: () => void
@@ -1607,7 +1626,11 @@ export function WorkspaceProvider({ children }: { children: React.ReactNode }) {
   )
 
   const markOptimisticMessageFailed = React.useCallback(
-    (clientMessageId: string, message: string) => {
+    (
+      clientMessageId: string,
+      message: string,
+      creationOutcome: 'rejected' | 'unknown' = 'rejected',
+    ) => {
       const failed = optimisticMessagesRef.current.find(
         (entry) => entry.clientMessageId === clientMessageId,
       )
@@ -1616,16 +1639,90 @@ export function WorkspaceProvider({ children }: { children: React.ReactNode }) {
         setSessions((current) => sortSessions(current))
       }
       setOptimisticMessages((prev) => {
-        const next = prev.map((entry) =>
-          entry.clientMessageId === clientMessageId
-            ? { ...entry, item: markOptimisticItemFailed(entry.item, message) }
-            : entry,
-        )
+        const next = prev.map((entry) => {
+          if (entry.clientMessageId !== clientMessageId) return entry
+          const item = markOptimisticItemFailed(
+            entry.item,
+            message,
+            creationOutcome,
+          )
+          if (!entry.localSessionId || entry.sessionId !== entry.localSessionId)
+            return { ...entry, item }
+          // No server session was bound. Stop the provisional waiting state;
+          // ordinary sends must leave the authoritative runtime state alone.
+          return {
+            ...entry,
+            creationOutcome,
+            item,
+            session: entry.session
+              ? { ...entry.session, status: 'error' as const }
+              : undefined,
+            state: entry.state
+              ? {
+                  ...entry.state,
+                  status: 'error' as const,
+                  statusReason: message,
+                  error: {
+                    message,
+                    ...(creationOutcome === 'unknown'
+                      ? { code: 'SESSION_CREATION_OUTCOME_UNKNOWN' }
+                      : {}),
+                  },
+                  updatedAt: item.updatedAt,
+                }
+              : undefined,
+          }
+        })
         optimisticMessagesRef.current = next
         return next
       })
     },
     [clearOptimisticTop, sortSessions],
+  )
+
+  const restoreFailedSessionDraft = React.useCallback(
+    (sessionId: string, overwrite = false) => {
+      if (!lastWorkbenchHash.current()) return 'missing' as const
+      const failed = optimisticMessagesRef.current.find(
+        (entry) =>
+          entry.sessionId === sessionId &&
+          entry.localSessionId === sessionId &&
+          entry.item.status === 'failed',
+      )
+      if (!failed?.draft || failed.creationOutcome === 'unknown')
+        return 'missing' as const
+      const draft = failed.draft
+      const prompt = workbenchCell('new-session/prompt', '')
+      const files = workbenchCell<AttachedFile[]>('new-session/attachments', [])
+      const hasOtherDraft =
+        (prompt.get().trim() && prompt.get() !== draft.prompt) ||
+        files.get().some((file) => !draft.attachments.includes(file))
+      if (hasOtherDraft && !overwrite) return 'conflict' as const
+      for (const file of files.get()) {
+        if (
+          !draft.attachments.includes(file) &&
+          file.preview?.startsWith('blob:')
+        )
+          URL.revokeObjectURL(file.preview)
+      }
+      prompt.set(draft.prompt)
+      files.set(draft.attachments)
+      workbenchCell('new-session/device', '').set(draft.device)
+      workbenchCell('new-session/runtime', '').set(draft.runtime)
+      workbenchCell('new-session/model', '').set(draft.model)
+      workbenchCell('new-session/agent-definition', '').set(
+        draft.agentDefinitionId ?? '',
+      )
+      workbenchCell('new-session/reasoning', '').set(draft.reasoning)
+      workbenchCell('new-session/permission', '').set(draft.permission)
+      workbenchCell<WorkspaceSelection | null>(
+        'new-session/workspace',
+        null,
+      ).set(draft.workspace)
+      goHome()
+      return 'restored' as const
+    },
+    [goHome],
   )
 
   const clearResolvedOptimisticMessages = React.useCallback(
@@ -1831,6 +1928,7 @@ export function WorkspaceProvider({ children }: { children: React.ReactNode }) {
     getOptimisticSessionState,
     isOptimisticSession,
     markOptimisticMessageFailed,
+    restoreFailedSessionDraft,
     appendPathToComposer,
     consumeComposerInsertion,
     refreshData: fetchData,

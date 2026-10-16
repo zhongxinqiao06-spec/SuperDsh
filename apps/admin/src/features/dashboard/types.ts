@@ -133,6 +133,7 @@ export type SessionStatusValue =
 export type RuntimeStatusValue = SessionStatusValue | 'error' | 'disconnected'
 
 export type SessionView = {
+  agentDefinition?: { id: string; name: string; version: number } | null
   executorKind?: 'desktop' | 'server-agent'
   id: string
   connectorId: string
@@ -338,6 +339,7 @@ export type ProjectDeleteResponse = {
 export type ProjectSessionListResponse = SessionListResponse
 
 export type SessionCreateRequest = {
+  agentDefinitionId?: string
   connectorId: string
   projectId: string
   runtime: string
@@ -349,6 +351,7 @@ export type SessionCreateRequest = {
 }
 
 export type SessionCreateAndStartRequest = {
+  agentDefinitionId?: string
   connectorId: string
   projectId: string
   runtime: string

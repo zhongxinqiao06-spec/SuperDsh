@@ -1,12 +1,16 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import {
   platformBridge,
+  platformAgentCreation,
+  platformAgentBinding,
   type PlatformAccountState,
   type PlatformJson,
   type PlatformRequest,
 } from '@superdsh/core/client/platform'
 import { object, rows, string, type Row } from './platform-model.ts'
 import { useNewSessionOptions } from './use-new-session-options.ts'
+import { useAgentDefinitions } from './use-agent-definitions.ts'
+import { useAgentArtifacts } from './use-agent-artifacts.ts'
 import {
   createPlatformConversationSource,
   type ConversationTarget,
@@ -52,7 +56,13 @@ export function usePlatformWorkspace() {
   const [models, setModels] = useState<Row[]>([])
   const [draft, setDraft] = useState('')
   const [attachments, setAttachments] = useState<PlatformJson[]>([])
-  const [workspace, setWorkspace] = useState('')
+  const [workspaceInput, setWorkspace] = useState('')
+  const [serverWorkspace, setServerWorkspace] = useState<{
+    identity: string
+    connectorId: string
+    projectId: string
+    path: string
+  } | null>(null)
   const [tab, setTab] = useState<'chat' | 'files' | 'terminal'>('chat')
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState('')
@@ -119,6 +129,7 @@ export function usePlatformWorkspace() {
     setDraft('')
     setAttachments([])
     setWorkspace('')
+    setServerWorkspace(null)
     setError('')
     setServerAgent({})
     setServerAgentError('')
@@ -288,7 +299,29 @@ export function usePlatformWorkspace() {
     )
     setSessionCursor(string(value.nextCursor))
   }, [device, request])
-  const newSession = useNewSessionOptions(request, device, sessionId, !!device)
+  const selected = devices.find((row) => row.id === device)
+  const isServerAgent = selected?.executorKind === 'server-agent'
+  const agents = useAgentDefinitions(request, device, sessionId, isServerAgent)
+  const artifacts = useAgentArtifacts(
+    request,
+    device,
+    sessionId,
+    isServerAgent,
+    string(object(snapshot.state).status) === 'idle'
+      ? `idle:${string(snapshot.eventCursor)}`
+      : string(object(snapshot.state).status),
+  )
+  const newSession = useNewSessionOptions(
+    request,
+    device,
+    sessionId,
+    !!device,
+    isServerAgent
+      ? serverAgent.connectorId === device
+        ? string(serverAgent.runtimeId)
+        : ''
+      : undefined,
+  )
   useEffect(() => {
     if (account?.status !== 'ready' || account.user?.resetRequired) return
     let disposed = false
@@ -421,12 +454,52 @@ export function usePlatformWorkspace() {
     account?.identityKey,
     account?.identityGeneration,
   ])
-  const selected = devices.find((row) => row.id === device)
-  const isServerAgent = selected?.executorKind === 'server-agent'
+  const serverConnectorId = string(serverAgent.connectorId)
+  const serverProjectId = string(serverAgent.projectId)
+  const workspace = isServerAgent
+    ? serverWorkspace?.identity === directoryIdentity &&
+      serverWorkspace.connectorId === device &&
+      serverWorkspace.projectId === serverProjectId &&
+      device === serverConnectorId
+      ? serverWorkspace.path
+      : ''
+    : workspaceInput
   useEffect(() => {
-    if (isServerAgent && device === serverAgent.connectorId)
-      setWorkspace('/workspace')
-  }, [device, isServerAgent, serverAgent])
+    setServerWorkspace(null)
+    if (!isServerAgent || device !== serverConnectorId || !serverProjectId)
+      return
+    let disposed = false
+    void request({ operation: 'projects' })
+      .then((value) => {
+        if (disposed || selectionRef.current.device !== device) return
+        const project = rows(object(value).projects).find(
+          (row) => row.id === serverProjectId && row.connectorId === device,
+        )
+        const path = string(project?.workspacePath)
+        if (!path) throw new Error('服务端工作区尚未准备完成，请重试')
+        setServerWorkspace({
+          identity: directoryIdentity,
+          connectorId: device,
+          projectId: serverProjectId,
+          path,
+        })
+      })
+      .catch((reason) => {
+        if (!disposed && selectionRef.current.device === device)
+          setError(reason instanceof Error ? reason.message : String(reason))
+      })
+    return () => {
+      disposed = true
+    }
+  }, [
+    device,
+    isServerAgent,
+    serverConnectorId,
+    serverProjectId,
+    serverAgent.status,
+    directoryIdentity,
+    request,
+  ])
   const online = selected?.status === 'online' && !selected.blockedAt
   const capabilities = rows(object(snapshot.effectiveCapabilities).capabilities)
   const allows = (name: string) =>
@@ -490,7 +563,18 @@ export function usePlatformWorkspace() {
       setAttachments([])
       await refreshSession()
     } else {
-      if (!workspace.trim()) throw new Error('请输入目标设备的工作区绝对路径')
+      const agentSelection = platformAgentCreation(
+        isServerAgent ? 'server-agent' : 'desktop',
+        sessionId,
+        agents.selectedId,
+        agents.items,
+      )
+      if (!workspace.trim())
+        throw new Error(
+          isServerAgent
+            ? '服务端工作区尚未准备完成，请重试'
+            : '请输入目标设备的工作区绝对路径',
+        )
       if (!newSession.runtimeId || !newSession.model || !newSession.permission)
         throw new Error('请先选择新会话的模型和权限')
       const projects = rows(
@@ -503,7 +587,7 @@ export function usePlatformWorkspace() {
           row.workspacePath === workspace &&
           (!isServerAgent || row.id === serverAgent.projectId),
       )
-      if (isServerAgent && (!project || workspace !== '/workspace'))
+      if (isServerAgent && !project)
         throw new Error('服务端工作区尚未准备完成，请重试')
       const baseName =
         workspace.split(/[\\/]/).filter(Boolean).at(-1) || 'Workspace'
@@ -532,6 +616,7 @@ export function usePlatformWorkspace() {
         await request({
           operation: 'create-session',
           body: {
+            ...agentSelection,
             connectorId: device,
             projectId: string(project.id),
             runtime: 'dsh',
@@ -601,7 +686,31 @@ export function usePlatformWorkspace() {
       throw new Error('目标已切换，此附件响应已丢弃')
     return value
   }
+  const downloadAttachment = async (fileId: string) => {
+    if (
+      !sessionId ||
+      selectionRef.current.device !== device ||
+      selectionRef.current.sessionId !== sessionId
+    )
+      throw new Error('请先选择文件所属会话')
+    const current = generation.current
+    const result = await request({
+      operation: 'download-attachment',
+      sessionId,
+      attachmentId: fileId,
+    })
+    if (current !== generation.current)
+      throw new Error('目标已切换，此文件响应已丢弃')
+    return result
+  }
   return {
+    agents,
+    artifacts,
+    agentBinding:
+      (object(snapshot.session).id === sessionId
+        ? platformAgentBinding(object(snapshot.session).agentDefinition)
+        : null) ?? artifacts.binding,
+    downloadAttachment,
     serverAgent,
     serverAgentError,
     prepareServerAgent,

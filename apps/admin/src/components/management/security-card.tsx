@@ -17,7 +17,7 @@ export function SecurityCard() {
   const tr = useManagementText()
   const { navigate, session: account } = useAuth()
   const [page, setPage] = React.useState(1)
-  const [pageSize, setPageSize] = React.useState(25)
+  const [pageSize, setPageSize] = React.useState(10)
   const resource = useManagementResource(
     `login-sessions:${page}:${pageSize}`,
     () => managementApi.sessions(page, '', pageSize),

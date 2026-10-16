@@ -1,80 +1,74 @@
 # SuperDsh
 
-SuperDsh includes a desktop Agent app, unified management console, Python server, and Android app. The console organizes overview, permissions, models, devices, and system settings; chat is an Agent workspace module. DeepSeek Harness runs tasks as a required engine plugin.
+SuperDsh includes a desktop Agent application, a full-stack Next.js + Node.js management platform, and an Android application. The platform centers on overview, access, models, devices and system management; chat is its Agent Workbench module. DeepSeek Harness is a required engine plugin managed by the product.
 
-**Use this page for everyday development.** [中文](README.md) · [Origins](#upstream-foundations) · [Design](#design-principles) · [Progress](#current-progress) · [Code locations](#project-structure) · [Startup](#daily-development) · [Integration](#cross-client-development) · [Checks](#checks-and-packaging)
+**Use this page for daily development.** [中文](README.md) · [Origins](#upstream-foundations) · [Principles](#design-principles) · [Progress](#current-progress) · [Code](#project-structure) · [Startup](#daily-development) · [Integration](#three-client-integration) · [Checks](#checks-and-packaging)
 
 ## Upstream foundations
 
-| Upstream project                                                                    | Reused foundation                                                               | SuperDsh changes                                                                                                                        |
-| ----------------------------------------------------------------------------------- | ------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------- |
-| [Anywhere Labs / dsh-desktop](https://github.com/anywhere-labs/dsh-desktop)         | Electron shell, desktop capabilities, and interactions from Desktop / Next      | Uses Next as the basis for one desktop product, consolidates UI / Core, and owns the application root, navigation, and engine lifecycle |
-| [DeepSeek / deepseek-harness](https://github.com/deepseek-ai/deepseek-harness)      | Full Host, Agents, tools, workflows, session persistence, and client components | Moves UI source into the product UI; wraps the engine in `@superdsh/harness`, sharing Host startup between desktop and server           |
-| [Anywhere Labs / Agents-Anywhere](https://github.com/anywhere-labs/Agents-Anywhere) | Connector, Bridge, API v2, admin web, and mobile clients                        | Moves admin, server, and Android into `apps`; extends unified login, RBAC, device controls, personal models, and Server Agent           |
+| Upstream                                                                            | Reused foundation                                                     | SuperDsh changes                                                                                                                |
+| ----------------------------------------------------------------------------------- | --------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------- |
+| [Anywhere Labs / dsh-desktop](https://github.com/anywhere-labs/dsh-desktop)         | Desktop / Next Electron shell, native capabilities and interaction    | One desktop product based on Next, consolidated UI / Core, product-owned root, navigation and engine lifecycle                  |
+| [DeepSeek / deepseek-harness](https://github.com/deepseek-ai/deepseek-harness)      | Full Host, Agent, tools, workflows, persistence and client components | Owned UI source; `@superdsh/harness` wraps the engine and shares Host startup across desktop and server                         |
+| [Anywhere Labs / Agents-Anywhere](https://github.com/anywhere-labs/Agents-Anywhere) | Connector, Bridge, API v2, web UI and mobile clients                  | Imported admin and Android; migrated server APIs, identity, persistence and Connector to Node, extending RBAC and server Agents |
 
-Harness is pinned to `0.1.7-alpha.2`; see [upstream.json](upstream.json). AA apps were imported from `f9129757c3ee`; see the [application provenance manifest](vendor/agents-anywhere/apps-source.json). Both upstream submodules stay pinned; protocol compatibility changes live in product adapters and controlled patches. Retired desktop directories are no longer development or build inputs.
+Harness is pinned to `0.1.7-alpha.2` in [upstream.json](upstream.json); AA applications were imported from `f9129757c3ee`, recorded in the [provenance manifest](vendor/agents-anywhere/apps-source.json). Pinned submodules remain unchanged; product adapters and controlled patches provide compatibility changes.
 
 ## Design principles
 
-- **Desktop first, with the product shell in control.** SuperDsh owns windows, navigation, accounts, devices, and state. DSH is the required internal execution plugin. Keep Harness queues rather than building another execution engine.
-- **Find code by responsibility.** Desktop views belong in UI, business and native capabilities in Core, and Harness integration in the plugin. Admin, server, and Android have separate development and build entry points.
-- **Separate console management from the workspace.** The console owns menus, permissions, and routes; chat loads only inside its module. Future Agent product management can register another module; publication, assignment, and version management are outside this change.
-- **One main chat, two execution targets.** Users choose their own computer or Server Agent. Mobile, web, and desktop reuse API v2 and the same owned session. Server execution does not require an online computer; Android does not embed Harness.
-- **Separate platform identity from model authorization.** Platform accounts manage resources and remote access; DeepSeek or personal keys authorize model calls. Desktop retains local Home and model settings; platform login neither restarts the app nor opens another chat window.
-- **Preserve ownership isolation and compatibility.** Administrator and member are the two built-in roles, with custom roles supported. Management permissions do not grant access to other users' content. Server instances are isolated per user; pinned protocols and third-party plugin compatibility remain.
+- **Desktop first, product-owned control.** SuperDsh manages windows, navigation, identity and state; Harness owns execution and its queue. There is no second engine.
+- **Locate code by responsibility.** Desktop views live in UI, business/native capabilities in Core, and Harness integration in the plugin. Web and Node server live together in `apps/admin`.
+- **Separate management from the workbench.** The top-level Agent management menu contains four submenus: Agents, Knowledge bases, Skills and Tools. Configure resources separately, associate them with an Agent, and publish to the same main chat with knowledge, skill and tool versions fixed at conversation creation.
+- **One conversation, two execution targets.** All clients use API v2 to access their computers or server Agent. Android does not embed Harness, and server execution does not require a computer online.
+- **Separate platform identity and model authorization.** Platform accounts control resources and remote access; DeepSeek / personal keys provide model access. Desktop keeps its local Home, and platform login does not restart the application.
+- **Ownership first.** Administrator and member are the built-in roles; custom roles remain supported. Administrators cannot read other users' content. Native Agents have separate directories and authorization, but processes under one OS user are not an OS sandbox.
 
-This phase excludes organizations/tenants, device sharing, multiple engines, a second task queue, and a new workflow DAG editor. Prioritize reliable existing capabilities, consistent interaction, and clear development entry points.
+This is a **single-platform demo, not a complete enterprise multitenant system**. Published Agents and their bound resources are shared within this platform; personal conversations and artifacts remain owner-authorized. Company tenants, employee invitations, tenant-specific knowledge libraries, arbitrary skill uploads and DingTalk/WeCom integration are not implemented. Shared devices, multiple engines, another queue and a DAG editor remain out of scope.
 
 ## Current progress
 
-**As of 2026-10-12: the core architecture and management console refactor are implemented; feature integration and stability work continue. Release acceptance is incomplete.** The table separates implemented code from verification; historical tests do not certify the current version.
+**As of 2026-10-15: Agent management, actual resource uploads, main chat and Office artifacts have passed temporary-environment validation.** The old Python backend at `apps/server` has been physically deleted and replaced by `apps/admin/server`; releases still require target-system checks.
 
-| Area                         | Status                                           | Evidence and remaining limits                                                                                                                                                                                                                  |
-| ---------------------------- | ------------------------------------------------ | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Repository and desktop shell | Migrated and separated                           | Four apps under `apps`, desktop UI / Core / Harness responsibilities, retired desktop source removed; see the [migration record](docs/superdsh-migration-validation.md)                                                                        |
-| Desktop login and main chat  | Implemented, stage validation                    | Inline password login, fixed local Home, automatic computer connection, device switching in the main chat; real Host / Connector and headless UI verified separately in the [record](docs/desktop-inline-login-validation.md)                  |
-| Platform identity and RBAC   | Implemented, stage validation                    | Multiple roles, login refresh/revocation, ownership checks, device blocking, and audit; see the [identity record](docs/platform-identity-validation.md), whose old account-space design is superseded by inline login                          |
-| Management console           | Refactored, regression checked                   | Overview and seven navigation areas, persistent permission-filtered menus, workspace loaded on demand; future Agent publication and assignment are excluded                                                                                    |
-| Server Agent                 | Implemented, integration ongoing                 | Per-user execution, preparation upon web workspace entry or native login, real Host / Connector online verification; [historical integration](docs/server-agent-validation.md) used local model fixtures, not complete real-client UI coverage |
-| Personal and platform models | Implemented, partial verification                | Three protocols, encrypted keys, defaults, and DeepSeek presets; recent real-key connection verification passed, while complete chat replies and error feedback still need work                                                                |
-| Android and shared sessions  | Implemented, current-client revalidation pending | Chinese UI, login, server entry, offline history/drafts have source and build records; [older emulator connectivity](docs/apps-migration-validation.md) does not certify the current physical-phone experience                                 |
-| Packaging and release        | Stage builds, not released                       | Windows Chinese-path, Docker, desktop directory, and Debug APK builds have records; latest full installer, clean OS, macOS/Linux, signing, and updates still need acceptance                                                                   |
+| Area                       | Status and boundaries                                                                                                                                                                                 |
+| -------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Desktop                    | UI / Core / Harness separated; inline login, fixed Home and main-chat device selection have [stage records](docs/desktop-inline-login-validation.md)                                                  |
+| Management platform        | Independent overview, permission-filtered menus, dialogs and pagination; management pages do not need chat initialization                                                                             |
+| Node API and data          | Identity, RBAC, menus, devices, conversations, files, terminals, models and persistence moved to `apps/admin/server`; API v2 retained; empty databases and `v2_35` through `v2_42` upgrades supported |
+| Business Agents            | Real Node API, PG/Redis, Connector and full Host with a local tool-calling model fixture verified uploads, generation, downloads, knowledge citations and version retention after restart             |
+| Identity/management checks | Temporary PostgreSQL tests cover rotation, ownership, last administrator, concurrent menus and migration rollback; existing user databases were not used                                              |
+| Server Agent               | Native Node Connector + full Harness processes, per-user Home and runtime leases; neither development nor production uses Agent containers                                                            |
+| Models and clients         | Three protocols, personal/platform models and defaults implemented; paid providers, current Android UI and complete cross-client interactions require environment-specific revalidation               |
+| Release                    | Source and temporary-environment checks are not Windows installer, CentOS, macOS/Linux, signing or updater acceptance                                                                                 |
 
-**Next priorities:** investigate missing server chat replies and missing errors, improve empty-model guidance and selectable-model checks, then validate real DeepSeek and shared-session operation across mobile/web/desktop, reconnection, and target switching. Historical evidence is linked from the [documentation index](docs/README.en.md#validation-records).
+Separate checks passed: a headless Next browser with real API/Host for management actions and main chat; headless desktop with real Host and a platform API fixture for selection, frozen versions and downloads; admin production build, Node server checks and layout checks. Runtime tests used a **local model fixture**: an uploaded CSV produced Excel/PPT revenue of 260; after restart, the existing conversation retained v2 and a new chat attachment produced 777 rather than the bound sales data. Knowledge answers included source excerpts. Temporary resources were cleaned up; paid models, real desktop GUI and the new Android entry were not verified.
 
-**Model center proposal (not implemented):** unify provider connections, the model catalog, and usage permissions, with simpler desktop presets. Evaluate a separate Docker gateway for 9router / Codex authorization, serving the three clients first and reserving an external API. Keep local, personal-account, and platform-provided sources distinct and isolate personal authorization by user. The current deployment does not include 9router or a Codex authorization shortcut.
+**Model-center roadmap, not implemented:** unify provider connections, model catalogs and access grants, with desktop shortcuts. 9router / Codex authorization remains future work and is not installed by current startup. See the [historical validation index](docs/README.en.md#validation-records).
 
 ## Project structure
 
-| What to change                                    | Location and entry points                                                                                                                                             |
-| ------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Desktop root, navigation, UI, and theme           | [apps/desktop/ui](apps/desktop/ui/): `src/app`, `src/features`, `src/components`, `src/theme`                                                                         |
-| Desktop chat, history, composer, workflows        | UI `features/chat`, `conversation`, `workspace`, `workflows`                                                                                                          |
-| Desktop platform login, devices, remote chat      | UI `features/platform`; reuses the main sidebar, messages, and composer                                                                                               |
-| Desktop logic, windows, IPC, permissions, updates | [apps/desktop/core](apps/desktop/core/): `src/main`, `preload`, `client`, `services`                                                                                  |
-| Backend lifecycle, imports, cross-process types   | Core `src/backend`, `application`, `contracts`                                                                                                                        |
-| Harness startup, Profiles, protocol adaptation    | [apps/desktop/plugins/harness](apps/desktop/plugins/harness/): `src/host`, `host-runtime.ts`, `profiles.ts`                                                           |
-| Admin web, users, roles, device pages             | [apps/admin](apps/admin/): `src/app`, `src/features`, `src/components`; Next.js / React / TypeScript                                                                  |
-| API, authentication, RBAC, relay, database        | [apps/server](apps/server/): `agent_server/api`, `services`, `infra`, `migrations`; Python 3.12 / FastAPI                                                             |
-| Server Agent and container coordination           | Server `agent-runtime`, `agent-supervisor`; a separate Harness / Connector per user                                                                                   |
-| Android UI, logic, networking, Chinese strings    | [apps/android](apps/android/): `ui`, `feature`, `api` under `app/src/main/java/com/agentsanywhere/app`; strings in `app/src/main/res/values-zh-rCN`; Kotlin / Compose |
+| Change                                                        | Location                                                                                                                            |
+| ------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------- |
+| Desktop root, navigation, chat, settings and theme            | [apps/desktop/ui](apps/desktop/ui/): `src/app`, `features`, `components`, `theme`                                                   |
+| Desktop business logic, windows, IPC, permissions and updates | [apps/desktop/core](apps/desktop/core/): `src/main`, `preload`, `client`, `services`, `contracts`                                   |
+| Harness startup, profiles and protocol adapters               | [apps/desktop/plugins/harness](apps/desktop/plugins/harness/): `src/host`, `host-runtime.ts`, `server-profile.ts`                   |
+| Web management, overview and workbench                        | [apps/admin/src](apps/admin/src/): `components/console`, `features/console`, `features/workbench`                                   |
+| API, identity, RBAC, devices and database                     | [apps/admin/server](apps/admin/server/): `identity`, `management`, `devices`, `conversations`, `files`, `infrastructure`            |
+| Platform/personal models and server Agents                    | Server `models` and `runtime`: Node Connector, model gateway and full Host lifecycle                                                |
+| Business Agents, knowledge and Office artifacts               | `apps/admin/server/agents`; web `src/features/agents`, `components/management/agents-panel.tsx`; desktop `ui/src/features/platform` |
+| PG / Redis / Qdrant and deployment                            | [apps/admin/deployment](apps/admin/deployment/); only database dependencies use Docker                                              |
+| Android UI, network and Chinese localization                  | [apps/android](apps/android/): `app/src/main/java/com/agentsanywhere/app`; strings in `app/src/main/res/values-zh-rCN`              |
 
-`apps/desktop` assembles and releases the product; UI and Core are its two main business packages. Pinned upstreams are in `deepseek-harness` and `agents-anywhere`. AA retains Connector, Bridge, shared protocols, and iOS reference source; iOS migration is outside this phase.
+`apps/desktop` assembles and publishes the desktop product. Web modules register in `src/features/console/modules.ts`; the server catalog is `server/management/navigation.ts`. Management modules do not depend on chat's `WorkspaceProvider`. Pinned upstreams remain in `deepseek-harness` and `agents-anywhere`; iOS remains upstream reference only.
 
-Console development entry points: `apps/admin/src/components/console` contains the shell and menu editor; `src/features/console/modules.ts` registers pages, permissions, and loading entries; `src/features/console/routes.ts` owns Hash routing. Existing chat is assembled in `components/demo.tsx`; `features/workbench` holds account-scoped transient interaction state. Management modules do not depend on `WorkspaceProvider`.
+## Environment preparation
 
-## Prerequisites
+Run all commands from the **repository root**. Windows examples use `corepack.cmd`; use `corepack` on macOS/Linux.
 
-Run all commands from the **repository root**. Examples use Windows PowerShell; replace `corepack.cmd` with `corepack` on macOS/Linux.
-
-| Work                                | Requirements                                                                                                             |
-| ----------------------------------- | ------------------------------------------------------------------------------------------------------------------------ |
-| Desktop and admin web               | Git, Node 24.x, Corepack, Yarn 4.18                                                                                      |
-| Python API                          | `server:sync` uses uv to prepare Python 3.12 and locked dependencies; `UV_PATH` can select uv                            |
-| Local databases and full deployment | Docker Desktop with its Linux engine; an existing PostgreSQL / Redis installation lets the native API run without Docker |
-| Android                             | JDK 17, Android SDK 36, Build Tools 34.0.0; emulation also needs Emulator, Platform Tools, and an existing AVD           |
-
-After obtaining the source:
+| Area                 | Requirements                                                                                                |
+| -------------------- | ----------------------------------------------------------------------------------------------------------- |
+| Desktop and platform | Git, Node 24.x, Corepack, Yarn 4.18                                                                         |
+| Local database       | Docker Linux engine, only for PG / Redis / Qdrant; existing database endpoints can be configured explicitly |
+| Android              | JDK 17, Android SDK 36, Build Tools 34.0.0; emulator also needs Emulator, Platform Tools and an AVD         |
 
 ```powershell
 git submodule update --init --recursive
@@ -82,7 +76,7 @@ node scripts/prepare-aa-source.mjs
 corepack.cmd yarn install --immutable
 ```
 
-Source preparation applies sparse checkout to AA, excluding the old application directories now owned under `apps`. Do not restore those paths or add forwarding links.
+Source preparation applies AA sparse checkout and excludes retired application directories; do not restore those paths. The Node platform and server Agent do not require Python. The existing desktop Connector or specific Agent tools may still use Python when needed.
 
 ## Daily development
 
@@ -92,149 +86,135 @@ Source preparation applies sparse checkout to AA, excluding the old application 
 corepack.cmd yarn dev
 ```
 
-This builds the product, then starts Electron and the UI watcher. **A successful UI rebuild restarts the backend and refreshes the page, interrupting running tasks.** Restart `dev` after Core, Preload, or Harness integration changes. Use `corepack.cmd yarn start` for existing artifacts; run `build` first after source changes.
+Builds first, then starts Electron and the UI watcher. **UI rebuilds restart the backend and interrupt running tasks.** Restart development after changing Core, Preload or Harness. Use `start` for existing artifacts and `build` after source changes. This differs from inline platform account login.
 
-### Admin web and Python API (recommended development mode)
+### Web, Node API and server Agent
 
-Start both applications manually on the host. `server:deps:up` runs **only PostgreSQL and Redis**; `server:dev` then prepares the Supervisor, API relay container, and runtime image required by Server Agent. Open Docker Desktop, then prepare dependencies once:
+Prepare dependencies and Harness once, then start the whole platform with one command:
 
 ```powershell
 corepack.cmd yarn server:sync
 corepack.cmd yarn server:deps:up
-```
-
-Terminal one starts the API, applies incremental migrations, ensures the development administrator, prepares Agent dependencies, then enables reload. The first startup builds the Harness runtime image if it is missing:
-
-```powershell
 corepack.cmd yarn server:dev
 ```
 
-Terminal two starts the web application:
+`server:deps:up` **starts only PostgreSQL / Redis / Qdrant containers**. `server:dev` runs Next.js, Node API and Agent lifecycle management on the host. Full Harness children start when a user needs a server Agent; no Supervisor, Python API or extra Agent command is required. `admin:dev` is an alias for the same entry; do not run both.
 
-```powershell
-corepack.cmd yarn admin:dev
-```
+| Service                                               | Default address                                           |
+| ----------------------------------------------------- | --------------------------------------------------------- |
+| Web and API                                           | [http://127.0.0.1:5174](http://127.0.0.1:5174)            |
+| Compatibility API listener, same backend and database | `http://127.0.0.1:8000`                                   |
+| Readiness                                             | `http://127.0.0.1:5174/api/v2/health/ready`               |
+| PostgreSQL / Redis / Qdrant, loopback only            | `127.0.0.1:15432` / `127.0.0.1:16379` / `127.0.0.1:16333` |
 
-Web login opens Overview. Permission-filtered navigation includes Users and permissions, Models, Device operations, Agent workspace, System, and Personal center. Configure two-level groups, order, and role visibility at `#/access/menus`; hiding a menu does not change authorization. Apply API migration `v2_39` before updating the web app; existing administrators receive menu permissions. Deployment updates remain manual.
+The empty managed `superdsh-dev` database gets **`admin` / `admin123`**; existing passwords and account state are unchanged. Explicit databases and empty production databases use the startup **setup token** to initialize an administrator; they have no default account. Web login opens the overview and prepares an Agent only on entering the workbench; native clients retain preparation after login.
 
-| Service                                                | Default address                                  |
-| ------------------------------------------------------ | ------------------------------------------------ |
-| Admin web                                              | [http://127.0.0.1:5174](http://127.0.0.1:5174)   |
-| API                                                    | `http://127.0.0.1:8000`                          |
-| API readiness                                          | `http://127.0.0.1:8000/api/v2/health/ready`      |
-| PostgreSQL / Redis (default, loopback only)            | `127.0.0.1:15432` / `127.0.0.1:16379`            |
-| Development Agent Supervisor (internal authentication) | `127.0.0.1:18090`                                |
-| Full Docker deployment (separate mode)                 | [http://127.0.0.1:15174](http://127.0.0.1:15174) |
+Development configuration is Git-ignored at `.superdsh-work/server-dev/aa-dev.env`. Repeated `server:deps:up` skips healthy dependencies. If another program occupies a default port, the script selects and persists a free port; explicitly specified ports are not changed. Qdrant defaults to `http://127.0.0.1:16333`; override `SUPERDSH_DEV_QDRANT_PORT`, or connect an existing instance with `SUPERDSH_QDRANT_URL` / `SUPERDSH_QDRANT_API_KEY`. Follow command output. If volumes exist but configuration is lost, restore the original file instead of generating replacement keys.
 
-The local `superdsh-dev` database automatically creates the administrator **`admin` / `admin123`**; an existing `admin` keeps its password, roles, and status. Development and deployed databases do not share accounts. Full Docker and production deployments still use a **setup token** to initialize an administrator for an empty database and provide no default account.
+Use `Ctrl+C` to stop web, API and their native Agents, then `corepack.cmd yarn server:deps:down` to stop only PG / Redis / Qdrant while retaining volumes. `server:dev:agents` is only a compatibility alias. `server:down` explains terminal/system-service shutdown rather than operating application containers.
 
-Development dependencies belong to the isolated `superdsh-dev` project. Credentials and model encryption keys live in the Git-ignored `.superdsh-work/server-dev/aa-dev.env`; keep this file with its volumes. Stop the native API and web application with `Ctrl+C` first, then use `corepack.cmd yarn server:deps:down` to stop databases, control services, and managed Agents while preserving all volumes. A running API may schedule Agents again.
-
-For computer-only development, set `$env:SUPERDSH_DEV_AGENT_ENABLED='0'` in the API terminal. Use `SUPERDSH_DEV_AGENT_PORT` to change the Supervisor port and `AGENT_SERVER_PORT` to change the API port. Development Agents reach the native API through Docker Desktop's `host.docker.internal`; this route is not yet verified on native Linux hosts, where full Docker deployment is available instead.
-
-Repeated `server:deps:up` calls skip healthy dependencies owned by this project. If another process occupies a port, the command selects a free port and saves it to `.superdsh-work/server-dev/aa-dev.env` for subsequent API startup. Use the actual ports printed by the command. Explicit shell port overrides are not changed automatically; restart any existing API process to load new ports.
-
-The web application proxies `/api/v2` to local port `8000` by default. Clear any previous `NEXT_OUTPUT=export` setting before development; use `AGENTS_ANYWHERE_API` to change the API target. To use existing databases, set both `AGENT_SERVER_DB_URL` and `AGENT_SERVER_REDIS_URL` in the API terminal and skip `server:deps:up`. An explicit database URL disables automatic development account creation; initialize an empty database with its setup token. See the [server guide](apps/server/README.md) for full configuration.
+Existing databases require both `AGENT_SERVER_DB_URL` and `AGENT_SERVER_REDIS_URL`, plus original authentication/model keys; no development account is created. `SUPERDSH_SERVER_PORT` controls the web port and `AGENT_SERVER_PORT` the compatibility API. The unified entry needs no `AGENTS_ANYWHERE_API` proxy configuration; clear obsolete `NEXT_OUTPUT=export`. See the [server guide](apps/admin/server/README.md).
 
 ### Android
 
-Open `apps/android` in Android Studio. With the SDK and an AVD available:
+Open `apps/android` in Android Studio. With SDK / AVD prepared:
 
 ```powershell
 corepack.cmd yarn android:build
 corepack.cmd yarn android:start --server http://127.0.0.1:8000
 ```
 
-`android:start` installs an existing Debug APK and opens the app; it does not build or start services. Double-clicking `start-android.cmd` uses local configuration. Updating an installation preserves its account and language settings and requires the original signing key.
+The launcher installs an existing Debug APK and opens the app; it does not build or start services. `--server` only checks health and configures emulator forwarding; **it does not change the app's saved address**. Enter the same address on login. Keep the original signing key to preserve account and language settings. See the [Android guide](docs/android-local-development.md).
 
-`--server` controls the health check and emulator port mapping; **it does not replace the server address saved in the app**. Enter `http://127.0.0.1:8000` on the login page. See the [Android guide](docs/android-local-development.md) for SDK, AVD, and build options.
-
-## Cross-client development
+## Three-client integration
 
 ```text
-Local desktop: SuperDsh Core → backend process → Harness plugin → local sessions
-Remote access: web / Android / desktop → Python API v2 → target Connector → Harness
-Execution target: your computer, or your Server Agent container
+Desktop local: Core → backend child → Harness → local conversations
+Computer execution: web / Android / desktop → Node API v2 → computer Connector → Harness
+Server execution: clients → same Node API v2 → Node Connector → native Harness child
 ```
 
-**Computer execution:** start the development services and desktop. Enter the API address, username or email, and password in the desktop account menu. Successful platform login automatically connects this computer and synchronizes sessions. Sign in with the same account on Android and web, then select the computer and session. The device is online only after Connector and Harness are ready; a signed-in phone does not need another QR scan.
+**Computer mode:** start the platform and desktop, then enter platform address and credentials in the desktop account menu. It connects the computer and synchronizes conversations automatically. Android/web use the same account and select that computer. Phone login sessions are not execution devices and need no extra QR scan. Remote files and terminals always target the selected computer.
 
-Desktop also works independently with DeepSeek / a personal API key. Platform login, logout, and account switching keep the app and Harness running, using the existing local Home and main chat. Remote files and terminals always address the selected device. Switching accounts with running tasks requires confirmation to stop them; cancellation preserves the account and tasks. In-place login and development UI rebuilds have different lifecycle behavior.
+**Server mode:** `server:dev` includes the runtime. The web workbench prepares and reuses an instance, exposing diagnostics and retry on failure. Personal center → Personal models → Add provider prefills DeepSeek; configure a key and default before sending. Existing conversations keep their selected model and require explicit replacement when invalid. An online Agent or successful provider check does not prove a generated reply.
 
-**Server Agent mode:** `server:dev` prepares runtime dependencies. Web login and management pages do not start an Agent; entering Agent workspace prepares or reuses the instance, with explicit retry after failure. Desktop and Android retain preparation after login. Personal center → Personal models → Add provider preselects DeepSeek: enter a key and save. With no existing default, the default-model option is checked; custom providers remain available. **An online Agent or successful connection check does not prove model replies work.** Explicitly select the configured model in existing sessions before sending again.
+Desktop can use local DeepSeek / API keys independently. Platform login/logout/switch does not restart Harness; switching during execution requires confirmation. Server tasks do not depend on a phone token; closing the phone or leaving the workbench does not end tasks. Stopping the platform reaps its Agents.
 
-To run both the admin web application and API in containers, follow the [Git-to-Docker server deployment guide](apps/server/docker/README.md#服务器首次部署) for first-time Linux / CentOS setup, administrator initialization, HTTPS, and updates. The following commands assume the environment and source are already prepared:
+| Client                            | Platform address and network                                                                        |
+| --------------------------------- | --------------------------------------------------------------------------------------------------- |
+| Local desktop / web               | `http://127.0.0.1:5174`; existing clients on `8000` reach the same backend                          |
+| Android emulator                  | `http://127.0.0.1:8000` with `adb reverse tcp:8000 tcp:8000`; map `5174` instead if using that port |
+| Physical phone / another computer | Reachable LAN or HTTPS platform address; another computer's `127.0.0.1` is not reachable            |
 
-```powershell
-corepack.cmd yarn server:build
-corepack.cmd yarn server:up --no-build
-```
+Web module switches retain account-scoped in-memory drafts, pending files and send results while releasing workbench subscriptions; reload/account switch clears temporary state. Android can view cached history and save drafts offline, with manual sending after reconnect.
 
-Open `15174` and sign all clients into that deployment; web prepares its Agent upon entering the workspace. Stop the full deployment with `corepack.cmd yarn server:down`, retaining volumes and their environment file. Its database, accounts, and Agents are separate from development on port `8000`.
+For production, obtain source with Git, build, set `SUPERDSH_SERVER_ENV` to the native service configuration, and run `server:start`. Web/API still defaults to `5174`. `server:up` aliases this command; the old `15174` container no longer starts automatically. See [server deployment](apps/admin/deployment/README.md#服务器首次部署).
 
-| Integration target     | Platform login address   | Emulator mapping                  |
-| ---------------------- | ------------------------ | --------------------------------- |
-| Native development API | `http://127.0.0.1:8000`  | `adb reverse tcp:8000 tcp:8000`   |
-| Full Docker service    | `http://127.0.0.1:15174` | `adb reverse tcp:15174 tcp:15174` |
+## Agent demo and development entry
 
-The launcher sets the matching mapping for loopback addresses passed through `--server`; use the commands above for manual connections. Physical phones need a reachable LAN or HTTPS address and cannot use the computer's `127.0.0.1`.
+1. Start the platform as above. Configure a working key and default in Personal center → Personal models, or use the administrator's platform default. The model must support tool calls; initializing demo content neither supplies model credits nor configures a key.
+2. An account with `agents.manage` automatically gets persisted “Xinghe Trading” examples on its first resource-management visit: three Agents, three knowledge bases, three skills and three tools. Later visits reuse records without overwriting edits or recreating intentionally deleted examples.
+3. Expand Agent management, then open Knowledge bases (`#/knowledge`) to upload documents and templates, Skills (`#/skills`) to edit instructions and required tools, and Tools (`#/tools`) to configure enabled status and execution parameters. In Agents (`#/agents`), associate the resources and publish. Each submenu has its own searchable, paginated list and configuration dialogs. Download and adapt demo templates first; see [supported constraints](apps/admin/server/README.md#智能体资料与-office-模板).
+4. In a new web Agent Workbench conversation, choose Server Agent and a published Agent. On desktop, sign into the same platform and choose that server target and Agent in the **existing main chat**. Download real `.xlsx` / `.pptx` files from Generated artifacts in chat; the same account can continue the conversation in either client. Existing conversations retain their bound version; create a new conversation to use updated configuration.
 
-Administrator and member are the only built-in roles; custom roles are supported. Administrative operations do not grant access to other users' chats, files, or terminals. Platform provider keys and server-side personal keys are encrypted and write-only. New server sessions prefer the personal default, then the platform default; existing sessions do not silently change model or billing source. Desktop personal models stay on that computer.
+| Sanitized example              | Example request                                                                         | Sources and output                                                                            |
+| ------------------------------ | --------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------- |
+| Business analysis assistant    | Generate an Excel sales report comparing regional revenue and gross profit              | Bound sales data and Excel template; programmatic totals and formulas in an editable workbook |
+| Company presentation assistant | Use the company introduction and sales data to produce a presentation with our template | Bound knowledge, sales data and controlled PPT template; editable presentation                |
+| Company knowledge assistant    | What services and after-sales policies does the company provide? Cite sources           | Bound resources with file/paragraph references; missing evidence is not invented              |
 
-Offline phones can read previously loaded history and save drafts, then send manually after reconnecting. Closing the phone client does not stop server tasks. Account and target switches must not mix history, subscriptions, or credentials.
+This iteration adds selection and artifacts to web and desktop; an Android-specific Agent selector is not yet integrated. Product Agents run only on the server; local and other-computer capabilities remain unchanged. Chat sales attachments accept CSV/XLSX up to 4 MiB, selected by an already-consumed filename; conflicting names require hash disambiguation. Attachment errors never fall back to demo data. Tools calculate sales figures; model-written numbers alone are not accounting results.
 
-Switching web modules releases workspace subscriptions and polling while retaining the current account’s drafts, pending files, selections, and send results in memory. Leaving the workspace or signing out does not stop submitted tasks. Reloading the document loses transient files; logout or account switching clears memory state.
+PostgreSQL stores source documents; Qdrant stores a rebuildable chunk index using sparse English-word and Chinese-bigram retrieval, without a separate embedding key. Dense semantic-vector retrieval is not implemented. The knowledge page exposes index status and rebuild. An unavailable Qdrant does not block management pages; actual knowledge retrieval reports an explicit error. Skills contain editable instructions and tools use registered implementations; uploaded arbitrary scripts are not executed as trusted tools.
 
 ## Checks and packaging
 
-Append these commands to `corepack.cmd yarn`, still from the repository root:
+Append these commands to `corepack.cmd yarn` at the repository root:
 
-| Area                | Command                                                | Purpose                                                        |
-| ------------------- | ------------------------------------------------------ | -------------------------------------------------------------- |
-| Desktop             | `build` / `start`                                      | Build the product / start existing artifacts                   |
-| UI only             | `workspace @superdsh/ui build`                         | Rebuild UI; perform a full build first                         |
-| Desktop quality     | `typecheck` / `lint` / `format:check` / `test`         | Types, code rules, formatting, tests                           |
-| Full desktop checks | `check` / `check:ui`                                   | Engineering and real Host checks / separate headless UI checks |
-| Admin web           | `admin:check` / `admin:build` / `admin:start`          | Types, tests, protocol / build / start a build                 |
-| Python server       | `server:check` / `server:test`                         | Protocol and layering / isolated tests                         |
-| Android             | `android:check` / `android:test` / `android:build`     | Static constraints / JVM tests / Debug APK                     |
-| Desktop release     | `package:dir` / `dist:win` / `dist:mac` / `dist:linux` | Unpacked app / platform artifacts (Linux: unpacked directory)  |
-| Source layout       | `sources:check` / `check:layout`                       | Pinned upstream and product ownership boundaries               |
+| Scope                         | Commands                                               | Purpose                                                                |
+| ----------------------------- | ------------------------------------------------------ | ---------------------------------------------------------------------- |
+| Desktop                       | `build` / `start` / `workspace @superdsh/ui build`     | Full build / run artifacts / UI only                                   |
+| Quality                       | `typecheck` / `lint` / `format:check` / `test`         | Desktop types, shared conventions and tests                            |
+| Desktop integration           | `check` / `check:ui`                                   | Engineering and Host / headless UI                                     |
+| Web                           | `admin:check` / `admin:build`                          | Web types, tests, protocol / web build                                 |
+| Node server                   | `server:check` / `server:test`                         | Types, tests, lint / tests                                             |
+| Database and Host integration | `server:test:integration`                              | Temporary PG / Redis / Qdrant, API and native runtime; Docker required |
+| Platform release              | `server:build` / `server:start`                        | Harness + Next build / native production start                         |
+| Android                       | `android:check` / `android:test` / `android:build`     | Static constraints / JVM / Debug APK                                   |
+| Desktop release               | `package:dir` / `dist:win` / `dist:mac` / `dist:linux` | Unpacked app / platform artifacts                                      |
+| Layout                        | `sources:check` / `check:layout`                       | Pinned sources and ownership boundaries                                |
 
-Root `dev/build/start/check` target desktop by default; use separate Admin, Server, and Android checks as well. Before the first `check:ui`, install Chromium with `corepack.cmd yarn workspace @superdsh/desktop exec playwright install chromium`. UI checks require built artifacts.
+Root `dev/build/start/check` still targets desktop and does not replace other application checks. Database tests explicitly skip without a temporary database; skips are not integration passes. Headless UI checks need Chromium installed and existing builds. Desktop packages are in `apps/desktop/dist`; Android APK is `apps/android/app/build/outputs/apk/debug/app-debug.apk`.
 
-Desktop packaging outputs to `apps/desktop/dist`; the Android APK is at `apps/android/app/build/outputs/apk/debug/app-debug.apk`. Full Docker deployment build, startup, and shutdown are separate operations; source edits do not automatically update running containers.
+## Conventions and data
 
-## Code and data conventions
-
-- UI imports only Core's public `client/*` and `contracts/*`, never Node, Electron, or upstream internals. Legacy third-party UI stays in a separate compatibility container with module IDs, Remote, and Slots semantics preserved.
-- Use two spaces, single quotes, and no ordinary statement semicolons; PascalCase components and kebab-case modules, with Prettier authoritative. Product code uses root Yarn; upstream Harness keeps pnpm. Do not edit generated types, build artifacts, or pinned upstream source.
-- Development Home defaults to `.superdsh/home`; installed apps use `SuperDsh/home` in system application data. `SUPERDSH_HOME` or saved directory settings can override the default.
-- Platform accounts do not change local Home. Credentials, device bindings, and sync checkpoints are separated by platform origin and stable user ID. Different accounts on one computer receive separate cloud copies of the same local history; old platform Homes are not automatically merged.
-- Imports require the source app to be stopped, an empty destination, and a backup. Failures roll back without overwriting the source. Authorizations, keys, environment variables, `.credentials.yaml`, and device bindings are excluded and must be configured again.
-- Do not commit local configuration, signing material, or keys. Database backups must include their original environment file and encryption keys. Configure your own updater and signing before release, retaining attribution. See [AGENTS.md](AGENTS.md) for repository rules.
+- UI imports only Core's public `client/*` and `contracts/*`; web components must not import server credentials, database or process implementations. Legacy third-party UI uses a separate compatibility container.
+- Two spaces, single quotes, no ordinary semicolons; PascalCase components and kebab-case modules, with Prettier authoritative. Owned work uses root Yarn. Do not edit generated types or pinned upstreams.
+- Desktop development Home defaults to `.superdsh/home`; installed Home is system application data `SuperDsh/home`. Account switching keeps Home while separating platform credentials, bindings and checkpoints by stable account.
+- Development Agent data is `.superdsh-work/server-dev/native`; production defaults to `.superdsh-work/server-native`, configurable with `SUPERDSH_SERVER_DATA_DIR`. Files retain `AGENT_SERVER_FILES_LOCAL_ROOT`. Old container Homes are not merged automatically.
+- Migrations preserve IDs, passwords, ownership and ciphertext. Product versions `v2_35` through `v2_42` are supported; `v2_40` adds Agent resources, definitions, conversation bindings and artifact records; `v2_41` adds independent knowledge-base, skill and tool configuration; `v2_42` groups the existing related menus under Agent management. Older databases must first upgrade using their original release, never by changing the version stamp.
+- Imports require empty targets and preserved sources/backups. Authorization, keys, environment variables, `.credentials.yaml` and device bindings are not copied. Back up database volumes together with authentication/encryption keys.
+- Native Agents share host OS permissions without container sandboxing. Model keys are not sent to clients, and operational admin rights do not bypass ownership. See [AGENTS.md](AGENTS.md).
 
 ## Troubleshooting and validation
 
-| Symptom                                                        | First checks                                                                                                                                                              |
-| -------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Missing `DockerDesktopLinuxEngine` pipe                        | Ensure Docker Desktop's Linux engine is ready; check `docker info` before dependency or deployment commands                                                               |
-| Web UI unreachable                                             | Development web uses `5174`, API uses `8000`, full deployment uses `15174`; confirm the matching process is running                                                       |
-| Login fails or device is offline                               | Check the environment and empty-database setup, then API readiness and Connector status; a login session is not an execution device                                       |
-| Agent online but chat has no reply                             | Check personal/platform models, the session selection, and execution errors; a built-in DeepSeek label does not prove authorization. See [progress](#current-progress)    |
-| Official model verification reports a non-public address       | A local Fake-IP proxy may trigger the check; review the exact origin in [server configuration](apps/server/README.md), restart the API, and avoid duplicate API instances |
-| Tool module not found in a Chinese path                        | Workspace scripts use tools' Node entry points; avoid batch wrappers that corrupt path encoding                                                                           |
-| First dependency install or web compilation runs out of memory | Retain diagnostics, free memory, and reduce concurrent work before retrying; unverified heap flags are not a universal fix                                                |
-| Android fails to open or still uses an old endpoint            | Build the APK first, then check SDK/AVD/signing, the saved app address, and the matching `adb reverse`                                                                    |
+| Symptom                           | Check                                                                                                                                    |
+| --------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------- |
+| Missing Docker pipe               | Only database dependencies and temporary integration tests need Docker; confirm the Linux engine with `docker info`                      |
+| Web unreachable / port collision  | Run one `server:dev`; `5174` is web/API, `8000` compatibility API; do not wait for the old `15174` container                             |
+| Login failure                     | Confirm database and environment; development defaults do not replace existing passwords, production requires setup-token initialization |
+| Agent preparation fails           | Build Harness with `server:sync`, inspect diagnostics and directory permissions; do not start the retired Python/Supervisor              |
+| Online but no reply               | Check personal/platform models, conversation selection and execution errors; bundled model names do not imply authorization              |
+| Non-public provider address       | Check the exact origin in [server configuration](apps/admin/server/README.md#模型与网络); avoid broad allowlists                         |
+| Tool failures under Chinese paths | Use Node-based workspace entry points instead of encoding-sensitive batch wrappers                                                       |
+| Android still uses an old address | Check the saved address, signing and corresponding `adb reverse`; launcher flags do not overwrite the address                            |
 
-This progress summary separates the current console regressions from historical cross-client integration evidence. Static checks, model fixtures, real Host tests, headless UI, and physical-device verification have separate scopes and do not substitute for one another.
+Source checks, temporary databases, fixture models, real Host, headless UI and physical phones are recorded separately. Historical reports keep their original paths and outcomes. Current signing, clean-system and real multi-client regressions need separate acceptance.
 
-## Further reading and license
+## Topics and licenses
 
-Use these three guides when you need more detail:
+- [Desktop component index](apps/desktop/ui/README.md): chat, settings and device components.
+- [Server deployment and configuration](apps/admin/server/README.md): Node modules, migrations, models and deployment entry.
+- [Android environment and emulator](docs/android-local-development.md): SDK, AVD, Gradle and device access.
 
-- [Desktop component index](apps/desktop/ui/README.md): specific chat, settings, and device components.
-- [Server deployment and configuration](apps/server/README.md): databases, keys, authentication, full deployment, and Server Agent.
-- [Android environment and emulator](docs/android-local-development.md): SDK, AVD, Gradle, signing, and device connections.
-
-Preserve the [MIT license](LICENSE) and the licenses and attribution of upstream and third-party components. See [upstream foundations](#upstream-foundations) for provenance. SuperDsh is an independent community project without official DeepSeek affiliation or endorsement.
+Retain the [MIT license](LICENSE) and upstream/third-party licenses and attribution. SuperDsh is an independent community project with no official DeepSeek affiliation or endorsement.

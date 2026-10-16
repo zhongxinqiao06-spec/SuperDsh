@@ -1,8 +1,16 @@
-# SuperDsh 桌面架构
+# SuperDsh 产品与平台架构
 
-SuperDsh 是产品外壳，Harness 是由它启动与管理的必需插件。桌面开发入口位于 `apps/desktop`，不再从 DSH 的 root 插槽选择产品界面。管理网页、Python 服务端和安卓应用分别位于同级的 `apps/admin`、`apps/server`、`apps/android`。
+SuperDsh 是产品外壳，Harness 是由它启动与管理的必需插件。桌面开发入口位于 `apps/desktop`，不再从 DSH 的 root 插槽选择产品界面。平台统一位于 `apps/admin`：`src` 是 Next.js 管理网页，`server` 是 Node.js API 与 Agent 生命周期；安卓位于 `apps/android`。
 
-管理网页与安卓通过现有 API v2 连接 Python 服务端；服务端通过 Connector 与桌面 Harness 通信。管理网页可以独立开发、构建，Docker 部署仍由 Python 服务端提供其静态文件，保持同源认证及现有地址。共享协议基准、Connector 和 Bridge 留在固定 AA 子模块；三个迁出的应用目录使用稀疏检出从上游工作区实际移除。根 `sources:prepare` 建立此布局，`sources:check` 防止旧目录重新成为开发入口。
+三端通过现有 API v2 访问 Node 平台。`server:dev` 在一个入口中启动 Next.js、API 与按需准备的本机 Agent 进程，管理网页与 API 同源；Docker 只运行 PostgreSQL 和 Redis。已有电脑继续经 Connector 连接桌面 Harness，服务端 Agent 使用原生 Node Connector 和同版本完整 Host。共享协议基准、原 Connector 和 Bridge 留在固定 AA 子模块；迁出的应用通过稀疏检出从上游工作区排除。根 `sources:prepare` 建立此布局，`sources:check` 检查旧目录没有恢复。
+
+## 平台边界
+
+后台框架拥有总览、RBAC、模型、设备运维、系统管理和个人中心；聊天作为 Agent 工作台接入。网页界面只通过 HTTP/WebSocket 使用 API，不直接导入 `server` 实现、数据库驱动或 Node 内置模块。UI 与 Node 服务端分别进行完整类型检查。
+
+Node API 管理身份、权限、资源归属、模型代理、持久化和 Agent 生命周期。每个用户的服务端 Agent 使用独立进程、Home 和工作区，数据库租约限制重复运行；它们以平台进程的操作系统身份执行，没有容器或操作系统文件沙箱。Harness 仍管理原有执行队列。退出客户端不终止已提交任务，停止平台则关闭其管理的 Agent 进程。
+
+平台接受空数据库，或将现有产品 `v2_35` 至 `v2_39` 数据库增量迁移；更早版本需先使用原版本完成升级。既有密钥、用户 ID、设备归属与凭据格式保持兼容。旧容器 Agent 数据通过离线导出、校验归属并导入空目标迁移，步骤见[部署与配置](../apps/admin/deployment/README.md)。
 
 ## 控制与进程
 
@@ -34,6 +42,10 @@ Core 管理后端启停、Profile 切换、重试、退出与恢复。只有必�
 | `apps/desktop/plugins/harness` | 固定 Host、Profile、协议适配和引擎运行依赖                                   |
 | `apps/desktop`                 | 公共产品身份、运行资源清单、构建/打包入口                                    |
 | `dsh-community-market`         | 可选插件的包身份和依赖；实现位于 UI features 和 Core services/contracts      |
+| `apps/admin/src`               | 管理网页、模块导航、个人工作台与 API 客户端                                  |
+| `apps/admin/server`            | Node API v2、身份与 RBAC、数据库、模型代理、原生 Agent 运行                  |
+| `apps/admin/deployment`        | PG/Redis Compose、部署与离线数据迁移说明                                     |
+| `apps/android`                 | Kotlin 安卓客户端，沿用 API v2 与原应用身份                                  |
 
 UI 只能依赖 Core 公开的 `client/*` 和 `contracts/*`。Core/client 不得引入 Node/Electron 或平台实现。Harness 可在构建时使用纯契约，不能对 Core 建立生产依赖循环。第三方源码、固定引擎和手机端仍在原依赖边界内。
 

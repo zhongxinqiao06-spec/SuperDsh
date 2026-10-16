@@ -1,6 +1,22 @@
 import { canOpenModule, consoleModules } from './modules'
 import type { MenuNode } from './types'
 
+export function navigationTitle(
+  item: MenuNode,
+  tr: (chinese: string, english: string) => string,
+) {
+  if (
+    item.kind === 'group' &&
+    item.id === 'agent-management' &&
+    item.title === '智能体管理'
+  )
+    return tr('智能体管理', 'Agent management')
+  const module = consoleModules.find((module) => module.id === item.moduleId)
+  return module && item.title === module.title
+    ? tr(module.title, module.englishTitle)
+    : item.title
+}
+
 export function visibleNavigation(
   items: MenuNode[],
   permissions: readonly string[],

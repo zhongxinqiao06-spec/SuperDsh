@@ -4,7 +4,11 @@ import * as React from 'react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { managementApi, type AuditEvent } from '@/features/management/api'
-import { ManagementDialog, ManagementPagination } from './presentation'
+import {
+  ManagementDialog,
+  ManagementList,
+  ManagementPagination,
+} from './presentation'
 import {
   dateLabel,
   ResourceState,
@@ -18,7 +22,7 @@ export function AuditPanel() {
   const [search, setSearch] = React.useState('')
   const [filter, setFilter] = React.useState('')
   const [page, setPage] = React.useState(1)
-  const [pageSize, setPageSize] = React.useState(25)
+  const [pageSize, setPageSize] = React.useState(10)
   const [selected, setSelected] = React.useState<AuditEvent | null>(null)
   const resource = useManagementResource(
     `audit:${page}:${pageSize}:${filter}`,
@@ -31,7 +35,21 @@ export function AuditPanel() {
       setPage(Math.max(1, Math.ceil(total / pageSize)))
   }, [resource.data, page, pageSize, total])
   return (
-    <div className="space-y-4">
+    <ManagementList
+      pagination={
+        <ManagementPagination
+          page={page}
+          pageSize={pageSize}
+          total={total}
+          onPageChange={setPage}
+          onPageSizeChange={(size) => {
+            setPageSize(size)
+            setPage(1)
+          }}
+          loading={resource.loading}
+        />
+      }
+    >
       <form
         className="flex flex-wrap items-center gap-2 rounded-xl border p-4"
         onSubmit={(event) => {
@@ -114,17 +132,7 @@ export function AuditPanel() {
           </p>
         )}
       </div>
-      <ManagementPagination
-        page={page}
-        pageSize={pageSize}
-        total={total}
-        onPageChange={setPage}
-        onPageSizeChange={(size) => {
-          setPageSize(size)
-          setPage(1)
-        }}
-        loading={resource.loading}
-      />
+
       <ManagementDialog
         open={Boolean(selected)}
         onOpenChange={(open) => !open && setSelected(null)}
@@ -148,6 +156,6 @@ export function AuditPanel() {
           {selected?.detail ? JSON.stringify(selected.detail, null, 2) : '—'}
         </pre>
       </ManagementDialog>
-    </div>
+    </ManagementList>
   )
 }

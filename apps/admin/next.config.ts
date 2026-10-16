@@ -4,7 +4,8 @@ const apiTarget = process.env.AGENTS_ANYWHERE_API ?? 'http://127.0.0.1:8000'
 const apiNamespace = process.env.AGENTS_ANYWHERE_API_NAMESPACE ?? '/api/v2'
 const proxyClientMaxBodySize = 100 * 1024 * 1024
 const staticExport = process.env.NEXT_OUTPUT === 'export'
-const browserApiTarget = staticExport ? '' : apiTarget
+const nativePlatform = process.env.SUPERDSH_NATIVE_PLATFORM === '1'
+const browserApiTarget = staticExport || nativePlatform ? '' : apiTarget
 const apiRoutePrefixes = [
   '/admin',
   '/agents',
@@ -32,7 +33,7 @@ const nextConfig: NextConfig = {
     // Full timeline sync uses HTTP ingest through this same-origin proxy.
     proxyClientMaxBodySize,
   },
-  ...(staticExport
+  ...(staticExport || nativePlatform
     ? {}
     : {
         async rewrites() {

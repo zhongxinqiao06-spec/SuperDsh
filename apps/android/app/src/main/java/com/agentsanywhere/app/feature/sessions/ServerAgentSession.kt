@@ -17,7 +17,8 @@ fun serverAgentDraft(
         projectId = requireNotNull(agent.projectId),
         runtime = "dsh", runtimeId = requireNotNull(agent.runtimeId), runtimeType = "dsh",
         runtimeLabel = "DSH", runtimeName = "DSH", title = null,
-        cwd = "/workspace", deviceName = deviceName, knownSessionIds = knownSessionIds,
+        // The platform owns this project and chooses its native workspace path.
+        cwd = null, deviceName = deviceName, knownSessionIds = knownSessionIds,
         selections = selections, attachmentsEnabled = attachmentsEnabled,
         executorKind = "server-agent", workspaceLabel = workspaceLabel,
     )

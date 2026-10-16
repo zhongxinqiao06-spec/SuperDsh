@@ -174,6 +174,35 @@ it('uses real authenticated API v2 HTTP and ticketed WebSocket for device chat, 
   }
 })
 
+it('preserves API v2 runtime rejection details for messages and new sessions', async () => {
+  const identity = { key: 'a'.repeat(64), generation: 1 }
+  const account = {
+    identity: () => identity,
+    json: vi.fn(),
+  }
+  const remote = new PlatformRemote(
+    account as unknown as PlatformAccount,
+    vi.fn(),
+  )
+  account.json.mockResolvedValueOnce({
+    ok: false,
+    error: { code: 'model_unavailable', message: '请重新选择可用模型' },
+  })
+  await expect(
+    remote.request({ operation: 'send', sessionId: 'session' }),
+  ).rejects.toThrow('请重新选择可用模型')
+  account.json.mockResolvedValueOnce({
+    session: { id: 'rejected' },
+    connectorResult: {
+      ok: false,
+      error: { code: 'workspace_mismatch', message: '目标工作区已变化' },
+    },
+  })
+  await expect(
+    remote.request({ operation: 'create-session', body: {} }),
+  ).rejects.toThrow('目标工作区已变化')
+})
+
 it('rejects stale identity targets before any request, upload or subscription can reach a replacement account', async () => {
   const oldIdentity = { key: 'a'.repeat(64), generation: 1 }
   const identity = { key: 'b'.repeat(64), generation: 2 }

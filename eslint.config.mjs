@@ -2,6 +2,7 @@ import js from '@eslint/js'
 import globals from 'globals'
 import tseslint from 'typescript-eslint'
 import reactHooks from 'eslint-plugin-react-hooks'
+import { adminBrowserBoundary } from './scripts/eslint-admin-boundaries.mjs'
 
 export default tseslint.config(
   {
@@ -18,6 +19,7 @@ export default tseslint.config(
       '**/coverage/**',
       '**/generated/**',
       'apps/admin/.next/**',
+      'apps/admin/.next-*/**',
       'apps/admin/out/**',
       'apps/admin/next-env.d.ts',
       '**/api-catalog.ts',
@@ -58,6 +60,13 @@ export default tseslint.config(
   {
     files: ['**/*.{ts,tsx}'],
     rules: { 'no-undef': 'off' },
+  },
+  {
+    files: ['apps/admin/src/**/*.{ts,tsx}'],
+    plugins: {
+      'superdsh-admin': { rules: { 'browser-boundary': adminBrowserBoundary } },
+    },
+    rules: { 'superdsh-admin/browser-boundary': 'error' },
   },
   {
     files: [

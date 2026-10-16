@@ -12,6 +12,11 @@ const dependencies = [
     setting: 'SUPERDSH_DEV_REDIS_PORT',
     internalPort: '6379/tcp',
   },
+  {
+    service: 'qdrant',
+    setting: 'SUPERDSH_DEV_QDRANT_PORT',
+    internalPort: '6333/tcp',
+  },
 ]
 
 export function inspectDevelopmentContainers() {

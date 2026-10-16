@@ -14,7 +14,11 @@ import {
   useManagementResource,
   useManagementText,
 } from './controls'
-import { ManagementDialog, ManagementPagination } from './presentation'
+import {
+  ManagementDialog,
+  ManagementList,
+  ManagementPagination,
+} from './presentation'
 
 type Draft = {
   username: string
@@ -35,7 +39,7 @@ export function UsersPanel() {
   const tr = useManagementText()
   const { can, me } = useAuth()
   const [page, setPage] = React.useState(1)
-  const [pageSize, setPageSize] = React.useState(25)
+  const [pageSize, setPageSize] = React.useState(10)
   const [query, setQuery] = React.useState('')
   const [search, setSearch] = React.useState('')
   const [editing, setEditing] = React.useState<AdminUser | 'new' | null>(null)
@@ -145,7 +149,21 @@ export function UsersPanel() {
     if (ok) setConfirmation(null)
   }
   return (
-    <div className="space-y-4">
+    <ManagementList
+      pagination={
+        <ManagementPagination
+          page={page}
+          pageSize={pageSize}
+          total={total}
+          onPageChange={setPage}
+          onPageSizeChange={(size) => {
+            setPageSize(size)
+            setPage(1)
+          }}
+          loading={resource.loading || resource.busy}
+        />
+      }
+    >
       <form
         className="flex flex-wrap items-center gap-2 rounded-xl border p-4"
         onSubmit={(event) => {
@@ -475,17 +493,6 @@ export function UsersPanel() {
           </p>
         )}
       </div>
-      <ManagementPagination
-        page={page}
-        pageSize={pageSize}
-        total={total}
-        onPageChange={setPage}
-        onPageSizeChange={(size) => {
-          setPageSize(size)
-          setPage(1)
-        }}
-        loading={resource.loading || resource.busy}
-      />
-    </div>
+    </ManagementList>
   )
 }

@@ -11,6 +11,7 @@ export function registerSource() {
       if (
         [
           'next/navigation',
+          'next/dynamic',
           'next/link',
           'next/headers',
           'ajv/dist/2020',

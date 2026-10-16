@@ -1,5 +1,6 @@
 import {
   Bot,
+  BookOpen,
   Folder,
   Gauge,
   History,
@@ -10,12 +11,15 @@ import {
   Settings,
   Shield,
   Smartphone,
+  Sparkles,
   User,
   Users,
+  Wrench,
 } from 'lucide-react'
 
 const icons = {
   bot: Bot,
+  'book-open': BookOpen,
   folder: Folder,
   gauge: Gauge,
   history: History,
@@ -26,8 +30,10 @@ const icons = {
   settings: Settings,
   shield: Shield,
   smartphone: Smartphone,
+  sparkles: Sparkles,
   user: User,
   users: Users,
+  wrench: Wrench,
 }
 
 export function ConsoleIcon({ name }: { name: string }) {

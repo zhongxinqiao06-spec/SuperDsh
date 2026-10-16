@@ -86,6 +86,8 @@ const fixtures = registerHooks({
 const { ConsoleShell } =
   await import('../src/components/console/console-shell.tsx')
 const { consoleModules } = await import('../src/features/console/modules.ts')
+const { navigationTitle } =
+  await import('../src/features/console/navigation.ts')
 const { apiClient } = await import('../src/lib/api/index.ts')
 const { saveStoredSession, clearStoredSession } =
   await import('../src/features/auth/session.ts')
@@ -110,9 +112,11 @@ const adminPermissions = [
   'menus.read',
   'menus.manage',
   'settings.manage',
+  'agents.manage',
 ]
 const groups = [
   { id: 'access', title: '用户与权限', icon: 'users' },
+  { id: 'agent-management', title: '智能体管理', icon: 'bot' },
   { id: 'system', title: '系统管理', icon: 'settings' },
   { id: 'account', title: '个人中心', icon: 'user' },
 ].map((group, order) => ({
@@ -130,7 +134,11 @@ const items = [
     id: module.id,
     kind: 'page',
     moduleId: module.id,
-    parentId: module.id.includes('.') ? module.id.split('.')[0] : null,
+    parentId: ['agents', 'knowledge', 'skills', 'tools'].includes(module.id)
+      ? 'agent-management'
+      : module.id.includes('.')
+        ? module.id.split('.')[0]
+        : null,
     title: module.title,
     icon: module.icon,
     order,
@@ -182,7 +190,7 @@ const responses = {
     ],
     total: 1,
     page: 1,
-    pageSize: 25,
+    pageSize: 10,
   },
   '/admin/roles': { roles: [], permissions: [] },
   '/admin/devices': { devices: [] },
@@ -347,6 +355,48 @@ test('default login route opens console overview and no chat provider or runtime
   assert.deepEqual(globalThis.consoleLeaves, ['overview:mount'])
 })
 
+test('Agent management contains four independently addressed pages and retains single-group expansion', async (t) => {
+  const view = await mount(t)
+  await until(() => view.content().querySelector('[data-fixture="overview"]'))
+  const navigation = view.navigation()
+  assert.equal(navigation.querySelector('[aria-expanded="true"]'), null)
+  assert.equal(navigation.querySelector('a[href="#/agents"]'), null)
+  await clickLabel(navigation, '智能体管理')
+  for (const [route, title] of [
+    ['#/agents', '智能体列表'],
+    ['#/knowledge', '知识库'],
+    ['#/skills', '技能管理'],
+    ['#/tools', '工具管理'],
+  ])
+    assert.equal(
+      navigation.querySelector(`a[href="${route}"]`)?.textContent,
+      title,
+    )
+  assert.equal(navigation.querySelectorAll('[aria-expanded="true"]').length, 1)
+  await clickLabel(navigation, '用户与权限')
+  assert.equal(navigation.querySelector('a[href="#/agents"]'), null)
+  assert.ok(navigation.querySelector('a[href="#/access/users"]'))
+  assert.equal(navigation.querySelectorAll('[aria-expanded="true"]').length, 1)
+  await clickLabel(navigation, '用户与权限')
+  assert.equal(navigation.querySelector('[aria-expanded="true"]'), null)
+})
+
+test('default Agent group and page labels are translated without changing custom labels', () => {
+  const group = items.find((item) => item.id === 'agent-management')
+  const page = items.find((item) => item.moduleId === 'agents')
+  const english = (_chinese, text) => text
+  assert.equal(navigationTitle(group, english), 'Agent management')
+  assert.equal(navigationTitle(page, english), 'Agents')
+  assert.equal(
+    navigationTitle({ ...group, title: 'Company agents' }, english),
+    'Company agents',
+  )
+  assert.equal(
+    navigationTitle({ ...page, title: 'Company catalog' }, english),
+    'Company catalog',
+  )
+})
+
 test('console menus mount all five real management panels and their scoped APIs', async (t) => {
   const view = await mount(t)
   for (const [label, route, endpoint] of sections) {
@@ -367,7 +417,7 @@ test('console menus mount all five real management panels and their scoped APIs'
   assert.ok(view.calls.some(({ path }) => path === '/admin/models/default'))
   assert.deepEqual(
     view.calls.find(({ path }) => path === '/admin/users').options,
-    { query: { page: 1, pageSize: 25, search: '' } },
+    { query: { page: 1, pageSize: 10, search: '' } },
   )
   assert.equal(globalThis.consoleLeaves.includes('workbench:mount'), false)
 })

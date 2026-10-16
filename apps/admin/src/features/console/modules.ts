@@ -77,6 +77,58 @@ export const consoleModules: readonly ConsoleModule[] = [
     ),
   },
   {
+    id: 'agents',
+    route: '#/agents',
+    title: '智能体列表',
+    englishTitle: 'Agents',
+    icon: 'bot',
+    permissions: ['agents.manage'],
+    component: lazy(() =>
+      import('@/components/management/agents-panel').then((m) => ({
+        default: m.AgentsPanel,
+      })),
+    ),
+  },
+  {
+    id: 'knowledge',
+    route: '#/knowledge',
+    title: '知识库',
+    englishTitle: 'Knowledge bases',
+    icon: 'book-open',
+    permissions: ['agents.manage'],
+    component: lazy(() =>
+      import('@/components/management/knowledge-bases-panel').then((m) => ({
+        default: m.KnowledgeBasesPanel,
+      })),
+    ),
+  },
+  {
+    id: 'skills',
+    route: '#/skills',
+    title: '技能管理',
+    englishTitle: 'Skills',
+    icon: 'sparkles',
+    permissions: ['agents.manage'],
+    component: lazy(() =>
+      import('@/components/management/skills-panel').then((m) => ({
+        default: m.SkillsPanel,
+      })),
+    ),
+  },
+  {
+    id: 'tools',
+    route: '#/tools',
+    title: '工具管理',
+    englishTitle: 'Tools',
+    icon: 'wrench',
+    permissions: ['agents.manage'],
+    component: lazy(() =>
+      import('@/components/management/tools-panel').then((m) => ({
+        default: m.ToolsPanel,
+      })),
+    ),
+  },
+  {
     id: 'models',
     route: '#/models',
     title: '模型管理',

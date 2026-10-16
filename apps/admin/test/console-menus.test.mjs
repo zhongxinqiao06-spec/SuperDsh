@@ -532,20 +532,20 @@ test('menu rows paginate and changing or clearing search resets to the first pag
   const pagination = container.querySelector(
     'nav[aria-label="List pagination"]',
   )
-  assert.equal(container.querySelectorAll('tbody tr').length, 25)
+  assert.equal(container.querySelectorAll('tbody tr').length, 10)
   await click(pagination, 'Next')
-  assert.equal(container.querySelectorAll('tbody tr').length, 9)
-  assert.match(pagination.textContent, /Page 2 \/ 2/)
+  assert.equal(container.querySelectorAll('tbody tr').length, 10)
+  assert.match(pagination.textContent, /Page 2 \/ 4/)
   const search = container.querySelector('input[aria-label="Search menus"]')
   await fill(search, 'Operations 29')
   assert.equal(container.querySelectorAll('tbody tr').length, 1)
   assert.match(pagination.textContent, /Page 1 \/ 1/)
   await fill(search, '')
-  assert.equal(container.querySelectorAll('tbody tr').length, 25)
-  assert.match(pagination.textContent, /Page 1 \/ 2/)
-  await fill(pagination.querySelector('select'), '10')
   assert.equal(container.querySelectorAll('tbody tr').length, 10)
   assert.match(pagination.textContent, /Page 1 \/ 4/)
+  await fill(pagination.querySelector('select'), '20')
+  assert.equal(container.querySelectorAll('tbody tr').length, 20)
+  assert.match(pagination.textContent, /Page 1 \/ 2/)
 })
 
 test('ordinary overview renders account shortcuts without workspace, inventory or agent requests', async (t) => {

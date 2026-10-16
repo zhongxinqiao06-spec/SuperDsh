@@ -41,7 +41,7 @@ export function LoginScreen() {
     <AuthShell>
       <div className="flex flex-col items-center gap-2 text-center mb-8">
         <h1 className="text-2xl font-bold tracking-tight">
-          {t('login.titlePrefix')} <span className="aa-wordmark">SuperDsh</span>
+          {t('login.titlePrefix')} <span>星桥智能平台</span>
         </h1>
         <p className="text-sm text-muted-foreground leading-relaxed">
           {t('login.description')}

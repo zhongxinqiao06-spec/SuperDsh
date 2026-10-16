@@ -148,16 +148,26 @@ class SessionsController(
 
         return withContext(Dispatchers.IO) {
             val resolved = try {
-                val path = resolveDirectory(serverUrl, accessToken, draft.connectorId, draft.cwd.orEmpty())
-                val project = resolveWorkspaceProject(
-                    connectorId = draft.connectorId, path = path,
-                    deviceOs = devices.firstOrNull { it.id == draft.connectorId }?.deviceOs,
-                    knownProjects = projects,
-                    list = { sessionsApi.listProjects(serverUrl, accessToken).projects.map(RemoteProject::toAgentProject) },
-                    create = { name, workspace -> sessionsApi.createProject(
-                        serverUrl, accessToken, name, draft.connectorId, workspace, manuallyCreated = false,
-                    ).project.toAgentProject() },
-                )
+                val project = if (draft.executorKind == "server-agent") {
+                    val matches: (AgentProject) -> Boolean = {
+                        it.id == draft.projectId && it.connectorId == draft.connectorId
+                    }
+                    projects.singleOrNull(matches)
+                        ?: sessionsApi.listProjects(serverUrl, accessToken).projects
+                            .map(RemoteProject::toAgentProject).singleOrNull(matches)
+                        ?: error("The server Agent workspace is not ready. Please retry.")
+                } else {
+                    val path = resolveDirectory(serverUrl, accessToken, draft.connectorId, draft.cwd.orEmpty())
+                    resolveWorkspaceProject(
+                        connectorId = draft.connectorId, path = path,
+                        deviceOs = devices.firstOrNull { it.id == draft.connectorId }?.deviceOs,
+                        knownProjects = projects,
+                        list = { sessionsApi.listProjects(serverUrl, accessToken).projects.map(RemoteProject::toAgentProject) },
+                        create = { name, workspace -> sessionsApi.createProject(
+                            serverUrl, accessToken, name, draft.connectorId, workspace, manuallyCreated = false,
+                        ).project.toAgentProject() },
+                    )
+                }
                 draft.copy(projectId = project.id, cwd = project.workspacePath)
             } catch (error: CancellationException) {
                 throw error
@@ -173,7 +183,7 @@ class SessionsController(
                         projectId = resolved.projectId,
                         runtime = draft.runtimeType,
                         title = draft.title?.trim()?.takeIf(String::isNotBlank),
-                        cwd = resolved.cwd,
+                        cwd = resolved.cwd.takeUnless { draft.executorKind == "server-agent" },
                         content = draft.content.trim(),
                         selections = draft.selections.toMap(),
                         attachments = draft.attachments.map(NewSessionAttachmentPart::toInlineAttachmentRef),
@@ -188,7 +198,9 @@ class SessionsController(
             } catch (error: CancellationException) {
                 throw error
             } catch (error: Exception) {
-                if (error.mayHaveUnknownCreateOutcome()) {
+                if (error is ApiException && error.errorCode == "session_create_outcome_unknown") {
+                    NewSessionCreateOutcome.Failed(error, outcomeUnknown = true)
+                } else if (error.mayHaveUnknownCreateOutcome()) {
                     reconcileCreateAfterNetworkFailure(
                         draft = resolved,
                         serverUrl = serverUrl,
@@ -221,9 +233,17 @@ class SessionsController(
             )
         }.getOrNull()
         val candidates = refreshedState?.newCreateCandidates(draft).orEmpty()
+        // A different client may have created a session in the same project.
+        // Only this request's durable message echo proves that it was accepted.
+        val confirmed = candidates.singleOrNull()?.takeIf { candidate ->
+            runCatching {
+                val snapshot = sessionsApi.getSessionSnapshot(serverUrl, accessToken, candidate.id)
+                !snapshot.cachedOffline && hasAcceptedCreateMessage(snapshot.timeline.items, draft.clientMessageId)
+            }.getOrDefault(false)
+        }
         return when {
-            candidates.size == 1 -> NewSessionCreateOutcome.Created(
-                session = candidates.single(),
+            confirmed != null -> NewSessionCreateOutcome.Created(
+                session = confirmed,
                 recoveredAfterNetworkFailure = true,
                 refreshedState = refreshedState,
             )
@@ -749,7 +769,9 @@ class SessionsController(
 
 internal fun validateNewSessionDraft(draft: NewSessionCreateDraft): String? {
     if (draft.connectorId.isBlank()) return "Choose a connector before starting."
-    if (draft.cwd.isNullOrBlank()) return "Choose a workspace before starting."
+    if (draft.executorKind == "server-agent") {
+        if (draft.projectId.isBlank()) return "The server Agent workspace is not ready. Please retry."
+    } else if (draft.cwd.isNullOrBlank()) return "Choose a workspace before starting."
     if (!draft.runtimeType.isValidRuntimeType() || draft.runtime != draft.runtimeType) {
         return "Choose a valid runtime type before starting."
     }

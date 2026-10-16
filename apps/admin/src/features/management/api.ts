@@ -58,7 +58,7 @@ function pageQuery(page?: number, search?: string, pageSize?: number) {
 
 const id = encodeURIComponent
 export const managementApi = {
-  users: (page: number, search: string, pageSize = 25) =>
+  users: (page: number, search: string, pageSize = 10) =>
     apiClient.get<AdminUserListResponse>('/admin/users', {
       query: pageQuery(page, search, pageSize),
     }),

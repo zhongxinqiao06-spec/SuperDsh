@@ -1,0 +1,774 @@
+[
+  {
+    "method": "GET",
+    "path": "/api/v2/.well-known/oauth-authorization-server"
+  },
+  {
+    "method": "GET",
+    "path": "/api/v2/admin/announcement"
+  },
+  {
+    "method": "PUT",
+    "path": "/api/v2/admin/announcement"
+  },
+  {
+    "method": "GET",
+    "path": "/api/v2/admin/audit"
+  },
+  {
+    "method": "GET",
+    "path": "/api/v2/admin/dashboard/overview"
+  },
+  {
+    "method": "GET",
+    "path": "/api/v2/admin/dashboard/settings"
+  },
+  {
+    "method": "PATCH",
+    "path": "/api/v2/admin/dashboard/settings"
+  },
+  {
+    "method": "POST",
+    "path": "/api/v2/admin/dashboard/snapshots/today"
+  },
+  {
+    "method": "POST",
+    "path": "/api/v2/admin/dashboard/snapshots/{target_date}"
+  },
+  {
+    "method": "GET",
+    "path": "/api/v2/admin/devices"
+  },
+  {
+    "method": "POST",
+    "path": "/api/v2/admin/devices/{connector_id}/block"
+  },
+  {
+    "method": "POST",
+    "path": "/api/v2/admin/devices/{connector_id}/resume"
+  },
+  {
+    "method": "GET",
+    "path": "/api/v2/admin/menus"
+  },
+  {
+    "method": "PUT",
+    "path": "/api/v2/admin/menus"
+  },
+  {
+    "method": "POST",
+    "path": "/api/v2/admin/menus/reset"
+  },
+  {
+    "method": "GET",
+    "path": "/api/v2/admin/models/default"
+  },
+  {
+    "method": "PUT",
+    "path": "/api/v2/admin/models/default"
+  },
+  {
+    "method": "GET",
+    "path": "/api/v2/admin/models/providers"
+  },
+  {
+    "method": "POST",
+    "path": "/api/v2/admin/models/providers"
+  },
+  {
+    "method": "DELETE",
+    "path": "/api/v2/admin/models/providers/{provider_id}"
+  },
+  {
+    "method": "PATCH",
+    "path": "/api/v2/admin/models/providers/{provider_id}"
+  },
+  {
+    "method": "GET",
+    "path": "/api/v2/admin/roles"
+  },
+  {
+    "method": "POST",
+    "path": "/api/v2/admin/roles"
+  },
+  {
+    "method": "DELETE",
+    "path": "/api/v2/admin/roles/{role_id}"
+  },
+  {
+    "method": "PATCH",
+    "path": "/api/v2/admin/roles/{role_id}"
+  },
+  {
+    "method": "GET",
+    "path": "/api/v2/admin/service"
+  },
+  {
+    "method": "GET",
+    "path": "/api/v2/admin/settings"
+  },
+  {
+    "method": "PATCH",
+    "path": "/api/v2/admin/settings"
+  },
+  {
+    "method": "GET",
+    "path": "/api/v2/admin/users"
+  },
+  {
+    "method": "POST",
+    "path": "/api/v2/admin/users"
+  },
+  {
+    "method": "DELETE",
+    "path": "/api/v2/admin/users/{user_id}"
+  },
+  {
+    "method": "PATCH",
+    "path": "/api/v2/admin/users/{user_id}"
+  },
+  {
+    "method": "POST",
+    "path": "/api/v2/admin/users/{user_id}/password-reset"
+  },
+  {
+    "method": "POST",
+    "path": "/api/v2/admin/users/{user_id}/restore"
+  },
+  {
+    "method": "GET",
+    "path": "/api/v2/agents/{runtime}/model-catalog"
+  },
+  {
+    "method": "GET",
+    "path": "/api/v2/agents/{runtime}/permission-catalog"
+  },
+  {
+    "method": "GET",
+    "path": "/api/v2/announcement"
+  },
+  {
+    "method": "POST",
+    "path": "/api/v2/auth/change-password"
+  },
+  {
+    "method": "GET",
+    "path": "/api/v2/auth/config"
+  },
+  {
+    "method": "POST",
+    "path": "/api/v2/auth/email-code"
+  },
+  {
+    "method": "POST",
+    "path": "/api/v2/auth/login"
+  },
+  {
+    "method": "POST",
+    "path": "/api/v2/auth/logout"
+  },
+  {
+    "method": "POST",
+    "path": "/api/v2/auth/logout-all"
+  },
+  {
+    "method": "GET",
+    "path": "/api/v2/auth/me"
+  },
+  {
+    "method": "DELETE",
+    "path": "/api/v2/auth/me/avatar"
+  },
+  {
+    "method": "PUT",
+    "path": "/api/v2/auth/me/avatar"
+  },
+  {
+    "method": "PUT",
+    "path": "/api/v2/auth/me/email"
+  },
+  {
+    "method": "PUT",
+    "path": "/api/v2/auth/me/profile"
+  },
+  {
+    "method": "POST",
+    "path": "/api/v2/auth/mobile-login/confirm"
+  },
+  {
+    "method": "POST",
+    "path": "/api/v2/auth/mobile-login/exchange"
+  },
+  {
+    "method": "POST",
+    "path": "/api/v2/auth/mobile-login/qr"
+  },
+  {
+    "method": "POST",
+    "path": "/api/v2/auth/mobile-login/request"
+  },
+  {
+    "method": "POST",
+    "path": "/api/v2/auth/mobile-login/status"
+  },
+  {
+    "method": "GET",
+    "path": "/api/v2/auth/oauth/callback"
+  },
+  {
+    "method": "POST",
+    "path": "/api/v2/auth/oauth/finalize"
+  },
+  {
+    "method": "GET",
+    "path": "/api/v2/auth/oauth/start"
+  },
+  {
+    "method": "POST",
+    "path": "/api/v2/auth/password-salt"
+  },
+  {
+    "method": "POST",
+    "path": "/api/v2/auth/recovery-codes"
+  },
+  {
+    "method": "POST",
+    "path": "/api/v2/auth/recovery/reset"
+  },
+  {
+    "method": "POST",
+    "path": "/api/v2/auth/recovery/reset-email"
+  },
+  {
+    "method": "POST",
+    "path": "/api/v2/auth/refresh"
+  },
+  {
+    "method": "POST",
+    "path": "/api/v2/auth/register"
+  },
+  {
+    "method": "GET",
+    "path": "/api/v2/auth/sessions"
+  },
+  {
+    "method": "DELETE",
+    "path": "/api/v2/auth/sessions/{session_id}"
+  },
+  {
+    "method": "POST",
+    "path": "/api/v2/connector/auth"
+  },
+  {
+    "method": "PUT",
+    "path": "/api/v2/connector/fs/transfers/{transfer_id}"
+  },
+  {
+    "method": "POST",
+    "path": "/api/v2/connector/ingest"
+  },
+  {
+    "method": "GET",
+    "path": "/api/v2/connector/models/catalog"
+  },
+  {
+    "method": "POST",
+    "path": "/api/v2/connector/models/{provider_id}/{protocol}/{operation:path}"
+  },
+  {
+    "method": "GET",
+    "path": "/api/v2/connector/sessions/{session_id}/attachments/{file_id}/content"
+  },
+  {
+    "method": "WEBSOCKET",
+    "path": "/api/v2/connector/terminals/{terminal_id}/relay"
+  },
+  {
+    "method": "WEBSOCKET",
+    "path": "/api/v2/connector/ws"
+  },
+  {
+    "method": "GET",
+    "path": "/api/v2/connectors"
+  },
+  {
+    "method": "POST",
+    "path": "/api/v2/connectors"
+  },
+  {
+    "method": "POST",
+    "path": "/api/v2/connectors/fs/preview-session"
+  },
+  {
+    "method": "POST",
+    "path": "/api/v2/connectors/fs/preview/read"
+  },
+  {
+    "method": "POST",
+    "path": "/api/v2/connectors/fs/preview/readText"
+  },
+  {
+    "method": "DELETE",
+    "path": "/api/v2/connectors/{connector_id}"
+  },
+  {
+    "method": "GET",
+    "path": "/api/v2/connectors/{connector_id}"
+  },
+  {
+    "method": "PATCH",
+    "path": "/api/v2/connectors/{connector_id}"
+  },
+  {
+    "method": "POST",
+    "path": "/api/v2/connectors/{connector_id}/fs/list"
+  },
+  {
+    "method": "POST",
+    "path": "/api/v2/connectors/{connector_id}/fs/preview-token"
+  },
+  {
+    "method": "POST",
+    "path": "/api/v2/connectors/{connector_id}/fs/read"
+  },
+  {
+    "method": "POST",
+    "path": "/api/v2/connectors/{connector_id}/fs/readText"
+  },
+  {
+    "method": "GET",
+    "path": "/api/v2/connectors/{connector_id}/fs/transfers/{transfer_id}"
+  },
+  {
+    "method": "POST",
+    "path": "/api/v2/connectors/{connector_id}/fs/write"
+  },
+  {
+    "method": "GET",
+    "path": "/api/v2/connectors/{connector_id}/preferences"
+  },
+  {
+    "method": "GET",
+    "path": "/api/v2/connectors/{connector_id}/protocol/capabilities"
+  },
+  {
+    "method": "POST",
+    "path": "/api/v2/connectors/{connector_id}/revoke"
+  },
+  {
+    "method": "GET",
+    "path": "/api/v2/connectors/{connector_id}/runtime-types"
+  },
+  {
+    "method": "POST",
+    "path": "/api/v2/connectors/{connector_id}/runtime-types/discover"
+  },
+  {
+    "method": "GET",
+    "path": "/api/v2/connectors/{connector_id}/runtimes"
+  },
+  {
+    "method": "POST",
+    "path": "/api/v2/connectors/{connector_id}/runtimes"
+  },
+  {
+    "method": "POST",
+    "path": "/api/v2/connectors/{connector_id}/runtimes/discover"
+  },
+  {
+    "method": "GET",
+    "path": "/api/v2/connectors/{connector_id}/runtimes/{runtime_id}"
+  },
+  {
+    "method": "PATCH",
+    "path": "/api/v2/connectors/{connector_id}/runtimes/{runtime_id}"
+  },
+  {
+    "method": "PUT",
+    "path": "/api/v2/connectors/{connector_id}/runtimes/{runtime_id}/active"
+  },
+  {
+    "method": "GET",
+    "path": "/api/v2/connectors/{connector_id}/runtimes/{runtime_id}/capabilities"
+  },
+  {
+    "method": "GET",
+    "path": "/api/v2/connectors/{connector_id}/runtimes/{runtime_id}/catalogs/model"
+  },
+  {
+    "method": "GET",
+    "path": "/api/v2/connectors/{connector_id}/runtimes/{runtime_id}/catalogs/permission"
+  },
+  {
+    "method": "GET",
+    "path": "/api/v2/connectors/{connector_id}/runtimes/{runtime_id}/commands"
+  },
+  {
+    "method": "DELETE",
+    "path": "/api/v2/connectors/{connector_id}/runtimes/{runtime_id}/config"
+  },
+  {
+    "method": "PUT",
+    "path": "/api/v2/connectors/{connector_id}/runtimes/{runtime_id}/config"
+  },
+  {
+    "method": "POST",
+    "path": "/api/v2/connectors/{connector_id}/sessions/archive-all"
+  },
+  {
+    "method": "POST",
+    "path": "/api/v2/connectors/{connector_id}/shell/exec"
+  },
+  {
+    "method": "POST",
+    "path": "/api/v2/connectors/{connector_id}/shell/tasks"
+  },
+  {
+    "method": "GET",
+    "path": "/api/v2/connectors/{connector_id}/shell/tasks/{task_id}/wait"
+  },
+  {
+    "method": "GET",
+    "path": "/api/v2/connectors/{connector_id}/terminals"
+  },
+  {
+    "method": "POST",
+    "path": "/api/v2/connectors/{connector_id}/terminals"
+  },
+  {
+    "method": "GET",
+    "path": "/api/v2/connectors/{connector_id}/terminals-v2"
+  },
+  {
+    "method": "POST",
+    "path": "/api/v2/connectors/{connector_id}/terminals-v2"
+  },
+  {
+    "method": "DELETE",
+    "path": "/api/v2/connectors/{connector_id}/terminals-v2/{terminal_id}"
+  },
+  {
+    "method": "PATCH",
+    "path": "/api/v2/connectors/{connector_id}/terminals-v2/{terminal_id}"
+  },
+  {
+    "method": "PATCH",
+    "path": "/api/v2/connectors/{connector_id}/terminals-v2/{terminal_id}/persistence"
+  },
+  {
+    "method": "POST",
+    "path": "/api/v2/connectors/{connector_id}/terminals-v2/{terminal_id}/resize"
+  },
+  {
+    "method": "GET",
+    "path": "/api/v2/connectors/{connector_id}/terminals-v2/{terminal_id}/snapshot"
+  },
+  {
+    "method": "WEBSOCKET",
+    "path": "/api/v2/connectors/{connector_id}/terminals-v2/{terminal_id}/stream"
+  },
+  {
+    "method": "POST",
+    "path": "/api/v2/connectors/{connector_id}/terminals-v2/{terminal_id}/write"
+  },
+  {
+    "method": "DELETE",
+    "path": "/api/v2/connectors/{connector_id}/terminals/{terminal_id}"
+  },
+  {
+    "method": "PATCH",
+    "path": "/api/v2/connectors/{connector_id}/terminals/{terminal_id}"
+  },
+  {
+    "method": "POST",
+    "path": "/api/v2/connectors/{connector_id}/terminals/{terminal_id}/resize"
+  },
+  {
+    "method": "WEBSOCKET",
+    "path": "/api/v2/connectors/{connector_id}/terminals/{terminal_id}/stream"
+  },
+  {
+    "method": "WEBSOCKET",
+    "path": "/api/v2/dashboard/ws"
+  },
+  {
+    "method": "GET",
+    "path": "/api/v2/health"
+  },
+  {
+    "method": "GET",
+    "path": "/api/v2/health/live"
+  },
+  {
+    "method": "GET",
+    "path": "/api/v2/health/ready"
+  },
+  {
+    "method": "GET",
+    "path": "/api/v2/models/catalog"
+  },
+  {
+    "method": "GET",
+    "path": "/api/v2/models/personal/default"
+  },
+  {
+    "method": "PUT",
+    "path": "/api/v2/models/personal/default"
+  },
+  {
+    "method": "GET",
+    "path": "/api/v2/models/personal/providers"
+  },
+  {
+    "method": "POST",
+    "path": "/api/v2/models/personal/providers"
+  },
+  {
+    "method": "DELETE",
+    "path": "/api/v2/models/personal/providers/{provider_id}"
+  },
+  {
+    "method": "PATCH",
+    "path": "/api/v2/models/personal/providers/{provider_id}"
+  },
+  {
+    "method": "POST",
+    "path": "/api/v2/models/personal/providers/{provider_id}/validate"
+  },
+  {
+    "method": "POST",
+    "path": "/api/v2/models/personal/providers/{provider_id}/verify"
+  },
+  {
+    "method": "POST",
+    "path": "/api/v2/models/{provider_id}/{protocol}/{operation:path}"
+  },
+  {
+    "method": "GET",
+    "path": "/api/v2/navigation"
+  },
+  {
+    "method": "GET",
+    "path": "/api/v2/oauth/authorize"
+  },
+  {
+    "method": "POST",
+    "path": "/api/v2/oauth/authorize"
+  },
+  {
+    "method": "POST",
+    "path": "/api/v2/oauth/token"
+  },
+  {
+    "method": "POST",
+    "path": "/api/v2/pairing/claim"
+  },
+  {
+    "method": "POST",
+    "path": "/api/v2/pairing/poll"
+  },
+  {
+    "method": "POST",
+    "path": "/api/v2/pairing/start"
+  },
+  {
+    "method": "GET",
+    "path": "/api/v2/projects"
+  },
+  {
+    "method": "POST",
+    "path": "/api/v2/projects"
+  },
+  {
+    "method": "DELETE",
+    "path": "/api/v2/projects/{project_id}"
+  },
+  {
+    "method": "PATCH",
+    "path": "/api/v2/projects/{project_id}"
+  },
+  {
+    "method": "GET",
+    "path": "/api/v2/projects/{project_id}/sessions"
+  },
+  {
+    "method": "POST",
+    "path": "/api/v2/projects/{project_id}/sessions/archive-all"
+  },
+  {
+    "method": "GET",
+    "path": "/api/v2/public/shares/{share_id}"
+  },
+  {
+    "method": "GET",
+    "path": "/api/v2/public/shares/{share_id}/attachments/{file_id}"
+  },
+  {
+    "method": "GET",
+    "path": "/api/v2/server-agent"
+  },
+  {
+    "method": "POST",
+    "path": "/api/v2/server-agent"
+  },
+  {
+    "method": "GET",
+    "path": "/api/v2/sessions"
+  },
+  {
+    "method": "POST",
+    "path": "/api/v2/sessions"
+  },
+  {
+    "method": "POST",
+    "path": "/api/v2/sessions/archive"
+  },
+  {
+    "method": "POST",
+    "path": "/api/v2/sessions/create-and-start"
+  },
+  {
+    "method": "GET",
+    "path": "/api/v2/sessions/list"
+  },
+  {
+    "method": "GET",
+    "path": "/api/v2/sessions/local/{session_id}/{file_id}"
+  },
+  {
+    "method": "POST",
+    "path": "/api/v2/sessions/read"
+  },
+  {
+    "method": "POST",
+    "path": "/api/v2/sessions/unarchive"
+  },
+  {
+    "method": "POST",
+    "path": "/api/v2/sessions/{session_id}/attachments"
+  },
+  {
+    "method": "GET",
+    "path": "/api/v2/sessions/{session_id}/attachments/{file_id}"
+  },
+  {
+    "method": "GET",
+    "path": "/api/v2/sessions/{session_id}/attachments/{file_id}/open"
+  },
+  {
+    "method": "GET",
+    "path": "/api/v2/sessions/{session_id}/events"
+  },
+  {
+    "method": "GET",
+    "path": "/api/v2/sessions/{session_id}/meta"
+  },
+  {
+    "method": "PATCH",
+    "path": "/api/v2/sessions/{session_id}/meta"
+  },
+  {
+    "method": "GET",
+    "path": "/api/v2/sessions/{session_id}/runtime/capabilities"
+  },
+  {
+    "method": "GET",
+    "path": "/api/v2/sessions/{session_id}/runtime/catalogs/model"
+  },
+  {
+    "method": "GET",
+    "path": "/api/v2/sessions/{session_id}/runtime/catalogs/permission"
+  },
+  {
+    "method": "GET",
+    "path": "/api/v2/sessions/{session_id}/runtime/commands"
+  },
+  {
+    "method": "POST",
+    "path": "/api/v2/sessions/{session_id}/runtime/commands"
+  },
+  {
+    "method": "POST",
+    "path": "/api/v2/sessions/{session_id}/runtime/interrupt"
+  },
+  {
+    "method": "POST",
+    "path": "/api/v2/sessions/{session_id}/runtime/messages"
+  },
+  {
+    "method": "GET",
+    "path": "/api/v2/sessions/{session_id}/runtime/notices"
+  },
+  {
+    "method": "POST",
+    "path": "/api/v2/sessions/{session_id}/runtime/notices/{notice_id}/respond"
+  },
+  {
+    "method": "PATCH",
+    "path": "/api/v2/sessions/{session_id}/runtime/selections"
+  },
+  {
+    "method": "GET",
+    "path": "/api/v2/sessions/{session_id}/runtime/state"
+  },
+  {
+    "method": "POST",
+    "path": "/api/v2/sessions/{session_id}/runtime/steer"
+  },
+  {
+    "method": "POST",
+    "path": "/api/v2/sessions/{session_id}/shares"
+  },
+  {
+    "method": "GET",
+    "path": "/api/v2/sessions/{session_id}/snapshot"
+  },
+  {
+    "method": "POST",
+    "path": "/api/v2/sessions/{session_id}/sync"
+  },
+  {
+    "method": "DELETE",
+    "path": "/api/v2/sessions/{session_id}/takeover"
+  },
+  {
+    "method": "POST",
+    "path": "/api/v2/sessions/{session_id}/takeover"
+  },
+  {
+    "method": "GET",
+    "path": "/api/v2/sessions/{session_id}/terminals"
+  },
+  {
+    "method": "POST",
+    "path": "/api/v2/sessions/{session_id}/terminals"
+  },
+  {
+    "method": "DELETE",
+    "path": "/api/v2/sessions/{session_id}/terminals/{terminal_id}"
+  },
+  {
+    "method": "PATCH",
+    "path": "/api/v2/sessions/{session_id}/terminals/{terminal_id}"
+  },
+  {
+    "method": "POST",
+    "path": "/api/v2/sessions/{session_id}/terminals/{terminal_id}/resize"
+  },
+  {
+    "method": "WEBSOCKET",
+    "path": "/api/v2/sessions/{session_id}/terminals/{terminal_id}/stream"
+  },
+  {
+    "method": "GET",
+    "path": "/api/v2/sessions/{session_id}/timeline"
+  },
+  {
+    "method": "WEBSOCKET",
+    "path": "/api/v2/sessions/{session_id}/ws"
+  },
+  {
+    "method": "POST",
+    "path": "/api/v2/ws-ticket"
+  }
+]

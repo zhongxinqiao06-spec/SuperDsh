@@ -29,7 +29,10 @@ import {
   type AttachedFile,
   useAttachments,
 } from '@/components/attachment-input'
-import { buildOptimisticUserMessage } from '@/components/session/optimistic-timeline'
+import {
+  buildOptimisticUserMessage,
+  messageFailureOutcome,
+} from '@/components/session/optimistic-timeline'
 import {
   ProjectEditorDialog,
   type ProjectEditorState,
@@ -42,11 +45,15 @@ import { useWorkspace } from '@/components/workspace-context'
 import { useAuth } from '@/components/auth/auth-context'
 import { dashboardApi } from '@/features/dashboard/api'
 import { ServerAgentControl } from '@/components/server-agent-control'
+import { AgentDefinitionPicker } from '@/components/agent-definition-picker'
+import { agentsApi } from '@/features/agents/api'
+import { serverAgentApi } from '@/features/dashboard/server-agent'
 import { serverAgentDefaultModel } from '@/features/dashboard/server-agent-model'
 import { loadStoredSession } from '@/features/auth/session'
 import { useWorkbenchState, workbenchCell } from '@/features/workbench/memory'
 import { createClientId } from '@/lib/id'
 import { apiClient } from '@/lib/api'
+import { isApiError } from '@/lib/api/errors'
 import { cn } from '@/lib/utils'
 import { useElementWidth } from '@/hooks/use-element-width'
 import type {
@@ -59,7 +66,10 @@ import type {
   SessionView as RealSessionView,
 } from '@/features/dashboard/types'
 import { useTranslations } from 'next-intl'
-import { useManagementText } from '@/components/management/controls'
+import {
+  useManagementResource,
+  useManagementText,
+} from '@/components/management/controls'
 import {
   catalogItemDisabledReason,
   catalogItemEnabled,
@@ -327,6 +337,26 @@ function ScopedTaskComposer() {
     null
   const selectedConnectorId = selectedConnector?.id ?? ''
   const isServerAgent = selectedConnector?.executorKind === 'server-agent'
+  const [agentDefinitionId, setAgentDefinitionId] = useWorkbenchState(
+    'new-session/agent-definition',
+    '',
+  )
+  const agentDefinitions = useManagementResource(
+    'workspace-agent-definitions',
+    agentsApi.available,
+    { enabled: isServerAgent && Boolean(authSession?.accessToken) },
+  )
+  const selectedDefinition = agentDefinitions.data?.items.find(
+    (agent) => agent.id === agentDefinitionId && agent.published,
+  )
+  const validDefinition =
+    !isServerAgent ||
+    !agentDefinitionId ||
+    Boolean(
+      !agentDefinitions.loading &&
+      !agentDefinitions.error &&
+      selectedDefinition,
+    )
   const agentOptions = React.useMemo(
     () =>
       selectedConnector
@@ -368,24 +398,38 @@ function ScopedTaskComposer() {
   )
   const [workspace, setWorkspace] =
     useWorkbenchState<WorkspaceSelection | null>('new-session/workspace', null)
+  const serverAgentResource = useManagementResource(
+    `new-session/server-agent/${selectedConnectorId}/${selectedAgent}`,
+    serverAgentApi.get,
+    { enabled: isServerAgent && Boolean(selectedRuntime) },
+  )
+  const managedAgent = serverAgentResource.data?.agent
+  const serverAgentProject =
+    isServerAgent &&
+    !serverAgentResource.loading &&
+    !serverAgentResource.error &&
+    managedAgent?.status === 'running' &&
+    managedAgent.connectorId === selectedConnectorId &&
+    managedAgent.runtimeId === selectedRuntime?.runtimeId
+      ? projects.find(
+          (value) =>
+            value.id === managedAgent.projectId &&
+            value.connectorId === selectedConnectorId,
+        )
+      : undefined
   React.useEffect(() => {
     if (!isServerAgent) return
-    const project = projects.find(
-      (value) =>
-        value.connectorId === selectedConnectorId &&
-        value.workspacePath === '/workspace',
-    )
     setWorkspace(
-      project
+      serverAgentProject
         ? {
             connectorId: selectedConnectorId,
-            projectId: project.id,
-            label: project.name,
-            path: project.workspacePath,
+            projectId: serverAgentProject.id,
+            label: serverAgentProject.name,
+            path: serverAgentProject.workspacePath,
           }
         : null,
     )
-  }, [isServerAgent, projects, selectedConnectorId])
+  }, [isServerAgent, serverAgentProject, selectedConnectorId])
   const [projectEditor, setProjectEditor] =
     React.useState<ProjectEditorState>(null)
   const [prompt, setPrompt] = useWorkbenchState('new-session/prompt', '')
@@ -478,7 +522,7 @@ function ScopedTaskComposer() {
     if (!newSessionProject) {
       if (projectPrefillAppliedRef.current !== null) {
         projectPrefillAppliedRef.current = null
-        setWorkspace(null)
+        if (!isServerAgent) setWorkspace(null)
       }
       return
     }
@@ -498,13 +542,14 @@ function ScopedTaskComposer() {
     }
 
     projectPrefillAppliedRef.current = newSessionProject.id
+    if (isServerAgent) return
     setWorkspace({
       label: newSessionProject.name,
       path: newSessionProject.workspacePath,
       connectorId: newSessionProject.connectorId,
       projectId: newSessionProject.id,
     })
-  }, [deviceOptions, newSessionProject, selectedDevice])
+  }, [deviceOptions, newSessionProject, selectedDevice, isServerAgent])
 
   React.useEffect(() => {
     if (newSessionProject || workspaceLoading || runtimeInventoryLoading) return
@@ -985,6 +1030,7 @@ function ScopedTaskComposer() {
     canUsePermissionCatalog && permissionOptions.length > 0
   const hasSelectionSettings = models.length > 0 || permissionOptions.length > 0
   const canCreate =
+    validDefinition &&
     Boolean(
       authSession?.accessToken &&
       selectedConnector &&
@@ -995,7 +1041,12 @@ function ScopedTaskComposer() {
     !creating &&
     !catalogsLoading &&
     (!requiresModelSelection || Boolean(selectedModelSelection)) &&
-    (!isServerAgent || Boolean(selectedModelSelection)) &&
+    (!isServerAgent ||
+      Boolean(
+        selectedModelSelection &&
+        serverAgentProject &&
+        workspace?.projectId === serverAgentProject.id,
+      )) &&
     (!requiresPermissionSelection || Boolean(selectedPermissionSelection)) &&
     (attachments.length === 0 || canUseAttachments) &&
     attachmentsAllowed &&
@@ -1013,12 +1064,13 @@ function ScopedTaskComposer() {
   const showCollapsedBrand = isMobile || sidebarState === 'collapsed'
 
   const handleCreate = async () => {
+    const sameAccount = () =>
+      creatingCell.current() &&
+      loadStoredSession()?.userId === authSession?.userId
     const identityMatches = () => {
       const current = loadStoredSession()
       return (
-        creatingCell.current() &&
-        current?.userId === authSession?.userId &&
-        current?.authzVersion === authSession?.authzVersion
+        sameAccount() && current?.authzVersion === authSession?.authzVersion
       )
     }
     if (
@@ -1031,9 +1083,15 @@ function ScopedTaskComposer() {
       return
     if (workspace.connectorId !== selectedConnector.id) return
     if (!prompt.trim() && attachments.length === 0) return
+    if (!validDefinition) return
     if (catalogsLoading) return
     if (requiresModelSelection && !selectedModelSelection) return
     if (isServerAgent && !selectedModelSelection) return
+    if (
+      isServerAgent &&
+      (!serverAgentProject || workspace.projectId !== serverAgentProject.id)
+    )
+      return
     if (requiresPermissionSelection && !selectedPermissionSelection) return
     if (attachments.length > 0 && (!canUseAttachments || !attachmentsAllowed))
       return
@@ -1042,11 +1100,7 @@ function ScopedTaskComposer() {
     let project
     try {
       project = isServerAgent
-        ? projects.find(
-            (value) =>
-              value.id === workspace.projectId &&
-              value.connectorId === selectedConnector.id,
-          )
+        ? serverAgentProject
         : await resolveProject({
             connectorId: selectedConnector.id,
             workspacePath: workspace.path,
@@ -1137,6 +1191,17 @@ function ScopedTaskComposer() {
       localSessionId,
       session: optimisticSession,
       state: optimisticState,
+      draft: {
+        prompt,
+        attachments: selectedAttachments,
+        device: selectedConnector.id,
+        runtime: selectedRuntime.runtimeId,
+        model: selectedModel,
+        agentDefinitionId: isServerAgent ? agentDefinitionId : '',
+        reasoning: selectedReasoning,
+        permission: selectedPermissionMode,
+        workspace,
+      },
       item: buildOptimisticUserMessage({
         sessionId: localSessionId,
         clientMessageId,
@@ -1149,6 +1214,7 @@ function ScopedTaskComposer() {
     clear({ revokePreviews: false })
     setPrompt('')
     openSession(localSessionId)
+    let creationRequested = false
     try {
       const selections = {
         ...(selectedModelSelection ? { model: selectedModelSelection } : {}),
@@ -1157,6 +1223,9 @@ function ScopedTaskComposer() {
           : {}),
       }
       const createBody = {
+        ...(isServerAgent && selectedDefinition
+          ? { agentDefinitionId: selectedDefinition.id }
+          : {}),
         connectorId: selectedConnector.id,
         projectId: project.id,
         ...sessionRuntimeRequestIdentity(
@@ -1190,6 +1259,7 @@ function ScopedTaskComposer() {
           ? await inlineAttachmentsFromFiles(selectedAttachments)
           : undefined
       if (!identityMatches()) return
+      creationRequested = true
       const created = await dashboardApi.createAndStartSession(
         authSession.accessToken,
         {
@@ -1200,7 +1270,7 @@ function ScopedTaskComposer() {
           clientMessageId,
         },
       )
-      if (!identityMatches()) return
+      if (!sameAccount()) return
       toolSidebarStore.migrateSession(localSessionId, created.session.id)
       bindOptimisticSession(
         localSessionId,
@@ -1208,9 +1278,30 @@ function ScopedTaskComposer() {
         created.attachments,
       )
     } catch (err) {
-      if (!identityMatches()) return
+      if (!sameAccount()) return
       const message = err instanceof Error ? err.message : t('createFailed')
-      markOptimisticMessageFailed(clientMessageId, message)
+      const creationOutcome = creationRequested
+        ? messageFailureOutcome(err)
+        : 'rejected'
+      markOptimisticMessageFailed(clientMessageId, message, creationOutcome)
+      if (
+        creationOutcome === 'unknown' &&
+        isApiError(err) &&
+        err.code === 'session_create_outcome_unknown' &&
+        err.payload &&
+        typeof err.payload === 'object' &&
+        'sessionId' in err.payload &&
+        typeof err.payload.sessionId === 'string' &&
+        err.payload.sessionId
+      ) {
+        // The server allocated this ID before dispatch. Open its authoritative
+        // snapshot/stream; never turn an uncertain dispatch into a fresh send.
+        toolSidebarStore.migrateSession(localSessionId, err.payload.sessionId)
+        bindOptimisticSession(localSessionId, {
+          ...optimisticSession,
+          id: err.payload.sessionId,
+        })
+      }
       toast.error(message)
     } finally {
       creatingRef.current = false
@@ -1243,7 +1334,10 @@ function ScopedTaskComposer() {
         {authSession && can('devices.manage') && can('models.use') && (
           <ServerAgentControl
             key={authSession.userId}
-            onAvailable={refreshData}
+            onAvailable={() => {
+              refreshData()
+              serverAgentResource.reload()
+            }}
             onReady={(agent) => {
               goHome()
               refreshData()
@@ -1252,6 +1346,19 @@ function ScopedTaskComposer() {
                 persistTargetPreference(agent.connectorId, agent.runtimeId)
               setCatalogVersion((value) => value + 1)
             }}
+          />
+        )}
+        {isServerAgent && (
+          <AgentDefinitionPicker
+            value={agentDefinitionId}
+            onChange={setAgentDefinitionId}
+            items={(agentDefinitions.data?.items ?? []).filter(
+              (agent) => agent.published,
+            )}
+            loading={agentDefinitions.loading}
+            error={agentDefinitions.error}
+            onRetry={agentDefinitions.reload}
+            disabled={creating}
           />
         )}
         <h1
@@ -1573,10 +1680,40 @@ function ScopedTaskComposer() {
         <div className="mt-3">
           {isServerAgent ? (
             <div className="space-y-2 text-sm text-muted-foreground">
-              <p>{t('serverAgentWorkspace')} · /workspace</p>
+              <p>
+                {t('serverAgentWorkspace')}
+                {workspace?.connectorId === selectedConnectorId &&
+                  ` · ${workspace.path}`}
+              </p>
               {!catalogsLoading && !selectedModelSelection && (
                 <p role="status">{t('serverAgentModelRequired')}</p>
               )}
+              {serverAgentResource.loading ? (
+                <p role="status">
+                  {tr('正在确认服务端工作区…', 'Checking server workspace…')}
+                </p>
+              ) : !serverAgentProject ? (
+                <div className="flex items-center gap-2">
+                  <p role="alert" className="text-destructive">
+                    {serverAgentResource.error ||
+                      managedAgent?.error ||
+                      tr(
+                        '服务端工作区尚未准备完成，请重试',
+                        'Server workspace is not ready. Please retry.',
+                      )}
+                  </p>
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    onClick={() => {
+                      refreshData()
+                      serverAgentResource.reload()
+                    }}
+                  >
+                    {tr('重试', 'Retry')}
+                  </Button>
+                </div>
+              ) : null}
             </div>
           ) : (
             <WorkspacePicker

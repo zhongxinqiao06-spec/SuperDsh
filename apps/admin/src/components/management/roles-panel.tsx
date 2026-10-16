@@ -12,6 +12,7 @@ import {
 } from './controls'
 import {
   ManagementDialog,
+  ManagementList,
   ManagementPagination,
   useClientPagination,
 } from './presentation'
@@ -45,7 +46,18 @@ export function RolesPanel() {
   }
   const locked = editing !== null && editing !== 'new' && editing.builtin
   return (
-    <div className="space-y-4">
+    <ManagementList
+      pagination={
+        <ManagementPagination
+          page={pagination.page}
+          pageSize={pagination.pageSize}
+          total={pagination.total}
+          onPageChange={pagination.setPage}
+          onPageSizeChange={pagination.setPageSize}
+          loading={resource.loading || resource.busy}
+        />
+      }
+    >
       <div className="flex flex-wrap items-center justify-between gap-3 rounded-xl border p-4">
         <p className="text-sm text-muted-foreground">
           {tr(
@@ -116,14 +128,7 @@ export function RolesPanel() {
           {tr('没有匹配的角色。', 'No matching roles.')}
         </p>
       )}
-      <ManagementPagination
-        page={pagination.page}
-        pageSize={pagination.pageSize}
-        total={pagination.total}
-        onPageChange={pagination.setPage}
-        onPageSizeChange={pagination.setPageSize}
-        loading={resource.loading || resource.busy}
-      />
+
       {editing && (
         <ManagementDialog
           open
@@ -276,6 +281,6 @@ export function RolesPanel() {
             )}
         </p>
       </ManagementDialog>
-    </div>
+    </ManagementList>
   )
 }

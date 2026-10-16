@@ -300,6 +300,194 @@ test('pending send state survives remount and completion cannot clear another ac
   assert.equal(status.pending, true)
 })
 
+test('failed new-session creation stops waiting and retains the failure across a workspace remount', async () => {
+  login('failed-creator')
+  globalThis.workbenchAuth.can = () => false
+  let workspace
+  function Probe() {
+    workspace = useWorkspace()
+    return null
+  }
+  await mount(h(WorkspaceProvider, null, h(Probe)))
+  const id = 'session_failed_local'
+  const originalFile = new File(['fixture'], '未发送.txt', {
+    type: 'text/plain',
+  })
+  const attachments = [
+    {
+      id: 'original-file',
+      file: originalFile,
+      name: originalFile.name,
+      type: 'file',
+      size: originalFile.size,
+      mediaType: originalFile.type,
+      uploadStatus: 'local',
+    },
+  ]
+  const record = {
+    id,
+    connectorId: 'server-agent',
+    runtime: 'dsh',
+    runtimeId: 'dsh',
+    title: '你好',
+    status: 'waiting',
+    connectorStatus: 'online',
+    updatedSeq: 1,
+    lastReadSeq: 0,
+    latestTurnEndSeq: 0,
+    cwd: '/owned-workspace',
+    takeover: true,
+  }
+  await act(async () => {
+    workspace.addOptimisticMessage({
+      clientMessageId: 'failed-create',
+      localSessionId: id,
+      sessionId: id,
+      session: record,
+      draft: {
+        prompt: '你好',
+        attachments,
+        device: record.connectorId,
+        runtime: record.runtime,
+        model: 'chosen-model',
+        reasoning: 'high',
+        permission: 'ask',
+        workspace: {
+          connectorId: record.connectorId,
+          projectId: 'canonical',
+          path: record.cwd,
+        },
+      },
+      state: {
+        sessionId: id,
+        runtime: 'dsh',
+        status: 'waiting',
+        selections: {},
+        metadata: {},
+        updatedSeq: 1,
+      },
+      item: {
+        id: 'optimistic-message:failed-create',
+        sessionId: id,
+        type: 'message',
+        role: 'user',
+        status: 'pending',
+        source: { clientMessageId: 'failed-create', optimistic: true },
+        content: { text: '你好' },
+        updatedSeq: 1,
+      },
+    })
+  })
+  const diagnostic = 'The selected model is no longer available'
+  await act(async () =>
+    workspace.markOptimisticMessageFailed('failed-create', diagnostic),
+  )
+  for (const remount of [false, true]) {
+    if (remount) {
+      await unmount()
+      await mount(h(WorkspaceProvider, null, h(Probe)))
+    }
+    const failed = workspace.getOptimisticSessionState(id)
+    assert.equal(failed.session.status, 'error')
+    assert.equal(failed.state.status, 'error')
+    assert.deepEqual(failed.state.error, { message: diagnostic })
+    assert.equal(failed.items[0].status, 'failed')
+    assert.equal(failed.items[0].content.text, '你好')
+    assert.equal(failed.items[0].content.error, diagnostic)
+  }
+  assert.equal(workbenchCell('new-session/prompt', '').get(), '')
+  assert.deepEqual(workbenchCell('new-session/attachments', []).get(), [])
+  await act(async () =>
+    workspace.markOptimisticMessageFailed(
+      'failed-create',
+      'Outcome unknown',
+      'unknown',
+    ),
+  )
+  assert.equal(workspace.restoreFailedSessionDraft(id, true), 'missing')
+  assert.equal(
+    workspace.getOptimisticSessionState(id).state.error.code,
+    'SESSION_CREATION_OUTCOME_UNKNOWN',
+  )
+  assert.equal(workbenchCell('new-session/prompt', '').get(), '')
+  await act(async () =>
+    workspace.markOptimisticMessageFailed(
+      'failed-create',
+      diagnostic,
+      'rejected',
+    ),
+  )
+  await act(async () => {
+    assert.equal(workspace.restoreFailedSessionDraft(id), 'restored')
+  })
+  assert.equal(workbenchCell('new-session/prompt', '').get(), '你好')
+  assert.equal(
+    workbenchCell('new-session/attachments', []).get()[0].file,
+    originalFile,
+  )
+  assert.equal(workbenchCell('new-session/model', '').get(), 'chosen-model')
+  assert.equal(workbenchCell('new-session/reasoning', '').get(), 'high')
+  assert.equal(workbenchCell('new-session/permission', '').get(), 'ask')
+  assert.equal(workspace.page, 'home')
+  assert.equal(
+    workspace.getOptimisticSessionState(id).items[0].status,
+    'failed',
+  )
+  workbenchCell('new-session/prompt', '').set('A different unsent draft')
+  assert.equal(workspace.restoreFailedSessionDraft(id), 'conflict')
+  assert.equal(
+    workbenchCell('new-session/prompt', '').get(),
+    'A different unsent draft',
+  )
+  await act(async () => {
+    assert.equal(workspace.restoreFailedSessionDraft(id, true), 'restored')
+  })
+  assert.equal(workbenchCell('new-session/prompt', '').get(), '你好')
+  const previousWorkspace = workspace
+  await unmount()
+  login('another-account')
+  assert.equal(previousWorkspace.restoreFailedSessionDraft(id, true), 'missing')
+  assert.equal(workbenchCell('new-session/prompt', '').get(), '')
+  assert.deepEqual(workbenchCell('new-session/attachments', []).get(), [])
+})
+
+test('a rejected follow-up does not replace the running authoritative session state', async () => {
+  login('failed-follow-up')
+  globalThis.workbenchAuth.can = () => false
+  let workspace
+  function Probe() {
+    workspace = useWorkspace()
+    return null
+  }
+  await mount(h(WorkspaceProvider, null, h(Probe)))
+  await act(async () => {
+    workspace.addOptimisticMessage({
+      clientMessageId: 'rejected-follow-up',
+      localSessionId: 'previous-local-id',
+      sessionId: 'canonical-id',
+      session: { id: 'canonical-id', status: 'running' },
+      state: { sessionId: 'canonical-id', status: 'running' },
+      item: {
+        id: 'optimistic-message:rejected-follow-up',
+        sessionId: 'canonical-id',
+        type: 'message',
+        role: 'user',
+        status: 'pending',
+        source: { clientMessageId: 'rejected-follow-up', optimistic: true },
+        content: { text: 'Follow-up' },
+        updatedSeq: 1,
+      },
+    })
+  })
+  await act(async () =>
+    workspace.markOptimisticMessageFailed('rejected-follow-up', 'Forbidden'),
+  )
+  const failed = workspace.getOptimisticSessionState('canonical-id')
+  assert.equal(failed.items[0].status, 'failed')
+  assert.equal(failed.session.status, 'running')
+  assert.equal(failed.state.status, 'running')
+})
+
 test('workspace project resolution cannot create or refresh under a newly logged-in account', async () => {
   login('project-owner')
   globalThis.workbenchAuth.can = () => false

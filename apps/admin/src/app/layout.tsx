@@ -7,9 +7,9 @@ import { I18nProvider } from '@/i18n/client-provider'
 import { sans, mono, serif, brand } from './fonts'
 
 export const metadata: Metadata = {
-  title: 'SuperDsh',
-  description: 'SuperDsh management console and Agent workspace',
-  applicationName: 'SuperDsh',
+  title: '星桥智能平台',
+  description: '星桥智能平台 · 企业管理与 AI 智能体工作台',
+  applicationName: '星桥智能平台',
   manifest: '/site.webmanifest',
   icons: {
     icon: [
@@ -38,7 +38,7 @@ export const metadata: Metadata = {
   },
   appleWebApp: {
     capable: true,
-    title: 'SuperDsh',
+    title: '星桥智能平台',
     statusBarStyle: 'black-translucent',
   },
 }

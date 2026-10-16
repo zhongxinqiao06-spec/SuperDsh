@@ -969,8 +969,8 @@ export function DevicePage() {
           {managedServerAgent && (
             <p className="mb-3 text-sm text-muted-foreground">
               {tr(
-                '服务端 Agent 由平台统一管理运行环境。个人模型在设置中配置，工作区保存在你的独立容器中。',
-                'The platform manages this server Agent runtime. Configure personal models in Settings; the workspace is stored in your isolated container.',
+                '服务端 Agent 由平台统一管理运行环境。个人模型在设置中配置，文件保存在你的服务端工作区中。',
+                'The platform manages this server Agent runtime. Configure personal models in Settings; files are stored in your server workspace.',
               )}
             </p>
           )}

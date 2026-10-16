@@ -1,8 +1,16 @@
-# SuperDsh desktop architecture
+# SuperDsh product and platform architecture
 
-SuperDsh owns the product shell and starts Harness as a required builtin plugin. Product development is under `apps/desktop`. The DSH root slot no longer chooses the product UI. Admin web, the Python server and Android live in the sibling directories `apps/admin`, `apps/server` and `apps/android`.
+SuperDsh owns the product shell and starts Harness as a required builtin plugin. Desktop development is under `apps/desktop`; the DSH root slot no longer chooses the product UI. The platform lives in `apps/admin`: `src` owns the Next.js management UI, and `server` owns the Node.js API and Agent lifecycle. Android lives in `apps/android`.
 
-Admin web and Android connect to the Python server through API v2; the server reaches desktop Harness through Connector. Admin web builds and runs independently during development. Docker deployment serves its static files from Python, preserving same-origin authentication and the existing address. Shared protocol fixtures, Connector and Bridge remain in the pinned AA submodule. Sparse checkout physically excludes the three migrated applications from that upstream working tree. Root `sources:prepare` establishes this layout; `sources:check` prevents the old paths from becoming development entry points again.
+All three clients reach the Node platform through existing API v2. `server:dev` starts Next.js, the API and native Agent processes prepared on demand through one entry, keeping web and API on the same origin. Docker runs only PostgreSQL and Redis. Existing computers still connect through desktop Connector; server Agents use a native Node Connector and the same full Host version. Shared protocol fixtures, the original Connector and Bridge remain in the pinned AA submodule. Sparse checkout excludes migrated applications from that upstream working tree. Root `sources:prepare` establishes this layout; `sources:check` verifies that old paths have not returned.
+
+## Platform boundaries
+
+The console owns overview, RBAC, models, device operations, system management and the personal center; chat is an Agent workbench module. Browser UI uses HTTP/WebSocket APIs without importing `server` implementations, database drivers or Node builtins. UI and the Node backend have separate complete type checks.
+
+The Node API owns identity, permissions, resource ownership, model proxying, persistence and Agent lifecycle. Each user's server Agent has a separate process, Home and workspace, with database leases preventing duplicate runtimes. These processes run under the platform's operating-system account; there is no container or operating-system file sandbox. Harness retains its existing execution queue. Signing out of a client does not stop submitted tasks; stopping the platform closes its managed Agent processes.
+
+The platform accepts an empty database or incrementally migrates existing product schemas from `v2_35` through `v2_39`. Earlier databases must first be upgraded with the original release. Existing keys, user IDs, device ownership and credential formats remain compatible. Old container Agent data requires offline export, ownership validation and import into an empty target; see [deployment and configuration](../apps/admin/deployment/README.md).
 
 ## Control and processes
 
@@ -21,6 +29,10 @@ The main chat uses Core's `ConversationTarget` / `ConversationSource` to disting
 | `apps/desktop/plugins/harness` | Fixed Host, Profiles, protocol adapters and runtime dependencies                                             |
 | `apps/desktop`                 | Product identity, injected asset manifest and build/release entry                                            |
 | `dsh-community-market`         | Optional plugin identity and dependencies; implementation resides in UI features and Core services/contracts |
+| `apps/admin/src`               | Management UI, module navigation, personal workbench and API clients                                         |
+| `apps/admin/server`            | Node API v2, identity/RBAC, database access, model proxy and native Agent runtime                            |
+| `apps/admin/deployment`        | PG/Redis Compose, deployment and offline data migration instructions                                         |
+| `apps/android`                 | Kotlin Android client, retaining API v2 and the original application identity                                |
 
 UI may import only Core's public `client/*` and `contracts/*`. Core/client cannot import Node/Electron or platform implementations. Harness may bundle pure contracts at build time but cannot depend on Core at runtime. Upstream engine, mobile and third-party source retain their dependency boundaries.
 

@@ -640,29 +640,33 @@ test('provider cards and model catalogs paginate without truncating the edit dra
   }))
   const save = t.mock.method(modelsApi, 'save', async () => providers[0])
   const container = await mount(t, ModelsPanel)
-  assert.equal(container.querySelectorAll('section').length, 25)
+  assert.equal(container.querySelectorAll('section').length, 10)
   const first = container.querySelector('section')
-  assert.equal(first.querySelectorAll('tbody tr').length, 25)
+  assert.equal(first.querySelectorAll('tbody tr').length, 10)
   await click(first, 'Next')
-  assert.equal(first.querySelectorAll('tbody tr').length, 6)
+  assert.equal(first.querySelectorAll('tbody tr').length, 10)
+  await click(first, 'Next')
+  assert.equal(first.querySelectorAll('tbody tr').length, 10)
+  await click(first, 'Next')
+  assert.equal(first.querySelectorAll('tbody tr').length, 1)
   assert.match(first.querySelector('tbody').textContent, /Model 31/)
   await click(first, 'Edit')
   assert.equal(
     container.querySelectorAll('[role="dialog"] input[required]').length,
-    27,
+    12,
   )
   await click(container.querySelector('[role="dialog"]'), 'Next')
   assert.equal(
     field(container.querySelector('[role="dialog"]'), 'Model ID').value,
-    'model-26',
+    'model-11',
   )
   await click(container.querySelector('[role="dialog"]'), 'Add model')
   assert.equal(
-    field(container.querySelector('[role="dialog"]'), 'Model ID', 6).value,
+    field(container.querySelector('[role="dialog"]'), 'Model ID', 1).value,
     '',
   )
   await fill(
-    field(container.querySelector('[role="dialog"]'), 'Model ID', 6),
+    field(container.querySelector('[role="dialog"]'), 'Model ID', 1),
     'model-32',
   )
   await click(container.querySelector('[role="dialog"]'), 'Save')
@@ -670,16 +674,19 @@ test('provider cards and model catalogs paginate without truncating the edit dra
   assert.equal(save.mock.calls[0].arguments[1].models[31].modelId, 'model-32')
   const providerPagination = [...container.querySelectorAll('nav')].at(-1)
   await click(providerPagination, 'Next')
-  assert.equal(container.querySelectorAll('section').length, 1)
-  assert.match(container.querySelector('section').textContent, /Provider 26/)
+  assert.equal(container.querySelectorAll('section').length, 10)
+  assert.match(container.querySelector('section').textContent, /Provider 11/)
+  await click(providerPagination, 'Next')
+  assert.equal(container.querySelectorAll('section').length, 6)
+  assert.match(container.querySelector('section').textContent, /Provider 21/)
   await fill(
     container.querySelector('input[aria-label="Search providers or models"]'),
     'Provider 1',
   )
-  assert.equal(container.querySelectorAll('section').length, 11)
+  assert.equal(container.querySelectorAll('section').length, 10)
   assert.match(
     [...container.querySelectorAll('nav')].at(-1).textContent,
-    /Page 1 \/ 1/,
+    /Page 1 \/ 2/,
   )
 })
 
@@ -700,10 +707,12 @@ test('role cards paginate and a failed edit keeps its values inside the dialog',
   })
   const remove = t.mock.method(managementApi, 'deleteRole', async () => ({}))
   const container = await mount(t, RolesPanel)
-  assert.equal(container.querySelectorAll('h2').length, 25)
+  assert.equal(container.querySelectorAll('h2').length, 10)
   await click(container, 'Next')
-  assert.equal(container.querySelectorAll('h2').length, 1)
-  assert.equal(container.querySelector('h2').textContent, 'Role 26')
+  assert.equal(container.querySelectorAll('h2').length, 10)
+  await click(container, 'Next')
+  assert.equal(container.querySelectorAll('h2').length, 6)
+  assert.equal(container.querySelector('h2').textContent, 'Role 21')
   await click(container, 'Edit')
   await fill(field(container, 'Role name'), 'Updated role')
   await click(container, 'Save permissions')
@@ -722,8 +731,8 @@ test('role cards paginate and a failed edit keeps its values inside the dialog',
     container.querySelector('input[aria-label="Search roles"]'),
     'Role 1',
   )
-  assert.equal(container.querySelectorAll('h2').length, 11)
-  assert.match(container.querySelector('nav').textContent, /Page 1 \/ 1/)
+  assert.equal(container.querySelectorAll('h2').length, 10)
+  assert.match(container.querySelector('nav').textContent, /Page 1 \/ 2/)
 })
 
 test('users use server pagination and dialog mutations preserve failures and require confirmation', async (t) => {
@@ -773,17 +782,17 @@ test('users use server pagination and dialog mutations preserve failures and req
   const remove = t.mock.method(managementApi, 'deleteUser', async () => ({}))
   const update = t.mock.method(managementApi, 'updateUser', async () => ({}))
   const container = await mount(t, () => h(AuthProvider, null, h(UsersPanel)))
-  assert.deepEqual(users.mock.calls[0].arguments, [1, '', 25])
+  assert.deepEqual(users.mock.calls[0].arguments, [1, '', 10])
   await click(container, 'Next')
-  assert.deepEqual(users.mock.calls.at(-1).arguments, [2, '', 25])
-  await select(container.querySelector('nav select'), '10')
-  assert.deepEqual(users.mock.calls.at(-1).arguments, [1, '', 10])
+  assert.deepEqual(users.mock.calls.at(-1).arguments, [2, '', 10])
+  await select(container.querySelector('nav select'), '20')
+  assert.deepEqual(users.mock.calls.at(-1).arguments, [1, '', 20])
   await fill(
     container.querySelector('input[aria-label="Search users"]'),
     'member',
   )
   await click(container, 'Search')
-  assert.deepEqual(users.mock.calls.at(-1).arguments, [1, 'member', 10])
+  assert.deepEqual(users.mock.calls.at(-1).arguments, [1, 'member', 20])
   await click(container, 'Create user')
   let dialog = container.querySelector('[role="dialog"]')
   await fill(field(dialog, 'Username'), 'new-user')
@@ -908,7 +917,7 @@ test('provider submission validates every model page and locates the first inval
     editor.querySelector('[role="alert"]').textContent,
     /Model 1: Model ID is required/,
   )
-  assert.match(editor.querySelector('nav').textContent, /Page 1 \/ 2/)
+  assert.match(editor.querySelector('nav').textContent, /Page 1 \/ 4/)
   assert.equal(field(editor, 'Model ID').value, '  ')
   await fill(field(editor, 'Model ID'), 'model-1')
   await click(editor, 'Next')
@@ -918,18 +927,18 @@ test('provider submission validates every model page and locates the first inval
   assert.equal(save.mock.callCount(), 0)
   assert.match(
     editor.querySelector('[role="alert"]').textContent,
-    /Model 26: Model ID model-1 is duplicated/,
+    /Model 11: Model ID model-1 is duplicated/,
   )
-  assert.match(editor.querySelector('nav').textContent, /Page 2 \/ 2/)
+  assert.match(editor.querySelector('nav').textContent, /Page 2 \/ 4/)
   assert.equal(field(editor, 'Model ID').value, ' model-1 ')
-  await fill(field(editor, 'Model ID'), ' model-26 ')
+  await fill(field(editor, 'Model ID'), ' model-11 ')
   await fill(field(editor, 'Max output tokens (optional)'), '1.5')
   await click(editor, 'Previous')
   await click(editor, 'Save')
   assert.equal(save.mock.callCount(), 0)
   assert.match(
     editor.querySelector('[role="alert"]').textContent,
-    /Model 26: Max output tokens must be a positive integer/,
+    /Model 11: Max output tokens must be a positive integer/,
   )
   await fill(field(editor, 'Max output tokens (optional)'), '128')
   await fill(field(editor, 'Context window (optional)', 1), '0')
@@ -938,14 +947,14 @@ test('provider submission validates every model page and locates the first inval
   assert.equal(save.mock.callCount(), 0)
   assert.match(
     editor.querySelector('[role="alert"]').textContent,
-    /Model 27: Context window must be a positive integer/,
+    /Model 12: Context window must be a positive integer/,
   )
   await fill(field(editor, 'Context window (optional)', 1), '1024')
   await click(editor, 'Save')
   assert.equal(save.mock.callCount(), 1)
   const submitted = save.mock.calls[0].arguments[1].models
   assert.equal(submitted.length, 31)
-  assert.equal(submitted[25].modelId, 'model-26')
-  assert.equal(submitted[25].maxTokens, 128)
-  assert.equal(submitted[26].contextWindow, 1024)
+  assert.equal(submitted[10].modelId, 'model-11')
+  assert.equal(submitted[10].maxTokens, 128)
+  assert.equal(submitted[11].contextWindow, 1024)
 })

@@ -29,3 +29,5 @@ apps/admin/.next/**
 apps/admin/.next-*/**
 apps/admin/out/**
 apps/admin/next-env.d.ts
+apps/admin/server/contracts/openapi-v2.json
+apps/admin/server/contracts/legacy-routes.json

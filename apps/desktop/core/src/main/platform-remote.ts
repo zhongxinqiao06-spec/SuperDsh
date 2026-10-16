@@ -12,6 +12,11 @@ const id = (value: unknown): string => {
     throw new Error('缺少设备或会话标识')
   return encodeURIComponent(value)
 }
+const artifactId = (value: unknown): string => {
+  if (typeof value !== 'string' || !/^[\w-]{1,200}$/.test(value))
+    throw new Error('缺少或无效的会话/附件标识')
+  return value
+}
 export function remoteRoute(request: PlatformRequest): {
   path: string
   method: string
@@ -20,6 +25,15 @@ export function remoteRoute(request: PlatformRequest): {
   let path: string
   let method = 'GET'
   switch (request.operation) {
+    case 'agents':
+      path = '/agents'
+      break
+    case 'agent-artifacts':
+      path = `/sessions/${artifactId(request.sessionId)}/agent-artifacts`
+      break
+    case 'download-attachment':
+      path = `/sessions/${artifactId(request.sessionId)}/attachments/${artifactId(request.attachmentId)}`
+      break
     case 'server-agent':
     case 'prepare-server-agent':
       path = '/server-agent'
@@ -201,6 +215,68 @@ export class PlatformRemote {
   async request(request: PlatformRequest): Promise<PlatformJson> {
     const identity = this.identity(request.identity)
     const route = remoteRoute(request)
+    if (request.operation === 'download-attachment') {
+      const response = await this.account.fetch(route.path, {
+        signal: AbortSignal.timeout(60_000),
+      })
+      // API v2 wraps attachment bytes in base64 JSON. Bound the encoded response too.
+      const maximumBytes = 32 * 1024 * 1024
+      const maximum = Math.ceil(maximumBytes / 3) * 4 + 65536
+      if (Number(response.headers.get('content-length')) > maximum) {
+        await response.body?.cancel()
+        throw new Error('附件超过桌面下载上限（32 MB）')
+      }
+      const chunks: Uint8Array[] = []
+      let size = 0
+      const reader = response.body?.getReader()
+      if (!reader) throw new Error('附件响应为空')
+      try {
+        for (;;) {
+          const chunk = await reader.read()
+          if (chunk.done) break
+          this.identity(identity)
+          size += chunk.value.length
+          if (size > maximum) throw new Error('附件超过桌面下载上限（32 MB）')
+          chunks.push(chunk.value)
+        }
+      } catch (error) {
+        await reader.cancel().catch(() => {})
+        throw error
+      } finally {
+        reader.releaseLock()
+      }
+      this.identity(identity)
+      let value: unknown
+      try {
+        value = JSON.parse(Buffer.concat(chunks).toString('utf8'))
+      } catch {
+        throw new Error('附件响应格式无效')
+      }
+      if (!value || typeof value !== 'object' || Array.isArray(value))
+        throw new Error('附件响应格式无效')
+      const attachment = value as Record<string, unknown>
+      const encoded = attachment.contentBase64
+      if (typeof encoded !== 'string' || encoded.length % 4 !== 0)
+        throw new Error('附件内容格式无效')
+      const bytes = Buffer.from(encoded, 'base64')
+      if (bytes.toString('base64') !== encoded)
+        throw new Error('附件内容格式无效')
+      if (bytes.length > maximumBytes)
+        throw new Error('附件超过桌面下载上限（32 MB）')
+      if (
+        typeof attachment.size === 'number' &&
+        attachment.size !== bytes.length
+      )
+        throw new Error('附件内容与大小不匹配')
+      return {
+        contentBase64: encoded,
+        mediaType:
+          typeof attachment.mediaType === 'string'
+            ? attachment.mediaType
+            : 'application/octet-stream',
+        size: bytes.length,
+      }
+    }
     const response = await this.account.json(
       route.path,
       route.method,
@@ -221,12 +297,21 @@ export class PlatformRemote {
             nested.ok === false
           ? nested
           : undefined
-    if (failure)
+    if (failure) {
+      const detail =
+        failure.error &&
+        typeof failure.error === 'object' &&
+        !Array.isArray(failure.error)
+          ? failure.error
+          : {}
       throw new Error(
         typeof failure.message === 'string'
           ? failure.message
-          : '目标设备拒绝了此操作',
+          : typeof detail.message === 'string'
+            ? detail.message
+            : '目标设备拒绝了此操作',
       )
+    }
     if (request.operation === 'model-catalog')
       return { ...body, scope: identity.key }
     return response

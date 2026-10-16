@@ -55,6 +55,8 @@ import {
   SessionSkeletonInline,
 } from '@/components/session/session-skeleton'
 import { TimelineEntry } from '@/components/session/session-timeline-entry'
+import { FailedSessionRecovery } from '@/components/session/failed-session-recovery'
+import { AgentSessionArtifacts } from '@/components/session/agent-session-artifacts'
 import { TurnActions, type TurnAction } from '@/components/session/turn-actions'
 import {
   JsonBlock,
@@ -65,6 +67,7 @@ import { timelineRunCounts } from '@/components/session/timeline-summary'
 import { needsOlderTimelinePage } from '@/components/session/timeline-autofill'
 import { createTimelineScrollFollow } from '@/components/session/timeline-scroll-follow'
 import { createSessionEventBuffer } from '@/components/session/session-event-buffer'
+import { parseProtocolEvent } from '@/components/session/protocol-event'
 import {
   CAPABILITY,
   capabilityIsUsable,
@@ -91,6 +94,9 @@ import {
   mergeTimelineSnapshot,
   preserveOptimisticItems,
   timelineClientMessageId,
+  messageFailureOutcome,
+  hasUnconfirmedMessage,
+  restoreRejectedSendState,
 } from '@/components/session/optimistic-timeline'
 import { nextTimelineResetVersion } from '@/components/session/session-review-history'
 import {
@@ -369,6 +375,8 @@ export function SessionDetail({
     getOptimisticSessionState,
     isOptimisticSession,
     markOptimisticMessageFailed,
+    restoreFailedSessionDraft,
+    refreshData,
     replaceHome,
   } = useWorkspace()
   const initialOptimisticState = getOptimisticSessionState(sessionId)
@@ -379,6 +387,11 @@ export function SessionDetail({
   )
   const [loading, setLoading] = React.useState(() => !initialOptimisticState)
   const [error, setError] = React.useState<string | null>(null)
+  const [refreshVersion, refreshSession] = React.useReducer(
+    (value: number) => value + 1,
+    0,
+  )
+  const unconfirmedSend = hasUnconfirmedMessage(state?.items ?? [])
   const sendingCell = workbenchCell(`session/${sessionId}/sending`, false)
   const [sending, setSending] = useWorkbenchState(
     `session/${sessionId}/sending`,
@@ -1345,7 +1358,7 @@ export function SessionDetail({
       if (reconnectTimer !== null) window.clearTimeout(reconnectTimer)
       socket?.close()
     }
-  }, [isLocalOptimisticSession, sessionId, token])
+  }, [isLocalOptimisticSession, sessionId, token, refreshVersion])
 
   const handleSend = async (
     content: string,
@@ -1380,19 +1393,24 @@ export function SessionDetail({
       item: optimisticMessage,
     })
     const previousRuntimeState = state?.state ?? null
+    let previousSequence = state?.nextSeq ?? 0
+    let optimisticWaitingState: SessionRuntimeState | null = null
     setState((current) => {
       if (!current) return current
+      previousSequence = current.nextSeq
+      optimisticWaitingState = nextOptimisticRuntimeState(
+        current.state,
+        current.session,
+        'waiting',
+      )
       return {
         ...current,
-        state: nextOptimisticRuntimeState(
-          current.state,
-          current.session,
-          'waiting',
-        ),
+        state: optimisticWaitingState,
         items: mergeTimelineItems(current.items, [optimisticMessage]),
       }
     })
     setSending(true)
+    let sendRequested = false
     try {
       const selectionPatch = selectionPatchFromComposerSelections(
         runtimeState?.selections ?? {},
@@ -1404,21 +1422,24 @@ export function SessionDetail({
           session.id,
           selectionPatch,
         )
-        setState((current) =>
-          current
-            ? {
-                ...current,
-                state: runtimeStateWithSelectionResult(
-                  current.state,
-                  current.session,
-                  selectionPatch,
-                  selectionResult.state,
-                ),
-              }
-            : current,
-        )
+        setState((current) => {
+          if (!current) return current
+          const selectedState = runtimeStateWithSelectionResult(
+            current.state,
+            current.session,
+            selectionPatch,
+            selectionResult.state,
+          )
+          if (
+            current.state === optimisticWaitingState &&
+            !selectionResult.state
+          )
+            optimisticWaitingState = selectedState
+          return { ...current, state: selectedState }
+        })
       }
       if (!sendingCell.current()) return false
+      sendRequested = true
       await dashboardApi.sendSessionMessage(token, session.id, messageText, {
         attachments: uploadedAttachments.map((attachment) => ({
           fileId: attachment.fileId,
@@ -1438,19 +1459,24 @@ export function SessionDetail({
         : err instanceof Error
           ? err.message
           : tSession('sendFailed')
-      markOptimisticMessageFailed(clientMessageId, message)
+      const outcome = sendRequested ? messageFailureOutcome(err) : 'rejected'
+      markOptimisticMessageFailed(clientMessageId, message, outcome)
       setState((current) => {
         if (!current) return current
         return {
           ...current,
-          state:
-            current.state?.status === 'waiting'
-              ? previousRuntimeState
-              : current.state,
+          state: restoreRejectedSendState(
+            current.state,
+            optimisticWaitingState,
+            previousRuntimeState,
+            current.nextSeq,
+            previousSequence,
+            outcome,
+          ),
           items: current.items.map((item) =>
             timelineClientMessageId(item) === clientMessageId &&
             isOptimisticTimelineItem(item)
-              ? markOptimisticItemFailed(item, message)
+              ? markOptimisticItemFailed(item, message, outcome)
               : item,
           ),
         }
@@ -1956,9 +1982,10 @@ export function SessionDetail({
           <div
             ref={timelineContentRef}
             aria-busy={
-              runtimeStatus === 'waiting' ||
-              runtimeStatus === 'pending' ||
-              runtimeStatus === 'running'
+              !unconfirmedSend &&
+              (runtimeStatus === 'waiting' ||
+                runtimeStatus === 'pending' ||
+                runtimeStatus === 'running')
             }
             className={cn(
               'mx-auto flex w-full min-w-0 max-w-[calc(48rem+2rem)] flex-col gap-3 overflow-hidden px-4 pb-44 pt-20',
@@ -2044,9 +2071,17 @@ export function SessionDetail({
             {detachedNotifications.map((notice) => (
               <NotificationCard key={notice.noticeId} notice={notice} />
             ))}
-            {runtimeStatus === 'waiting' ||
-            runtimeStatus === 'pending' ||
-            runtimeStatus === 'running' ? (
+            {!isLocalOptimisticSession && session.agentDefinition && (
+              <AgentSessionArtifacts
+                key={sessionId}
+                sessionId={sessionId}
+                status={runtimeStatus}
+              />
+            )}
+            {!unconfirmedSend &&
+            (runtimeStatus === 'waiting' ||
+              runtimeStatus === 'pending' ||
+              runtimeStatus === 'running') ? (
               <div className="flex items-center gap-2 text-sm text-muted-foreground">
                 <Loader2 className="size-4 animate-spin" />
                 <span>
@@ -2091,29 +2126,47 @@ export function SessionDetail({
               onReview={() => onOpenReview()}
             />
           ) : null}
-          <SessionComposer
-            token={token}
-            session={session}
-            runtimeState={runtimeState}
-            pendingInteractionCount={blockingInteractionCount}
-            creatingSession={isLocalOptimisticSession}
-            sending={sending}
-            interrupting={interrupting}
-            takeoverBusy={takeoverBusy}
-            value={composerDraft}
-            effectiveCapabilities={state?.effectiveCapabilities ?? null}
-            modelCatalog={state?.catalogs.model ?? null}
-            permissionCatalog={state?.catalogs.permission ?? null}
-            runtimeCommands={runtimeCommands}
-            commandsLoading={commandsLoading}
-            onCommandQueryChange={handleCommandQueryChange}
-            onValueChange={setComposerDraft}
-            onSelectionChange={handleSelectionChange}
-            onSend={handleSend}
-            onInterrupt={handleInterrupt}
-            onCommand={handleSessionCommand}
-            onToggleTakeover={() => setPendingTakeover(!session.takeover)}
-          />
+          {(isLocalOptimisticSession && runtimeStatus === 'error') ||
+          unconfirmedSend ? (
+            <FailedSessionRecovery
+              key={sessionId}
+              uncertain={unconfirmedSend}
+              knownSession={!isLocalOptimisticSession}
+              onCheck={() => {
+                if (isLocalOptimisticSession) {
+                  refreshData()
+                  replaceHome()
+                } else refreshSession()
+              }}
+              onRestore={(overwrite) =>
+                restoreFailedSessionDraft(sessionId, overwrite)
+              }
+            />
+          ) : (
+            <SessionComposer
+              token={token}
+              session={session}
+              runtimeState={runtimeState}
+              pendingInteractionCount={blockingInteractionCount}
+              creatingSession={isLocalOptimisticSession}
+              sending={sending}
+              interrupting={interrupting}
+              takeoverBusy={takeoverBusy}
+              value={composerDraft}
+              effectiveCapabilities={state?.effectiveCapabilities ?? null}
+              modelCatalog={state?.catalogs.model ?? null}
+              permissionCatalog={state?.catalogs.permission ?? null}
+              runtimeCommands={runtimeCommands}
+              commandsLoading={commandsLoading}
+              onCommandQueryChange={handleCommandQueryChange}
+              onValueChange={setComposerDraft}
+              onSelectionChange={handleSelectionChange}
+              onSend={handleSend}
+              onInterrupt={handleInterrupt}
+              onCommand={handleSessionCommand}
+              onToggleTakeover={() => setPendingTakeover(!session.takeover)}
+            />
+          )}
         </div>
       </div>
       <Dialog
@@ -3172,36 +3225,6 @@ function mergeNotices(current: Notice[], incoming: Notice[]): Notice[] {
     (a, b) =>
       a.updatedSeq - b.updatedSeq || a.noticeId.localeCompare(b.noticeId),
   )
-}
-
-function parseProtocolEvent(data: string): ProtocolEventEnvelope | null {
-  try {
-    const event = JSON.parse(data) as Partial<ProtocolEventEnvelope>
-    if (!event || typeof event.type !== 'string') return null
-    if (event.type === 'keepalive') return null
-    if (
-      event.protocolVersion !== '1.0' ||
-      typeof event.eventId !== 'string' ||
-      typeof event.emittedAt !== 'string' ||
-      typeof event.sessionId !== 'string' ||
-      typeof event.sequence !== 'number' ||
-      typeof event.cursor !== 'string'
-    ) {
-      return null
-    }
-    return {
-      protocolVersion: event.protocolVersion,
-      eventId: event.eventId,
-      sequence: event.sequence,
-      cursor: event.cursor,
-      type: event.type,
-      sessionId: event.sessionId,
-      emittedAt: event.emittedAt,
-      payload: event.payload ?? {},
-    }
-  } catch {
-    return null
-  }
 }
 
 function cursorSequence(cursor: string | null | undefined): number {

@@ -40,6 +40,7 @@ data class NewSessionCreateDraft(
     val runtimeId: String = runtime,
     val runtimeType: String = runtime,
     val projectId: String = "",
+    val executorKind: String = "desktop",
 )
 
 sealed interface NewSessionCreateOutcome {
@@ -108,6 +109,15 @@ internal fun SessionsState.newCreateCandidates(draft: NewSessionCreateDraft): Li
             (expectedTitle.isEmpty() || session.title == expectedTitle) &&
             (session.cwd?.trim().orEmpty() == expectedCwd)
     }
+}
+
+internal fun hasAcceptedCreateMessage(
+    items: List<com.agentsanywhere.app.api.RemoteTimelineItem>,
+    clientMessageId: String,
+): Boolean = clientMessageId.isNotBlank() && items.any { item ->
+    item.type == "message" && item.role == "user" &&
+        item.status !in setOf("failed", "error", "cancelled") &&
+        item.source.optString("clientMessageId") == clientMessageId
 }
 
 fun workspaceOptionsFor(

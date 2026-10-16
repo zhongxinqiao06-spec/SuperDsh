@@ -53,6 +53,7 @@ import {
 } from '@/features/dashboard/attachments'
 import { MessageAttachments } from '@/components/session/message-attachments'
 import { CollapsibleUserMessage } from '@/components/session/collapsible-user-message'
+import { useManagementText } from '@/components/management/controls'
 
 const MarkdownText = dynamic(
   () =>
@@ -242,6 +243,7 @@ function MessageCard({
 }) {
   const tSession = useTranslations('dashboard.session')
   const tNew = useTranslations('dashboard.new')
+  const tr = useManagementText()
   const attachments = extractAttachments(item.content)
   const isUser = item.role === 'user'
   const hasAttachments = attachments.length > 0
@@ -307,7 +309,32 @@ function MessageCard({
           </div>
         ) : null}
         {!isUser ? attachmentList : null}
-        {showUserStatus ? <TimelineStatusBadge status={item.status} /> : null}
+        {showUserStatus ? (
+          <div
+            role="alert"
+            className="max-w-full rounded-lg border border-destructive/30 bg-destructive/10 px-3 py-2 text-destructive"
+          >
+            <p className="flex items-center gap-2 text-xs font-medium">
+              <CircleAlert className="size-3.5 shrink-0" />
+              {item.content.deliveryOutcome === 'unknown'
+                ? tr('发送结果尚未确认', 'Sending outcome not yet confirmed')
+                : tSession('sendFailed')}
+            </p>
+            {textOf(item.content.error) ? (
+              <p className="mt-1 whitespace-pre-wrap break-words text-xs">
+                {textOf(item.content.error)}
+              </p>
+            ) : null}
+            {item.content.deliveryOutcome === 'unknown' && (
+              <p className="mt-1 text-xs">
+                {tr(
+                  '可能已发送。请先刷新会话确认，不要重复发送。',
+                  'The message may have been sent. Refresh the session before sending again.',
+                )}
+              </p>
+            )}
+          </div>
+        ) : null}
       </div>
     </div>
   )

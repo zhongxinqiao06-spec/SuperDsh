@@ -196,6 +196,7 @@ fun SessionDetailScreen(
     var retryClientMessageId by remember(composerDraftSessionId) { mutableStateOf(restoredComposerDraft.clientMessageId) }
     var retryMessageAction by remember(composerDraftSessionId) { mutableStateOf(restoredComposerDraft.retryAction) }
     var preparedSessionCreating by remember(preparedSession) { mutableStateOf(false) }
+    var preparedSessionOutcomeUnknown by remember(preparedSession) { mutableStateOf(false) }
     var preparedSelections by remember(preparedSession) { mutableStateOf(preparedSession?.selections ?: NewSessionSelections()) }
     var preparedModelOptions by remember(preparedSession) { mutableStateOf(emptyList<com.agentsanywhere.app.feature.sessiondetail.RuntimeSelectionOption>()) }
     var preparedPermissionCatalog by remember(preparedSession) { mutableStateOf<NewSessionPermissionCatalog?>(null) }
@@ -706,7 +707,7 @@ fun SessionDetailScreen(
     fun sendText(text: String) {
         val pending = preparedSession
         if (pending != null) {
-            if (preparedSessionCreating) return
+            if (preparedSessionCreating || preparedSessionOutcomeUnknown) return
             val message = text.trim()
             val pendingAttachments = attachments
             if (message.isBlank() && pendingAttachments.isEmpty()) return
@@ -765,6 +766,7 @@ fun SessionDetailScreen(
                     }
                     is NewSessionCreateOutcome.Failed -> {
                         preparedSessionCreating = false
+                        preparedSessionOutcomeUnknown = outcome.outcomeUnknown
                         draft = message
                         attachments = pendingAttachments
                         retryClientMessageId = clientMessageId
@@ -1396,6 +1398,7 @@ fun SessionDetailScreen(
         blockingNotices.isEmpty() &&
         !state.sending &&
         !preparedSessionCreating &&
+        !preparedSessionOutcomeUnknown &&
         !state.commandExecuting &&
         attachmentsReady &&
         (attachments.isEmpty() || canUseAttachments) &&
@@ -1825,7 +1828,10 @@ fun SessionDetailScreen(
             onSelectModel = {
                 val option = modelOptions.firstOrNull { option -> option.selectionId == it }
                 if (option?.enabled == true) {
-                    if (isPreparedSession) preparedSelections = preparedSelections.copy(model = it)
+                    if (isPreparedSession) {
+                        if (preparedSelections.model != it) setComposerDraft(draft)
+                        preparedSelections = preparedSelections.copy(model = it)
+                    }
                     else updateSelection("model", it)
                 } else {
                     showError(option?.disabledReason ?: context.getString(R.string.session_selection_update_failed))
@@ -1834,7 +1840,10 @@ fun SessionDetailScreen(
             onSelectPermission = {
                 val option = permissionOptions.firstOrNull { option -> option.selectionId == it }
                 if (option?.enabled == true) {
-                    if (isPreparedSession) preparedSelections = preparedSelections.copy(permission = it)
+                    if (isPreparedSession) {
+                        if (preparedSelections.permission != it) setComposerDraft(draft)
+                        preparedSelections = preparedSelections.copy(permission = it)
+                    }
                     else updateSelection("permission", it)
                 } else {
                     showError(option?.disabledReason ?: context.getString(R.string.session_selection_update_failed))

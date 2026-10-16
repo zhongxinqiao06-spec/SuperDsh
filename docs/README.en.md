@@ -6,11 +6,11 @@ Start development with the root [README](../README.en.md), which owns [upstream 
 
 ## Development topics
 
-| Document                                                  | Covers                                                                     |
-| --------------------------------------------------------- | -------------------------------------------------------------------------- |
-| [Desktop UI index](../apps/desktop/ui/README.md)          | Components, feature directories, and edit locations                        |
-| [Server guide](../apps/server/README.md)                  | API, development configuration, database migrations, and Docker deployment |
-| [Local Android development](android-local-development.md) | SDK, Gradle, AVD, startup options, and emulator connectivity               |
+| Document                                                  | Covers                                                       |
+| --------------------------------------------------------- | ------------------------------------------------------------ |
+| [Desktop UI index](../apps/desktop/ui/README.md)          | Components, feature directories, and edit locations          |
+| [Server guide](../apps/admin/server/README.md)            | Node API, database migrations, native Agents and deployment  |
+| [Local Android development](android-local-development.md) | SDK, Gradle, AVD, startup options, and emulator connectivity |
 
 ## User documentation
 

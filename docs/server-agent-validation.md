@@ -1,5 +1,7 @@
 # 服务端 Agent 联调记录
 
+本文是 2026-10-09 的历史验收记录，保留下列旧 Python / Docker 架构的证据。当前版本已迁至 `apps/admin/server`，原 `apps/server` 脚本、`server:check --agent`、`server:up --no-build` 与旧端口不再是当前运行方式。新版本检查使用 `corepack yarn server:check`、`corepack yarn server:test:integration`；服务器拉取、构建、备份与重启以[现行部署指南](../apps/admin/deployment/README.md#常规更新)为准。
+
 验证日期：2026-10-09。环境：Windows 中文仓库路径、Docker Linux 容器、Node 24、Python 3.12。
 
 最终使用三个正式 `local` 镜像运行完整检查，退出码为 0，21 项通过，耗时约 3 分钟。证据位于 `.superdsh-work/superdsh-agent-verification-1791531899678-700340/evidence.json`：无失败记录，`cleanedUp=true`、`productionStackUnchanged=true`。专用容器、网络、卷及临时账号配置已清理；既有 `15174` 服务的进程启动时间和运行状态不变。

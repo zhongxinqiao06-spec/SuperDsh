@@ -14,7 +14,7 @@
 | 模型     | 三种兼容推理协议、服务端 AES-GCM 加密供应商 Key、固定平台代理和流式取消；个人模型仍保存在执行设备，本次没有外部模型消费。                         |
 | 导入     | 平台导入只复制到空目标，排除授权、Key、环境变量、`.credentials.yaml` 和设备绑定；保留本地空间。                                                   |
 
-当前源码入口与启动命令见 [README](../README.md#三端联调)、[服务端说明](../apps/server/README.md)。固定上游子模块未修改；RuntimeBridge 窄入口由受控产品补丁生成。
+当前源码入口与启动命令见 [README](../README.md#三端联调)、[服务端说明](../apps/admin/server/README.md)。固定上游子模块未修改；RuntimeBridge 窄入口由受控产品补丁生成。
 
 ## 验证结果
 

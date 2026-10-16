@@ -1,6 +1,5 @@
 import { randomBytes } from 'node:crypto'
 import {
-  appendFileSync,
   existsSync,
   mkdirSync,
   readFileSync,
@@ -30,6 +29,7 @@ export function prepareDevelopmentEnv(root, environment = process.env) {
       `POSTGRES_PASSWORD=${randomBytes(24).toString('hex')}`,
       'SUPERDSH_DEV_PG_PORT=15432',
       'SUPERDSH_DEV_REDIS_PORT=16379',
+      'SUPERDSH_DEV_QDRANT_PORT=16333',
       `AGENT_SERVER_SECRET=${randomBytes(32).toString('hex')}`,
       `SUPERDSH_MODEL_ENCRYPTION_KEY=${randomBytes(32).toString('base64url')}=`,
       'AGENT_SERVER_PUBLIC_ORIGIN=http://127.0.0.1:5174',
@@ -41,22 +41,6 @@ export function prepareDevelopmentEnv(root, environment = process.env) {
   return file
 }
 
-export function prepareDevelopmentAgentEnv(root, environment = process.env) {
-  const file = developmentEnvFile(root, environment)
-  const saved = parseEnv(readFileSync(file, 'utf8'))
-  if (
-    !saved.SUPERDSH_AGENT_SUPERVISOR_SECRET &&
-    !environment.SUPERDSH_AGENT_SUPERVISOR_SECRET
-  ) {
-    appendFileSync(
-      file,
-      `\nSUPERDSH_AGENT_SUPERVISOR_SECRET=${randomBytes(32).toString('base64url')}\n`,
-      { encoding: 'utf8', mode: 0o600 },
-    )
-  }
-  return developmentEnvironment(root, environment)
-}
-
 export function persistDevelopmentPorts(
   root,
   ports,
@@ -66,7 +50,11 @@ export function persistDevelopmentPorts(
   const original = readFileSync(file, 'utf8')
   let updated = original
   const newline = original.includes('\r\n') ? '\r\n' : '\n'
-  for (const name of ['SUPERDSH_DEV_PG_PORT', 'SUPERDSH_DEV_REDIS_PORT']) {
+  for (const name of [
+    'SUPERDSH_DEV_PG_PORT',
+    'SUPERDSH_DEV_REDIS_PORT',
+    'SUPERDSH_DEV_QDRANT_PORT',
+  ]) {
     const value = port(ports[name], name)
     const entry = new RegExp(
       `^([ \\t]*(?:export[ \\t]+)?${name}[ \\t]*=)[^\\r\\n]*`,
@@ -122,17 +110,14 @@ export function developmentEnvironment(root, environment = process.env) {
     settings.SUPERDSH_DEV_REDIS_PORT || '16379',
     'SUPERDSH_DEV_REDIS_PORT',
   )
-  const agentPort = port(
-    settings.SUPERDSH_DEV_AGENT_PORT || '18090',
-    'SUPERDSH_DEV_AGENT_PORT',
-  )
-  const managedDatabase = !settings.AGENT_SERVER_DB_URL
   const apiPort = port(
     settings.AGENT_SERVER_PORT || '8000',
     'AGENT_SERVER_PORT',
   )
-  const enableAgent =
-    managedDatabase && settings.SUPERDSH_DEV_AGENT_ENABLED !== '0'
+  const qdrantPort = port(
+    settings.SUPERDSH_DEV_QDRANT_PORT || '16333',
+    'SUPERDSH_DEV_QDRANT_PORT',
+  )
   if (!settings.POSTGRES_PASSWORD && !externalDatabase)
     throw new Error(
       'POSTGRES_PASSWORD is missing from the development env file',
@@ -145,18 +130,20 @@ export function developmentEnvironment(root, environment = process.env) {
     ...settings,
     SUPERDSH_DEV_PG_PORT: pgPort,
     SUPERDSH_DEV_REDIS_PORT: redisPort,
+    SUPERDSH_DEV_QDRANT_PORT: qdrantPort,
+    SUPERDSH_QDRANT_URL:
+      settings.SUPERDSH_QDRANT_URL || `http://127.0.0.1:${qdrantPort}`,
     // Only the database created by our local dependency command gets a known
     // development login. An explicit database URL may point at real user data.
     SUPERDSH_BOOTSTRAP_DEV_ADMIN: settings.AGENT_SERVER_DB_URL ? '0' : '1',
-    SUPERDSH_DEV_AGENT_ENABLED: enableAgent ? '1' : '0',
-    SUPERDSH_DEV_AGENT_PORT: agentPort,
+    SUPERDSH_NATIVE_PLATFORM: '1',
+    SUPERDSH_SERVER_DATA_DIR:
+      settings.SUPERDSH_SERVER_DATA_DIR || join(dirname(file), 'native'),
     AGENT_SERVER_PORT: apiPort,
-    ...(enableAgent
-      ? {
-          SUPERDSH_AGENT_SUPERVISOR_URL: `http://127.0.0.1:${agentPort}`,
-          SUPERDSH_AGENT_SERVER_URL: 'http://server-next:8000',
-        }
-      : {}),
+    // Ignore retired Supervisor addresses without rewriting the saved env file.
+    SUPERDSH_AGENT_SUPERVISOR_URL: '',
+    SUPERDSH_AGENT_SUPERVISOR_SECRET: '',
+    SUPERDSH_AGENT_SERVER_URL: '',
     AGENT_SERVER_DB_BACKEND: 'postgres',
     AGENT_SERVER_DB_URL:
       settings.AGENT_SERVER_DB_URL ||
@@ -172,7 +159,6 @@ export function developmentEnvironment(root, environment = process.env) {
     AGENT_SERVER_CORS_ORIGINS:
       settings.AGENT_SERVER_CORS_ORIGINS ||
       'http://127.0.0.1:5174,http://localhost:5174',
-    PYTHONUTF8: '1',
   }
 }
 
@@ -184,7 +170,7 @@ export function developmentComposeArgs(root, file) {
     '--env-file',
     file,
     '--file',
-    join(root, 'apps/server/docker/compose.dev.yml'),
+    join(root, 'apps/admin/deployment/compose.dependencies.yml'),
   ]
 }
 

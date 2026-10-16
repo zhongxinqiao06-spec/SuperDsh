@@ -1,7 +1,11 @@
 'use client'
 
 import type { AttachedFile } from '@/components/attachment-input'
-import type { TimelineItem } from '@/features/dashboard/types'
+import type {
+  SessionRuntimeState,
+  TimelineItem,
+} from '@/features/dashboard/types'
+import { isApiError } from '@/lib/api/errors'
 import { sortTimelineItems } from '@/components/session/session-utils'
 import {
   incomingTimelineItemCanReplace,
@@ -155,7 +159,14 @@ function optimisticUserMessageMatchesServerItem(
   if (optimisticItem.type !== 'message' || optimisticItem.role !== 'user')
     return false
   if (serverItem.type !== 'message' || serverItem.role !== 'user') return false
-  if (optimisticItem.status !== 'pending') return false
+  if (
+    optimisticItem.status !== 'pending' &&
+    !(
+      optimisticItem.status === 'failed' &&
+      optimisticItem.content.deliveryOutcome === 'unknown'
+    )
+  )
+    return false
   const optimisticClientMessageId = timelineClientMessageId(optimisticItem)
   return Boolean(
     serverClientMessageId &&
@@ -324,11 +335,48 @@ function revokeOptimisticAttachmentPreview(
 export function markOptimisticItemFailed(
   item: TimelineItem,
   message: string,
+  outcome: 'rejected' | 'unknown' = 'rejected',
 ): TimelineItem {
   return {
     ...item,
     status: 'failed',
-    content: { ...item.content, error: message },
+    content: { ...item.content, error: message, deliveryOutcome: outcome },
     updatedAt: new Date().toISOString(),
   }
+}
+
+export function messageFailureOutcome(error: unknown): 'rejected' | 'unknown' {
+  return isApiError(error) &&
+    error.code !== 'session_create_outcome_unknown' &&
+    error.status >= 400 &&
+    error.status < 500 &&
+    error.status !== 408 &&
+    error.status !== 409
+    ? 'rejected'
+    : 'unknown'
+}
+
+export function hasUnconfirmedMessage(items: TimelineItem[]): boolean {
+  return items.some(
+    (item) =>
+      isOptimisticTimelineItem(item) &&
+      item.status === 'failed' &&
+      item.content.deliveryOutcome === 'unknown',
+  )
+}
+
+export function restoreRejectedSendState(
+  current: SessionRuntimeState | null | undefined,
+  optimistic: SessionRuntimeState | null,
+  previous: SessionRuntimeState | null,
+  currentSequence: number,
+  startedSequence: number,
+  outcome: 'rejected' | 'unknown',
+): SessionRuntimeState | null | undefined {
+  return outcome === 'rejected' &&
+    optimistic !== null &&
+    current === optimistic &&
+    currentSequence === startedSequence
+    ? previous
+    : current
 }

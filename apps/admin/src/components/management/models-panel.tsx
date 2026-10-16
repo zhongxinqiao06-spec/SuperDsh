@@ -29,6 +29,7 @@ import {
 } from './controls'
 import {
   ManagementDialog,
+  ManagementList,
   ManagementPagination,
   useClientPagination,
 } from './presentation'
@@ -254,7 +255,19 @@ function ScopedModelsPanel({ scope }: { scope: 'platform' | 'personal' }) {
         )?.name ?? resource.data.selection.modelId)
     : tr('未设置', 'Not configured')
   return (
-    <div className="space-y-5">
+    <ManagementList
+      className="gap-5"
+      pagination={
+        <ManagementPagination
+          page={pagination.page}
+          pageSize={pagination.pageSize}
+          total={pagination.total}
+          onPageChange={pagination.setPage}
+          onPageSizeChange={pagination.setPageSize}
+          loading={resource.loading || resource.busy}
+        />
+      }
+    >
       <div className="flex flex-wrap items-center justify-between gap-3 rounded-xl border p-4">
         <div>
           <h2 className="font-medium">
@@ -769,14 +782,6 @@ function ScopedModelsPanel({ scope }: { scope: 'platform' | 'personal' }) {
             {tr('没有匹配的供应商或模型。', 'No matching providers or models.')}
           </p>
         )}
-      <ManagementPagination
-        page={pagination.page}
-        pageSize={pagination.pageSize}
-        total={pagination.total}
-        onPageChange={pagination.setPage}
-        onPageSizeChange={pagination.setPageSize}
-        loading={resource.loading || resource.busy}
-      />
       {!resource.loading && !resource.data?.providers.length && (
         <p className="rounded-xl border p-6 text-sm text-muted-foreground">
           {scope === 'personal'
@@ -792,6 +797,7 @@ function ScopedModelsPanel({ scope }: { scope: 'platform' | 'personal' }) {
       )}
       {resource.data?.selection && (
         <Button
+          className="self-start"
           size="sm"
           disabled={resource.busy}
           variant="outline"
@@ -802,7 +808,7 @@ function ScopedModelsPanel({ scope }: { scope: 'platform' | 'personal' }) {
             : tr('清除平台默认模型', 'Clear platform default')}
         </Button>
       )}
-    </div>
+    </ManagementList>
   )
 }
 

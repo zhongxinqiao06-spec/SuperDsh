@@ -271,7 +271,7 @@ test('revocation requires confirmation and only revokes the selected login sessi
 test('mobile login pages include only mobile records and clamp after the last record is revoked', async (t) => {
   let sessions = [
     loginSession('web', 'Browser'),
-    ...Array.from({ length: 26 }, (_, i) =>
+    ...Array.from({ length: 21 }, (_, i) =>
       loginSession(`phone-${i}`, 'SuperDsh Android'),
     ),
   ]
@@ -279,15 +279,17 @@ test('mobile login pages include only mobile records and clamp after the last re
     sessions = sessions.filter((item) => item.id !== id)
   })
   const { container } = await render(t, { load: async () => ({ sessions }) })
-  await until(() => rows(container).length === 25)
-  assert.match(container.textContent, /共 26 条/)
+  await until(() => rows(container).length === 10)
+  assert.match(container.textContent, /共 21 条/)
+  await act(async () => button(container, '下一页').click())
+  assert.equal(rows(container).length, 10)
   await act(async () => button(container, '下一页').click())
   assert.equal(rows(container).length, 1)
-  assert.equal(rows(container)[0].dataset.mobileLoginSession, 'phone-25')
+  assert.equal(rows(container)[0].dataset.mobileLoginSession, 'phone-20')
   await act(async () => button(container, '撤销登录').click())
   await act(async () => button(document.body, '确认撤销').click())
-  await until(() => rows(container).length === 25)
-  assert.match(container.textContent, /第 1 \/ 1 页/)
+  await until(() => rows(container).length === 10)
+  assert.match(container.textContent, /第 2 \/ 2 页/)
 })
 
 test('QR sign-in remains an optional dialog action', async (t) => {

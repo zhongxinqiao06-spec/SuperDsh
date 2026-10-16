@@ -7,11 +7,13 @@ import {
   type Row,
 } from './platform-model.ts'
 import { remotePlatformDefault } from './remote-model-default.ts'
+import { newSessionRuntime } from './new-session-runtime.ts'
 export function useNewSessionOptions(
   request: Request,
   device: string,
   sessionId: string,
   open: boolean,
+  managedRuntimeId?: string,
 ) {
   const [runtimeId, setRuntimeId] = useState('')
   const [models, setModels] = useState<Row[]>([])
@@ -30,10 +32,13 @@ export function useNewSessionOptions(
     if (!device || sessionId || !open) return
     let disposed = false
     void (async () => {
-      const runtime = rows(
-        object(await request({ operation: 'runtimes', connectorId: device }))
-          .runtimes,
-      ).find((row) => row.runtimeType === 'dsh' && row.active !== false)
+      const runtime = newSessionRuntime(
+        rows(
+          object(await request({ operation: 'runtimes', connectorId: device }))
+            .runtimes,
+        ),
+        managedRuntimeId,
+      )
       if (!runtime) throw new Error('目标设备尚未启用 DSH 运行环境')
       const id = string(runtime.runtimeId) || string(runtime.id)
       const [modelResult, permissionResult, platform] = await Promise.all([
@@ -96,7 +101,7 @@ export function useNewSessionOptions(
     return () => {
       disposed = true
     }
-  }, [device, sessionId, open, request, version])
+  }, [device, sessionId, open, request, version, managedRuntimeId])
   return {
     refresh: () => setVersion((current) => current + 1),
     runtimeId,

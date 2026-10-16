@@ -1,0 +1,33 @@
+{
+  "product": "星桥智能平台",
+  "source": "Owned apps/admin Web application rendered in headless Chromium",
+  "captureScript": "scripts/capture-website-product.mjs",
+  "command": "node scripts/capture-website-product.mjs",
+  "baseUrlEnvironment": "WEBSITE_CAPTURE_URL",
+  "data": "Entirely fictional browser-local API fixtures: 星河商贸, 经营分析助手, 第三季度经营复盘. No real account, user profile, API credential or business record is used.",
+  "presentation": "These are actual Web UI captures with demonstration data, not native Electron or Android captures and not proof of a live Agent execution.",
+  "captureMethod": "Fresh temporary browser contexts; all API v2 HTTP and WebSocket requests intercepted; no DOM or product styles replaced. Screenshot PNGs encoded as WebP without compositing.",
+  "images": [
+    {
+      "file": "desktop-workbench.webp",
+      "label": "桌面 Web 工作台 · 演示数据",
+      "viewport": { "width": 1440, "height": 940 },
+      "deviceScaleFactor": 1.5,
+      "pixels": { "width": 2160, "height": 1410 }
+    },
+    {
+      "file": "mobile-workbench.webp",
+      "label": "手机 Web 工作台 · 演示数据",
+      "viewport": { "width": 390, "height": 844 },
+      "deviceScaleFactor": 2,
+      "pixels": { "width": 780, "height": 1688 }
+    },
+    {
+      "file": "agents-desktop.webp",
+      "label": "智能体管理 · 演示数据",
+      "viewport": { "width": 1440, "height": 940 },
+      "deviceScaleFactor": 1.5,
+      "pixels": { "width": 2160, "height": 1410 }
+    }
+  ]
+}

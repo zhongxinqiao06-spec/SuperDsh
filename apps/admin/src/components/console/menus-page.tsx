@@ -12,6 +12,7 @@ import {
 } from '@/components/management/controls'
 import {
   ManagementDialog,
+  ManagementList,
   ManagementPagination,
   useClientPagination,
 } from '@/components/management/presentation'
@@ -67,8 +68,8 @@ export function MenusPage() {
       </p>
     )
   return (
-    <div className="h-full overflow-y-auto">
-      <div className="mx-auto max-w-6xl space-y-6 p-4 sm:p-8">
+    <div className="flex min-h-0 min-w-0 flex-1 flex-col">
+      <div className="mx-auto flex min-h-0 min-w-0 w-full max-w-6xl flex-1 flex-col gap-6 p-4 sm:p-8">
         <PageHeader
           title={tr('菜单管理', 'Menu management')}
           description={tr(
@@ -213,7 +214,16 @@ export function MenusEditor({
     if (await onSave(next)) setConfirmation(null)
   }
   return (
-    <div className="space-y-4">
+    <ManagementList
+      pagination={
+        <ManagementPagination
+          {...pagination}
+          onPageChange={pagination.setPage}
+          onPageSizeChange={pagination.setPageSize}
+          loading={busy}
+        />
+      }
+    >
       <div className="flex flex-wrap items-center gap-2 rounded-xl border p-4">
         <Input
           className="max-w-sm"
@@ -328,12 +338,7 @@ export function MenusEditor({
           </p>
         )}
       </div>
-      <ManagementPagination
-        {...pagination}
-        onPageChange={pagination.setPage}
-        onPageSizeChange={pagination.setPageSize}
-        loading={busy}
-      />
+
       <ManagementDialog
         open={Boolean(selected)}
         onOpenChange={(open) => !open && setSelected(null)}
@@ -553,6 +558,6 @@ export function MenusEditor({
           </>
         }
       />
-    </div>
+    </ManagementList>
   )
 }

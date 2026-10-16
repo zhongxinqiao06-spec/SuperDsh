@@ -1,6 +1,6 @@
 # 安卓开发与本地启动
 
-安卓产品源码在 `apps/android`，与 `apps/desktop`、`apps/admin`、`apps/server` 同级。使用 Kotlin + Jetpack Compose，独立使用 Gradle；根 Yarn 只提供统一命令。旧 `agents-anywhere/android` 已通过稀疏检出从工作目录移除，上游版本仍保存在固定提交中。
+安卓产品源码在 `apps/android`，与 `apps/desktop`、`apps/admin` 同级。平台网页和 Node 后端统一在 `apps/admin`。安卓使用 Kotlin + Jetpack Compose，独立使用 Gradle；根 Yarn 只提供统一命令。旧 `agents-anywhere/android` 已通过稀疏检出从工作目录移除，上游版本仍保存在固定提交中。
 
 通用构建、启动和检查命令见根 [README](../README.md#检查与打包)，登录与聊天模式见 [三端联调](../README.md#三端联调)。本页只维护安卓工具链、模拟器和参数说明。
 
@@ -68,12 +68,13 @@ Android Studio 直接打开 `apps/android`。分层规则见该目录的 `ARCHIT
 
 脚本核对设备编号和 AVD 名称后复用已有模拟器，并保留原窗口模式；不会卸载 App、清数据或结束其他设备。启动参数 `--server` 或配置中的 `server` 只用于健康检查与本机 `adb reverse`，不会改写 App 已保存的服务器地址，也不会启动 Docker。切换环境后，必须在 App 登录页选择对应地址。
 
-| 环境             | App 的平台服务地址       | 用途                                                      |
-| ---------------- | ------------------------ | --------------------------------------------------------- |
-| 本机开发 API     | `http://127.0.0.1:8000`  | 连接本机 Python API，网页开发地址 `5174` 不用于 App 登录  |
-| 完整 Docker 部署 | `http://127.0.0.1:15174` | 连接部署后的 API，含服务端 Agent 的 Supervisor 和运行容器 |
+| 环境         | App 的平台服务地址          | 用途                                            |
+| ------------ | --------------------------- | ----------------------------------------------- |
+| 本机兼容 API | `http://127.0.0.1:8000`     | 统一 Node 入口保留的客户端 API 地址             |
+| 网页与 API   | `http://127.0.0.1:5174`     | 同一 Node 服务，也支持 App 登录，需映射相应端口 |
+| 生产部署     | 维护者配置的 HTTPS 平台地址 | 网页、API 与原生服务端 Agent 共用地址           |
 
-启动脚本对本机地址自动反向映射对应端口。手动使用已经打开的模拟器时，开发 API 需要执行 `adb -s emulator-5580 reverse tcp:8000 tcp:8000`；完整 Docker 环境对应 `tcp:15174 tcp:15174`。设备编号以 `adb devices` 为准。仅 PG / Redis 的开发模式不提供服务端 Agent 容器；电脑模式需要目标 Connector/Harness 在线，完整部署方式见 [服务端说明](../apps/server/README.md)。
+启动脚本对本机地址自动反向映射对应端口。手动使用已经打开的模拟器时，兼容 API 执行 `adb -s emulator-5580 reverse tcp:8000 tcp:8000`；使用主端口时改为 `tcp:5174 tcp:5174`。设备编号以 `adb devices` 为准。`server:dev` 已包含本机服务端 Agent 管理，不需要 Supervisor 或 Agent 容器；电脑模式仍需目标 Connector/Harness 在线，见 [服务端说明](../apps/admin/server/README.md)。旧 `15174` 只有显式配置后才有效。
 
 App 的首页头像 → `Language（语言）` → `简体中文` 可切换语言；网页授权页有自己的语言菜单。登录状态、中文设置和既有会话随 AVD 保留。
 

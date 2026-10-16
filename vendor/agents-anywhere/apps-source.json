@@ -9,7 +9,9 @@
       "upstreamTree": "81f71bbd1c87b304ff3842433cfab0f8bfa57514"
     },
     {
-      "path": "apps/server",
+      "path": "apps/admin/server",
+      "originalImportPath": "apps/server",
+      "implementation": "Node.js API v2 port; original Python source retired after migration",
       "upstreamPath": "server",
       "upstreamTree": "f5128aecd2ad15c0281e14ff570f931ffa7ec900"
     },

@@ -21,7 +21,7 @@ const excluded = new Set([
 const buildOutput =
   /^(?:apps\/admin\/(?:out|\.next-[^/]+)|apps\/desktop(?:\/core|\/plugins\/harness)?\/(?:lib|dist)|apps\/desktop\/ui\/(?:client|dist|native-ui)|dsh-community-market\/(?:lib|dist))(?:\/|$)/u
 const generated =
-  /(?:^|\/)(?:next-env\.d\.ts|api-catalog\.ts|slot-catalog\.ts|client-manifest\.json|build-sources\.json|source-manifest\.json|module-packages\.json|migration-paths\.json|tsconfig\.paths\.json)$/u
+  /(?:^|\/)(?:next-env\.d\.ts|api-catalog\.ts|slot-catalog\.ts|client-manifest\.json|build-sources\.json|source-manifest\.json|module-packages\.json|migration-paths\.json|tsconfig\.paths\.json)$|\/apps\/admin\/server\/contracts\/(?:openapi-v2|legacy-routes)\.json$/u
 const extensions = new Set([
   '.ts',
   '.tsx',
@@ -50,9 +50,6 @@ export function ownedCodeFiles(directory = root) {
   const files = [
     'apps/admin',
     'apps/desktop',
-    'apps/server/agent-runtime',
-    'apps/server/scripts',
-    'apps/server/docker',
     'dsh-community-market',
     'scripts',
     '.github/workflows',

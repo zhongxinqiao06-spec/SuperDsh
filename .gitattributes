@@ -1,3 +1,5 @@
 * text=auto eol=lf
 patches/*.patch text eol=lf whitespace=-space-before-tab,-blank-at-eol
 .yarn/patches/*.patch text eol=lf whitespace=-space-before-tab,-blank-at-eol
+# Preserve the generated legacy schema snapshot's original formatting.
+apps/admin/server/infrastructure/schema-v2-39.sql text eol=lf whitespace=-blank-at-eol

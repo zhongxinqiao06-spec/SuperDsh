@@ -6,7 +6,7 @@ import { pathToFileURL } from 'node:url'
 const retired = ['web-next', 'server', 'android']
 const markers = [
   'apps/admin/package.json',
-  'apps/server/pyproject.toml',
+  'apps/admin/server/application.ts',
   'apps/android/settings.gradle.kts',
 ]
 

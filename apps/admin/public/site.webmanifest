@@ -1,6 +1,6 @@
 {
-  "name": "Agents Anywhere",
-  "short_name": "Agents Anywhere",
+  "name": "星桥智能平台",
+  "short_name": "星桥",
   "icons": [
     {
       "src": "/icon-192.png",
@@ -27,7 +27,7 @@
       "purpose": "maskable"
     }
   ],
-  "theme_color": "#0a0a0b",
-  "background_color": "#0a0a0b",
+  "theme_color": "#0a0d0c",
+  "background_color": "#0a0d0c",
   "display": "standalone"
 }

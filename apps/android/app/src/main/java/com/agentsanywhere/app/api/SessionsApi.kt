@@ -732,6 +732,19 @@ class SessionsApi(
     }
 
     private fun JSONObject.toRemoteSessionCreateResponse(): RemoteSessionCreateResponse {
+        val failure = when {
+            has("ok") && !optBoolean("ok", true) -> this
+            optJSONObject("connectorResult")?.optBoolean("ok", true) == false -> getJSONObject("connectorResult")
+            else -> null
+        }
+        if (failure != null) {
+            val detail = failure.optJSONObject("error")
+            throw ApiException(
+                failure.optNullableString("message") ?: detail?.optNullableString("message")
+                    ?: "Runtime rejected session creation.",
+                errorCode = failure.optNullableString("code") ?: detail?.optNullableString("code"),
+            )
+        }
         return RemoteSessionCreateResponse(
             session = getJSONObject("session").toRemoteSession(),
         )

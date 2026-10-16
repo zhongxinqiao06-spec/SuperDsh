@@ -1,0 +1,10 @@
+{
+  "extends": "../../../tsconfig.node.json",
+  "compilerOptions": {
+    "noUnusedLocals": true,
+    "noUnusedParameters": true,
+    "erasableSyntaxOnly": true
+  },
+  "include": ["**/*.ts"],
+  "exclude": ["test", "node_modules"]
+}

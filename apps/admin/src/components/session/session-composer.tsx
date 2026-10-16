@@ -449,7 +449,9 @@ export function SessionComposer({
     })
   }
   const placeholder = creatingSession
-    ? tSession('creatingPlaceholder')
+    ? isError
+      ? tSession('sendFailed')
+      : tSession('creatingPlaceholder')
     : sourceUnavailable
       ? tSession('sourceUnavailablePlaceholder')
       : !session.takeover

@@ -1,0 +1,9 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="256" height="256" viewBox="0 0 256 256" fill="none">
+  <title>星桥智能平台</title>
+  <rect width="256" height="256" rx="58" fill="#0a0d0c"/>
+  <g fill="#c4f76b">
+    <path d="M46 188v-43c0-40 30-70 70-70s70 30 70 70v43h-22v-43c0-27-21-48-48-48s-48 21-48 48v43H46Z"/>
+    <path d="M36 150h160v22H36z"/>
+    <path d="m190 35 7.5 20.5L218 63l-20.5 7.5L190 91l-7.5-20.5L162 63l20.5-7.5L190 35Z"/>
+  </g>
+</svg>

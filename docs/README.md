@@ -9,7 +9,7 @@
 | 文档                                         | 内容                                    |
 | -------------------------------------------- | --------------------------------------- |
 | [桌面 UI 索引](../apps/desktop/ui/README.md) | 界面组件、功能目录与修改入口            |
-| [服务端说明](../apps/server/README.md)       | API、开发配置、数据库迁移与 Docker 部署 |
+| [服务端说明](../apps/admin/server/README.md) | Node API、数据库迁移、本机 Agent 与部署 |
 | [安卓本地开发](android-local-development.md) | SDK、Gradle、AVD、启动参数与模拟器联通  |
 
 ## 使用说明

@@ -6,6 +6,7 @@ import { useManagementText } from '@/components/management/controls'
 import { ModelsPanel } from '@/components/management/models-panel'
 import { MobileConnectionsPage } from '@/components/pages/mobile-connections-page'
 import { PageHeader } from '@/components/pages/page-header'
+import { cn } from '@/lib/utils'
 import {
   AccountSecuritySection,
   AccountTab,
@@ -28,8 +29,21 @@ export function AccountPage({ section }: { section: AccountSection }) {
     appearance: tr('外观与语言', 'Appearance and language'),
   }
   return (
-    <div className="h-full overflow-y-auto">
-      <div className="mx-auto max-w-6xl space-y-6 p-4 sm:p-8">
+    <div
+      className={
+        section === 'models'
+          ? 'flex min-h-0 min-w-0 flex-1 flex-col'
+          : 'h-full overflow-y-auto'
+      }
+    >
+      <div
+        className={cn(
+          'mx-auto w-full max-w-6xl p-4 sm:p-8',
+          section === 'models'
+            ? 'flex min-h-0 min-w-0 flex-1 flex-col gap-6'
+            : 'space-y-6',
+        )}
+      >
         <PageHeader title={titles[section]} />
         {section === 'profile' && profile && session && (
           <AccountTab

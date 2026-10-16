@@ -13,6 +13,30 @@ import {
 import { cn } from '@/lib/utils'
 import { useManagementText } from './controls'
 
+export function ManagementList({
+  children,
+  className,
+  pagination,
+}: {
+  children: React.ReactNode
+  className?: string
+  pagination: React.ReactNode
+}) {
+  return (
+    <div className="flex min-h-0 min-w-0 flex-1 flex-col gap-4">
+      <div
+        className={cn(
+          'flex min-h-0 min-w-0 flex-1 flex-col gap-4 overflow-auto overscroll-contain [&>*]:min-w-0 [&>*]:shrink-0',
+          className,
+        )}
+      >
+        {children}
+      </div>
+      <div className="shrink-0">{pagination}</div>
+    </div>
+  )
+}
+
 export function ManagementDialog({
   open,
   onOpenChange,
@@ -74,6 +98,7 @@ export function ManagementPagination({
   onPageChange,
   onPageSizeChange,
   loading = false,
+  className,
 }: {
   page: number
   pageSize: number
@@ -81,6 +106,7 @@ export function ManagementPagination({
   onPageChange: (page: number) => void
   onPageSizeChange?: (pageSize: number) => void
   loading?: boolean
+  className?: string
 }) {
   const tr = useManagementText()
   const pages = Math.max(1, Math.ceil(total / pageSize))
@@ -89,7 +115,10 @@ export function ManagementPagination({
   return (
     <nav
       aria-label={tr('列表分页', 'List pagination')}
-      className="flex flex-wrap items-center justify-between gap-3 rounded-xl border bg-card px-4 py-3 text-sm"
+      className={cn(
+        'flex flex-wrap items-center justify-between gap-3 rounded-xl border bg-card px-4 py-3 text-sm',
+        className,
+      )}
     >
       <p className="text-muted-foreground" aria-live="polite">
         {tr(`共 ${total} 条`, `${total} records`)}
@@ -105,7 +134,7 @@ export function ManagementPagination({
               disabled={loading}
               onChange={(event) => onPageSizeChange(Number(event.target.value))}
             >
-              {[10, 25, 50, 100].map((size) => (
+              {[10, 20, 50].map((size) => (
                 <option key={size} value={size}>
                   {size}
                 </option>
@@ -142,7 +171,7 @@ export function useClientPagination<T>(items: T[], resetKey = '') {
   const [state, setState] = React.useState({
     key: resetKey,
     page: 1,
-    pageSize: 25,
+    pageSize: 10,
   })
   const pageSize = state.pageSize
   const total = items.length

@@ -27,7 +27,10 @@ import {
 import { accountDisplayName } from '@/features/auth/account-profile'
 import { consoleApi, NAVIGATION_CHANGED_EVENT } from '@/features/console/api'
 import { canOpenModule, consoleModules } from '@/features/console/modules'
-import { visibleNavigation } from '@/features/console/navigation'
+import {
+  navigationTitle,
+  visibleNavigation,
+} from '@/features/console/navigation'
 import type { MenuNode } from '@/features/console/types'
 import { cn } from '@/lib/utils'
 import { ConsoleIcon } from './console-icons'
@@ -62,7 +65,7 @@ export function ConsoleShell() {
   const activeItem = items.find((item) => item.moduleId === module?.id)
   const parent = items.find((item) => item.id === activeItem?.parentId)
   const title =
-    activeItem?.title ??
+    (activeItem ? navigationTitle(activeItem, tr) : undefined) ??
     (module
       ? tr(module.title, module.englishTitle)
       : tr('页面不存在', 'Page not found'))
@@ -79,6 +82,9 @@ export function ConsoleShell() {
       'account.mobile',
       'access.menus',
     ].includes(module.id)
+  const paginated =
+    module &&
+    (!standalone || ['access.menus', 'account.models'].includes(module.id))
   const Page = module?.component
   const menusAllowed = can('menus.read') || can('menus.manage')
   const menu = (
@@ -89,7 +95,7 @@ export function ConsoleShell() {
           onClick={() => setMobileOpen(false)}
           className="text-lg font-semibold tracking-tight"
         >
-          SuperDsh
+          {tr('星桥智能平台', 'Starbridge')}
         </a>
         <p className="mt-1 text-xs text-muted-foreground">
           {tr('统一管理平台', 'Management console')}
@@ -214,13 +220,13 @@ export function ConsoleShell() {
               href="#/overview"
               className="shrink-0 text-muted-foreground hover:text-foreground"
             >
-              SuperDsh
+              {tr('星桥智能平台', 'Starbridge')}
             </a>
             <span className="text-muted-foreground">/</span>
             {parent && (
               <>
                 <span className="truncate text-muted-foreground">
-                  {parent.title}
+                  {navigationTitle(parent, tr)}
                 </span>
                 <span className="text-muted-foreground">/</span>
               </>
@@ -258,15 +264,23 @@ export function ConsoleShell() {
                   {module.id === 'workbench' ? (
                     <Page />
                   ) : (
-                    <div className="h-full overflow-y-auto">
+                    <div
+                      className={cn(
+                        'h-full min-w-0',
+                        paginated ? 'overflow-hidden' : 'overflow-y-auto',
+                      )}
+                    >
                       <div
                         className={cn(
-                          'mx-auto w-full max-w-6xl',
-                          !standalone && 'space-y-6 p-4 sm:p-8',
+                          'mx-auto flex min-w-0 w-full max-w-6xl flex-col',
+                          paginated ? 'h-full min-h-0' : 'min-h-full',
+                          !standalone && 'gap-6 p-4 sm:p-8',
                         )}
                       >
                         {!standalone && (
-                          <h1 className="text-2xl font-semibold">{title}</h1>
+                          <h1 className="shrink-0 text-2xl font-semibold">
+                            {title}
+                          </h1>
                         )}
                         <Page />
                       </div>
@@ -316,6 +330,8 @@ function NavigationItem({
   onToggleGroup: (id: string) => void
   onNavigate: () => void
 }) {
+  const tr = useManagementText()
+  const title = navigationTitle(item, tr)
   const open = expandedGroupId === item.id
   const module = consoleModules.find((module) => module.id === item.moduleId)
   if (item.kind === 'group')
@@ -328,7 +344,7 @@ function NavigationItem({
           onClick={() => onToggleGroup(item.id)}
         >
           <ConsoleIcon name={item.icon} />
-          <span className="flex-1 text-left">{item.title}</span>
+          <span className="flex-1 text-left">{title}</span>
           <ChevronDown
             className={cn(
               'size-3.5 transition-transform',
@@ -369,7 +385,7 @@ function NavigationItem({
       )}
     >
       <ConsoleIcon name={item.icon} />
-      <span>{item.title}</span>
+      <span>{title}</span>
     </a>
   )
 }

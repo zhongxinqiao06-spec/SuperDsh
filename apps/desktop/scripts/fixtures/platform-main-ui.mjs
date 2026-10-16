@@ -290,13 +290,15 @@ export async function installPlatformMainFixture(page) {
   })
 }
 
-export async function verifyPlatformMainFixture(page) {
-  const screenshots = fileURLToPath(
-    new URL(
-      '../../../../.superdsh-work/device-connection-fix/ui/',
-      import.meta.url,
-    ),
-  )
+export async function verifyPlatformMainFixture(page, screenshotDirectory) {
+  const screenshots =
+    screenshotDirectory ??
+    fileURLToPath(
+      new URL(
+        '../../../../.superdsh-work/device-connection-fix/ui/',
+        import.meta.url,
+      ),
+    )
   await mkdir(screenshots, { recursive: true })
   const source = page.getByRole('button', { name: '当前聊天设备' })
   const selector = page.locator('[data-superdsh-source-selector]')

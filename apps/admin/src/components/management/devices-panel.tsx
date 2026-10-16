@@ -5,7 +5,11 @@ import { useAuth } from '@/components/auth/auth-context'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { managementApi, type DeviceInventory } from '@/features/management/api'
-import { ManagementDialog, ManagementPagination } from './presentation'
+import {
+  ManagementDialog,
+  ManagementList,
+  ManagementPagination,
+} from './presentation'
 import {
   dateLabel,
   ResourceState,
@@ -20,7 +24,7 @@ export function DevicesPanel() {
   const [search, setSearch] = React.useState('')
   const [filter, setFilter] = React.useState('')
   const [page, setPage] = React.useState(1)
-  const [pageSize, setPageSize] = React.useState(25)
+  const [pageSize, setPageSize] = React.useState(10)
   const resource = useManagementResource(
     `devices:${page}:${pageSize}:${filter}`,
     () => managementApi.devices(page, filter, pageSize),
@@ -43,7 +47,21 @@ export function DevicesPanel() {
     if (success) setSelected(null)
   }
   return (
-    <div className="space-y-4">
+    <ManagementList
+      pagination={
+        <ManagementPagination
+          page={page}
+          pageSize={pageSize}
+          total={total}
+          onPageChange={setPage}
+          onPageSizeChange={(size) => {
+            setPageSize(size)
+            setPage(1)
+          }}
+          loading={resource.loading || resource.busy}
+        />
+      }
+    >
       <p className="text-sm text-muted-foreground">
         {tr(
           '这里仅展示平台运维信息。会话、文件与终端仍只对设备所属用户开放。阻断设备会断开平台连接，恢复后允许重新连接。',
@@ -148,17 +166,7 @@ export function DevicesPanel() {
           </p>
         )}
       </div>
-      <ManagementPagination
-        page={page}
-        pageSize={pageSize}
-        total={total}
-        onPageChange={setPage}
-        onPageSizeChange={(size) => {
-          setPageSize(size)
-          setPage(1)
-        }}
-        loading={resource.loading || resource.busy}
-      />
+
       <ManagementDialog
         open={Boolean(selected)}
         onOpenChange={(open) => !open && setSelected(null)}
@@ -215,6 +223,6 @@ export function DevicesPanel() {
           </label>
         )}
       </ManagementDialog>
-    </div>
+    </ManagementList>
   )
 }

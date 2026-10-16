@@ -59,7 +59,29 @@ export interface PlatformPasswordLogin {
 export interface PlatformPasswordChange {
   newPassword: string
 }
+export interface PlatformAgentDefinition {
+  id: string
+  name: string
+  description: string
+  instructions: string
+  knowledgeAssetIds: string[]
+  templateAssetIds: string[]
+  skillIds: string[]
+  toolIds: string[]
+  published: boolean
+  version: number
+  createdAt: string
+  updatedAt: string
+}
+export interface PlatformAgentBinding {
+  id: string
+  name: string
+  version: number
+}
 export type PlatformOperation =
+  | 'agents'
+  | 'agent-artifacts'
+  | 'download-attachment'
   | 'server-agent'
   | 'prepare-server-agent'
   | 'personal-providers'
@@ -107,6 +129,7 @@ export interface PlatformRequest {
   terminalId?: string
   noticeId?: string
   providerId?: string
+  attachmentId?: string
   query?: Record<string, string>
   body?: PlatformJson
 }

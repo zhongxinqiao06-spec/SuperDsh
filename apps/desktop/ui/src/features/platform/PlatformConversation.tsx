@@ -17,6 +17,8 @@ import {
 } from '@deepseek-ai/dsh-client-ui-primitives'
 import { NoticePrompt } from './NoticePrompt.tsx'
 import { NewSessionOptions } from './NewSessionOptions.tsx'
+import { AgentDefinitionSelect } from './AgentDefinitionSelect.tsx'
+import { AttachmentDownload } from './AttachmentDownload.tsx'
 import { RemoteFiles } from './RemoteFiles.tsx'
 import { RemoteTerminal } from './RemoteTerminal.tsx'
 import { PlatformSelect } from './PlatformSelect.tsx'
@@ -83,7 +85,7 @@ export function PlatformConversation({
             onChange={(event) => setWorkspace(event.target.value)}
             placeholder={
               model.isServerAgent
-                ? '服务端工作区 · /workspace'
+                ? '正在读取服务端工作区'
                 : '目标设备上的绝对路径'
             }
           />
@@ -168,7 +170,14 @@ function PlatformConversationBody({
     (!!draft.trim() || attachments.length > 0) &&
     (sessionId
       ? allows('session.send_message')
-      : !!model.newSession.model && !!model.newSession.permission)
+      : !!model.workspace &&
+        !model.agents.loading &&
+        (!model.agents.selectedId ||
+          model.agents.items.some(
+            (agent) => agent.id === model.agents.selectedId,
+          )) &&
+        !!model.newSession.model &&
+        !!model.newSession.permission)
   return (
     <>
       <div
@@ -237,7 +246,13 @@ function PlatformConversationBody({
                 />
               )}
               {rows(message.content.attachments).map((file) => (
-                <small key={string(file.fileId)}>{string(file.name)}</small>
+                <AttachmentDownload
+                  file={file}
+                  key={string(file.fileId)}
+                  disabled={busy || !sessionId}
+                  download={model.downloadAttachment}
+                  run={run}
+                />
               ))}
             </article>
           ))}
@@ -249,6 +264,42 @@ function PlatformConversationBody({
             </p>
           )}
         </MarkdownDelegateProvider>
+        {!!sessionId &&
+          model.isServerAgent &&
+          (model.agentBinding || model.artifacts.items.length > 0) && (
+            <section className="productAgentArtifacts" aria-label="生成成果">
+              <div className="platformActions">
+                <strong>生成成果</strong>
+                <Button
+                  size="sm"
+                  disabled={model.artifacts.loading}
+                  onClick={model.artifacts.refresh}
+                >
+                  刷新成果
+                </Button>
+              </div>
+              {model.artifacts.items.map((file) => (
+                <AttachmentDownload
+                  key={string(file.fileId)}
+                  file={file}
+                  disabled={busy}
+                  download={model.downloadAttachment}
+                  run={run}
+                />
+              ))}
+              {model.artifacts.loading && <small>正在读取成果…</small>}
+              {!model.artifacts.loading &&
+                !model.artifacts.error &&
+                model.artifacts.items.length === 0 && (
+                  <small>智能体生成的文件会显示在这里。</small>
+                )}
+              {model.artifacts.error && (
+                <p role="alert" className="platformError">
+                  {model.artifacts.error}
+                </p>
+              )}
+            </section>
+          )}
       </div>
       <div className="productRemoteComposer">
         {notices.map((notice) => (
@@ -263,6 +314,16 @@ function PlatformConversationBody({
           />
         ))}
         <ComposerCard>
+          <AgentDefinitionSelect
+            agents={model.agents}
+            disabled={busy || !online}
+          />
+          {!!sessionId && model.isServerAgent && model.agentBinding && (
+            <small className="productAgentBinding">
+              智能体：{model.agentBinding.name} · v{model.agentBinding.version}
+              （本会话已固定）
+            </small>
+          )}
           {!sessionId && (
             <NewSessionOptions
               options={model.newSession}

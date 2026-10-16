@@ -82,4 +82,5 @@ internal fun NewSessionDraft.firstMessageRequest(
     runtimeId = runtimeId,
     runtimeType = runtimeType,
     projectId = projectId,
+    executorKind = executorKind,
 )

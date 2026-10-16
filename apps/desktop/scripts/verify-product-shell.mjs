@@ -175,7 +175,7 @@ try {
     .locator('[contenteditable="true"]')
     .first()
     .waitFor({ timeout: 15_000 })
-  await verifyPlatformMainFixture(product)
+  await verifyPlatformMainFixture(product, join(home, 'screenshots'))
   await installServerAgentFixture(product)
   await verifyServerAgentFixture(product)
 

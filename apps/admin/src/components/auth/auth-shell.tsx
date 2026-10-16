@@ -7,13 +7,16 @@ export function AuthShell({ children }: { children: React.ReactNode }) {
     <div className="flex h-dvh flex-col overflow-y-auto bg-background">
       {/* Top nav */}
       <header className="flex shrink-0 items-center justify-between px-8 py-5">
-        <span className="aa-wordmark hidden text-xl md:inline">SuperDsh</span>
+        <a href="/" className="flex items-center gap-2 text-sm font-semibold">
+          <img src="/icon.svg" alt="" width={30} height={30} />
+          <span>星桥智能平台</span>
+        </a>
         <nav className="flex items-center gap-4 text-sm text-muted-foreground">
           <a
-            href="#"
+            href="/"
             className="hidden transition-colors hover:text-foreground md:inline"
           >
-            GitHub
+            了解星桥
           </a>
           <LocaleSwitcher
             size="sm"

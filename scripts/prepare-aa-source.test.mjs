@@ -56,7 +56,7 @@ function fixture(t) {
   )
   for (const name of [
     'apps/admin/package.json',
-    'apps/server/pyproject.toml',
+    'apps/admin/server/application.ts',
     'apps/android/settings.gradle.kts',
   ])
     write(name, '')
