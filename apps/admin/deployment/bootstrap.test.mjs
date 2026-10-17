@@ -1,11 +1,14 @@
 import assert from 'node:assert/strict'
 import { randomBytes } from 'node:crypto'
-import { mkdtemp, readFile, rm, stat, writeFile } from 'node:fs/promises'
+import { mkdir, mkdtemp, readFile, rm, stat, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import test from 'node:test'
 import { parseEnv } from 'node:util'
 import { bootstrapDeployment, deploymentEnvironment } from './bootstrap.mjs'
+import { IdentityService } from '../server/identity/service.ts'
+
+const upgradeKey = 'deployment.initial-admin-password.v1'
 
 async function fixture(t, overrides = {}) {
   const directory = await mkdtemp(join(tmpdir(), 'starbridge-bootstrap-'))
@@ -16,6 +19,7 @@ async function fixture(t, overrides = {}) {
     migrated: 0,
     released: 0,
     created: [],
+    settings: {},
   }
   const logs = []
   const environment = await deploymentEnvironment({
@@ -40,12 +44,30 @@ async function fixture(t, overrides = {}) {
         assert.equal(sql, 'SELECT id FROM users LIMIT 1')
         return state.users
       },
+      async transaction(operation) {
+        const settings = { ...state.settings }
+        const result = await operation({
+          settings,
+          async query(sql) {
+            assert.equal(sql, 'SELECT pg_advisory_xact_lock(4141455)')
+            return []
+          },
+        })
+        state.settings = settings
+        return result
+      },
     },
     async initializeIdentity(values) {
       assert.ok(values.AGENT_SERVER_SECRET)
       state.migrated++
       state.populated = true
       return {
+        async getSetting(key, connection) {
+          return connection.settings[key] ?? null
+        },
+        async setSetting(key, value, connection) {
+          connection.settings[key] = value
+        },
         async createUser(credentials, settings) {
           assert.deepEqual(settings, { role: 'admin', bootstrap: true })
           state.created.push({ ...credentials })
@@ -76,6 +98,7 @@ test('empty deployment creates durable unique secrets and the default administra
   assert.equal(credentials.username, 'admin')
   assert.equal(credentials.password, 'admin123')
   assert.deepEqual(state.created, [credentials])
+  assert.equal(state.settings[upgradeKey], 'new-deployment')
   assert.ok(logs.some((line) => line.includes(credentials.password)))
   assert.equal(first.NODE_ENV, 'production')
   assert.equal(first.SUPERDSH_BOOTSTRAP_DEV_ADMIN, '0')
@@ -209,8 +232,9 @@ test('failed account initialization retries with the same saved password', async
   })
   const initialize = options.initializeIdentity
   options.initializeIdentity = async (values) => {
-    await initialize(values)
+    const identity = await initialize(values)
     return {
+      ...identity,
       async createUser() {
         throw new Error('synthetic transaction failure')
       },
@@ -220,6 +244,7 @@ test('failed account initialization retries with the same saved password', async
     bootstrapDeployment(options),
     /synthetic transaction failure/,
   )
+  assert.equal(state.settings[upgradeKey], 'new-deployment')
   const credentials = JSON.parse(
     await readFile(join(directory, 'config/initial-admin.txt'), 'utf8'),
   )
@@ -282,4 +307,315 @@ test('database URL is derived from the shared password file without losing speci
     explicit.AGENT_SERVER_DB_URL,
     'postgresql://external.example.com/platform',
   )
+})
+
+async function legacyFixture(t) {
+  const f = await fixture(t, {
+    AGENT_SERVER_SECRET: 'synthetic-retained-signing-key',
+    SUPERDSH_MODEL_ENCRYPTION_KEY: Buffer.alloc(32, 7).toString('base64url'),
+  })
+  const { state, options, directory } = f
+  const original = {
+    username: 'admin',
+    password: 'synthetic-previous-initial-password',
+    displayName: 'Initial admin',
+  }
+  const credentialPath = join(directory, 'config/initial-admin.txt')
+  await mkdir(join(directory, 'config'), { recursive: true })
+  await writeFile(credentialPath, JSON.stringify(original))
+  state.populated = true
+  state.users = [
+    {
+      id: 'synthetic-admin',
+      username: 'admin',
+      role: 'admin',
+      disabled: 0,
+      deleted_at: null,
+      auth_version: 3,
+      reset_required: 0,
+    },
+    {
+      id: 'synthetic-member',
+      username: 'member',
+      role: 'member',
+      auth_version: 8,
+    },
+  ]
+  state.assignments = ['admin']
+  state.sessions = [
+    { user_id: 'synthetic-admin', revoked_at: null },
+    { user_id: 'synthetic-member', revoked_at: null },
+  ]
+  state.recovery = ['synthetic-admin', 'synthetic-member']
+  state.audit = []
+  const controls = { failSetting: false, loseDuringAudit: false }
+  options.database.lease = async () => ({
+    lost: new Promise((resolve) => {
+      controls.loseOwnership = resolve
+    }),
+    async release() {
+      state.released++
+    },
+  })
+  options.database.transaction = async (operation) => {
+    const draft = structuredClone(state)
+    const result = await operation({
+      async query(sql, values = []) {
+        if (sql === 'SELECT pg_advisory_xact_lock(4141455)') return []
+        if (sql === 'SELECT value FROM instance_settings WHERE key=$1')
+          return draft.settings[values[0]]
+            ? [{ value: draft.settings[values[0]] }]
+            : []
+        if (sql.startsWith('INSERT INTO instance_settings(')) {
+          if (controls.failSetting)
+            throw new Error('synthetic marker write failure')
+          draft.settings[values[0]] = values[1]
+          return []
+        }
+        if (
+          sql ===
+          'SELECT id,password_hash FROM users WHERE username=$1 FOR UPDATE'
+        )
+          return draft.users.filter((user) => user.username === values[0])
+        if (sql === 'SELECT * FROM users WHERE id=$1')
+          return draft.users.filter((user) => user.id === values[0])
+        if (
+          sql ===
+          'SELECT role_id FROM user_roles WHERE user_id=$1 ORDER BY role_id'
+        )
+          return draft.assignments.map((role_id) => ({ role_id }))
+        if (
+          sql === 'SELECT permissions_json FROM roles WHERE id=ANY($1::text[])'
+        )
+          return [{ permissions_json: '[]' }]
+        if (sql.startsWith('UPDATE users SET password_hash=')) {
+          const user = draft.users.find(
+            (item) => item.id === values[0] && !item.deleted_at,
+          )
+          if (!user) return []
+          user.password_hash = values[1]
+          user.auth_version++
+          user.reset_required = 0
+          user.updated_at = values[2]
+          return [{ id: user.id }]
+        }
+        if (sql === 'UPDATE auth_sessions SET revoked_at=$2 WHERE user_id=$1') {
+          for (const session of draft.sessions)
+            if (session.user_id === values[0]) session.revoked_at = values[1]
+          return []
+        }
+        if (sql === 'DELETE FROM recovery_codes WHERE user_id=$1') {
+          draft.recovery = draft.recovery.filter((id) => id !== values[0])
+          return []
+        }
+        if (sql.startsWith('INSERT INTO identity_audit(')) {
+          draft.audit.push({
+            actor: values[1],
+            action: values[2],
+            target: values[3],
+            detail: JSON.parse(values[5]),
+          })
+          if (controls.loseDuringAudit)
+            controls.loseOwnership(new Error('synthetic ownership loss'))
+          return []
+        }
+        throw new Error(`Unexpected SQL in isolated bootstrap test: ${sql}`)
+      },
+    })
+    for (const key of ['users', 'settings', 'sessions', 'recovery', 'audit'])
+      state[key] = draft[key]
+    return result
+  }
+  const identity = new IdentityService(options.database, {
+    secret: 'synthetic-bootstrap-test',
+  })
+  state.users[0].password_hash = await identity.passwordHash({
+    password: original.password,
+  })
+  options.initializeIdentity = async () => {
+    state.migrated++
+    return identity
+  }
+  return { ...f, identity, original, credentialPath, controls }
+}
+
+test('legacy unchanged initial password upgrades once with credential revocation and an atomic marker', async (t) => {
+  const f = await legacyFixture(t)
+  const member = structuredClone(f.state.users[1])
+  const result = await bootstrapDeployment(f.options)
+  const user = f.state.users[0]
+  assert.equal(
+    await f.identity.crypto.verifyPassword('admin123', user.password_hash),
+    true,
+  )
+  assert.equal(
+    await f.identity.crypto.verifyPassword(
+      f.original.password,
+      user.password_hash,
+    ),
+    false,
+  )
+  assert.equal(user.auth_version, 4)
+  assert.ok(f.state.sessions[0].revoked_at)
+  assert.equal(f.state.sessions[1].revoked_at, null)
+  assert.deepEqual(f.state.recovery, ['synthetic-member'])
+  assert.deepEqual(f.state.users[1], member)
+  assert.equal(f.state.settings[upgradeKey], 'upgraded')
+  assert.deepEqual(f.state.audit, [
+    {
+      actor: 'deployment-bootstrap',
+      action: 'user.initial_password_upgraded',
+      target: user.id,
+      detail: { source: 'deployment-bootstrap', upgrade: upgradeKey },
+    },
+  ])
+  assert.deepEqual(
+    JSON.parse(await readFile(f.credentialPath, 'utf8')),
+    f.original,
+  )
+  assert.equal(
+    result.AGENT_SERVER_SECRET,
+    f.options.environment.AGENT_SERVER_SECRET,
+  )
+  assert.equal(
+    result.SUPERDSH_MODEL_ENCRYPTION_KEY,
+    f.options.environment.SUPERDSH_MODEL_ENCRYPTION_KEY,
+  )
+  assert.ok(f.logs.some((line) => line.includes('upgraded once')))
+  assert.ok(
+    f.logs.every(
+      (line) =>
+        !line.includes(f.original.password) && !line.includes('admin123'),
+    ),
+  )
+
+  const changed = await f.identity.passwordHash({
+    password: 'later-user-selected-password',
+  })
+  f.state.users[0].password_hash = changed
+  f.options.environment.SUPERDSH_INITIAL_ADMIN_PASSWORD =
+    'later-configured-password'
+  await bootstrapDeployment(f.options)
+  assert.equal(f.state.users[0].password_hash, changed)
+  assert.equal(f.state.users[0].auth_version, 4)
+  assert.equal(f.state.audit.length, 1)
+})
+
+test('legacy upgrade honors the configured initial password and avoids revocation when already current', async (t) => {
+  const custom = await legacyFixture(t)
+  custom.options.environment.SUPERDSH_INITIAL_ADMIN_PASSWORD =
+    'synthetic-configured-password'
+  await bootstrapDeployment(custom.options)
+  assert.equal(
+    await custom.identity.crypto.verifyPassword(
+      'synthetic-configured-password',
+      custom.state.users[0].password_hash,
+    ),
+    true,
+  )
+  assert.equal(
+    await custom.identity.crypto.verifyPassword(
+      'admin123',
+      custom.state.users[0].password_hash,
+    ),
+    false,
+  )
+  const current = await legacyFixture(t)
+  current.options.environment.SUPERDSH_INITIAL_ADMIN_PASSWORD =
+    current.original.password
+  await bootstrapDeployment(current.options)
+  assert.equal(current.state.settings[upgradeKey], 'already-current')
+  assert.equal(current.state.users[0].auth_version, 3)
+  assert.equal(current.state.sessions[0].revoked_at, null)
+  assert.deepEqual(current.state.audit, [])
+})
+
+test('a password already changed by the administrator is preserved and never reconsidered', async (t) => {
+  const f = await legacyFixture(t)
+  const changed = await f.identity.passwordHash({
+    password: 'already-selected-password',
+  })
+  f.state.users[0].password_hash = changed
+  await bootstrapDeployment(f.options)
+  assert.equal(f.state.users[0].password_hash, changed)
+  assert.equal(f.state.settings[upgradeKey], 'preserved-changed-password')
+  assert.equal(f.state.sessions[0].revoked_at, null)
+  assert.deepEqual(f.state.audit, [])
+  const originalHash = await f.identity.passwordHash({
+    password: f.original.password,
+  })
+  f.state.users[0].password_hash = originalHash
+  await bootstrapDeployment(f.options)
+  assert.equal(f.state.users[0].password_hash, originalHash)
+})
+
+test('legacy missing, invalid or mismatched records and unavailable administrators keep their passwords', async (t) => {
+  for (const scenario of [
+    'missing-file',
+    'invalid-file',
+    'other-username',
+    'missing-user',
+    'member',
+    'disabled',
+    'deleted',
+  ]) {
+    await t.test(scenario, async (t) => {
+      const f = await legacyFixture(t)
+      if (scenario === 'missing-file') await rm(f.credentialPath)
+      if (scenario === 'invalid-file')
+        await writeFile(f.credentialPath, '{invalid')
+      if (scenario === 'other-username')
+        await writeFile(
+          f.credentialPath,
+          JSON.stringify({ ...f.original, username: 'someone-else' }),
+        )
+      if (scenario === 'missing-user') f.state.users.shift()
+      if (scenario === 'member') f.state.assignments = ['member']
+      if (scenario === 'disabled') f.state.users[0].disabled = 1
+      if (scenario === 'deleted') f.state.users[0].deleted_at = '2026-01-01'
+      const users = structuredClone(f.state.users)
+      await bootstrapDeployment(f.options)
+      assert.deepEqual(f.state.users, users)
+      assert.match(f.state.settings[upgradeKey], /^preserved-/)
+      assert.deepEqual(f.state.audit, [])
+      assert.equal(f.state.sessions[0].revoked_at, null)
+      assert.equal(f.state.released, 1)
+    })
+  }
+})
+
+test('failed upgrade marker and lost ownership roll back the password, sessions and audit before retry', async (t) => {
+  for (const failure of ['marker', 'ownership']) {
+    await t.test(failure, async (t) => {
+      const f = await legacyFixture(t)
+      const originalHash = f.state.users[0].password_hash
+      f.controls.failSetting = failure === 'marker'
+      f.controls.loseDuringAudit = failure === 'ownership'
+      await assert.rejects(
+        bootstrapDeployment(f.options),
+        /marker write failure|ownership lost/,
+      )
+      assert.equal(f.state.users[0].password_hash, originalHash)
+      assert.equal(f.state.users[0].auth_version, 3)
+      assert.equal(f.state.sessions[0].revoked_at, null)
+      assert.deepEqual(f.state.recovery, [
+        'synthetic-admin',
+        'synthetic-member',
+      ])
+      assert.deepEqual(f.state.audit, [])
+      assert.equal(f.state.settings[upgradeKey], undefined)
+      f.controls.failSetting = false
+      f.controls.loseDuringAudit = false
+      await bootstrapDeployment(f.options)
+      assert.equal(
+        await f.identity.crypto.verifyPassword(
+          'admin123',
+          f.state.users[0].password_hash,
+        ),
+        true,
+      )
+      assert.equal(f.state.settings[upgradeKey], 'upgraded')
+      assert.equal(f.state.released, 2)
+    })
+  }
 })

@@ -6,6 +6,7 @@ import { fileURLToPath, pathToFileURL } from 'node:url'
 import { parseEnv } from 'node:util'
 
 const secretNames = ['AGENT_SERVER_SECRET', 'SUPERDSH_MODEL_ENCRYPTION_KEY']
+const initialPasswordUpgrade = 'deployment.initial-admin-password.v1'
 
 async function optionalFile(path) {
   try {
@@ -75,6 +76,76 @@ export async function deploymentEnvironment(environment = process.env) {
     result.AGENT_SERVER_DB_URL = `postgresql://${encodeURIComponent(username)}:${encodeURIComponent(password)}@${host}:${port}/${encodeURIComponent(database)}`
   }
   return result
+}
+
+async function upgradeInitialPassword({
+  environment,
+  database,
+  identity,
+  credentialsPath,
+  checkOwnership,
+}) {
+  return database.transaction(async (connection) => {
+    await connection.query('SELECT pg_advisory_xact_lock(4141455)')
+    checkOwnership()
+    if (await identity.getSetting(initialPasswordUpgrade, connection))
+      return 'previously-checked'
+
+    const finish = async (outcome) => {
+      checkOwnership()
+      await identity.setSetting(initialPasswordUpgrade, outcome, connection)
+      checkOwnership()
+      return outcome
+    }
+    const saved = await optionalFile(credentialsPath)
+    let original
+    try {
+      original = saved === null ? null : JSON.parse(saved)
+    } catch {
+      return finish('preserved-invalid-record')
+    }
+    const username =
+      environment.SUPERDSH_INITIAL_ADMIN_USERNAME?.trim() || 'admin'
+    if (
+      !original ||
+      original.username !== username ||
+      typeof original.password !== 'string' ||
+      original.password.length < 8 ||
+      original.password.length > 1024
+    )
+      return finish('preserved-unmatched-record')
+
+    const [row] = await connection.query(
+      'SELECT id,password_hash FROM users WHERE username=$1 FOR UPDATE',
+      [username],
+    )
+    if (!row) return finish('preserved-missing-account')
+    const user = await identity.getUser(row.id, connection)
+    if (user.deletedAt || user.disabled || !user.roles.includes('admin'))
+      return finish('preserved-unavailable-account')
+    if (
+      !(await identity.crypto.verifyPassword(
+        original.password,
+        row.password_hash,
+      ))
+    )
+      return finish('preserved-changed-password')
+
+    const password = environment.SUPERDSH_INITIAL_ADMIN_PASSWORD || 'admin123'
+    if (password === original.password) return finish('already-current')
+    const stored = await identity.passwordHash({ password })
+    checkOwnership()
+    await identity.changePassword(user.userId, stored, connection)
+    checkOwnership()
+    await identity.audit(
+      'deployment-bootstrap',
+      'user.initial_password_upgraded',
+      user.userId,
+      { source: 'deployment-bootstrap', upgrade: initialPasswordUpgrade },
+      connection,
+    )
+    return finish('upgraded')
+  })
 }
 
 export async function bootstrapDeployment({
@@ -147,8 +218,17 @@ export async function bootstrapDeployment({
     checkOwnership()
     const users = await database.query('SELECT id FROM users LIMIT 1')
     if (users.length) {
+      const outcome = await upgradeInitialPassword({
+        environment,
+        database,
+        identity,
+        credentialsPath,
+        checkOwnership,
+      })
       log(
-        'Existing platform accounts retained; no administrator password was changed.',
+        outcome === 'upgraded'
+          ? 'The unchanged initial administrator password was upgraded once to the configured initial password. initial-admin.txt remains the historical first credential record.'
+          : 'Existing platform accounts retained; no administrator password was changed.',
       )
       return result
     }
@@ -190,6 +270,19 @@ export async function bootstrapDeployment({
         `${JSON.stringify(credentials, null, 2)}\n`,
       )
     await chmod(credentialsPath, 0o600)
+    checkOwnership()
+    // Mark before creation so a crash after creating the user cannot turn a
+    // later configuration edit into an unintended password upgrade.
+    await database.transaction(async (connection) => {
+      await connection.query('SELECT pg_advisory_xact_lock(4141455)')
+      checkOwnership()
+      await identity.setSetting(
+        initialPasswordUpgrade,
+        'new-deployment',
+        connection,
+      )
+      checkOwnership()
+    })
     checkOwnership()
     await identity.createUser(credentials, { role: 'admin', bootstrap: true })
     log(

@@ -2,7 +2,7 @@
 
 SuperDsh 包含桌面 Agent 应用、Next.js + Node.js 全栈管理后台和安卓应用。后台以总览、权限、模型、设备和系统管理为主体，聊天是 Agent 工作台模块；DeepSeek Harness 是由产品调度的必需引擎插件。
 
-**服务器部署：** 拉取代码后在仓库根执行 `docker compose up -d --build`，默认配置自动初始化，访问 `http://服务器IP:5174`。全新部署初始账号为 **`admin` / `admin123`**，登录后请修改密码；已有部署保留原密码，完整步骤与密码恢复见[Compose 部署与更新](apps/admin/deployment/README.md)。
+**服务器部署：** 拉取代码后在仓库根执行 `docker compose up -d --build`，默认配置自动初始化，访问 `http://服务器IP:5174`。初始账号为 **`admin` / `admin123`**，登录后请修改密码。旧 Compose 部署仍使用原始随机初始密码时，首次升级启动会自动对齐；已经自行修改的密码保留。完整步骤见[Compose 部署与更新](apps/admin/deployment/README.md)。
 
 **日常开发以本页为准。** [English](README.en.md) · [来源](#基于哪些项目改造) · [理念](#设计理念) · [进度](#目前完成进度) · [代码位置](#项目结构) · [启动](#日常开发) · [联调](#三端联调) · [检查](#检查与打包)
 
@@ -109,7 +109,7 @@ corepack.cmd yarn server:dev
 | 就绪检查                              | `http://127.0.0.1:5174/api/v2/health/ready`               |
 | PostgreSQL / Redis / Qdrant（仅本机） | `127.0.0.1:15432` / `127.0.0.1:16379` / `127.0.0.1:16333` |
 
-默认 `superdsh-dev` 开发空库和默认 Compose 全新部署均创建 **`admin` / `admin123`**；已有账号密码与状态不改。Compose 可覆盖首次账号密码，并将首次凭据保存在配置卷，登录后请修改默认密码。原生模式的显式数据库和生产空库使用启动日志的 **setup token** 初始化管理员。登录进入总览，进入 Agent 工作台才准备网页 Agent；桌面、安卓沿用登录后准备。
+默认 `superdsh-dev` 开发空库和默认 Compose 全新部署均创建 **`admin` / `admin123`**。Compose 可覆盖首次账号密码，并将首次凭据保存在配置卷；旧 Compose 初始密码首次升级时自动兼容，已经自行改过的密码与账号状态保留，登录后请修改默认密码。原生模式的显式数据库和生产空库使用启动日志的 **setup token** 初始化管理员。登录进入总览，进入 Agent 工作台才准备网页 Agent；桌面、安卓沿用登录后准备。
 
 开发配置在被 Git 忽略的 `.superdsh-work/server-dev/aa-dev.env`。重复 `server:deps:up` 跳过健康依赖；其他程序占用默认端口时选择空闲端口并写回配置，显式指定的端口不自动修改，以输出为准。Qdrant 默认 `http://127.0.0.1:16333`，可通过 `SUPERDSH_DEV_QDRANT_PORT` 改端口，或用 `SUPERDSH_QDRANT_URL` / `SUPERDSH_QDRANT_API_KEY` 连接现有实例。已有数据卷而配置丢失时必须恢复原文件，不能生成新密钥覆盖。
 
