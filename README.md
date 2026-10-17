@@ -2,7 +2,7 @@
 
 SuperDsh 包含桌面 Agent 应用、Next.js + Node.js 全栈管理后台和安卓应用。后台以总览、权限、模型、设备和系统管理为主体，聊天是 Agent 工作台模块；DeepSeek Harness 是由产品调度的必需引擎插件。
 
-**服务器部署：** 拉取代码后在仓库根执行 `docker compose up -d --build`，默认配置自动初始化，访问 `http://服务器IP:5174`。首次管理员密码用 `docker compose exec platform cat /data/config/initial-admin.txt` 查看；完整步骤见[Compose 部署与更新](apps/admin/deployment/README.md)。
+**服务器部署：** 拉取代码后在仓库根执行 `docker compose up -d --build`，默认配置自动初始化，访问 `http://服务器IP:5174`。全新部署初始账号为 **`admin` / `admin123`**，登录后请修改密码；已有部署保留原密码，完整步骤与密码恢复见[Compose 部署与更新](apps/admin/deployment/README.md)。
 
 **日常开发以本页为准。** [English](README.en.md) · [来源](#基于哪些项目改造) · [理念](#设计理念) · [进度](#目前完成进度) · [代码位置](#项目结构) · [启动](#日常开发) · [联调](#三端联调) · [检查](#检查与打包)
 
@@ -109,7 +109,7 @@ corepack.cmd yarn server:dev
 | 就绪检查                              | `http://127.0.0.1:5174/api/v2/health/ready`               |
 | PostgreSQL / Redis / Qdrant（仅本机） | `127.0.0.1:15432` / `127.0.0.1:16379` / `127.0.0.1:16333` |
 
-默认 `superdsh-dev` 开发空库创建 **`admin` / `admin123`**；已有账号密码与状态不改。原生模式的显式数据库和生产空库使用启动日志的 **setup token** 初始化管理员；默认 Compose 空库则自动创建 `admin` 并持久保存随机密码，无通用生产默认密码。登录进入总览，进入 Agent 工作台才准备网页 Agent；桌面、安卓沿用登录后准备。
+默认 `superdsh-dev` 开发空库和默认 Compose 全新部署均创建 **`admin` / `admin123`**；已有账号密码与状态不改。Compose 可覆盖首次账号密码，并将首次凭据保存在配置卷，登录后请修改默认密码。原生模式的显式数据库和生产空库使用启动日志的 **setup token** 初始化管理员。登录进入总览，进入 Agent 工作台才准备网页 Agent；桌面、安卓沿用登录后准备。
 
 开发配置在被 Git 忽略的 `.superdsh-work/server-dev/aa-dev.env`。重复 `server:deps:up` 跳过健康依赖；其他程序占用默认端口时选择空闲端口并写回配置，显式指定的端口不自动修改，以输出为准。Qdrant 默认 `http://127.0.0.1:16333`，可通过 `SUPERDSH_DEV_QDRANT_PORT` 改端口，或用 `SUPERDSH_QDRANT_URL` / `SUPERDSH_QDRANT_API_KEY` 连接现有实例。已有数据卷而配置丢失时必须恢复原文件，不能生成新密钥覆盖。
 
@@ -204,7 +204,7 @@ corepack.cmd yarn android:start --server http://127.0.0.1:8000
 | --------------------- | ---------------------------------------------------------------------------------------------------- |
 | Docker 管道不存在     | Compose 部署、开发数据库和临时集成测试需 Docker；用 `docker info` 确认 Linux 引擎                    |
 | 网页不可达 / 端口冲突 | 只运行一份 `server:dev`；`5174` 网页/API、`8000` 兼容 API，不再等待 `15174` 容器                     |
-| 登录失败              | 核对数据库和环境地址；开发默认账号不覆盖已有密码；Compose 查看初始密码文件，原生空库使用 setup token |
+| 登录失败              | 核对数据库和环境地址；默认账号不覆盖已有密码；Compose 查看初始密码文件或按部署文档显式重置，原生空库使用 setup token |
 | Agent 无法准备        | 先 `server:sync` 构建 Harness，查看诊断与目录权限；不要启动旧 Python/Supervisor                      |
 | 在线却无回复          | 核对个人/平台模型、会话选择和执行错误；内置模型名称不等于已有授权                                    |
 | 模型地址非公网        | 按[服务端配置](apps/admin/server/README.md#模型与网络)核对精确 origin，避免宽泛放行                  |

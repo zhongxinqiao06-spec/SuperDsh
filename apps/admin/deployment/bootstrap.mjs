@@ -167,9 +167,7 @@ export async function bootstrapDeployment({
       credentials = {
         username:
           environment.SUPERDSH_INITIAL_ADMIN_USERNAME?.trim() || 'admin',
-        password:
-          environment.SUPERDSH_INITIAL_ADMIN_PASSWORD ||
-          randomBytes(24).toString('base64url'),
+        password: environment.SUPERDSH_INITIAL_ADMIN_PASSWORD || 'admin123',
         displayName:
           environment.SUPERDSH_INITIAL_ADMIN_DISPLAY_NAME?.trim() ||
           '星桥管理员',

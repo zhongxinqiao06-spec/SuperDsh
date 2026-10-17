@@ -58,7 +58,7 @@ async function fixture(t, overrides = {}) {
   return { directory, options, state, logs }
 }
 
-test('empty deployment creates durable unique secrets and a random administrator exactly once', async (t) => {
+test('empty deployment creates durable unique secrets and the default administrator exactly once', async (t) => {
   const { directory, options, state, logs } = await fixture(t)
   const first = await bootstrapDeployment(options)
   const secretPath = join(directory, 'config/platform.env')
@@ -74,8 +74,7 @@ test('empty deployment creates durable unique secrets and a random administrator
     first.SUPERDSH_MODEL_ENCRYPTION_KEY,
   )
   assert.equal(credentials.username, 'admin')
-  assert.equal(credentials.password.length, 32)
-  assert.notEqual(credentials.password, 'admin123')
+  assert.equal(credentials.password, 'admin123')
   assert.deepEqual(state.created, [credentials])
   assert.ok(logs.some((line) => line.includes(credentials.password)))
   assert.equal(first.NODE_ENV, 'production')
@@ -205,7 +204,9 @@ test('incomplete persisted configuration is rejected instead of generating repla
 })
 
 test('failed account initialization retries with the same saved password', async (t) => {
-  const { directory, options, state } = await fixture(t)
+  const { directory, options, state } = await fixture(t, {
+    SUPERDSH_INITIAL_ADMIN_PASSWORD: 'previously-generated-password',
+  })
   const initialize = options.initializeIdentity
   options.initializeIdentity = async (values) => {
     await initialize(values)
@@ -222,8 +223,10 @@ test('failed account initialization retries with the same saved password', async
   const credentials = JSON.parse(
     await readFile(join(directory, 'config/initial-admin.txt'), 'utf8'),
   )
+  options.environment.SUPERDSH_INITIAL_ADMIN_PASSWORD = 'admin123'
   options.initializeIdentity = initialize
   await bootstrapDeployment(options)
+  assert.equal(credentials.password, 'previously-generated-password')
   assert.deepEqual(state.created, [credentials])
   assert.equal(state.released, 2)
 })

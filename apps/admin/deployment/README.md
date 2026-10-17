@@ -30,15 +30,32 @@ curl --fail --silent --show-error http://127.0.0.1:5174/api/v2/health/ready
 
 ### 首次管理员与模型
 
-默认管理员账号为 **`admin`**，初始密码随机生成，不使用固定公开密码。在服务器仓库根读取：
+全新部署默认管理员账号为 **`admin`**，初始密码为 **`admin123`**。登录后请立即修改密码；也可在首次启动前用 `SUPERDSH_INITIAL_ADMIN_PASSWORD` 设置自己的初始密码。在服务器仓库根读取首次凭据记录：
 
 ```bash
 docker compose exec platform cat /data/config/initial-admin.txt
 ```
 
-该文件仅用于保存首次初始化信息。登录后可在平台修改密码；文件里的旧密码不会随密码修改更新。重启、重新构建和拉取代码不会重置已有账号，也不会重新生成数据库密码、鉴权密钥或模型加密密钥。首次管理员配置只用于空库，不覆盖已有用户。
+该文件仅用于保存首次初始化信息。登录后可在平台修改密码；文件里的旧密码不会随密码修改更新，手工编辑文件也不会修改数据库密码。重启、重新构建和拉取代码不会重置已有账号，也不会重新生成数据库密码、鉴权密钥或模型加密密钥。首次管理员配置只用于空库，不覆盖已有用户；旧版本生成并保存的随机密码继续保留，包括首次建号失败后重试的情况。
 
 平台与知识检索可直接启动。实际 AI 对话仍需要你在「模型管理」或「个人中心 → 个人模型」填入自己的供应商 Key 并选择模型，默认配置不包含付费模型凭据或额度。桌面和手机填写同一个平台地址，例如 `http://服务器IP:5174`；默认无需另开 `8000`。
+
+### 登录 401 与已有管理员密码恢复
+
+点击登录后 `/api/v2/auth/login` 返回 `401 invalid credentials` 表示账号或密码校验失败。先核对首次凭据记录，或使用后来修改过的密码；旧部署拉取新代码后不会自动变成 `admin / admin123`。未登录时页面检查 `/api/v2/auth/refresh` 收到 401 则属于正常会话检查。
+
+确实需要将**现有管理员 `admin`** 重置为 `admin123` 时，在服务器原仓库目录执行下面的命令。会短暂停止平台与 Agent，并撤销该管理员的旧登录会话和恢复码；账号、角色、模型配置、资料与数据卷保留。PostgreSQL 保持运行。每步确认成功再继续：
+
+```bash
+git pull --ff-only origin main
+docker compose stop platform
+printf '%s' 'admin123' | docker compose run --rm -T --no-deps --volume "$PWD/apps/admin/deployment/reset-admin-password.mjs:/app/apps/admin/deployment/reset-admin-password.mjs:ro" platform node apps/admin/deployment/reset-admin-password.mjs --username admin --password-stdin
+docker compose start platform
+```
+
+这里将新脚本只读挂载到现有平台镜像，**无需为密码恢复重新构建镜像或在宿主机安装 Node**。命令要求平台已停止、目标账号存在且是启用状态的管理员，不会新建账号、提升权限、重新启用账号或重新生成密钥。脚本成功后使用 `admin / admin123` 登录并修改密码。`initial-admin.txt` 仍保留首次记录，不作为当前密码的凭证。
+
+如果恢复步骤失败，保留报错并用 `docker compose start platform` 恢复原服务，不删除卷或编辑数据库哈希。自定义管理员账号应将 `--username admin` 改为真实用户名；希望设置自己的密码时，可在 Bash 中用 `read -r -s -p 'New administrator password: ' admin_password` 读取，再将上面 `printf '%s' 'admin123'` 换为 `printf '%s' "$admin_password"`，执行后 `unset admin_password`。
 
 ### PostgreSQL 初始化报 Operation not permitted
 
@@ -147,7 +164,7 @@ curl --fail --silent --show-error http://127.0.0.1:5174/api/v2/health/ready
 | Agent 数据                       | `platform-data`，保留每个用户的 Home、工作区与运行数据          |
 | 文件与成果                       | `files-data`，保留上传附件与本地文件存储                        |
 | PostgreSQL / Redis / Qdrant 数据 | `postgres-data` / `redis-data` / `qdrant-data`                  |
-| 首次账号                         | `admin`，随机密码保存于 `/data/config/initial-admin.txt`        |
+| 首次账号                         | `admin` / `admin123`，首次凭据保存于 `/data/config/initial-admin.txt` |
 
 Docker 卷实际名称默认带项目名前缀，例如 `starbridge_config-data`。源码目录、镜像与持久数据分离：`git pull`、镜像重建、容器重建和正常 `docker compose down` 均保留卷。**不要使用 `docker compose down -v` 删除生产数据。** 保持原项目名；改名会创建另一组新卷，看起来像一套空平台，不会自动迁移原数据。
 
@@ -161,7 +178,7 @@ Docker 卷实际名称默认带项目名前缀，例如 `starbridge_config-data`
 | `SUPERDSH_PUBLIC_ORIGIN`          | 留空使用实际请求地址；配置域名时填写 `https://实际域名`               |
 | `SUPERDSH_CORS_ORIGINS`           | 留空沿用平台默认规则；需要跨域时填写允许的 origin                     |
 | `SUPERDSH_INITIAL_ADMIN_USERNAME` | `admin`，首次空库管理员账号                                           |
-| `SUPERDSH_INITIAL_ADMIN_PASSWORD` | 留空自动生成；仅首次空库初始化使用                                    |
+| `SUPERDSH_INITIAL_ADMIN_PASSWORD` | `admin123`；留空沿用默认值，仅首次空库初始化使用                       |
 | `POSTGRES_PASSWORD`               | 留空自动生成并持久保存；已有库沿用原密码                              |
 | `SUPERDSH_POSTGRES_IMAGE`         | `postgres:17-alpine`；新库兼容问题可按上节选择 `postgres:17-bookworm` |
 
