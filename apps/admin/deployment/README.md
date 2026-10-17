@@ -40,6 +40,42 @@ docker compose exec platform cat /data/config/initial-admin.txt
 
 平台与知识检索可直接启动。实际 AI 对话仍需要你在「模型管理」或「个人中心 → 个人模型」填入自己的供应商 Key 并选择模型，默认配置不包含付费模型凭据或额度。桌面和手机填写同一个平台地址，例如 `http://服务器IP:5174`；默认无需另开 `8000`。
 
+### PostgreSQL 初始化报 Operation not permitted
+
+`dependency failed to start: container starbridge-postgres-1 is unhealthy` 是结果，先查看实际数据库日志：
+
+```bash
+docker compose logs --tail=100 postgres
+docker version --format 'Docker Server: {{.Server.Version}}'
+uname -r
+# CentOS / RHEL 上补充检查：
+rpm -q libseccomp
+getenforce
+```
+
+如果 `creating subdirectories`、`creating configuration files` 已成功，随后写 `postmaster.pid` 和 `pg_wal/xlogtemp.*` 时出现 `Operation not permitted`，应优先排查新版 Alpine / musl 与旧 Docker、libseccomp 的系统调用兼容问题。musl 的定位写入可能使用较新的系统调用，旧过滤规则返回 EPERM 时无法按“不支持”回退；这类问题见 [Docker 官方镜像维护者说明](https://github.com/docker-library/official-images/issues/16829)。仍需结合宿主版本和安全审计日志确认，不能仅凭 `unhealthy` 判断为目录权限问题。
+
+**仅对新建数据卷、`initdb` 从未成功且日志反复提示清理初始化目录的部署**，可选用同为 PostgreSQL 17 的 Debian Bookworm 镜像。保留原卷和已生成的密码；在仓库根 `.env` 新增或修改这一项（不要用示例文件覆盖已有 `.env`）：
+
+```dotenv
+SUPERDSH_POSTGRES_IMAGE=postgres:17-bookworm
+```
+
+然后执行以下命令。平台镜像已经构建成功时，无需再次运行 Yarn 或重新构建平台：
+
+```bash
+git pull --ff-only origin main
+docker compose stop postgres
+docker compose pull postgres
+docker compose up -d --no-build
+docker compose ps -a
+docker compose logs --tail=100 postgres platform
+```
+
+`.env` 的镜像选择会保留到下次更新。默认仍是 `postgres:17-alpine`，避免拉取代码时给已有数据库隐式更换发行版。**已有成功初始化的 Alpine 数据库不要直接套用这次新库处理步骤**：不同发行版的 libc、locale / collation 和扩展可能不同；优先在维护窗口升级 Docker / libseccomp，或通过备份、逻辑导出与恢复迁移到独立目标并验证。不要换 PostgreSQL 主版本、删除数据卷、使用 `chmod 777`，或把 `privileged` / `seccomp=unconfined` 作为部署修复。
+
+如果 Bookworm 镜像仍报同样错误，保留日志和宿主版本信息，再检查实际数据挂载、文件系统及 SELinux 审计记录；此配置不能代替对宿主容器运行环境的修复。
+
 ### 小内存服务器与 exit code 137
 
 镜像默认已限制 Yarn 下载 / 解包、原生依赖编译和 Next 构建的并发，并只安装当前 CPU 架构所需依赖；这些限制只用于构建阶段，不改变平台运行时配置。Yarn 的并发参数含义见[官方配置说明](https://yarnpkg.com/configuration/yarnrc#taskPoolConcurrency)。
@@ -117,16 +153,17 @@ Docker 卷实际名称默认带项目名前缀，例如 `starbridge_config-data`
 
 可选项需要变更时，再把 `.env.example` 复制成仓库根 `.env`，按文件注释修改后运行 `docker compose up -d --build`：
 
-| 可选变量                          | 默认值 / 用途                                           |
-| --------------------------------- | ------------------------------------------------------- |
-| `SUPERDSH_HTTP_PORT`              | `5174`，宿主机发布端口                                  |
-| `SUPERDSH_BIND_ADDRESS`           | `0.0.0.0`；使用同机反向代理时可改为 `127.0.0.1`         |
-| `TZ`                              | `Asia/Shanghai`                                         |
-| `SUPERDSH_PUBLIC_ORIGIN`          | 留空使用实际请求地址；配置域名时填写 `https://实际域名` |
-| `SUPERDSH_CORS_ORIGINS`           | 留空沿用平台默认规则；需要跨域时填写允许的 origin       |
-| `SUPERDSH_INITIAL_ADMIN_USERNAME` | `admin`，首次空库管理员账号                             |
-| `SUPERDSH_INITIAL_ADMIN_PASSWORD` | 留空自动生成；仅首次空库初始化使用                      |
-| `POSTGRES_PASSWORD`               | 留空自动生成并持久保存；已有库沿用原密码                |
+| 可选变量                          | 默认值 / 用途                                                         |
+| --------------------------------- | --------------------------------------------------------------------- |
+| `SUPERDSH_HTTP_PORT`              | `5174`，宿主机发布端口                                                |
+| `SUPERDSH_BIND_ADDRESS`           | `0.0.0.0`；使用同机反向代理时可改为 `127.0.0.1`                       |
+| `TZ`                              | `Asia/Shanghai`                                                       |
+| `SUPERDSH_PUBLIC_ORIGIN`          | 留空使用实际请求地址；配置域名时填写 `https://实际域名`               |
+| `SUPERDSH_CORS_ORIGINS`           | 留空沿用平台默认规则；需要跨域时填写允许的 origin                     |
+| `SUPERDSH_INITIAL_ADMIN_USERNAME` | `admin`，首次空库管理员账号                                           |
+| `SUPERDSH_INITIAL_ADMIN_PASSWORD` | 留空自动生成；仅首次空库初始化使用                                    |
+| `POSTGRES_PASSWORD`               | 留空自动生成并持久保存；已有库沿用原密码                              |
+| `SUPERDSH_POSTGRES_IMAGE`         | `postgres:17-alpine`；新库兼容问题可按上节选择 `postgres:17-bookworm` |
 
 `.env` 不纳入 Git。首次密码覆盖项只在初始化空库前设置有效，不能用它重置现有账号。数据库和加密密钥须保留原值；配置卷丢失时应恢复备份，不让旧数据搭配新生成的密钥启动。
 

@@ -67,7 +67,7 @@ services:
         max-file: '3'
 
   postgres:
-    image: postgres:17-alpine
+    image: ${SUPERDSH_POSTGRES_IMAGE:-postgres:17-alpine}
     restart: unless-stopped
     environment:
       POSTGRES_DB: agents_anywhere
