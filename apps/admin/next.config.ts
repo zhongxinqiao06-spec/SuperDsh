@@ -32,6 +32,7 @@ const nextConfig: NextConfig = {
   experimental: {
     // Full timeline sync uses HTTP ingest through this same-origin proxy.
     proxyClientMaxBodySize,
+    ...(process.env.SUPERDSH_LOW_MEMORY_BUILD === '1' ? { cpus: 1 } : {}),
   },
   ...(staticExport || nativePlatform
     ? {}

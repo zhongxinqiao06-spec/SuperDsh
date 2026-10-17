@@ -10,7 +10,17 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     && rm -rf /var/lib/apt/lists/* \
     && corepack enable && corepack prepare yarn@4.18.0 --activate
 WORKDIR /app
-ENV NEXT_TELEMETRY_DISABLED=1 ELECTRON_SKIP_BINARY_DOWNLOAD=1
+# Keep archive conversion and native compilation bounded on small servers.
+# These limits apply only to this build stage, not the running platform.
+ENV NEXT_TELEMETRY_DISABLED=1 \
+    ELECTRON_SKIP_BINARY_DOWNLOAD=1 \
+    YARN_NETWORK_CONCURRENCY=2 \
+    YARN_TASK_POOL_CONCURRENCY=1 \
+    YARN_TASK_POOL_MODE=async \
+    npm_config_jobs=1 \
+    CMAKE_BUILD_PARALLEL_LEVEL=1 \
+    RAYON_NUM_THREADS=1 \
+    SUPERDSH_LOW_MEMORY_BUILD=1
 COPY package.json yarn.lock .yarnrc.yml ./
 COPY .yarn/patches/ ./.yarn/patches/
 COPY patches/ ./patches/
@@ -23,7 +33,8 @@ COPY apps/desktop/plugins/harness/package.json ./apps/desktop/plugins/harness/pa
 COPY dsh-community-market/package.json ./dsh-community-market/package.json
 COPY dsh-community-fabric/package.json ./dsh-community-fabric/package.json
 RUN --mount=type=cache,target=/root/.yarn/berry/cache \
-    corepack yarn install --immutable
+    corepack yarn config set --json supportedArchitectures.cpu '["current"]' \
+    && corepack yarn install --immutable
 COPY . .
 RUN node scripts/server.mjs build
 
