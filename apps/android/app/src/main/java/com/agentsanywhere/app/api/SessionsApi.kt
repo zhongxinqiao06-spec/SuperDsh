@@ -9,6 +9,22 @@ class SessionsApi(
     private val client: ApiClient = ApiClient(),
     private val historyCache: HistoryCache? = null,
 ) {
+    fun agentDefinitions(serverUrl: String, token: String): List<BusinessAgentDefinition> = ServerAgentApi(client).definitions(serverUrl, token)
+    fun agentBinding(serverUrl: String, token: String, sessionId: String): Int =
+        client.getJson(serverUrl, "/sessions/${sessionId.urlEncode()}/agent-binding", token).optInt("bindingVersion", 0)
+
+    fun bindAgent(serverUrl: String, token: String, sessionId: String, agentId: String, version: Int) {
+        client.putJson(serverUrl, "/sessions/${sessionId.urlEncode()}/agent-binding", JSONObject().put("agentDefinitionId", agentId).put("bindingVersion", version), token)
+    }
+    fun officeResources(serverUrl: String, token: String, sessionId: String): OfficeSessionResources {
+        val artifacts = client.getJson(serverUrl, "/sessions/${sessionId.urlEncode()}/agent-artifacts", token)
+        val agent = artifacts.optJSONObject("agentDefinition")
+        if (agent == null) return OfficeSessionResources(null, emptyList(), emptyList())
+        val plans = client.getJson(serverUrl, "/sessions/${sessionId.urlEncode()}/office-plans", token)
+        return OfficeSessionResources(agent.optNullableString("name"),
+            artifacts.optJSONArray("items").toObjectList { toOfficeArtifact() },
+            plans.optJSONArray("items").toObjectList { toOfficePlan() })
+    }
     fun listProjects(
         serverUrl: String,
         authorizationToken: String,
@@ -136,6 +152,7 @@ class SessionsApi(
         val body = JSONObject().apply {
             put("connectorId", request.connectorId)
             put("projectId", request.projectId)
+            request.agentDefinitionId?.let { put("agentDefinitionId", it) }
             put("runtime", request.runtimeType)
             request.runtimeId.takeIf { it.isNotBlank() && it != request.runtimeType }?.let {
                 put("runtimeId", it)

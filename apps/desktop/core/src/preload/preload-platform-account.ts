@@ -17,6 +17,8 @@ export function createPlatformBridge(): PlatformBridge {
       ipcRenderer.invoke(IPC.platformAccount, 'disconnect'),
     importLocal: () => ipcRenderer.invoke(IPC.platformAccount, 'import'),
     request: (request) => ipcRenderer.invoke(IPC.platformRemote, request),
+    saveAttachment: (request) =>
+      ipcRenderer.invoke(IPC.platformSaveAttachment, request),
     watch: (sessionId, ownerId, identity) =>
       ipcRenderer.invoke(IPC.platformWatch, {
         action: 'watch',

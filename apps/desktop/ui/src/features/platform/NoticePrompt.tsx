@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import {
   Button,
   Checkbox,
@@ -151,9 +151,18 @@ function InputQuestions({
           answer = object(answers[id]),
           selected = Array.isArray(answer.optionIds) ? answer.optionIds : []
         return (
-          <fieldset key={id}>
+          <fieldset
+            key={id}
+            data-plan-review={
+              object(question.intent).kind === 'plan-review' || undefined
+            }
+          >
             <legend>{string(question.header) || '请回答'}</legend>
             <MarkdownText text={string(question.prompt)} labels={labels} />
+            {string(question.detail) &&
+              !string(question.prompt).includes(string(question.detail)) && (
+                <MarkdownText text={string(question.detail)} labels={labels} />
+              )}
             {rows(question.options).map((option) => (
               <div key={string(option.id)}>
                 {question.multiple ? (
@@ -171,6 +180,7 @@ function InputQuestions({
                   />
                 ) : (
                   <Button
+                    type="button"
                     className="platformQuestionOption"
                     size="sm"
                     variant="outline"
@@ -226,6 +236,8 @@ export function NoticePrompt({
   refresh(): Promise<void>
 }) {
   const [answers, setAnswers] = useState<Record<string, PlatformJson>>({})
+  const noticeKey = JSON.stringify([sessionId, notice.noticeId, notice.actions])
+  useEffect(() => setAnswers({}), [noticeKey])
   return (
     <section className="platformNotice">
       <strong>{string(notice.title)}</strong>

@@ -39,7 +39,10 @@ it('creates independent immutable public PiAi routes without editable credential
   expect(route.piProvider!.getModels()[0]).toMatchObject({
     id: 'test',
     input: ['text', 'image'],
+    contextWindow: 8192,
+    maxTokens: 2048,
   })
+  expect(route.configuredMaxTokens.get('test')).toBe(2048)
   catalog.providers[0]!.models[0]!.name = 'Changed'
   expect(route.piProvider!.getModels()[0]!.name).toBe('Test')
   expect(

@@ -75,6 +75,34 @@ export async function deploymentEnvironment(environment = process.env) {
     const port = environment.POSTGRES_PORT || '5432'
     result.AGENT_SERVER_DB_URL = `postgresql://${encodeURIComponent(username)}:${encodeURIComponent(password)}@${host}:${port}/${encodeURIComponent(database)}`
   }
+  const selectedStorage = await optionalFile(
+    resolve(result.SUPERDSH_DEPLOYMENT_CONFIG_DIR, 'storage-backend'),
+  )
+  result.AGENT_SERVER_FILES_BACKEND =
+    environment.AGENT_SERVER_FILES_BACKEND || selectedStorage?.trim() || 'local'
+  if (
+    result.AGENT_SERVER_FILES_BACKEND === 's3' &&
+    !environment.AGENT_SERVER_FILES_S3_ACCESS_KEY
+  ) {
+    result.AGENT_SERVER_FILES_S3_ENDPOINT_URL =
+      environment.AGENT_SERVER_FILES_S3_ENDPOINT_URL || 'http://minio:9000'
+    result.AGENT_SERVER_FILES_S3_BUCKET =
+      environment.AGENT_SERVER_FILES_S3_BUCKET || 'superdsh-files'
+    result.AGENT_SERVER_FILES_S3_REGION =
+      environment.AGENT_SERVER_FILES_S3_REGION || 'us-east-1'
+    result.AGENT_SERVER_FILES_S3_ACCESS_KEY = (
+      await readFile(
+        resolve(result.SUPERDSH_DEPLOYMENT_CONFIG_DIR, 'minio-app-user'),
+        'utf8',
+      )
+    ).trim()
+    result.AGENT_SERVER_FILES_S3_SECRET_KEY = (
+      await readFile(
+        resolve(result.SUPERDSH_DEPLOYMENT_CONFIG_DIR, 'minio-app-password'),
+        'utf8',
+      )
+    ).trim()
+  }
   return result
 }
 

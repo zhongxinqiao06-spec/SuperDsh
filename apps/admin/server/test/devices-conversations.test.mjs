@@ -143,6 +143,92 @@ test('session streams and reconnect recovery are accepted by the actual browser 
   await closed
 })
 
+test('failed Host turns remain failed with a durable explanation after idle notifications and reconnect', async (t) => {
+  const f = await fixture(t)
+  const scope = { runtime: 'dsh', runtimeId: 'dsh', sessionId: f.sessionId }
+  const terminal = {
+    id: 'failed-turn',
+    type: 'turn.end',
+    status: 'failed',
+    role: 'system',
+    orderSeq: 2,
+    revision: 1,
+    content: {
+      kind: 'turn_end',
+      reason: {
+        kind: 'error',
+        error: {
+          code: 'PI_AI_ERROR',
+          message: 'Response incomplete: length',
+        },
+      },
+    },
+  }
+  await f.hub.notify(f.connectorId, 'timeline.itemUpsert', {
+    ...scope,
+    item: terminal,
+  })
+  await f.hub.notify(f.connectorId, 'session.turnEnded', {
+    ...scope,
+    outcome: 'failed',
+  })
+  await f.hub.notify(f.connectorId, 'session.state.updated', {
+    ...scope,
+    status: 'idle',
+  })
+  const current = f.hub.liveState.get(f.sessionId)
+  assert.equal(current.status, 'error')
+  assert.equal(current.error.code, 'MODEL_OUTPUT_LIMIT')
+  assert.match(current.error.message, /长度上限/)
+  await f.hub.notify(f.connectorId, 'timeline.sync', {
+    ...scope,
+    complete: true,
+    items: [terminal],
+  })
+  await f.hub.notify(f.connectorId, 'timeline.itemUpsert', {
+    ...scope,
+    item: terminal,
+  })
+  const notices = await f.db.query(
+    "SELECT payload_json FROM timeline_items WHERE session_id=$1 AND type='system'",
+    [f.sessionId],
+  )
+  assert.equal(
+    notices.length,
+    1,
+    'snapshot and repeated events preserve one failure notice',
+  )
+  assert.match(JSON.stringify(notices[0].payload_json), /MODEL_OUTPUT_LIMIT/)
+  f.hub.liveState.delete(f.sessionId)
+  const events = await f.api(`/sessions/${f.sessionId}/events?after=seq:0`)
+  assert.equal(
+    events.body.events.find((event) => event.type === 'runtime.state.updated')
+      .payload.state.status,
+    'error',
+  )
+  await f.hub.notify(f.connectorId, 'timeline.itemUpsert', {
+    ...scope,
+    item: {
+      id: 'next-turn',
+      type: 'turn.start',
+      status: 'done',
+      role: 'system',
+      orderSeq: 3,
+      content: { kind: 'turn_start' },
+    },
+  })
+  await f.hub.notify(f.connectorId, 'session.state.updated', {
+    ...scope,
+    status: 'running',
+  })
+  await f.hub.notify(f.connectorId, 'session.turnEnded', {
+    ...scope,
+    outcome: 'completed',
+  })
+  assert.equal(f.hub.liveState.get(f.sessionId).status, 'idle')
+  assert.equal(f.hub.liveState.get(f.sessionId).error, null)
+})
+
 async function fixture(t) {
   let cleanupDatabase
   const db = await withTestDatabase({
@@ -267,6 +353,15 @@ async function fixture(t) {
   const local = {
     call: async (method, params) => {
       calls.push({ method, params })
+      if (['runtime.validateConfig', 'runtime.start'].includes(method)) {
+        assert.equal(typeof params.name, 'string')
+        assert.ok(params.name.length > 0)
+        assert.ok(Number.isSafeInteger(params.configRevision))
+        assert.ok(params.configRevision >= 0)
+        assert.equal(typeof params.config, 'object')
+      }
+      if (method === 'runtime.stop')
+        assert.deepEqual(Object.keys(params).sort(), ['runtime', 'runtimeId'])
       if (method === 'runtime.discover')
         return {
           runtimeTypes: [
@@ -368,6 +463,90 @@ async function fixture(t) {
     local,
   }
 }
+
+test('desktop runtime lifecycle sends the pinned Connector name and configuration revision', async (t) => {
+  const f = await fixture(t)
+  await f.db.query(
+    'UPDATE connector_runtime_types SET max_instances=3 WHERE connector_id=$1',
+    [f.connectorId],
+  )
+  const base = `/connectors/${f.connectorId}/runtimes`
+  const created = await f.api(base, {
+    method: 'POST',
+    body: {
+      runtimeType: 'dsh',
+      name: '本机会话',
+      config: { dshHome: f.root },
+      active: true,
+    },
+  })
+  assert.equal(created.status, 201, JSON.stringify(created.body))
+  const runtimeId = created.body.runtimeId
+  const validated = f.calls.find(
+    (call) => call.method === 'runtime.validateConfig',
+  )
+  const started = f.calls.find((call) => call.method === 'runtime.start')
+  assert.equal(validated.params.runtimeId, runtimeId)
+  assert.deepEqual(started.params, validated.params)
+  const updated = await f.api(`${base}/${runtimeId}/config`, {
+    method: 'PUT',
+    body: { config: { dshHome: f.root, defaultAgentPreset: 'default' } },
+  })
+  assert.equal(updated.status, 200, JSON.stringify(updated.body))
+  const restarts = f.calls.filter((call) => call.method === 'runtime.start')
+  assert.ok(
+    restarts.at(-1).params.configRevision >= started.params.configRevision,
+  )
+  const stopped = await f.api(`${base}/${runtimeId}/active`, {
+    method: 'PUT',
+    body: { active: false },
+  })
+  assert.equal(stopped.status, 200, JSON.stringify(stopped.body))
+  const resumed = await f.api(`${base}/${runtimeId}/active`, {
+    method: 'PUT',
+    body: { active: true },
+  })
+  assert.equal(resumed.status, 200, JSON.stringify(resumed.body))
+})
+
+test('server Agent metadata events retain execution source and runtime labels after updates', async (t) => {
+  const f = await fixture(t)
+  await f.db.query(
+    "UPDATE connectors SET executor_kind='server-agent' WHERE id=$1",
+    [f.connectorId],
+  )
+  await f.db.query(
+    `INSERT INTO server_agents(owner_user_id,connector_id,runtime_id,project_id,credential_ciphertext,created_at,updated_at)
+     SELECT user_id,id,'dsh',$2,'test-only',created_at,updated_at FROM connectors WHERE id=$1`,
+    [f.connectorId, f.projectId],
+  )
+  const received = []
+  const originalEmit = f.hub.emit.bind(f.hub)
+  f.hub.emit = (id, sequence, type, payload) => {
+    if (type === 'session.meta.updated') received.push(payload.session)
+    return originalEmit(id, sequence, type, payload)
+  }
+  for (const method of [
+    'session.updated',
+    'session.turnEnded',
+    'session.source.updated',
+  ]) {
+    await f.hub.notify(f.connectorId, method, {
+      runtime: 'dsh',
+      runtimeId: 'dsh',
+      sessionId: f.sessionId,
+      title: '同一服务端会话',
+      availability: 'available',
+      observationOrigin: 'operation',
+    })
+  }
+  assert.equal(received.length, 3)
+  for (const session of received) {
+    assert.equal(session.executorKind, 'server-agent')
+    assert.equal(session.runtimeTypeDisplayName, 'Harness')
+    assert.equal(session.id, f.sessionId)
+  }
+})
 
 test('API ownership, schema-compatible metadata, model selections, and message RPC binding', async (t) => {
   const f = await fixture(t)
@@ -688,6 +867,11 @@ test('desktop Connector WebSocket authenticates and carries RPC plus ingress wit
   ws.on('message', (raw) => {
     const request = JSON.parse(raw)
     if (!request.id) return
+    assert.equal(
+      request.type,
+      'request',
+      'pinned Connector ignores frames without the request envelope',
+    )
     seen.push(request.method)
     const result =
       request.method === 'runtime.discover'
@@ -711,7 +895,9 @@ test('desktop Connector WebSocket authenticates and carries RPC plus ingress wit
               },
             }
           : { accepted: true, sessionId: request.params.sessionId }
-    ws.send(JSON.stringify({ jsonrpc: '2.0', id: request.id, result }))
+    ws.send(
+      JSON.stringify({ type: 'response', ok: true, id: request.id, result }),
+    )
   })
   await once(ws, 'open')
   await new Promise((resolve) => setTimeout(resolve, 30))
@@ -724,7 +910,7 @@ test('desktop Connector WebSocket authenticates and carries RPC plus ingress wit
   assert.ok(seen.includes('session.send_message'))
   ws.send(
     JSON.stringify({
-      jsonrpc: '2.0',
+      type: 'notification',
       method: 'session.meta.upsert',
       params: {
         sessionId: f.sessionId,
@@ -823,6 +1009,7 @@ test('desktop file download forwards initial bytes before the upload completes',
   ws.on('message', (raw) => {
     const rpc = JSON.parse(raw)
     if (!rpc.id) return
+    assert.equal(rpc.type, 'request')
     calls.push(rpc.method)
     let result = { accepted: true }
     if (rpc.method === 'runtime.discover') result = { runtimeTypes: [] }
@@ -847,7 +1034,7 @@ test('desktop file download forwards initial bytes before the upload completes',
         })(),
       })
     }
-    ws.send(JSON.stringify({ jsonrpc: '2.0', id: rpc.id, result }))
+    ws.send(JSON.stringify({ type: 'response', ok: true, id: rpc.id, result }))
   })
   await once(ws, 'open')
   const prepared = await f.api(

@@ -275,7 +275,7 @@ test('knowledge extraction reads UTF-8, tables and DOCX text without executing d
   assert.equal((await extractKnowledgeText(docx)).text, '企业知识正文')
   await assert.rejects(
     extractKnowledgeText({ filename: 'scan.pdf', content: Buffer.from('PDF') }),
-    /支持的文件格式/u,
+    /不是有效的 PDF/u,
   )
 })
 

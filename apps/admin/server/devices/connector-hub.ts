@@ -19,6 +19,10 @@ import type {
 } from '../infrastructure/database.ts'
 import { json } from '../infrastructure/database.ts'
 import {
+  runtimeFailure,
+  runtimeFailureItems,
+} from '../conversations/runtime-failure.ts'
+import {
   ConversationStore,
   array,
   hashToken,
@@ -621,7 +625,10 @@ export class ConnectorHub {
       })
       for (const row of changes)
         this.emit(text(row.id), Number(row.seq), 'session.meta.updated', {
-          session: sessionView(row, this.isOnline(connectorId)),
+          session: sessionView(
+            await this.store.session(text(row.id)),
+            this.isOnline(connectorId),
+          ),
         })
       await this.changed(connectorId)
       return
@@ -674,10 +681,11 @@ export class ConnectorHub {
       const id = text(session.id),
         now = utcNow()
       if (method === 'timeline.itemUpsert' || method === 'timeline.sync') {
-        const items =
+        const items = runtimeFailureItems(
           method === 'timeline.itemUpsert'
             ? [object(params.item)]
-            : array(params.items)
+            : array(params.items),
+        )
         if (method === 'timeline.sync' && params.complete === true) {
           const deleted = await db.query(
             'DELETE FROM timeline_items WHERE session_id=$1 AND NOT(id=ANY($2::text[])) RETURNING id',
@@ -717,11 +725,26 @@ export class ConnectorHub {
       } else {
         if (method === 'session.state.updated') {
           const selections = record(params.selections)
+          let status = text(params.status, 'idle')
+          let failure: Row | null = null
+          if (status === 'idle') {
+            const [boundary] = await db.query(
+              "SELECT payload_json FROM timeline_items WHERE session_id=$1 AND type IN ('turn.start','turn.end') ORDER BY order_seq DESC LIMIT 1",
+              [id],
+            )
+            const reason = record(
+              record(json<Row>(boundary?.payload_json, {}).content).reason,
+            )
+            if (reason.kind === 'error') {
+              status = 'error'
+              failure = runtimeFailure(reason)
+            }
+          }
           const [row] = await db.query(
             `UPDATE sessions SET status=$2,model_selection_id=COALESCE($3,model_selection_id),permission_selection_id=COALESCE($4,permission_selection_id),external_session_id=COALESCE($5,external_session_id),updated_at=$6,seq=seq+1,updated_seq=seq+1 WHERE id=$1 RETURNING *`,
             [
               id,
-              text(params.status, 'idle'),
+              status,
               selections.model ?? null,
               selections.permission ?? null,
               params.externalSessionId || null,
@@ -731,6 +754,10 @@ export class ConnectorHub {
           const state: Row = {
             ...this.store.state(row!),
             ...params,
+            status,
+            ...(failure
+              ? { error: failure, statusReason: failure.message }
+              : {}),
             sessionId: id,
             updatedSeq: Number(row!.seq),
             updatedAt: now,
@@ -759,9 +786,21 @@ export class ConnectorHub {
             payload: { state },
           })
         } else if (method === 'session.turnEnded') {
+          const failed = params.outcome === 'failed'
+          const [terminal] = failed
+            ? await db.query(
+                "SELECT id,payload_json FROM timeline_items WHERE session_id=$1 AND type='turn.end' ORDER BY order_seq DESC LIMIT 1",
+                [id],
+              )
+            : []
+          const failure = failed
+            ? runtimeFailure(
+                record(json<Row>(terminal?.payload_json, {}).content).reason,
+              )
+            : null
           const [row] = await db.query(
-            "UPDATE sessions SET status='idle',seq=seq+1,updated_seq=seq+1,latest_turn_end_seq=seq+1,updated_at=$2 WHERE id=$1 RETURNING *",
-            [id, now],
+            'UPDATE sessions SET status=$3,seq=seq+1,updated_seq=seq+1,latest_turn_end_seq=seq+1,updated_at=$2 WHERE id=$1 RETURNING *',
+            [id, now, failed ? 'error' : 'idle'],
           )
           await db.query(
             'DELETE FROM session_active_runs WHERE session_id=$1',
@@ -771,14 +810,24 @@ export class ConnectorHub {
             sessionId: id,
             sequence: Number(row!.seq),
             type: 'session.meta.updated',
-            payload: { session: sessionView(row!, this.isOnline(connectorId)) },
+            payload: {
+              session: sessionView(
+                await this.store.session(id, undefined, db),
+                this.isOnline(connectorId),
+              ),
+            },
           })
-          this.liveState.set(id, this.store.state(row!))
+          const state = {
+            ...this.store.state(row!),
+            error: failure,
+            statusReason: failure?.message ?? null,
+          }
+          this.liveState.set(id, state)
           effects.push({
             sessionId: id,
             sequence: Number(row!.seq),
             type: 'runtime.state.updated',
-            payload: { state: this.store.state(row!) },
+            payload: { state },
           })
         } else if (method === 'session.source.updated') {
           const updated = await this.updateSource(db, session, params, now)
@@ -787,7 +836,10 @@ export class ConnectorHub {
             sequence: Number(updated!.seq),
             type: 'session.meta.updated',
             payload: {
-              session: sessionView(updated!, this.isOnline(connectorId)),
+              session: sessionView(
+                await this.store.session(id, undefined, db),
+                this.isOnline(connectorId),
+              ),
             },
           })
         } else if (method === 'notice.upsert') {
@@ -833,7 +885,10 @@ export class ConnectorHub {
             sequence: Number(updated!.seq),
             type: 'session.meta.updated',
             payload: {
-              session: sessionView(updated!, this.isOnline(connectorId)),
+              session: sessionView(
+                await this.store.session(id, undefined, db),
+                this.isOnline(connectorId),
+              ),
             },
           })
         }
@@ -904,6 +959,7 @@ export class ConnectorHub {
           runtimeId: runtime.runtime_id,
           name: runtime.name,
           config: json(runtime.config_json, {}),
+          configRevision: Date.parse(text(runtime.updated_at)),
         })
         await this.store.db.query(
           "UPDATE device_runtimes SET status='running' WHERE connector_id=$1 AND runtime_id=$2",
@@ -1052,7 +1108,7 @@ export class ConnectorHub {
           })
           signal?.addEventListener('abort', abort, { once: true })
           ws.send(
-            JSON.stringify({ jsonrpc: '2.0', id: requestId, method, params }),
+            JSON.stringify({ type: 'request', id: requestId, method, params }),
           )
         }),
     }

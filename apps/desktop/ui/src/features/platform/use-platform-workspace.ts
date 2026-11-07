@@ -693,6 +693,21 @@ export function usePlatformWorkspace() {
       selectionRef.current.sessionId !== sessionId
     )
       throw new Error('请先选择文件所属会话')
+    if (bridge?.saveAttachment) {
+      if (
+        !account?.identityKey ||
+        typeof account.identityGeneration !== 'number'
+      )
+        throw new Error('平台账号尚未就绪')
+      return bridge.saveAttachment({
+        identity: {
+          key: account.identityKey,
+          generation: account.identityGeneration,
+        },
+        sessionId,
+        attachmentId: fileId,
+      })
+    }
     const current = generation.current
     const result = await request({
       operation: 'download-attachment',

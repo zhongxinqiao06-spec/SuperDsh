@@ -1667,6 +1667,9 @@ fun SessionDetailScreen(
                             Column(
                                 modifier = Modifier.onSizeChanged { composerHeightPx = it.height },
                             ) {
+                                if (canBrowseFiles && sessionId != null && state.session?.executorKind == "server-agent" && preparedSession == null) {
+                                    OfficeSessionResourcesButton(sessionId, controller, state.runtime.status.toString())
+                                }
                                 BlockingRuntimeNoticeStack(
                                     notices = blockingNotices,
                                     respondingNoticeIds = state.respondingNoticeIds,

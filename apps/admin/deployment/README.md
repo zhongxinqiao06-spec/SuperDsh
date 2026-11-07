@@ -1,12 +1,36 @@
 # 星桥智能平台：Docker Compose 部署与更新
 
-拉取代码后，在仓库根执行 **`docker compose up -d --build`** 即可构建并启动官网、工作台、Node API、服务端 Harness、PostgreSQL、Redis 和 Qdrant。默认配置已齐全，**无需复制 `.env`、手工填写数据库地址或安装宿主机 Node / Yarn**。应用启动后自动迁移数据库，并在全新空库创建首个管理员。
+拉取代码后，在仓库根执行 **`docker compose up -d --build`** 即可构建并启动官网、工作台、Node API、服务端 Harness、PostgreSQL、Redis、Qdrant 和 MinIO。默认配置已齐全，**无需复制 `.env`、手工填写数据库地址或安装宿主机 Node / Yarn**。应用启动后自动迁移数据库，并在全新空库创建首个管理员。
 
 代码仓库：[zhongxinqiao06-spec/SuperDsh](https://github.com/zhongxinqiao06-spec/SuperDsh)，默认分支 `main`。已有 Compose 部署看[常规更新](#常规更新)；已有原生、systemd 或旧 Python 部署先看[迁移边界](#旧-python-部署切换边界)。日常源码开发继续使用根 [README](../../../README.md#日常开发) 的命令。
 
+## MinIO 与文件存储升级
+
+开发依赖 `server:deps:up` 统一管理 PostgreSQL、Redis、Qdrant、MinIO；应用仍由本机 `server:dev` 启动。MinIO 开发 API / 控制台仅绑定 `127.0.0.1:19000` / `127.0.0.1:19001`，若自动分配其他端口，以命令输出和 `aa-dev.env` 为准。`server:deps:down` 只停止依赖，保留卷及密钥。
+
+MinIO 从官方 [RELEASE.2025-10-15T17-29-55Z](https://github.com/minio/minio/releases/tag/RELEASE.2025-10-15T17-29-55Z) 源码构建；源码 SHA-256、固定 `mc`、Go 和运行镜像摘要见 [sources.json](minio/sources.json)，构建定义见 [Dockerfile](minio/Dockerfile)。镜像保留两份 AGPL-3.0 许可证。不替换为浮动第三方镜像。
+
+初始化创建私有 `superdsh-files`、`superdsh-temporary` 两桶及独立受限应用用户；浏览器不获取任何存储凭据。开发密钥保存在被忽略的 `aa-dev.env`，完整 Compose 的根凭据与应用凭据分别保存于 `config-data` 卷的独立文件，使用不同文件所有者与仅本人可读权限，数据在 `minio-data` 卷。重复初始化保留凭据与对象；已有卷缺少凭据时须恢复备份。完整部署不向宿主暴露 MinIO 端口。`minio-init` 成功退出是正常状态。
+
+**新环境默认 MinIO；已有环境仍用原 local / S3 选择。** 升级不自动搬文件或清理数据库原文。先备份 PostgreSQL、文件源、存储卷与配套密钥；手动升级数据库到 `v2_45` 后停止平台，按以下顺序迁移（生产原生环境加 `--production`）：
+
+```powershell
+corepack.cmd yarn server:files
+corepack.cmd yarn server:files --apply
+# 在「系统管理 → 文件存储」新增并检查目标连接，记录返回的 storage ID；再次停止平台
+corepack.cmd yarn server:files --target=storage_ID
+corepack.cmd yarn server:files --apply --target=storage_ID
+```
+
+清单覆盖本地 / S3 附件及 `business_agent_assets.content`，逐文件 SHA-256 校验后提交映射；失败保留源，重跑续传；不改用户、会话 ID、Qdrant 索引或桌面 Home。迁移完成并抽查下载后，才在文件存储页面明确切换新上传默认连接。旧位置和数据库原文仍保留；切换默认仅影响新文件，不能当作已迁移文件的位置回滚。需要回迁时用同一命令指定原连接并重新校验。
+
+`server:files --cleanup` 仅列出过期暂存、无引用回收站及孤立对象；加 `--apply` 才清理，需平台停止。迁移源备份、旧源文件及数据库原文不在该清理范围。默认文件策略为 32 MiB、暂存 24 小时、回收站 30 天，管理员可调整；引用仍有效的文件不能物理删除。MinIO 不可达会明确报错，不自动落到本地磁盘。
+
+本机模型初始化文件由用户保管，不进 Git 或 Docker 上下文。`server:models:init` 读取 `.superdsh-work/server-dev/model-initialization.json` 并检查，`--apply` 仅建立缺失连接；不覆盖已有 Key、个人归属或默认模型。火山连接创建后仍须在模型管理指定有访问权限的模型 ID / 推理接入点；“连接存在”不等于实际调用通过。
+
 ## 服务器首次部署
 
-服务器准备 **Git、Docker Engine 与 Docker Compose v2**，Docker 使用 Linux 容器。先确认 `docker info` 和 `docker compose version` 正常；服务器需能访问依赖、镜像仓库。构建在容器内完成，包含固定的 Node 24、Yarn 4.18、Harness 和 Next 生产产物，以及 Office 预览组件与中文字体。
+服务器准备 **Git、Docker Engine 与 Docker Compose v2**，Docker 使用 Linux 容器。先确认 `docker info` 和 `docker compose version` 正常；服务器需能访问依赖、镜像仓库及模型下载源。构建在容器内完成，包含固定的 Node 24、Yarn 4.18、Harness 和 Next 生产产物，以及 Office 预览组件、中文字体与本地 Embedding 模型。
 
 **2 GB 或更少内存的服务器先检查 swap**，按[小内存服务器](#小内存服务器与-exit-code-137)准备构建所需余量后再执行下面的启动命令。
 
@@ -49,6 +73,16 @@ git pull --ff-only origin main && docker compose up -d --build
 已经自行修改过密码、账号状态不符或缺少初始记录的部署保留现有账号。`initial-admin.txt` 继续保留历史记录，自动对齐完成后应使用新的初始密码登录；旧文件不代表当前密码。所有其他账号、模型配置、资料和数据卷保持不变。
 
 平台与知识检索可直接启动。实际 AI 对话仍需要你在「模型管理」或「个人中心 → 个人模型」填入自己的供应商 Key 并选择模型，默认配置不包含付费模型凭据或额度。桌面和手机填写同一个平台地址，例如 `http://服务器IP:5174`；默认无需另开 `8000`。
+
+### 知识检索与办公助手准备
+
+镜像构建会下载并逐文件校验固定的 `Xenova/bge-small-zh-v1.5` q8 ONNX（512 维，revision `75c43b069aac4d136ba6bc1122f995fedcfd2781`），存放在 `/app/models/bge-small-zh-v1.5`。构建需能访问 Hugging Face；下载或校验失败应先处理明确报错，不跳过校验、不在用户首次提问时下载。原生开发对应根命令为 `corepack yarn server:knowledge:prepare`。
+
+进入「智能体管理 → 知识库 → 检索设置」可配置本地或外部 OpenAI 兼容 Embedding，保存及全局索引同时要求 `models.manage` 和 `agents.manage`，独立于聊天模型。默认本地模式不需要外发配置。外部 Key 加密保存，不自动切换供应商。更换模型时建立独立索引，验证成功再切换；失败保留原索引。「索引与检索」显示每份资料状态和重试入口。Qdrant 卷仍需保留；索引可重建，但原文在文件存储（旧原文仍在 PostgreSQL），元数据与权限在 PostgreSQL，不能只备份 Qdrant。
+
+外部 Embedding 会接收平台知识原文。部署维护者必须先在根 `.env` 明确批准可信 origin，例如 `SUPERDSH_KNOWLEDGE_EMBEDDING_TRUSTED_ORIGINS=https://embedding.example.com`，多个 origin 用逗号分隔，不含路径、凭据或通配符；更新容器环境后生效。网页不能修改此信任列表，仅有模型管理权限不能借配置导出其他用户资料。该许可表示企业部署方批准向这些服务发送平台知识，不应填写未经批准的地址。私网供应商还需独立配置 `SUPERDSH_PERSONAL_MODEL_ALLOWED_ORIGINS` 的网络访问许可；仅设置内网白名单不会授权资料外发。移除信任 origin 后，已保存的外部配置会停止知识请求并显示明确错误，不自动切回其他供应商；本地默认和平台其他功能继续可用。
+
+三个内置助手升级为 Excel 办公助手、PPT 演示助手、企业知识助手；用户编辑及删除的旧记录保持原状，可显式复制新版草稿。上传自己的资料后，Excel/PPT 先确认方案再生成；知识回答提供原文证据。生成文件可编辑，支持聊天内分页预览及下载；不是任意 Office 模板都能无损处理，具体输入边界见[服务端说明](../server/README.md#智能体资料与-office-模板)。仅用户明确选择时使用脱敏演示资料，模型在线、文件生成或 PDF 渲染成功均不能代替计算与真实客户端验收。
 
 ### 登录 401 与已有管理员密码恢复
 
@@ -150,7 +184,7 @@ free -h
 ```bash
 git pull --ff-only origin main
 docker compose stop platform
-docker compose stop postgres redis qdrant
+docker compose stop postgres redis qdrant minio
 # 此时按下文“一致备份”完成备份，确认成功后再继续。
 docker compose build
 docker compose up -d --no-build
@@ -158,23 +192,23 @@ docker compose ps -a
 curl --fail --silent --show-error http://127.0.0.1:5174/api/v2/health/ready
 ```
 
-逐条确认成功，不在构建失败后继续启动新镜像。仅构建失败、尚未启动新版本时，可用 `docker compose start postgres redis qdrant platform` 恢复原容器；已有数据迁移则按[回退步骤](#回退与停止)处理。停止容器保留卷和密钥，不使用 `down -v`、清理缓存或删除锁文件来处理内存不足。
+逐条确认成功，不在构建失败后继续启动新镜像。仅构建失败、尚未启动新版本时，可用 `docker compose start postgres redis qdrant minio platform` 恢复原容器；已有数据迁移则按[回退步骤](#回退与停止)处理。停止容器保留卷和密钥，不使用 `down -v`、清理缓存或删除锁文件来处理内存不足。
 
 ## 默认配置与数据
 
 根 [compose.yml](../../../compose.yml) 是正式部署入口，[.env.example](../../../.env.example) 仅提供可选覆盖项。所有启动必需值均有默认值；部署密钥在首次启动时随机生成，保存在 `config-data` 卷中，不写入 Git。
 
-| 项目                             | 默认行为                                                        |
-| -------------------------------- | --------------------------------------------------------------- |
-| Compose 项目名                   | `starbridge`，与开发环境 `superdsh-dev` 分开                    |
-| 对外端口                         | `5174`，统一承载网页、API、WebSocket 和客户端连接               |
-| 数据库                           | Compose 内部 PostgreSQL；地址、数据库名、账号与随机密码自动配置 |
-| Redis / Qdrant                   | 使用 Compose 私有网络中的服务地址；不发布宿主机数据库端口       |
-| 配置与密钥                       | `config-data`，容器内 `/data/config`                            |
-| Agent 数据                       | `platform-data`，保留每个用户的 Home、工作区与运行数据          |
-| 文件与成果                       | `files-data`，保留上传附件与本地文件存储                        |
-| PostgreSQL / Redis / Qdrant 数据 | `postgres-data` / `redis-data` / `qdrant-data`                  |
-| 首次账号                         | `admin` / `admin123`，首次凭据保存于 `/data/config/initial-admin.txt` |
+| 项目                                     | 默认行为                                                              |
+| ---------------------------------------- | --------------------------------------------------------------------- |
+| Compose 项目名                           | `starbridge`，与开发环境 `superdsh-dev` 分开                          |
+| 对外端口                                 | `5174`，统一承载网页、API、WebSocket 和客户端连接                     |
+| 数据库                                   | Compose 内部 PostgreSQL；地址、数据库名、账号与随机密码自动配置       |
+| Redis / Qdrant / MinIO                   | 使用 Compose 私有网络中的服务地址；不发布宿主机数据库端口             |
+| 配置与密钥                               | `config-data`，容器内 `/data/config`                                  |
+| Agent 数据                               | `platform-data`，保留每个用户的 Home、工作区与运行数据                |
+| 文件与成果                               | `files-data`，保留上传附件与本地文件存储                              |
+| PostgreSQL / Redis / Qdrant / MinIO 数据 | `postgres-data` / `redis-data` / `qdrant-data` / `minio-data`         |
+| 首次账号                                 | `admin` / `admin123`，首次凭据保存于 `/data/config/initial-admin.txt` |
 
 Docker 卷实际名称默认带项目名前缀，例如 `starbridge_config-data`。源码目录、镜像与持久数据分离：`git pull`、镜像重建、容器重建和正常 `docker compose down` 均保留卷。**不要使用 `docker compose down -v` 删除生产数据。** 保持原项目名；改名会创建另一组新卷，看起来像一套空平台，不会自动迁移原数据。
 
@@ -188,7 +222,7 @@ Docker 卷实际名称默认带项目名前缀，例如 `starbridge_config-data`
 | `SUPERDSH_PUBLIC_ORIGIN`          | 留空使用实际请求地址；配置域名时填写 `https://实际域名`               |
 | `SUPERDSH_CORS_ORIGINS`           | 留空沿用平台默认规则；需要跨域时填写允许的 origin                     |
 | `SUPERDSH_INITIAL_ADMIN_USERNAME` | `admin`，初始管理员账号及旧初始凭据的匹配目标                         |
-| `SUPERDSH_INITIAL_ADMIN_PASSWORD` | `admin123`；留空沿用默认值，用于新库初始化与旧初始密码的一次性兼容      |
+| `SUPERDSH_INITIAL_ADMIN_PASSWORD` | `admin123`；留空沿用默认值，用于新库初始化与旧初始密码的一次性兼容    |
 | `POSTGRES_PASSWORD`               | 留空自动生成并持久保存；已有库沿用原密码                              |
 | `SUPERDSH_POSTGRES_IMAGE`         | `postgres:17-alpine`；新库兼容问题可按上节选择 `postgres:17-bookworm` |
 
@@ -270,6 +304,10 @@ docker compose stop platform
 docker compose stop postgres redis qdrant
 project="$(docker inspect "$(docker compose ps -aq platform)" --format '{{index .Config.Labels "com.docker.compose.project"}}')"
 test -n "$project"
+minio_backup=()
+if docker volume inspect "${project}_minio-data" >/dev/null 2>&1; then
+  minio_backup=(--mount "type=volume,src=${project}_minio-data,dst=/backup/minio,readonly")
+fi
 docker run --rm --user 0:0 --entrypoint tar \
   --mount "type=volume,src=${project}_config-data,dst=/backup/config,readonly" \
   --mount "type=volume,src=${project}_platform-data,dst=/backup/platform,readonly" \
@@ -277,12 +315,13 @@ docker run --rm --user 0:0 --entrypoint tar \
   --mount "type=volume,src=${project}_postgres-data,dst=/backup/postgres,readonly" \
   --mount "type=volume,src=${project}_redis-data,dst=/backup/redis,readonly" \
   --mount "type=volume,src=${project}_qdrant-data,dst=/backup/qdrant,readonly" \
+  "${minio_backup[@]}" \
   --mount "type=bind,src=${backup_dir},dst=/output" \
   "$previous_image" -czf /output/volumes.tar.gz -C /backup .
 tar -tzf "$backup_dir/volumes.tar.gz" > "$backup_dir/contents.txt"
 ```
 
-这些命令沿用上节的 `backup_dir`、`previous_image`，使用默认卷定义；若自行改过 Compose 的卷名或改用外部数据库，须同步采用真实挂载和对应数据库备份方案。备份所有六个卷，可同时保留数据库、配套密钥、上传文件、Agent Home 和索引。可选 `.env`、反向代理配置及证书也应另存到同一受限备份位置；不要把含密钥的备份提交 Git。归档可列出不等同于恢复成功，应在独立环境演练恢复。
+这些命令沿用上节的 `backup_dir`、`previous_image`，使用默认卷定义；若自行改过 Compose 的卷名或改用外部数据库，须同步采用真实挂载和对应数据库备份方案。已启用 MinIO 的部署备份七个卷；尚未升级的旧环境仍备份原六个卷，不创建空 MinIO 卷冒充备份。数据库、配套密钥、上传文件、Agent Home 和索引必须一致保留。可选 `.env`、反向代理配置及证书也应另存到同一受限备份位置；不要把含密钥的备份提交 Git。归档可列出不等同于恢复成功，应在独立环境演练恢复。
 
 备份失败就停止更新，原容器及卷仍保留；用 `docker compose start postgres redis qdrant platform` 恢复原容器，不要执行 `up` 启动尚未验证的新镜像。备份成功后启动新版本：
 
@@ -313,12 +352,12 @@ docker compose stop
 
 新版本启动失败时先停止新平台、保留失败日志和数据副本。仅构建失败且新容器从未运行时，旧容器仍可启动；发生迁移或新写入后，不能只切旧 Git 提交 / 旧镜像就认为数据已回退。当前没有自动降级迁移。
 
-需要回退数据时，将**升级前 PostgreSQL、配置密钥、附件、Agent Home、Redis 与 Qdrant**一致恢复到隔离环境或确认的目标卷，并使用记录的旧提交、旧平台镜像及匹配的数据库镜像版本。备份之后的新增写入需要单独核对，不能静默丢弃。恢复期间不允许新旧平台同时写同一数据库或 Home；确认恢复可用后再对外提供服务。
+需要回退数据时，将**升级前 PostgreSQL、配置密钥、附件、Agent Home、Redis、Qdrant 与 MinIO**一致恢复到隔离环境或确认的目标卷，并使用记录的旧提交、旧平台镜像及匹配的数据库镜像版本。备份之后的新增写入需要单独核对，不能静默丢弃。恢复期间不允许新旧平台同时写同一数据库或 Home；确认恢复可用后再对外提供服务。
 
 ## 旧 Python 部署切换边界
 
 默认 Compose 是全新部署入口，使用独立 `starbridge_*` 卷，不会自动连接、复制或覆盖原 `superdsh-dev`、原生 systemd 或旧 Python 部署的数据。旧实例有资料时，直接启动得到的是新平台，不能把它当成历史数据已迁移。
 
-迁移已有平台须先备份并停止全部旧写入进程，保留原数据库、稳定用户 / Connector ID、密码哈希、鉴权密钥、模型加密密钥、附件与 Agent Home，再规划导入目标。原数据库当前支持产品 `v2_35` 至 `v2_42` 升级，更早的 AA 库需先用原发布版本升级；未知版本不能手工改 `alembic_version` 绕过。
+迁移已有平台须先备份并停止全部旧写入进程，保留原数据库、稳定用户 / Connector ID、密码哈希、鉴权密钥、模型加密密钥、附件与 Agent Home，再规划导入目标。原数据库当前支持产品 `v2_35` 至 `v2_45` 升级，更早的 AA 库需先用原发布版本升级；未知版本不能手工改 `alembic_version` 绕过。
 
 已有原生或 systemd 部署可继续使用[原生部署与更新](native.md#常规更新)，无需为本次代码更新立即切换存储方式。旧容器 Agent 的稳定归属核对、离线导出及空目标导入步骤保留在[原生迁移指南](native.md#旧容器-agent-数据离线导入)。迁入新 Compose 前必须把原配置与数据成套迁移，不能将新生成的密钥搭配原数据库，也不能在目标 Home 已有数据时覆盖导入。

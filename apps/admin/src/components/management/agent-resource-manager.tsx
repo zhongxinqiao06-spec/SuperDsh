@@ -1,6 +1,12 @@
 'use client'
 
 import * as React from 'react'
+import type { ToolImplementationRef } from '@superdsh/core/contracts/extensions'
+import { extensionsApi } from '@/features/agents/extensions-api'
+import { ToolSourcesDialog } from './tool-sources-dialog'
+import { ToolImplementationEditor } from './tool-implementation-editor'
+import { SkillImportDialog } from './skill-import-dialog'
+import { AgentResourceHistory } from './agent-resource-history'
 import { useAuth } from '@/components/auth/auth-context'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -31,10 +37,15 @@ import {
   ManagementPagination,
 } from './presentation'
 import { AgentAssetsPanel } from './agent-assets-panel'
+import { KnowledgeSearchSettings } from './knowledge-search-settings'
+import { KnowledgeIndexDialog } from './knowledge-index-dialog'
+import { SkillProgramEditor } from './skill-program-editor'
+import type { SkillProgram } from '@superdsh/core/contracts/skills'
 
 type Kind = 'knowledge' | 'skills' | 'tools'
 type Resource = KnowledgeBase | AgentSkill | AgentTool
 type Draft = {
+  programDraft?: SkillProgram | null
   name: string
   description: string
   enabled: boolean
@@ -43,10 +54,14 @@ type Draft = {
   instructions: string
   requiredToolIds: string[]
   settings: AgentTool['settings']
+  implementation?: ToolImplementationRef
 }
 
 function draftFor(resource?: Resource): Draft {
   return {
+    ...(resource && 'requiredToolIds' in resource
+      ? { programDraft: resource.programDraft ?? resource.program }
+      : {}),
     name: resource?.name ?? '',
     description: resource?.description ?? '',
     enabled: resource?.enabled ?? true,
@@ -58,6 +73,8 @@ function draftFor(resource?: Resource): Draft {
       resource && 'requiredToolIds' in resource
         ? [...resource.requiredToolIds]
         : [],
+    implementation:
+      resource && 'settings' in resource ? resource.implementation : undefined,
     settings:
       resource && 'settings' in resource ? { ...resource.settings } : {},
   }
@@ -85,6 +102,23 @@ export function AgentResourceManager({ kind }: { kind: Kind }) {
 
 function ScopedResourceManager({ kind }: { kind: Kind }) {
   const tr = useManagementText()
+  const { can } = useAuth()
+  const [sourcesOpen, setSourcesOpen] = React.useState(false)
+  const [historyItem, setHistoryItem] = React.useState<Resource | null>(null)
+  const [importOpen, setImportOpen] = React.useState(false)
+  const [matchOpen, setMatchOpen] = React.useState(false)
+  const [matchRequest, setMatchRequest] = React.useState('')
+  const [matchResult, setMatchResult] = React.useState<Awaited<
+    ReturnType<typeof agentSkillsApi.matchPreview>
+  > | null>(null)
+  const extensions = useManagementResource(
+    'tool-implementations',
+    extensionsApi.list,
+    { enabled: kind === 'tools' },
+  )
+  const [embeddingSettings, setEmbeddingSettings] = React.useState(false)
+  const [knowledgeDiagnostics, setKnowledgeDiagnostics] =
+    React.useState<KnowledgeBase | null>(null)
   const label =
     kind === 'knowledge'
       ? tr('知识库', 'knowledge base')
@@ -167,9 +201,19 @@ function ScopedResourceManager({ kind }: { kind: Kind }) {
           ...common,
           instructions: draft.instructions.trim(),
           requiredToolIds: draft.requiredToolIds,
+          programDraft: draft.programDraft,
+          ...(editing !== 'new' && 'references' in editing
+            ? {
+                references: editing.references,
+                packageSha256: (editing as AgentSkill).packageSha256,
+              }
+            : {}),
         })
-      if (!id) throw new Error('Select an existing tool implementation')
-      return agentToolsApi.save(id, { ...common, settings: draft.settings })
+      return agentToolsApi.save(id, {
+        ...common,
+        settings: draft.settings,
+        implementation: draft.implementation,
+      })
     })
     if (ok) {
       setEditing(null)
@@ -249,8 +293,8 @@ function ScopedResourceManager({ kind }: { kind: Kind }) {
       'Maintain reusable instructions, output requirements and required tools. Changes apply to new agent sessions; existing sessions keep their original configuration.',
     ),
     tools: tr(
-      '配置已接入的知识检索、Excel 和 PPT 工具。工具决定执行能力，技能决定使用方式。',
-      'Configure the integrated knowledge search, Excel and PPT tools. Tools provide execution capabilities; skills describe how to use them.',
+      '从已安装扩展或已授权 MCP 创建工具配置，再关联到技能和智能体。参数、凭据及实现版本独立管理。',
+      'Configure installed extensions and approved MCP tools, then link them to skills and agents. Settings, credentials and implementation versions are managed separately.',
     ),
   }
   return (
@@ -271,6 +315,77 @@ function ScopedResourceManager({ kind }: { kind: Kind }) {
       }
     >
       <p className="text-sm text-muted-foreground">{descriptions[kind]}</p>
+      {kind === 'skills' && (
+        <div className="flex justify-end">
+          <Button variant="outline" onClick={() => setMatchOpen(true)}>
+            匹配试验
+          </Button>
+        </div>
+      )}
+      <ManagementDialog
+        open={matchOpen}
+        onOpenChange={setMatchOpen}
+        title="技能匹配试验"
+        description="仅检查已发布技能的匹配条件，不生成文件或调用收费模型。"
+        busy={resource.busy}
+        error={resource.error}
+      >
+        <Textarea
+          aria-label="试验需求"
+          value={matchRequest}
+          onChange={(e) => setMatchRequest(e.target.value)}
+          placeholder="例如：制作一份客户培训 PPT"
+        />
+        <Button
+          className="mt-3"
+          disabled={resource.busy || !matchRequest.trim()}
+          onClick={() =>
+            void resource.perform(async () => {
+              setMatchResult(await agentSkillsApi.matchPreview(matchRequest))
+            })
+          }
+        >
+          检查匹配
+        </Button>
+        <ul className="mt-3 space-y-2">
+          {matchResult?.candidates.map((item) => (
+            <li key={item.id}>
+              {item.name} · {item.score < 0 ? '不适用' : `${item.score} 分`}
+              <p className="text-xs text-muted-foreground">
+                {item.reasons.join('；') ||
+                  '未命中词项，运行时由当前模型结合需求判断'}
+              </p>
+            </li>
+          ))}
+        </ul>
+      </ManagementDialog>
+      {kind === 'tools' && (
+        <div className="flex justify-end">
+          <Button variant="outline" onClick={() => setSourcesOpen(true)}>
+            扩展来源与 MCP
+          </Button>
+        </div>
+      )}
+      {sourcesOpen && (
+        <ToolSourcesDialog
+          onClose={() => setSourcesOpen(false)}
+          onUpdated={() => {
+            extensions.reload()
+            resource.reload()
+          }}
+        />
+      )}
+      {importOpen && (
+        <SkillImportDialog
+          tools={catalog.data?.tools ?? []}
+          onClose={() => setImportOpen(false)}
+          onImported={() => {
+            resource.reload()
+            catalog.reload()
+            setImportOpen(false)
+          }}
+        />
+      )}
       {kind === 'knowledge' && (
         <div className="flex flex-wrap items-center gap-3 rounded-xl border bg-card px-4 py-3 text-sm">
           <span
@@ -292,7 +407,30 @@ function ScopedResourceManager({ kind }: { kind: Kind }) {
           >
             {tr('检查连接', 'Check connection')}
           </Button>
+          {can('models.manage') && (
+            <Button
+              size="sm"
+              variant="outline"
+              onClick={() => setEmbeddingSettings(true)}
+            >
+              {tr('检索设置', 'Search settings')}
+            </Button>
+          )}
         </div>
+      )}
+      {embeddingSettings && (
+        <KnowledgeSearchSettings
+          onClose={() => setEmbeddingSettings(false)}
+          onUpdated={searchStatus.reload}
+        />
+      )}
+      {knowledgeDiagnostics && (
+        <KnowledgeIndexDialog
+          key={knowledgeDiagnostics.id}
+          id={knowledgeDiagnostics.id}
+          name={knowledgeDiagnostics.name}
+          onClose={() => setKnowledgeDiagnostics(null)}
+        />
       )}
       {indexMessage && (
         <p role="status" className="text-sm text-muted-foreground">
@@ -325,14 +463,19 @@ function ScopedResourceManager({ kind }: { kind: Kind }) {
             {tr('搜索', 'Search')}
           </Button>
         </form>
-        {kind !== 'tools' && (
+        <div className="flex gap-2">
+          {kind === 'skills' && (
+            <Button variant="outline" onClick={() => setImportOpen(true)}>
+              导入技能包
+            </Button>
+          )}
           <Button
             disabled={resource.busy || resource.loading}
             onClick={() => openEditor('new')}
           >
             {tr(`新增${label}`, `Create ${label}`)}
           </Button>
-        )}
+        </div>
       </div>
       <ResourceState
         loading={resource.loading}
@@ -379,11 +522,26 @@ function ScopedResourceManager({ kind }: { kind: Kind }) {
                     )
                   ) : (
                     <>
-                      <p>{tr('内置实现', 'Built-in implementation')}</p>
-                      <code className="text-xs">{item.id}</code>
+                      <p>
+                        {item.implementation?.sourceId ??
+                          tr('内置实现', 'Built-in implementation')}
+                      </p>
+                      <code className="text-xs">
+                        {item.implementation
+                          ? `${item.implementation.toolId} @ ${item.implementation.version}`
+                          : item.id}
+                      </code>
                     </>
                   )}
                   <p className="mt-1">v{item.version}</p>
+                  {'requiredToolIds' in item && (
+                    <p>
+                      {item.program
+                        ? `${item.program.stages.length} 个阶段 · 已发布`
+                        : '单项方法技能'}
+                      {item.programDraft ? ' · 有待发布草稿' : ''}
+                    </p>
+                  )}
                 </td>
                 <td>{dateLabel(item.updatedAt)}</td>
                 <td>
@@ -405,6 +563,15 @@ function ScopedResourceManager({ kind }: { kind: Kind }) {
                       <Button
                         size="sm"
                         variant="outline"
+                        onClick={() => setKnowledgeDiagnostics(item)}
+                      >
+                        {tr('索引与检索', 'Index and search')}
+                      </Button>
+                    )}
+                    {'assetIds' in item && (
+                      <Button
+                        size="sm"
+                        variant="outline"
                         disabled={!!indexing}
                         onClick={() => void reindex(item.id)}
                       >
@@ -420,7 +587,29 @@ function ScopedResourceManager({ kind }: { kind: Kind }) {
                     >
                       {tr('编辑', 'Edit')}
                     </Button>
-                    {kind !== 'tools' && (
+                    {'requiredToolIds' in item && item.programDraft && (
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        disabled={resource.busy}
+                        onClick={() =>
+                          void resource.perform(async () => {
+                            await agentSkillsApi.publish(item.id, item.version)
+                            catalog.reload()
+                          })
+                        }
+                      >
+                        发布阶段配置
+                      </Button>
+                    )}
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      onClick={() => setHistoryItem(item)}
+                    >
+                      {tr('版本记录', 'Versions')}
+                    </Button>
+                    {
                       <Button
                         size="sm"
                         variant="outline"
@@ -429,7 +618,7 @@ function ScopedResourceManager({ kind }: { kind: Kind }) {
                       >
                         {tr('删除', 'Delete')}
                       </Button>
-                    )}
+                    }
                   </div>
                 </td>
               </tr>
@@ -445,6 +634,17 @@ function ScopedResourceManager({ kind }: { kind: Kind }) {
         </table>
       </div>
 
+      {historyItem && (
+        <AgentResourceHistory
+          item={historyItem}
+          api={api}
+          onClose={() => setHistoryItem(null)}
+          onRestored={() => {
+            resource.reload()
+            catalog.reload()
+          }}
+        />
+      )}
       <ManagementDialog
         open={!!editing}
         onOpenChange={(open) => !open && setEditing(null)}
@@ -530,6 +730,28 @@ function ScopedResourceManager({ kind }: { kind: Kind }) {
             )}
             {kind === 'skills' && (
               <>
+                <SkillProgramEditor
+                  value={draft.programDraft}
+                  tools={catalog.data?.tools ?? []}
+                  skills={catalog.data?.skills ?? []}
+                  onChange={(programDraft) =>
+                    setDraft({
+                      ...draft,
+                      programDraft,
+                      requiredToolIds: [
+                        ...new Set([
+                          ...draft.requiredToolIds,
+                          ...(programDraft?.stages.flatMap((stage) => [
+                            ...stage.toolIds,
+                            ...(catalog.data?.skills.find(
+                              (skill) => skill.id === stage.skillId,
+                            )?.requiredToolIds ?? []),
+                          ]) ?? []),
+                        ]),
+                      ],
+                    })
+                  }
+                />
                 <FieldLabel title={tr('执行要求', 'Instructions')}>
                   <Textarea
                     required
@@ -558,71 +780,25 @@ function ScopedResourceManager({ kind }: { kind: Kind }) {
             )}
             {kind === 'tools' && (
               <>
-                <p className="rounded-lg border p-3 text-sm text-muted-foreground">
-                  {tr('内置实现', 'Built-in implementation')}：
-                  <code>{editing && editing !== 'new' ? editing.id : ''}</code>
-                </p>
-                {editing &&
-                editing !== 'new' &&
-                editing.id === 'knowledge_search' ? (
-                  <FieldLabel
-                    title={tr('最多返回段落数', 'Maximum result passages')}
-                  >
-                    <Input
-                      type="number"
-                      min={1}
-                      max={8}
-                      required
-                      value={draft.settings.maxResults ?? 8}
-                      onChange={(event) =>
-                        setDraft({
-                          ...draft,
-                          settings: {
-                            ...draft.settings,
-                            maxResults: Number(event.target.value),
-                          },
-                        })
-                      }
-                    />
-                  </FieldLabel>
-                ) : (
-                  <>
-                    <FieldLabel
-                      title={tr('默认公司名称', 'Default company name')}
-                    >
-                      <Input
-                        maxLength={120}
-                        value={draft.settings.companyName ?? ''}
-                        onChange={(event) =>
-                          setDraft({
-                            ...draft,
-                            settings: {
-                              ...draft.settings,
-                              companyName: event.target.value,
-                            },
-                          })
-                        }
-                      />
-                    </FieldLabel>
-                    <FieldLabel
-                      title={tr('默认报告标题', 'Default report title')}
-                    >
-                      <Input
-                        maxLength={160}
-                        value={draft.settings.title ?? ''}
-                        onChange={(event) =>
-                          setDraft({
-                            ...draft,
-                            settings: {
-                              ...draft.settings,
-                              title: event.target.value,
-                            },
-                          })
-                        }
-                      />
-                    </FieldLabel>
-                  </>
-                )}
+                <ResourceState
+                  loading={extensions.loading}
+                  error={extensions.error}
+                  onRetry={extensions.reload}
+                />
+                <ToolImplementationEditor
+                  sources={extensions.data?.items ?? []}
+                  implementation={draft.implementation}
+                  settings={draft.settings}
+                  existing={
+                    editing && editing !== 'new' && 'settings' in editing
+                      ? editing
+                      : undefined
+                  }
+                  onSelect={(implementation, settings) =>
+                    setDraft({ ...draft, implementation, settings })
+                  }
+                  onSettings={(settings) => setDraft({ ...draft, settings })}
+                />
               </>
             )}
             <label className="flex items-center gap-2 text-sm">
@@ -634,7 +810,10 @@ function ScopedResourceManager({ kind }: { kind: Kind }) {
                   setDraft({ ...draft, enabled: event.target.checked })
                 }
               />
-              {tr('启用，允许新会话使用', 'Enable for new sessions')}
+              {tr(
+                '启用工具或资源；停用将阻止后续调用',
+                'Enable this resource; disabling blocks subsequent calls',
+              )}
             </label>
           </fieldset>
         </form>
@@ -667,7 +846,9 @@ function ScopedResourceManager({ kind }: { kind: Kind }) {
                   (await resource.perform(() =>
                     kind === 'knowledge'
                       ? knowledgeBasesApi.remove(deleting.id)
-                      : agentSkillsApi.remove(deleting.id),
+                      : kind === 'tools'
+                        ? agentToolsApi.remove(deleting.id)
+                        : agentSkillsApi.remove(deleting.id),
                   ))
                 ) {
                   setDeleting(null)

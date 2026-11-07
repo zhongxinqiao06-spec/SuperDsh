@@ -278,8 +278,12 @@ export class ConversationStore {
       tokenPrefix: token.slice(0, 12),
     }
   }
-  async session(id: string, userId?: string): Promise<Row> {
-    const [row] = await this.db.query(
+  async session(
+    id: string,
+    userId?: string,
+    connection: Pick<SqlConnection, 'query'> = this.db,
+  ): Promise<Row> {
+    const [row] = await connection.query(
       sessionColumns +
         ' WHERE s.id=$1 AND c.revoked=0' +
         (userId ? ' AND c.user_id=$2' : ''),

@@ -38,7 +38,22 @@ export const modules = [
     'menu',
     ['menus.read', 'menus.manage'],
   ],
-  ['models', '#/models', '模型管理', 'key', ['models.manage']],
+  ['models', '#/models', '聊天模型', 'key', ['models.manage']],
+  [
+    'models.multimodal',
+    '#/models/multimodal',
+    '多模态模型',
+    'sparkles',
+    ['models.manage'],
+  ],
+  [
+    'system.storage',
+    '#/system/storage',
+    '文件存储',
+    'folder',
+    ['storage.manage'],
+  ],
+  ['account.files', '#/account/files', '我的文件', 'folder', ['files.read']],
   ['agents', '#/agents', '智能体列表', 'bot', ['agents.manage']],
   ['knowledge', '#/knowledge', '知识库', 'book-open', ['agents.manage']],
   ['skills', '#/skills', '技能管理', 'sparkles', ['agents.manage']],
@@ -107,6 +122,7 @@ export function defaultMenuItems(): MenuNode[] {
   const groups = [
     ['access', '用户与权限', 'users', 1],
     [agentMenuGroupId, '智能体管理', 'bot', 2],
+    ['model-management', '模型管理', 'key', 3],
     ['system', '系统管理', 'settings', 6],
     ['account', '个人中心', 'user', 7],
   ] as const
@@ -129,11 +145,14 @@ export function defaultMenuItems(): MenuNode[] {
     },
     childOrder: Record<string, number> = {}
   for (const module of modules) {
-    const parentId = agentPageIds.includes(module.id)
-      ? agentMenuGroupId
-      : module.id.includes('.')
-        ? module.id.split('.')[0]!
-        : null
+    const parentId =
+      module.id === 'models' || module.id.startsWith('models.')
+        ? 'model-management'
+        : agentPageIds.includes(module.id)
+          ? agentMenuGroupId
+          : module.id.includes('.')
+            ? module.id.split('.')[0]!
+            : null
     const order = parentId ? childOrder[parentId] || 0 : rootOrder[module.id]!
     if (parentId) childOrder[parentId] = order + 1
     items.push({
@@ -149,6 +168,33 @@ export function defaultMenuItems(): MenuNode[] {
     })
   }
   return items
+}
+
+/** Add product pages once without resetting hidden items, custom groups or role restrictions. */
+export function addFoundationMenuItems(items: MenuNode[]): MenuNode[] {
+  const result = [...items],
+    defaults = defaultMenuItems()
+  for (const id of [
+    'model-management',
+    'system',
+    'account',
+    'models.multimodal',
+    'system.storage',
+    'account.files',
+  ]) {
+    if (!result.some((item) => item.id === id))
+      result.push(defaults.find((item) => item.id === id)!)
+  }
+  return result.map((item) =>
+    item.id === 'models' && item.parentId === null
+      ? {
+          ...item,
+          parentId: 'model-management',
+          order: 0,
+          title: item.title === '模型管理' ? '聊天模型' : item.title,
+        }
+      : item,
+  )
 }
 
 /** One-time layout migration preserves each page's visibility and role restrictions. */

@@ -33,6 +33,11 @@ const { NextIntlClientProvider } = await import('next-intl')
 const hooks = registerSource()
 const { ModelsPanel } =
   await import('../src/components/management/models-panel.tsx')
+const { ModelConfigurationsPanel } =
+  await import('../src/components/management/model-configurations-panel.tsx')
+const { FilesPanel } =
+  await import('../src/components/management/files-panel.tsx')
+const { apiClient } = await import('../src/lib/api/index.ts')
 const { RolesPanel } =
   await import('../src/components/management/roles-panel.tsx')
 const { UsersPanel } =
@@ -152,6 +157,157 @@ function mockModels(t, selection = null) {
     selection,
   }))
 }
+
+test('multimodal management keeps chat separate and uses paginated lists and modal editing', async (t) => {
+  saveStoredSession({
+    userId: 'foundation-owner',
+    accessToken: 'synthetic',
+    roles: ['admin'],
+    permissions: ['models.manage'],
+    authzVersion: 1,
+  })
+  const configuration = {
+    id: 'image-0',
+    name: '图片配置 0',
+    kind: 'multimodal',
+    capability: 'image.generate',
+    connectionId: 'ark',
+    modelId: 'ep-image',
+    revision: 1,
+    enabled: true,
+    parameters: {},
+    roleIds: [],
+  }
+  const catalog = {
+    configurations: [
+      ...Array.from({ length: 12 }, (_, i) => ({
+        ...configuration,
+        id: 'image-' + i,
+        name: '图片配置 ' + i,
+      })),
+      {
+        ...configuration,
+        id: 'chat',
+        name: '独立聊天配置',
+        kind: 'chat',
+        capability: 'chat',
+      },
+    ],
+    connections: [
+      {
+        id: 'ark',
+        name: '火山方舟',
+        adapter: 'volcengine-ark',
+        baseUrl: 'https://ark.cn-beijing.volces.com/api/v3',
+        revision: 1,
+        enabled: true,
+        credentialConfigured: true,
+      },
+    ],
+    capabilities: [
+      {
+        id: 'image.generate',
+        name: '图片生成',
+        available: true,
+        configurationSchema: { properties: { size: { type: 'string' } } },
+      },
+      {
+        id: 'video.generate',
+        name: '视频生成',
+        available: false,
+        configurationSchema: { properties: {} },
+      },
+    ],
+    defaults: [],
+  }
+  t.mock.method(apiClient, 'get', async (path) => {
+    assert.equal(path, '/admin/models/configurations')
+    return catalog
+  })
+  const container = await mount(t, () =>
+    h(ModelConfigurationsPanel, { kind: 'multimodal' }),
+  )
+  assert.equal(container.querySelectorAll('tbody tr').length, 10)
+  assert.doesNotMatch(container.textContent, /独立聊天配置/)
+  const paging = container.querySelector('nav select')
+  assert.equal(paging.value, '10')
+  assert.deepEqual(
+    [...paging.options].map((x) => x.value),
+    ['10', '20', '50'],
+  )
+  await click(container, 'Next')
+  assert.equal(container.querySelectorAll('tbody tr').length, 2)
+  await click(container, '编辑')
+  assert.ok(container.querySelector('[role="dialog"]'))
+  assert.equal(field(container, '模型 / 推理接入点 ID').value, 'ep-image')
+  assert.ok(
+    [...container.querySelectorAll('option')].find(
+      (x) => x.value === 'video.generate',
+    ).disabled,
+  )
+})
+
+test('Ark connections explicitly select Agent Plan without overwriting the credential or default model', async (t) => {
+  t.mock.method(apiClient, 'get', async () => ({
+    configurations: [],
+    connections: [],
+    capabilities: [],
+    defaults: [],
+  }))
+  const saved = t.mock.method(apiClient, 'post', async () => ({}))
+  const selected = t.mock.method(apiClient, 'put', async () => ({}))
+  const container = await mount(t, () =>
+    h(ModelConfigurationsPanel, { kind: 'multimodal' }),
+  )
+  await click(container, '供应商连接')
+  await click(container, '新增连接')
+  await fill(field(container, 'API Key（留空保留原值）'), 'synthetic-plan-key')
+  await select(
+    field(container, '方舟服务入口'),
+    'https://ark.cn-beijing.volces.com/api/plan/v3',
+  )
+  assert.equal(
+    field(container, 'API 地址').value,
+    'https://ark.cn-beijing.volces.com/api/plan/v3',
+  )
+  assert.equal(
+    field(container, 'API Key（留空保留原值）').value,
+    'synthetic-plan-key',
+  )
+  await click(container, '保存')
+  assert.equal(saved.mock.calls[0].arguments[0], '/admin/models/connections')
+  assert.equal(
+    saved.mock.calls[0].arguments[1].baseUrl,
+    'https://ark.cn-beijing.volces.com/api/plan/v3',
+  )
+  assert.equal(selected.mock.calls.length, 0)
+})
+
+test('my files defaults to ten records and discards an upload dialog on account change', async (t) => {
+  saveStoredSession({
+    userId: 'files-owner',
+    accessToken: 'synthetic',
+    permissions: ['files.read', 'files.write'],
+    authzVersion: 1,
+  })
+  const calls = t.mock.method(apiClient, 'get', async (path) => {
+    assert.equal(path, '/files')
+    return { items: [], total: 0 }
+  })
+  const container = await mount(t, FilesPanel)
+  assert.equal(calls.mock.calls[0].arguments[1].query.pageSize, 10)
+  await click(container, '上传文件')
+  assert.ok(container.querySelector('[role="dialog"]'))
+  await act(async () =>
+    saveStoredSession({
+      userId: 'other-owner',
+      accessToken: 'other-synthetic',
+      permissions: ['files.read'],
+      authzVersion: 1,
+    }),
+  )
+  assert.equal(container.querySelector('[role="dialog"]'), null)
+})
 
 for (const scope of ['platform', 'personal']) {
   test(`${scope} providers can be created from only a key and select the returned provider as default`, async (t) => {

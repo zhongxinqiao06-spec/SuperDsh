@@ -46,3 +46,5 @@ apps/android/local.properties
 apps/android/**/build/
 apps/android/replay_pid*.log
 apps/android/hs_err_pid*.log
+# Prepared, checksum-verified document fonts. Downloaded during setup/build.
+apps/admin/.office-fonts/

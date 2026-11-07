@@ -33,7 +33,26 @@ export class BusinessHostChannel {
       if (message.error) request.reject(new Error('业务智能体运行配置加载失败'))
       else request.resolve()
     }
-    if (message.type === 'business-tool-cancel') this.running.get(id)?.abort()
+    if (message.type === 'business-tool-cancel')
+      this.running
+        .get(id)
+        ?.abort(
+          message.reason === 'timeout'
+            ? new ApiError(504, '办公工具执行超时，请减少输入或重试')
+            : new ApiError(499, '办公任务已取消'),
+        )
+    if (message.type === 'business-skill-settled' && this.port.settled) {
+      void Promise.resolve()
+        .then(() =>
+          this.port.settled!(
+            this.owner,
+            parseAgentToolContext(message.context),
+            String(message.reason),
+          ),
+        )
+        .catch(() => {})
+      return
+    }
     if (message.type !== 'business-tool' || !id || this.running.has(id)) return
     const controller = new AbortController()
     this.running.set(id, controller)
@@ -94,10 +113,16 @@ export class BusinessHostChannel {
       })
     })
   }
-  async prepare(sessionId: string): Promise<string | undefined> {
+  async prepare(
+    sessionId: string,
+    externalSessionId?: string,
+  ): Promise<string | undefined> {
     const binding = await this.port.binding(this.owner, sessionId)
     if (!binding) return undefined
-    await this.install(binding)
+    await this.install({
+      ...binding,
+      ...(externalSessionId ? { externalSessionId } : {}),
+    })
     return binding.presetId
   }
   close() {

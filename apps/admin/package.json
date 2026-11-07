@@ -16,7 +16,7 @@
     "protocol:generate": "node scripts/generate-protocol-types.mjs",
     "protocol:check": "node scripts/generate-protocol-types.mjs --check",
     "web:dev": "node node_modules/next/dist/bin/next dev --hostname 127.0.0.1 --port 5174",
-    "server:unit": "node --test server/test/api-coverage.test.mjs server/test/auth-compatibility.test.mjs server/test/bridge-catalogs.test.mjs server/test/native-agent-manager.test.mjs server/test/platform-server.test.mjs server/test/runtime-bridge.test.mjs server/test/agent-office.test.mjs server/test/agent-office-preview.test.mjs server/test/business-agent-knowledge.test.mjs server/test/business-agent-attachments.test.mjs"
+    "server:unit": "node --test --test-concurrency=2 server/test/api-coverage.test.mjs server/test/auth-compatibility.test.mjs server/test/bridge-catalogs.test.mjs server/test/native-agent-manager.test.mjs server/test/platform-server.test.mjs server/test/runtime-bridge.test.mjs server/test/agent-office.test.mjs server/test/agent-office-preview.test.mjs server/test/business-agent-knowledge.test.mjs server/test/business-agent-attachments.test.mjs server/test/agent-office-spreadsheet.test.mjs server/test/agent-generic-presentation.test.mjs server/test/knowledge-office-production.test.mjs server/test/knowledge-embedding-profiles.test.mjs server/test/office-runtime-fixture.test.mjs server/test/knowledge-answer-verification.test.mjs server/test/office-worker-boundary.test.mjs server/test/agent-office-definitions.test.mjs server/test/extensions-runtime.test.mjs server/test/extensions-mcp.test.mjs server/test/agent-presentation-design.test.mjs server/test/agent-word-production.test.mjs server/test/illustration-render.test.mjs server/test/office-rendered-quality.test.mjs server/test/office-production-quality.test.mjs server/test/file-storage-stream.test.mjs server/test/model-connection-check.test.mjs server/test/vision-response.test.mjs server/test/runtime-failure.test.mjs server/test/skill-foundation.test.mjs"
   },
   "dependencies": {
     "@aws-sdk/client-s3": "3.1152.0",
@@ -39,8 +39,11 @@
     "@codemirror/search": "^6.7.1",
     "@codemirror/state": "^6.6.0",
     "@codemirror/view": "^6.43.1",
+    "@dataiku/uv": "0.12.0",
     "@deepseek-ai/libreoffice-kit": "0.0.1",
+    "@huggingface/transformers": "4.3.1",
     "@lezer/highlight": "^1.2.3",
+    "@modelcontextprotocol/sdk": "1.32.2",
     "@noble/hashes": "2.4.0",
     "@radix-ui/react-avatar": "^1.2.0",
     "@radix-ui/react-checkbox": "^1.3.5",
@@ -55,6 +58,8 @@
     "@radix-ui/react-tabs": "^1.1.15",
     "@radix-ui/react-tooltip": "^1.2.10",
     "@remixicon/react": "^4.9.0",
+    "@resvg/resvg-js": "2.6.2",
+    "@superdsh/core": "workspace:*",
     "@tailwindcss/postcss": "^4.3.1",
     "@xmldom/xmldom": "0.9.12",
     "@xterm/addon-fit": "^0.11.0",
@@ -64,8 +69,10 @@
     "class-variance-authority": "^0.7.1",
     "clsx": "^2.1.1",
     "cmdk": "^1.1.1",
+    "docx": "9.15.0",
     "embla-carousel-react": "^8.6.0",
     "exceljs": "4.4.0",
+    "fontkit": "2.0.4",
     "highlight.js": "^11.11.1",
     "input-otp": "^1.4.2",
     "jszip": "3.10.2",
@@ -101,9 +108,11 @@
     "tailwindcss": "^4.3.1",
     "tw-animate-css": "^1.4.0",
     "vaul": "^1.1.2",
-    "ws": "8.22.0"
+    "ws": "8.22.0",
+    "yaml": "2.9.0"
   },
   "devDependencies": {
+    "@types/fontkit": "2.0.9",
     "@types/node": "^24.10.2",
     "@types/pg": "^8",
     "@types/qrcode": "^1",

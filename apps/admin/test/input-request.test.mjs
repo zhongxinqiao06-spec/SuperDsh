@@ -100,3 +100,51 @@ test('input request parser rejects duplicate protocol ids', () => {
 
   assert.equal(readInputRequestForm(notice), null)
 })
+
+test('office plan review preserves markdown and approve intent without selecting approval', () => {
+  const notice = inputRequestNotice([
+    {
+      id: 'office-plan',
+      prompt: '是否生成？\n\n## 数据来源\n\n- 季度表.xlsx',
+      detail: '输入哈希：verified-hash',
+      intent: { kind: 'plan-review', approveOptionId: 'approve' },
+      multiple: false,
+      allowCustom: true,
+      options: [
+        { id: 'revise', label: '修改方案' },
+        { id: 'approve', label: '确认生成' },
+      ],
+    },
+  ])
+  const form = readInputRequestForm(notice)
+  assert.deepEqual(form.questions[0].intent, {
+    kind: 'plan-review',
+    approveOptionId: 'approve',
+  })
+  assert.match(form.questions[0].prompt, /## 数据来源/u)
+  assert.equal(form.questions[0].detail, '输入哈希：verified-hash')
+  const draft = createInputRequestDrafts(form)
+  assert.equal(inputRequestIsComplete(form, draft), false)
+  assert.deepEqual(draft['office-plan'].optionIds, [])
+  draft['office-plan'] = {
+    optionIds: ['approve'],
+    customText: '',
+    useCustom: false,
+  }
+  assert.equal(inputRequestIsComplete(form, draft), true)
+  assert.deepEqual(buildInputRequestPayload(form, draft), {
+    answers: { 'office-plan': { optionIds: ['approve'] } },
+  })
+})
+
+test('unknown approval targets do not create an actionable plan review', () => {
+  const notice = inputRequestNotice([
+    {
+      id: 'plan',
+      prompt: 'Review',
+      options: [{ id: 'revise', label: '修改' }],
+      intent: { kind: 'plan-review', approveOptionId: 'missing' },
+    },
+  ])
+  assert.equal(readInputRequestForm(notice), null)
+})

@@ -220,7 +220,8 @@ export class NativeHarnessAdapter implements NativeAgentAdapter {
           workspace: context.paths.workspace,
           stateDirectory: context.paths.connector,
           prepareBusiness: business
-            ? (session) => business!.prepare(session)
+            ? (session, externalSession) =>
+                business!.prepare(session, externalSession)
             : undefined,
           ingest: (events) => this.options.ingest(binding.connectorId, events),
           health: (status) => this.options.health(binding.connectorId, status),

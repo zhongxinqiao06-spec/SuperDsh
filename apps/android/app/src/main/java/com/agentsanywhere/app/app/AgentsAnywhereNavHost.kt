@@ -279,6 +279,7 @@ internal fun AgentsAnywhereNavHost(
                             onLoadCapabilities = onLoadNewSessionRuntimeCapabilities,
                             onLoadModels = onLoadNewSessionModelCatalog, onLoadPermissions = onLoadNewSessionPermissionCatalog,
                             onLoadProductCatalog = serverAgentController::catalog,
+                            onLoadAgentDefinitions = serverAgentController::definitions,
                             onPrepareSession = onPrepareSession,
                             onPersonalModels = { navigate(AppDestination.PersonalModels) },
                             onBack = { navigate(AppDestination.Sessions) },

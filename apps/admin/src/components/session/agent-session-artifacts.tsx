@@ -2,8 +2,18 @@
 
 import * as React from 'react'
 import { Button } from '@/components/ui/button'
-import { agentsApi, saveAgentDownload } from '@/features/agents/api'
-import { sessionIdentityRevision } from '@/features/auth/session'
+import {
+  agentsApi,
+  saveAgentDownload,
+  type AgentArtifact,
+} from '@/features/agents/api'
+import { AgentArtifactPreview } from './agent-artifact-preview'
+import { AgentSessionOfficeContext } from './agent-session-office-context'
+import { SessionSkillRuns } from './skill-runs'
+import {
+  sessionIdentityRevision,
+  subscribeSession,
+} from '@/features/auth/session'
 import {
   ResourceState,
   useManagementResource,
@@ -26,10 +36,13 @@ export function AgentSessionArtifacts({
   generation.current = sessionId
   const [downloading, setDownloading] = React.useState<string | null>(null)
   const [error, setError] = React.useState('')
+  const [preview, setPreview] = React.useState<AgentArtifact | null>(null)
+  React.useEffect(() => subscribeSession(() => setPreview(null)), [])
   React.useEffect(() => {
     generation.current = sessionId
     setError('')
     setDownloading(null)
+    setPreview(null)
     return () => {
       generation.current = ''
     }
@@ -91,6 +104,7 @@ export function AgentSessionArtifacts({
           {tr('刷新', 'Refresh')}
         </Button>
       </div>
+      <SessionSkillRuns key={`skills:${sessionId}`} sessionId={sessionId} />
       <ResourceState
         loading={resource.loading}
         error={resource.error || error}
@@ -102,8 +116,8 @@ export function AgentSessionArtifacts({
       {resource.data?.items.length === 0 && (
         <p className="mt-3 text-xs text-muted-foreground">
           {tr(
-            '尚未生成文件。可在对话中要求按模板生成 Excel 或 PPT。',
-            'No files yet. Ask the agent to generate an Excel or PowerPoint file using its templates.',
+            '尚未生成文件。可在对话中提出需求，确认方案后在这里查看成果。',
+            'No files yet. Describe your request in chat and confirm the plan to generate an artifact.',
           )}
         </p>
       )}
@@ -115,23 +129,77 @@ export function AgentSessionArtifacts({
           >
             <span className="min-w-0">
               <span className="block break-words font-medium">{file.name}</span>
+              {file.quality && (
+                <span
+                  className={`block text-xs ${file.draft ? 'text-amber-600 dark:text-amber-400' : 'text-muted-foreground'}`}
+                >
+                  {file.draft
+                    ? tr(
+                        '草稿 · 请查看质量诊断',
+                        'Draft · Review quality diagnostics',
+                      )
+                    : tr(
+                        '已完成结构与实际渲染检查',
+                        'Structure and actual rendering checked',
+                      )}
+                  {file.quality.correctionRounds
+                    ? ` · ${tr('排版修正', 'Layout corrections')} ${file.quality.correctionRounds}`
+                    : ''}
+                </span>
+              )}
               <span className="text-xs text-muted-foreground">
                 {Math.max(1, Math.ceil(file.size / 1024))} KB
+                {file.revision &&
+                  ` · ${tr('方案', 'Plan')} v${file.revision.planVersion}${file.revision.previousArtifactId ? ` · ${tr('修订成果', 'Revision')}` : ''}`}
               </span>
+              {file.diagnostics?.map((message, index) => (
+                <span
+                  key={index}
+                  className="mt-1 block text-xs text-amber-600 dark:text-amber-400"
+                >
+                  {message}
+                </span>
+              ))}
             </span>
-            <Button
-              size="sm"
-              variant="outline"
-              disabled={!!downloading}
-              onClick={() => void download(file.fileId)}
-            >
-              {downloading === file.fileId
-                ? tr('下载中…', 'Downloading…')
-                : tr('下载', 'Download')}
-            </Button>
+            <div className="flex shrink-0 gap-2">
+              {/\.(xlsx|pptx|docx|png)$/i.test(file.name) && (
+                <Button
+                  size="sm"
+                  variant="outline"
+                  onClick={() => setPreview(file)}
+                >
+                  {file.preview?.state === 'failed'
+                    ? tr('重试预览', 'Retry preview')
+                    : tr('预览', 'Preview')}
+                </Button>
+              )}
+              <Button
+                size="sm"
+                variant="outline"
+                disabled={!!downloading}
+                onClick={() => void download(file.fileId)}
+              >
+                {downloading === file.fileId
+                  ? tr('下载中…', 'Downloading…')
+                  : tr('下载', 'Download')}
+              </Button>
+            </div>
           </li>
         ))}
       </ul>
+      <AgentSessionOfficeContext
+        key={sessionId}
+        sessionId={sessionId}
+        status={status}
+      />
+      {preview && (
+        <AgentArtifactPreview
+          key={`${sessionId}:${preview.fileId}`}
+          sessionId={sessionId}
+          file={preview}
+          close={() => setPreview(null)}
+        />
+      )}
     </section>
   )
 }

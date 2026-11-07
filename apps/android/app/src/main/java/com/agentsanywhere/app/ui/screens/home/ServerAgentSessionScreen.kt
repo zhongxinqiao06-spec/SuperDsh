@@ -43,6 +43,7 @@ fun ServerAgentSessionScreen(
     onLoadModels: suspend (String, String) -> Result<NewSessionModelCatalog>,
     onLoadPermissions: suspend (String, String) -> Result<NewSessionPermissionCatalog>,
     onLoadProductCatalog: suspend () -> Result<com.agentsanywhere.app.api.ProductModelCatalog>,
+    onLoadAgentDefinitions: suspend () -> Result<List<com.agentsanywhere.app.api.BusinessAgentDefinition>>,
     onPrepareSession: (NewSessionDraft) -> Unit,
     onPersonalModels: () -> Unit,
     onBack: () -> Unit,
@@ -58,6 +59,9 @@ fun ServerAgentSessionScreen(
     var error by remember { mutableStateOf<String?>(null) }
     var retry by remember { mutableStateOf(0) }
     var expanded by remember { mutableStateOf<NewSessionConfigurationKey?>(null) }
+    var definitions by remember { mutableStateOf<List<com.agentsanywhere.app.api.BusinessAgentDefinition>>(emptyList()) }
+    var selectedAgent by remember { mutableStateOf<String?>(null) }
+    var choosingAgent by remember { mutableStateOf(false) }
     val personalLabel = stringResource(R.string.server_agent_personal_source)
     val platformLabel = stringResource(R.string.server_agent_platform_source)
     val deviceName = stringResource(R.string.server_agent_title)
@@ -88,6 +92,8 @@ fun ServerAgentSessionScreen(
                 listOfNotNull(model.selectionId) + model.reasoningItems.filter { it.enabled }.map { it.selectionId }
             }
             val productCatalog = onLoadProductCatalog().getOrThrow()
+            definitions = onLoadAgentDefinitions().getOrThrow()
+            selectedAgent = selectedAgent?.takeIf { id -> definitions.any { it.id == id } }
             productModels = productCatalog
             modelSelection = modelSelection?.takeIf { it in options } ?: catalog.defaultSelection(productCatalog)
             val permissionCatalog = onLoadPermissions(connectorId, runtimeId).getOrThrow()
@@ -124,6 +130,9 @@ fun ServerAgentSessionScreen(
                 model.reasoningItems.map { NewSessionConfigurationOption(it.selectionId, "$label · ${it.displayName}", enabled = model.enabled && it.enabled) }
         }
         if (!busy && error == null) {
+            OutlinedButton(onClick = { choosingAgent = true }) {
+                Text("智能体：" + (definitions.firstOrNull { it.id == selectedAgent }?.name ?: "通用助手"))
+            }
             NewSessionConfigurationCard(
                 fields = listOf(
                     NewSessionConfigurationField(NewSessionConfigurationKey.Model, stringResource(R.string.new_session_model),
@@ -146,7 +155,17 @@ fun ServerAgentSessionScreen(
             val current = agent ?: return@Button
             onPrepareSession(serverAgentDraft(current, NewSessionSelections(modelSelection, permissionSelection), knownSessionIds,
                 capabilities?.find(ATTACHMENT_CAPABILITY, requireNotNull(current.runtimeId), "dsh")?.usable == true,
-                deviceName, workspaceLabel))
+                deviceName, workspaceLabel).copy(agentDefinitionId = selectedAgent))
         }) { Text(stringResource(R.string.new_session_start_chat)) }
     }
+    if (choosingAgent) androidx.compose.material3.AlertDialog(onDismissRequest = { choosingAgent = false },
+        title = { Text("选择已发布智能体") }, confirmButton = { TextButton(onClick = { choosingAgent = false }) { Text("关闭") } },
+        text = { androidx.compose.foundation.lazy.LazyColumn {
+            item { TextButton(onClick = { selectedAgent = null; choosingAgent = false }) { Text("通用助手") } }
+            items(definitions.size) { index -> val item = definitions[index]
+                TextButton(onClick = { selectedAgent = item.id; choosingAgent = false }) {
+                    Column { Text(item.name); Text(item.description, style = androidx.compose.material3.MaterialTheme.typography.bodySmall) }
+                }
+            }
+        } })
 }

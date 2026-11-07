@@ -1,3 +1,8 @@
+import type {
+  OfficePlan,
+  ArtifactRevision,
+  SourceReference,
+} from '@superdsh/core/contracts/office'
 import { apiClient } from '@/lib/api'
 import {
   ensureAgentResources,
@@ -7,7 +12,10 @@ import {
 } from './resources-api'
 
 export type AgentAssetKind =
-  'knowledge' | 'spreadsheet-template' | 'presentation-template'
+  | 'knowledge'
+  | 'spreadsheet-template'
+  | 'presentation-template'
+  | 'document-template'
 
 export type AgentAsset = {
   id: string
@@ -20,10 +28,14 @@ export type AgentAsset = {
 }
 
 export type AgentDefinition = {
+  skillPolicy?: import('@superdsh/core/contracts/skills').SkillPolicy
   id: string
   name: string
   description: string
   instructions: string
+  recommendedPrompts?: string[]
+  inputRequirements?: string[]
+  outputExamples?: string[]
   knowledgeBaseIds: string[]
   knowledgeAssetIds: string[]
   templateAssetIds: string[]
@@ -41,6 +53,16 @@ export type AgentDefinitionWrite = Omit<
 > & { version?: number }
 
 export type AgentCapability = { id: string; name: string; description: string }
+export type AgentReadiness = {
+  ready: boolean
+  errors: string[]
+  warnings: string[]
+  checks: {
+    id: string
+    status: 'pass' | 'warning' | 'error'
+    message: string
+  }[]
+}
 export type AgentCatalog = {
   assets: AgentAsset[]
   knowledgeBases: KnowledgeBase[]
@@ -57,12 +79,40 @@ export type AgentAssetPreview = AgentDownload & {
   mediaType: 'application/pdf'
   missingFonts?: string[]
 }
+export type AgentArtifactPreview = AgentDownload & {
+  mediaType: 'application/pdf' | 'image/png' | 'image/jpeg'
+  missingFonts?: string[]
+}
 export type AgentArtifact = {
+  draft?: boolean
+  quality?: {
+    status: 'passed' | 'draft'
+    correctionRounds: number
+    visualModelReviewed: false
+    officeClientReviewed: false
+  }
   fileId: string
   name: string
   mediaType: string
   size: number
   createdAt: string
+  revision?: ArtifactRevision
+  diagnostics?: string[]
+  preview?: {
+    state: 'ready' | 'failed'
+    missingFonts: string[]
+    error?: string
+  }
+}
+export type AgentOfficePlan = OfficePlan
+export type AgentEvidence = SourceReference & { id: string }
+export type AgentAnswerVerification = {
+  status: 'pending' | 'no-citations' | 'references-checked' | 'invalid'
+  message: string
+  messageId?: string
+  sourceIds: string[]
+  checkedQuotes: number
+  issues: string[]
 }
 export type AgentSessionArtifacts = {
   items: AgentArtifact[]
@@ -70,6 +120,20 @@ export type AgentSessionArtifacts = {
 }
 
 export const agentsApi = {
+  binding: (sessionId: string) =>
+    apiClient.get<{
+      agentDefinition: { id: string; name: string; version: number } | null
+      bindingVersion: number
+    }>(`/sessions/${encodeURIComponent(sessionId)}/agent-binding`),
+  bind: (
+    sessionId: string,
+    agentDefinitionId: string,
+    bindingVersion: number,
+  ) =>
+    apiClient.put(`/sessions/${encodeURIComponent(sessionId)}/agent-binding`, {
+      agentDefinitionId,
+      bindingVersion,
+    }),
   available: () =>
     apiClient.get<{ items: AgentDefinition[]; total: number }>('/agents'),
   list: async (page: number, pageSize: number, search: string) => {
@@ -94,10 +158,14 @@ export const agentsApi = {
       : apiClient.post<{ agent: AgentDefinition }>('/admin/agents', body),
   remove: (id: string) =>
     apiClient.delete(`/admin/agents/${encodeURIComponent(id)}`),
-  seedDemo: () =>
+  seedDemo: (copyLatest = false) =>
     apiClient.post<{ agents: AgentDefinition[]; assets: AgentAsset[] }>(
       '/admin/agents/demo',
-      {},
+      { copyLatest },
+    ),
+  readiness: (id: string) =>
+    apiClient.get<AgentReadiness>(
+      `/admin/agents/${encodeURIComponent(id)}/readiness`,
     ),
   upload: (body: {
     name: string
@@ -116,6 +184,20 @@ export const agentsApi = {
   artifacts: (sessionId: string) =>
     apiClient.get<AgentSessionArtifacts>(
       `/sessions/${encodeURIComponent(sessionId)}/agent-artifacts`,
+    ),
+  officePlans: (sessionId: string) =>
+    apiClient.get<{ items: AgentOfficePlan[] }>(
+      `/sessions/${encodeURIComponent(sessionId)}/office-plans`,
+    ),
+  evidence: (sessionId: string) =>
+    apiClient.get<{
+      items: AgentEvidence[]
+      answerVerification?: AgentAnswerVerification
+    }>(`/sessions/${encodeURIComponent(sessionId)}/agent-evidence`),
+  previewArtifact: (sessionId: string, fileId: string, signal?: AbortSignal) =>
+    apiClient.get<AgentArtifactPreview>(
+      `/sessions/${encodeURIComponent(sessionId)}/agent-artifacts/${encodeURIComponent(fileId)}/preview`,
+      { signal },
     ),
   downloadArtifact: (sessionId: string, fileId: string) =>
     apiClient.get<AgentDownload>(
@@ -140,6 +222,9 @@ export function emptyAgentDefinition(): AgentDefinitionWrite {
     name: '',
     description: '',
     instructions: '',
+    recommendedPrompts: [],
+    inputRequirements: [],
+    outputExamples: [],
     knowledgeBaseIds: [],
     knowledgeAssetIds: [],
     templateAssetIds: [],
@@ -151,9 +236,13 @@ export function emptyAgentDefinition(): AgentDefinitionWrite {
 
 export function editableAgent(agent: AgentDefinition): AgentDefinitionWrite {
   return {
+    skillPolicy: agent.skillPolicy,
     name: agent.name,
     description: agent.description,
     instructions: agent.instructions,
+    recommendedPrompts: [...(agent.recommendedPrompts ?? [])],
+    inputRequirements: [...(agent.inputRequirements ?? [])],
+    outputExamples: [...(agent.outputExamples ?? [])],
     knowledgeBaseIds: [...(agent.knowledgeBaseIds ?? [])],
     knowledgeAssetIds: [...agent.knowledgeAssetIds],
     templateAssetIds: [...agent.templateAssetIds],

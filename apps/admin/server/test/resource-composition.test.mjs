@@ -6,6 +6,7 @@ import { ConnectorHub } from '../devices/connector-hub.ts'
 import { BusinessAgentService } from '../agents/service.ts'
 import { AgentResourceService } from '../agents/resources.ts'
 import { QdrantKnowledgeIndex } from '../agents/knowledge-index.ts'
+import { syntheticKnowledgeEmbedding } from './support/knowledge-embedding.mjs'
 import { executeAgentTool } from '../agents/execution.ts'
 import { withTestDatabase } from './support/database.mjs'
 
@@ -50,10 +51,13 @@ async function fixture(t) {
   const options = {
     db,
     hub,
+    files: { library: undefined }, // Explicit legacy DB-blob storage fixture.
     getAccount: identity.getUser.bind(identity),
     audit: identity.audit.bind(identity),
     knowledgeIndex: new QdrantKnowledgeIndex(
       process.env.SUPERDSH_NODE_TEST_QDRANT_URL,
+      undefined,
+      syntheticKnowledgeEmbedding,
     ),
   }
   const business = new BusinessAgentService(options)

@@ -31,3 +31,6 @@ apps/admin/out/**
 apps/admin/next-env.d.ts
 apps/admin/server/contracts/openapi-v2.json
 apps/admin/server/contracts/legacy-routes.json
+# Frozen serialized descriptor order is part of the existing tool package digest.
+apps/admin/server/extensions/builtin-tools-v2.json
+apps/admin/server/extensions/builtin-tools-v2-initial.json

@@ -26,6 +26,35 @@
   border-radius: 12px;
   background: var(--dsw-alias-bg-layer-1);
 }
+.productAgentEvidence,
+.productAgentPreviewFrame,
+.productAgentPreview {
+  width: 100%;
+  min-width: 0;
+}
+.productAgentEvidence {
+  padding: 8px 0;
+  border-top: 0.5px solid var(--dsw-alias-border-l3);
+}
+.productAgentEvidence summary {
+  cursor: pointer;
+  overflow-wrap: anywhere;
+}
+.productAgentEvidenceText {
+  max-height: 280px;
+  overflow-y: auto;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+.productAgentPreview canvas {
+  max-width: 100%;
+  height: auto;
+  margin-top: 8px;
+}
+.platformNotice [data-plan-review] {
+  max-height: 60vh;
+  overflow-y: auto;
+}
 .platformActions > label {
   display: inline-flex;
   align-items: center;

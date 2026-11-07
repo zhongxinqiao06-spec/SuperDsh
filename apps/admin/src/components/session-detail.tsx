@@ -57,6 +57,7 @@ import {
 import { TimelineEntry } from '@/components/session/session-timeline-entry'
 import { FailedSessionRecovery } from '@/components/session/failed-session-recovery'
 import { AgentSessionArtifacts } from '@/components/session/agent-session-artifacts'
+import { SessionAgentBinding } from '@/components/session/session-agent-binding'
 import { TurnActions, type TurnAction } from '@/components/session/turn-actions'
 import {
   JsonBlock,
@@ -2071,13 +2072,24 @@ export function SessionDetail({
             {detachedNotifications.map((notice) => (
               <NotificationCard key={notice.noticeId} notice={notice} />
             ))}
-            {!isLocalOptimisticSession && session.agentDefinition && (
-              <AgentSessionArtifacts
-                key={sessionId}
-                sessionId={sessionId}
-                status={runtimeStatus}
-              />
-            )}
+            {!isLocalOptimisticSession &&
+              session.executorKind === 'server-agent' && (
+                <SessionAgentBinding
+                  key={`binding:${sessionId}`}
+                  sessionId={sessionId}
+                  status={runtimeStatus}
+                  takeover={session.takeover}
+                />
+              )}
+            {!isLocalOptimisticSession &&
+              (session.agentDefinition ||
+                session.executorKind === 'server-agent') && (
+                <AgentSessionArtifacts
+                  key={sessionId}
+                  sessionId={sessionId}
+                  status={runtimeStatus}
+                />
+              )}
             {!unconfirmedSend &&
             (runtimeStatus === 'waiting' ||
               runtimeStatus === 'pending' ||

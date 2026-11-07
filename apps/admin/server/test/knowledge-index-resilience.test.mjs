@@ -6,8 +6,13 @@ import { ApiRouter } from '../http/api-router.ts'
 import { IdentityService } from '../identity/service.ts'
 import { BusinessAgentService } from '../agents/service.ts'
 import { AgentResourceService } from '../agents/resources.ts'
-import { QdrantKnowledgeIndex } from '../agents/knowledge-index.ts'
+import {
+  QdrantKnowledgeIndex,
+  embeddingGeneration,
+} from '../agents/knowledge-index.ts'
+import { syntheticKnowledgeEmbedding } from './support/knowledge-embedding.mjs'
 import { registerKnowledgeIndexRoutes } from '../agents/knowledge-routes.ts'
+import { reparseLegacyKnowledgeAsset } from '../agents/knowledge-reparse.ts'
 import { withTestDatabase } from './support/database.mjs'
 
 async function endpoint(t, handler) {
@@ -63,7 +68,11 @@ test('knowledge index API reports outages, retains PostgreSQL originals, recover
     response.writeHead(503)
     response.end('Synthetic unavailable index')
   })
-  const index = new QdrantKnowledgeIndex(proxy)
+  const index = new QdrantKnowledgeIndex(
+    proxy,
+    undefined,
+    syntheticKnowledgeEmbedding,
+  )
   const identity = new IdentityService(db, {
     secret: 'synthetic-knowledge-recovery',
   })
@@ -145,9 +154,21 @@ test('knowledge index API reports outages, retains PostgreSQL originals, recover
   assert.match(retained.extracted_text, /财务复核/)
   online = true
   assert.equal((await request('/search-status')).body.ready, true)
+  await db.query(
+    "UPDATE business_agent_assets SET extracted_text='旧版展平摘要',source_segments_json='[]'::jsonb WHERE id=$1",
+    [asset.id],
+  )
   const rebuilt = await request(`/${base.id}/index`, 'POST')
   assert.equal(rebuilt.status, 200, JSON.stringify(rebuilt.body))
   assert.deepEqual(rebuilt.body, { indexedAssets: 1, chunks: 1 })
+  const [reparsed] = await db.query(
+    'SELECT content,sha256,source_segments_json,extracted_text FROM business_agent_assets WHERE id=$1',
+    [asset.id],
+  )
+  assert.deepEqual(reparsed.content, bytes)
+  assert.equal(reparsed.sha256, asset.sha256)
+  assert.match(reparsed.extracted_text, /财务复核/u)
+  assert.equal(reparsed.source_segments_json[0].location.line, 1)
   assert.equal((await request(`/${base.id}/index`, 'POST', other)).status, 404)
   assert.equal((await request(`/${base.id}/index`, 'POST', member)).status, 403)
   online = false
@@ -172,6 +193,17 @@ test('knowledge index API reports outages, retains PostgreSQL originals, recover
     [base.id],
   )
   assert.equal(audits.count, '2')
+  await db.query(
+    "UPDATE business_agent_assets SET name='legacy.pdf',source_segments_json='[]'::jsonb WHERE id=$1",
+    [asset.id],
+  )
+  const malformed = await request(`/${base.id}/index`, 'POST')
+  assert.equal(malformed.status, 422)
+  assert.match(malformed.body.detail, /PDF/u)
+  const failedStatus = await request(`/${base.id}/index`)
+  assert.equal(failedStatus.status, 200)
+  assert.equal(failedStatus.body.items[0].state, 'failed')
+  assert.match(failedStatus.body.items[0].message, /PDF/u)
 })
 
 test('cancelling the first query does not cancel collection preparation for a second owner', async (t) => {
@@ -186,7 +218,8 @@ test('cancelling the first query does not cancel collection preparation for a se
   const proxy = await endpoint(t, async (request, response) => {
     if (
       request.method === 'GET' &&
-      request.url === '/collections/superdsh_knowledge_sparse_v1'
+      request.url ===
+        `/collections/superdsh_knowledge_hybrid_${embeddingGeneration(syntheticKnowledgeEmbedding)}`
     ) {
       preparations++
       opened()
@@ -194,7 +227,11 @@ test('cancelling the first query does not cancel collection preparation for a se
     }
     await relay(request, response)
   })
-  const index = new QdrantKnowledgeIndex(proxy)
+  const index = new QdrantKnowledgeIndex(
+    proxy,
+    undefined,
+    syntheticKnowledgeEmbedding,
+  )
   const owner = randomUUID()
   const other = randomUUID()
   const ownRow = source('差旅报销需要保留凭证。')
@@ -241,6 +278,7 @@ test('Qdrant redirects do not forward the API key and empty searches need no ind
   const index = new QdrantKnowledgeIndex(
     redirect,
     'synthetic-private-index-key',
+    syntheticKnowledgeEmbedding,
   )
   assert.equal((await index.status()).ready, false)
   assert.equal(indexRequests, 1)
@@ -260,4 +298,89 @@ test('Qdrant redirects do not forward the API key and empty searches need no ind
     [],
   )
   assert.equal(indexRequests, 1)
+})
+
+test('explicit legacy reparse supports general CSV, preserves original bytes and aborts failures without writes', async (t) => {
+  const db = await withTestDatabase(t)
+  const identity = new IdentityService(db, {
+    secret: 'synthetic-legacy-reparse',
+  })
+  await identity.seedBuiltinRoles()
+  const owner = await identity.createUser(
+    {
+      username: 'legacy-owner',
+      displayName: 'Legacy fixture owner',
+      password: 'synthetic-owner-password',
+    },
+    { role: 'admin' },
+  )
+  const service = new BusinessAgentService({
+    db,
+    audit: identity.audit.bind(identity),
+  })
+  const bytes = Buffer.from('员工,部门,培训时长\n甲,研发,2\n乙,财务,3')
+  const asset = await service.upload(owner, {
+    name: '培训.csv',
+    kind: 'knowledge',
+    contentBase64: bytes.toString('base64'),
+  })
+  await db.query(
+    "UPDATE business_agent_assets SET extracted_text='旧版无法识别销售列',source_segments_json='[]'::jsonb WHERE id=$1",
+    [asset.id],
+  )
+  const [old] = await db.query(
+    'SELECT id,name,sha256,extracted_text,source_segments_json FROM business_agent_assets WHERE id=$1',
+    [asset.id],
+  )
+  await assert.rejects(
+    reparseLegacyKnowledgeAsset(
+      db,
+      'another-owner',
+      old,
+      AbortSignal.timeout(5000),
+    ),
+    (error) => error.status === 404,
+  )
+  const cancelled = new AbortController()
+  cancelled.abort()
+  await assert.rejects(
+    reparseLegacyKnowledgeAsset(db, owner.userId, old, cancelled.signal),
+    (error) => error.name === 'AbortError',
+  )
+  const parsed = await reparseLegacyKnowledgeAsset(
+    db,
+    owner.userId,
+    old,
+    AbortSignal.timeout(5000),
+  )
+  assert.match(parsed.extracted_text, /培训时长/u)
+  assert.equal(parsed.source_segments_json[1].location.row, 2)
+  const [saved] = await db.query(
+    'SELECT id,content,sha256 FROM business_agent_assets WHERE id=$1',
+    [asset.id],
+  )
+  assert.equal(saved.id, old.id)
+  assert.equal(saved.sha256, old.sha256)
+  assert.deepEqual(saved.content, bytes)
+  await db.query(
+    "UPDATE business_agent_assets SET name='legacy.pdf',extracted_text='保留失败前的提取文本',source_segments_json='[]'::jsonb WHERE id=$1",
+    [asset.id],
+  )
+  await assert.rejects(
+    reparseLegacyKnowledgeAsset(
+      db,
+      owner.userId,
+      old,
+      AbortSignal.timeout(5000),
+    ),
+    (error) => error.status === 422 && /PDF/u.test(error.message),
+  )
+  const [failed] = await db.query(
+    'SELECT content,sha256,source_segments_json,extracted_text FROM business_agent_assets WHERE id=$1',
+    [asset.id],
+  )
+  assert.deepEqual(failed.content, bytes)
+  assert.equal(failed.sha256, old.sha256)
+  assert.deepEqual(failed.source_segments_json, [])
+  assert.equal(failed.extracted_text, '保留失败前的提取文本')
 })

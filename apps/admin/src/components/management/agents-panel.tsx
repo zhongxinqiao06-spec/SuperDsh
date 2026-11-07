@@ -23,6 +23,7 @@ import {
   ManagementPagination,
 } from './presentation'
 import { AgentDefinitionEditor } from './agent-definition-editor'
+import { stageAgentTrial } from '@/features/agents/trial'
 
 export function AgentsPanel() {
   const { session, can } = useAuth()
@@ -58,6 +59,35 @@ function ScopedAgentsPanel() {
   const [draft, setDraft] = React.useState(emptyAgentDefinition)
   const [validationError, setValidationError] = React.useState('')
   const [deleting, setDeleting] = React.useState<AgentDefinition | null>(null)
+  const [checking, setChecking] = React.useState<AgentDefinition | null>(null)
+  const [copyingExamples, setCopyingExamples] = React.useState(false)
+  const [trialError, setTrialError] = React.useState('')
+  const readiness = useManagementResource(
+    `agent-readiness:${checking?.id}:${checking?.version}`,
+    () => agentsApi.readiness(checking!.id),
+    { enabled: !!checking },
+  )
+  const trial = (agent: AgentDefinition) => {
+    const status = stageAgentTrial(agent)
+    setTrialError(
+      status === 'draft'
+        ? tr(
+            '工作台已有未发送草稿或附件，请先处理后再试用，原草稿已保留。',
+            'The workspace has an unsent draft or attachment. Resolve it before trying this agent; your draft is unchanged.',
+          )
+        : status === 'busy'
+          ? tr(
+              '工作台正在创建会话，请稍后再试用。',
+              'A session is being created. Try again once it finishes.',
+            )
+          : status === 'unpublished'
+            ? tr(
+                '请先发布，再从工作台试用。',
+                'Publish this agent before trying it in the workspace.',
+              )
+            : '',
+    )
+  }
   const total = resource.data?.total ?? 0
   React.useEffect(() => {
     if (resource.data && !resource.loading)
@@ -92,6 +122,15 @@ function ScopedAgentsPanel() {
         name: draft.name.trim(),
         description: draft.description.trim(),
         instructions: draft.instructions.trim(),
+        recommendedPrompts: (draft.recommendedPrompts ?? [])
+          .map((value) => value.trim())
+          .filter(Boolean),
+        inputRequirements: (draft.inputRequirements ?? [])
+          .map((value) => value.trim())
+          .filter(Boolean),
+        outputExamples: (draft.outputExamples ?? [])
+          .map((value) => value.trim())
+          .filter(Boolean),
       }),
     )
     if (ok) setEditing(null)
@@ -115,8 +154,8 @@ function ScopedAgentsPanel() {
     >
       <p className="text-sm text-muted-foreground">
         {tr(
-          '关联知识库、技能和工具，发布到主工作台。首次使用会准备三个脱敏示例，可直接编辑或创建自己的智能体。',
-          'Combine knowledge bases, skills and tools for the workspace. First use prepares three anonymized examples to edit, or create your own agent.',
+          '关联知识库、技能和工具，发布到主工作台。首次使用会准备四个脱敏示例，可直接编辑或创建自己的智能体。',
+          'Combine knowledge bases, skills and tools for the workspace. First use prepares four anonymized examples to edit, or create your own agent.',
         )}
       </p>
       <div className="flex flex-wrap items-center justify-between gap-3">
@@ -138,15 +177,29 @@ function ScopedAgentsPanel() {
             {tr('搜索', 'Search')}
           </Button>
         </form>
-        <Button disabled={resource.busy} onClick={() => openEditor('new')}>
-          {tr('新增智能体', 'Create agent')}
-        </Button>
+        <div className="flex flex-wrap gap-2">
+          <Button
+            variant="outline"
+            disabled={resource.busy}
+            onClick={() => setCopyingExamples(true)}
+          >
+            {tr('复制新版示例', 'Copy latest examples')}
+          </Button>
+          <Button disabled={resource.busy} onClick={() => openEditor('new')}>
+            {tr('新增智能体', 'Create agent')}
+          </Button>
+        </div>
       </div>
       <ResourceState
         loading={resource.loading}
         error={resource.error}
         onRetry={resource.reload}
       />
+      {!!trialError && (
+        <p role="alert" className="text-sm text-destructive">
+          {trialError}
+        </p>
+      )}
       <div className="overflow-x-auto rounded-xl border bg-card">
         <table className={tableClass}>
           <thead>
@@ -166,6 +219,12 @@ function ScopedAgentsPanel() {
                   <p className="mt-1 max-w-md text-xs text-muted-foreground">
                     {agent.description}
                   </p>
+                  {!!agent.recommendedPrompts?.length && (
+                    <p className="mt-2 max-w-md text-xs text-muted-foreground">
+                      {tr('试用指令：', 'Try: ')}
+                      {agent.recommendedPrompts[0]}
+                    </p>
+                  )}
                 </td>
                 <td>
                   <span className="inline-flex rounded-full border px-2 py-1 text-xs">
@@ -193,7 +252,22 @@ function ScopedAgentsPanel() {
                 </td>
                 <td>{dateLabel(agent.updatedAt)}</td>
                 <td>
-                  <div className="flex gap-2">
+                  <div className="flex flex-wrap gap-2">
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      onClick={() => setChecking(agent)}
+                    >
+                      {tr('配置检查', 'Check setup')}
+                    </Button>
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      disabled={!agent.published}
+                      onClick={() => trial(agent)}
+                    >
+                      {tr('试用', 'Try')}
+                    </Button>
                     <Button
                       size="sm"
                       variant="outline"
@@ -240,6 +314,76 @@ function ScopedAgentsPanel() {
         onRetry={catalog.reload}
         busy={resource.busy}
         error={validationError || resource.error}
+      />
+      <ManagementDialog
+        open={!!checking}
+        onOpenChange={(open) => !open && setChecking(null)}
+        title={tr('智能体配置检查', 'Agent setup check')}
+        description={tr(
+          '检查已保存的配置。检查通过不代表模型、资料内容或真实任务已验收；工作台中的现有会话保留原版本。',
+          'Checks saved configuration. A pass does not verify the model, source content or a real task. Existing workspace sessions retain their version.',
+        )}
+        error={readiness.error}
+        footer={
+          <Button variant="outline" onClick={() => setChecking(null)}>
+            {tr('关闭', 'Close')}
+          </Button>
+        }
+      >
+        <ResourceState
+          loading={readiness.loading}
+          error={readiness.error}
+          onRetry={readiness.reload}
+        />
+        <ul className="space-y-3 text-sm">
+          {readiness.data?.checks.map((check) => (
+            <li key={check.id} className="rounded-lg border p-3">
+              <span
+                className={
+                  check.status === 'error'
+                    ? 'text-destructive'
+                    : 'text-muted-foreground'
+                }
+              >
+                {check.status === 'pass' ? '✓ ' : '· '}
+                {check.message}
+              </span>
+            </li>
+          ))}
+        </ul>
+      </ManagementDialog>
+      <ManagementDialog
+        open={copyingExamples}
+        onOpenChange={setCopyingExamples}
+        title={tr('复制新版办公示例', 'Copy updated office examples')}
+        busy={resource.busy}
+        error={resource.error}
+        description={tr(
+          '创建 Excel、PPT、企业知识助手的新版草稿和独立技能；保留你的已有配置，不恢复已经删除的原始示例。每个版本只复制一次。',
+          'Create updated Excel, PPT and knowledge drafts with separate skills. Existing configurations remain unchanged, and deleted originals stay deleted. Each version is copied once.',
+        )}
+        footer={
+          <>
+            <Button
+              variant="outline"
+              disabled={resource.busy}
+              onClick={() => setCopyingExamples(false)}
+            >
+              {tr('取消', 'Cancel')}
+            </Button>
+            <Button
+              disabled={resource.busy}
+              onClick={async () => {
+                if (await resource.perform(() => agentsApi.seedDemo(true))) {
+                  setCopyingExamples(false)
+                  catalog.reload()
+                }
+              }}
+            >
+              {tr('复制为草稿', 'Copy as drafts')}
+            </Button>
+          </>
+        }
       />
       <ManagementDialog
         open={!!deleting}

@@ -1,4 +1,13 @@
 /** Product account and remote-device contracts. Tokens never cross this boundary. */
+export type * from './models.ts'
+export type * from './files.ts'
+export type {
+  OfficePlan,
+  OfficeSource,
+  ArtifactRevision,
+  SourceReference,
+  EmbeddingProfile,
+} from './office.ts'
 export type PlatformJson =
   | null
   | boolean
@@ -64,6 +73,9 @@ export interface PlatformAgentDefinition {
   name: string
   description: string
   instructions: string
+  recommendedPrompts?: string[]
+  inputRequirements?: string[]
+  outputExamples?: string[]
   knowledgeAssetIds: string[]
   templateAssetIds: string[]
   skillIds: string[]
@@ -80,7 +92,13 @@ export interface PlatformAgentBinding {
 }
 export type PlatformOperation =
   | 'agents'
+  | 'agent-binding'
+  | 'set-agent-binding'
   | 'agent-artifacts'
+  | 'agent-artifact-preview'
+  | 'agent-evidence'
+  | 'office-plans'
+  | 'skill-runs'
   | 'download-attachment'
   | 'server-agent'
   | 'prepare-server-agent'
@@ -128,6 +146,7 @@ export interface PlatformRequest {
   sessionId?: string
   terminalId?: string
   noticeId?: string
+  artifactId?: string
   providerId?: string
   attachmentId?: string
   query?: Record<string, string>
@@ -139,6 +158,11 @@ export interface PlatformEvent {
   event: PlatformJson
 }
 export interface PlatformBridge {
+  saveAttachment?(request: {
+    identity: PlatformIdentitySnapshot
+    sessionId: string
+    attachmentId: string
+  }): Promise<{ saved: boolean }>
   state(): Promise<PlatformAccountState>
   login(origin: string): Promise<void>
   loginWithPassword(input: PlatformPasswordLogin): Promise<void>

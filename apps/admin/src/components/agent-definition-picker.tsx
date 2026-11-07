@@ -15,6 +15,7 @@ export function AgentDefinitionPicker({
   error,
   onRetry,
   disabled,
+  onPrompt,
 }: {
   value: string
   onChange: (id: string) => void
@@ -23,6 +24,7 @@ export function AgentDefinitionPicker({
   error: string
   onRetry: () => void
   disabled: boolean
+  onPrompt?: (prompt: string) => void
 }) {
   const tr = useManagementText()
   const selected = items.find((item) => item.id === value)
@@ -64,9 +66,46 @@ export function AgentDefinitionPicker({
         </Button>
       </div>
       {selected && (
-        <p className="mt-2 text-xs text-muted-foreground">
-          {selected.description} · v{selected.version}
-        </p>
+        <div className="mt-2 space-y-2 text-xs text-muted-foreground">
+          <p>
+            {selected.description} · v{selected.version}
+          </p>
+          {!!selected.inputRequirements?.length && (
+            <p>
+              {tr('输入：', 'Inputs: ')}
+              {selected.inputRequirements[0]}
+            </p>
+          )}
+          {!!selected.outputExamples?.length && (
+            <p>
+              {tr('输出：', 'Output: ')}
+              {selected.outputExamples[0]}
+            </p>
+          )}
+          {!!selected.recommendedPrompts?.length && (
+            <div className="flex flex-wrap gap-2">
+              {selected.recommendedPrompts.map((prompt) =>
+                onPrompt ? (
+                  <Button
+                    key={prompt}
+                    type="button"
+                    size="sm"
+                    variant="outline"
+                    disabled={disabled}
+                    className="h-auto max-w-full whitespace-normal text-left text-xs"
+                    onClick={() => onPrompt(prompt)}
+                  >
+                    {prompt}
+                  </Button>
+                ) : (
+                  <span key={prompt} className="rounded-md border px-2 py-1">
+                    {prompt}
+                  </span>
+                ),
+              )}
+            </div>
+          )}
+        </div>
       )}
       {!selected && !value && (
         <p className="mt-2 text-xs text-muted-foreground">

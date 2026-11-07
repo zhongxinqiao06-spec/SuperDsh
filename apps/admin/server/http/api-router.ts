@@ -54,6 +54,7 @@ export interface ApiRouteOptions {
   permission?: string
   status?: number
   rawBody?: boolean
+  maxBodyBytes?: number
 }
 interface Route {
   method: string
@@ -97,15 +98,17 @@ export function bearer(request: IncomingMessage): string {
   return value.startsWith('Bearer ') ? value.slice(7) : ''
 }
 
-async function jsonBody(request: IncomingMessage): Promise<unknown> {
+async function jsonBody(
+  request: IncomingMessage,
+  maximum = 8 * 1024 * 1024,
+): Promise<unknown> {
   if (request.method === 'GET' || request.method === 'HEAD') return {}
   const chunks: Buffer[] = []
   let size = 0
   for await (const chunk of request) {
     const buffer = Buffer.isBuffer(chunk) ? chunk : Buffer.from(chunk)
     size += buffer.length
-    if (size > 8 * 1024 * 1024)
-      throw new ApiError(413, 'request body too large')
+    if (size > maximum) throw new ApiError(413, 'request body too large')
     chunks.push(buffer)
   }
   if (!size) return {}
@@ -183,7 +186,9 @@ export class ApiRouter {
       const account = route.options.public
         ? null
         : await this.authorize(request, route.options.permission)
-      const parsedBody = route.options.rawBody ? {} : await jsonBody(request)
+      const parsedBody = route.options.rawBody
+        ? {}
+        : await jsonBody(request, route.options.maxBodyBytes)
       const context: ApiContext = {
         request,
         response,

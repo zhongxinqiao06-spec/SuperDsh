@@ -34,6 +34,14 @@
     "zod": "^4.4.3"
   },
   "exports": {
+    "./client/skill-presets": {
+      "types": "./src/client/skill-presets.ts",
+      "default": "./lib/client/skill-presets.js"
+    },
+    "./client/skill-run-view": {
+      "types": "./src/client/skill-run-view.ts",
+      "default": "./lib/client/skill-run-view.js"
+    },
     "./client/native-model-initialization": {
       "types": "./src/client/native-model-initialization.ts",
       "default": "./lib/client/native-model-initialization.js"
@@ -497,6 +505,14 @@
     "./client/desktop-settings-operations": {
       "types": "./src/client/desktop-settings-operations.ts",
       "default": "./lib/client/desktop-settings-operations.js"
+    },
+    "./contracts/office": {
+      "types": "./src/contracts/office.ts",
+      "default": "./lib/contracts/office.js"
+    },
+    "./contracts/extensions": {
+      "types": "./src/contracts/extensions.ts",
+      "default": "./lib/contracts/extensions.js"
     }
   },
   "files": [

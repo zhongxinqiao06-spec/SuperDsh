@@ -108,7 +108,13 @@ export function platformModelProfiles(
         jitterRatio: 0.1,
       },
       modelErrors: new Map(),
-      configuredMaxTokens: new Map(),
+      configuredMaxTokens: new Map(
+        entry.models.flatMap((model) =>
+          model.maxTokens === undefined
+            ? []
+            : [[model.modelId, model.maxTokens]],
+        ),
+      ),
     })
   }
   return profiles

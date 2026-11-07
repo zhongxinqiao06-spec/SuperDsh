@@ -1,4 +1,5 @@
 import { inflateRawSync } from 'node:zlib'
+import { posix } from 'node:path'
 import { DOMParser } from '@xmldom/xmldom'
 import JSZip from 'jszip'
 import { OfficeInputError, type OfficeInputFile } from './types.ts'
@@ -64,7 +65,18 @@ export function parseXml(xml: string) {
 }
 
 /** Validate the ZIP directory before bounded inflation; never extract paths to disk. */
-export function readOfficeArchive(file: OfficeInputFile) {
+export function readOfficeArchive(
+  file: OfficeInputFile,
+  options: { allowChartWorkbooks?: boolean } = {},
+) {
+  return readOfficeArchiveWithBudget(file, options, { expandedBytes: 0 })
+}
+
+function readOfficeArchiveWithBudget(
+  file: OfficeInputFile,
+  options: { allowChartWorkbooks?: boolean },
+  budget: { expandedBytes: number },
+): JSZip {
   validateInput(file, ['.xlsx', '.pptx', '.docx'])
   const bytes = file.content
   let eocd = -1
@@ -92,6 +104,8 @@ export function readOfficeArchive(file: OfficeInputFile) {
     throw new OfficeInputError('不支持多卷、ZIP64 或超出资源限制的文档')
   const archive = new JSZip()
   const names = new Set<string>()
+  const chartWorkbooks = new Map<string, Buffer>()
+  const chartWorkbookLinks = new Set<string>()
   let expandedBytes = 0
   for (let index = 0; index < count; index++) {
     if (offset + 46 > eocd || bytes.readUInt32LE(offset) !== 0x02014b50) {
@@ -130,9 +144,11 @@ export function readOfficeArchive(file: OfficeInputFile) {
         '文档含重复路径、危险路径、加密或不支持的压缩内容',
       )
     expandedBytes += expanded
+    budget.expandedBytes += expanded
     if (
       expanded > OFFICE_LIMITS.entryBytes ||
-      expandedBytes > OFFICE_LIMITS.expandedBytes
+      expandedBytes > OFFICE_LIMITS.expandedBytes ||
+      budget.expandedBytes > OFFICE_LIMITS.expandedBytes
     ) {
       throw new OfficeInputError('文档解压后超过资源限制')
     }
@@ -158,9 +174,16 @@ export function readOfficeArchive(file: OfficeInputFile) {
     }
     if (content.length !== expanded)
       throw new OfficeInputError('文档解压长度与目录不一致')
+    const chartWorkbook =
+      options.allowChartWorkbooks &&
+      /^ppt\/embeddings\/[^/]+\.xlsx$/iu.test(name)
+    if (chartWorkbook) chartWorkbooks.set(name, content)
     if (
       !name.endsWith('/') &&
-      /vbaProject|activeX|embeddings\/|externalLinks\/|oleObject/iu.test(name)
+      /vbaProject|activeX|embeddings\/|externalLinks\/|oleObject/iu.test(
+        name,
+      ) &&
+      !chartWorkbook
     ) {
       throw new OfficeInputError(
         '不支持宏、嵌入对象或外部数据链接，请上传简化模板',
@@ -178,6 +201,18 @@ export function readOfficeArchive(file: OfficeInputFile) {
             '不支持外部链接或远程资源，请使用自包含文档',
           )
         }
+        if (
+          options.allowChartWorkbooks &&
+          /^ppt\/charts\/_rels\/chart\d+\.xml\.rels$/u.test(name) &&
+          relationship.getAttribute('Type')?.endsWith('/package')
+        ) {
+          const target = relationship.getAttribute('Target') ?? ''
+          chartWorkbookLinks.add(
+            target.startsWith('/')
+              ? target.slice(1)
+              : posix.normalize(posix.join('ppt/charts', target)),
+          )
+        }
       }
     }
     names.add(name.toLowerCase())
@@ -186,6 +221,17 @@ export function readOfficeArchive(file: OfficeInputFile) {
   }
   if (offset !== eocd || !archive.file('[Content_Types].xml')) {
     throw new OfficeInputError('Office 文档目录不完整')
+  }
+  for (const [name, content] of chartWorkbooks) {
+    if (!chartWorkbookLinks.has(name))
+      throw new OfficeInputError('PPT 含非图表引用的嵌入文件')
+    const workbook = readOfficeArchiveWithBudget(
+      { filename: 'chart.xlsx', content },
+      {},
+      budget,
+    )
+    if (!workbook.file('xl/workbook.xml'))
+      throw new OfficeInputError('PPT 图表嵌入数据不是有效的 XLSX')
   }
   return archive
 }

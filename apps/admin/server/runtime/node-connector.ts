@@ -13,7 +13,10 @@ export interface DownloadedAttachment {
   name?: string
 }
 export interface NodeConnectorOptions {
-  prepareBusiness?(sessionId: string): Promise<string | undefined>
+  prepareBusiness?(
+    sessionId: string,
+    externalSessionId?: string,
+  ): Promise<string | undefined>
   connectorId: string
   home: string
   workspace: string
@@ -284,7 +287,12 @@ export class NodeHarnessConnector {
       const staged = await this.attachments(params)
       try {
         const businessPreset = this.options.prepareBusiness
-          ? await this.options.prepareBusiness(String(params.sessionId))
+          ? await this.options.prepareBusiness(
+              String(params.sessionId),
+              typeof params.externalSessionId === 'string'
+                ? params.externalSessionId
+                : undefined,
+            )
           : undefined
         if (
           typeof options.agentPreset === 'string' &&

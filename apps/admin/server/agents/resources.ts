@@ -13,7 +13,12 @@ import {
   type Row,
   type SqlConnection,
 } from '../infrastructure/database.ts'
-import { agentSkills, agentTools } from './contracts.ts'
+import { agentSkills, agentTools, defaultSkillTools } from './contracts.ts'
+import { presentationSkillIds } from './presentation-skills.ts'
+import { builtinBinding } from '../extensions/service.ts'
+import { validateValue } from '../extensions/validation.ts'
+import { packagePath } from '../extensions/validation.ts'
+import { validateSkillProgram } from '../skills/definitions.ts'
 import type { AgentServiceOptions } from './service.ts'
 import type {
   AgentResource,
@@ -30,12 +35,6 @@ const tables = {
   tools: 'business_agent_tools',
 } as const
 const labels = { 'knowledge-bases': '知识库', skills: '技能', tools: '工具' }
-const tools = new Set<string>(agentTools.map((item) => item.id))
-const defaultRequirements: Record<string, string[]> = {
-  'company-knowledge': ['knowledge_search'],
-  'sales-analysis': ['spreadsheet_report'],
-  'business-presentation': ['presentation_report'],
-}
 const view = <T>(row: Row) => json<T>(row.definition_json, {} as T)
 
 export function resourceIds(
@@ -63,30 +62,6 @@ function common(body: Row) {
   }
 }
 
-function toolSettings(id: string, value: unknown): AgentToolConfig['settings'] {
-  const input = object(value)
-  const accepted =
-    id === 'knowledge_search' ? ['maxResults'] : ['companyName', 'title']
-  if (Object.keys(input).some((key) => !accepted.includes(key)))
-    throw new ApiError(422, '工具包含不支持的配置项')
-  if (id === 'knowledge_search')
-    return input.maxResults === undefined
-      ? {}
-      : { maxResults: integer(input.maxResults, 8, 1, 8) }
-  const output: AgentToolConfig['settings'] = {}
-  for (const [key, maximum] of [
-    ['companyName', 120],
-    ['title', 160],
-  ] as const) {
-    if (input[key] !== undefined) {
-      if (typeof input[key] !== 'string' || input[key].length > maximum)
-        throw new ApiError(422, `${key}配置无效`)
-      if (input[key].trim()) output[key] = input[key].trim()
-    }
-  }
-  return output
-}
-
 export class AgentResourceService {
   readonly options: AgentServiceOptions
   constructor(options: AgentServiceOptions) {
@@ -109,7 +84,27 @@ export class AgentResourceService {
         'SELECT key FROM instance_settings WHERE key=$1',
         [key],
       )
-      if (marker) return
+      const upgradeKey = `${key}:document-v1`
+      const [upgraded] = await db.query(
+        'SELECT key FROM instance_settings WHERE key=$1',
+        [upgradeKey],
+      )
+      const graphicKey = `${key}:illustration-v1`
+      const [graphic] = await db.query(
+        'SELECT key FROM instance_settings WHERE key=$1',
+        [graphicKey],
+      )
+      const presentationKey = `${key}:presentation-skills-v1`
+      const [presentation] = await db.query(
+        'SELECT key FROM instance_settings WHERE key=$1',
+        [presentationKey],
+      )
+      const flowKey = `${key}:skill-flows-v1`
+      const [flows] = await db.query(
+        'SELECT key FROM instance_settings WHERE key=$1',
+        [flowKey],
+      )
+      if (marker && upgraded && graphic && presentation && flows) return
       const now = utcNow()
       for (const [kind, entries] of [
         ['tools', agentTools.map((entry) => ({ ...entry, settings: {} }))],
@@ -117,11 +112,28 @@ export class AgentResourceService {
           'skills',
           agentSkills.map((entry) => ({
             ...entry,
-            requiredToolIds: defaultRequirements[entry.id]!,
+            requiredToolIds: defaultSkillTools[entry.id]!,
           })),
         ],
       ] as const) {
         for (const entry of entries) {
+          if (
+            marker &&
+            !(
+              !upgraded &&
+              ['document_report', 'business-document'].includes(entry.id)
+            ) &&
+            !(!graphic && entry.id === 'illustration_render') &&
+            !(
+              !flows &&
+              ['presentation-flow', 'document-flow'].includes(entry.id)
+            ) &&
+            !(
+              !presentation &&
+              presentationSkillIds.some((id) => id === entry.id)
+            )
+          )
+            continue
           const item = {
             ...entry,
             enabled: true,
@@ -136,8 +148,25 @@ export class AgentResourceService {
         }
       }
       await db.query(
-        'INSERT INTO instance_settings(key,value,updated_at) VALUES($1,$2,$3)',
-        [key, '1', now],
+        'INSERT INTO instance_settings(key,value,updated_at) VALUES($1,$2,$3) ON CONFLICT DO NOTHING',
+        [marker ? upgradeKey : key, '1', now],
+      )
+      if (!marker)
+        await db.query(
+          'INSERT INTO instance_settings(key,value,updated_at) VALUES($1,$2,$3) ON CONFLICT DO NOTHING',
+          [upgradeKey, '1', now],
+        )
+      await db.query(
+        'INSERT INTO instance_settings(key,value,updated_at) VALUES($1,$2,$3) ON CONFLICT DO NOTHING',
+        [graphicKey, '1', now],
+      )
+      await db.query(
+        'INSERT INTO instance_settings(key,value,updated_at) VALUES($1,$2,$3) ON CONFLICT DO NOTHING',
+        [presentationKey, '1', now],
+      )
+      await db.query(
+        'INSERT INTO instance_settings(key,value,updated_at) VALUES($1,$2,$3) ON CONFLICT DO NOTHING',
+        [flowKey, '1', now],
       )
     })
   }
@@ -149,7 +178,7 @@ export class AgentResourceService {
   ) {
     requirePermission(account, 'agents.manage')
     const page = integer(query.get('page'), 1, 1, 100000)
-    const pageSize = integer(query.get('pageSize'), 25, 1, 100)
+    const pageSize = integer(query.get('pageSize'), 10, 1, 100)
     const search = (query.get('search') || '').trim().slice(0, 100)
     const values = [account.userId, `%${search.replace(/[\\%_]/g, '\\$&')}%`]
     const where = 'owner_user_id=$1 AND deleted_at IS NULL AND name ILIKE $2'
@@ -192,7 +221,11 @@ export class AgentResourceService {
         )
         if (rows.length !== input.assetIds.length)
           throw new ApiError(422, '资料不存在或不属于当前维护者')
-        for (const kind of ['spreadsheet-template', 'presentation-template'])
+        for (const kind of [
+          'spreadsheet-template',
+          'presentation-template',
+          'document-template',
+        ])
           if (rows.filter((row) => row.kind === kind).length > 1)
             throw new ApiError(422, '同一知识库内的同类输出只能绑定一个模板')
       },
@@ -215,13 +248,51 @@ export class AgentResourceService {
     id?: string,
   ): Promise<AgentSkill> {
     requirePermission(account, 'agents.manage')
+    if (id) {
+      const [existing] = await this.options.db.query(
+        'SELECT definition_json FROM business_agent_skills WHERE owner_user_id=$1 AND id=$2 AND deleted_at IS NULL',
+        [account.userId, id],
+      )
+      if (!existing) throw new ApiError(404, '技能不存在')
+      // A text-only edit must retain the imported reference package.
+      body = { ...view<AgentSkill>(existing), ...body }
+    }
     const input = {
       ...common(body),
       instructions: requiredText(body.instructions, '技能执行指令', 12000),
-      requiredToolIds: resourceIds(body.requiredToolIds, '依赖工具', 3),
+      requiredToolIds: resourceIds(body.requiredToolIds, '依赖工具', 100),
+      ...(body.program ? { program: validateSkillProgram(body.program) } : {}),
+      ...(body.programDraft !== undefined
+        ? {
+            programDraft:
+              body.programDraft === null
+                ? null
+                : validateSkillProgram(body.programDraft),
+          }
+        : {}),
+      ...(body.references !== undefined
+        ? {
+            references: (() => {
+              if (
+                !Array.isArray(body.references) ||
+                body.references.length > 100
+              )
+                throw new ApiError(422, '技能参考文件格式错误')
+              return body.references.map((raw) => {
+                const entry = object(raw)
+                return {
+                  path: packagePath(entry.path),
+                  assetId: requiredText(entry.assetId, '参考资料', 160),
+                  sha256: requiredText(entry.sha256, '资料哈希', 64),
+                }
+              })
+            })(),
+          }
+        : {}),
+      ...(body.packageSha256
+        ? { packageSha256: requiredText(body.packageSha256, '技能包哈希', 64) }
+        : {}),
     }
-    if (input.requiredToolIds.some((tool) => !tools.has(tool)))
-      throw new ApiError(422, '技能引用了未注册的工具')
     return this.save('skills', account, body, input, id, async (db) => {
       const rows = await db.query(
         'SELECT id FROM business_agent_tools WHERE owner_user_id=$1 AND id=ANY($2::text[]) AND deleted_at IS NULL',
@@ -229,18 +300,123 @@ export class AgentResourceService {
       )
       if (rows.length !== input.requiredToolIds.length)
         throw new ApiError(422, '技能依赖的工具不存在')
+      for (const reference of input.references ?? []) {
+        const [asset] = await db.query(
+          'SELECT id FROM business_agent_assets WHERE id=$1 AND owner_user_id=$2 AND sha256=$3',
+          [reference.assetId, account.userId, reference.sha256],
+        )
+        if (!asset) throw new ApiError(422, '技能参考资料不存在或版本不匹配')
+      }
+      for (const program of [input.program, input.programDraft]) {
+        if (!program) continue
+        for (const stage of program.stages) {
+          if (
+            stage.toolIds.some((tool) => !input.requiredToolIds.includes(tool))
+          )
+            throw new ApiError(422, `阶段“${stage.name}”的工具必须加入技能依赖`)
+          if (!stage.skillId) continue
+          if (stage.skillId === id)
+            throw new ApiError(422, '技能不能循环引用自己')
+          const [linked] = await db.query(
+            'SELECT definition_json FROM business_agent_skills WHERE owner_user_id=$1 AND id=$2 AND deleted_at IS NULL AND enabled=1',
+            [account.userId, stage.skillId],
+          )
+          if (!linked) throw new ApiError(422, '引用技能不存在或已停用')
+          const helper = view<AgentSkill>(linked)
+          if (helper.program || helper.programDraft)
+            throw new ApiError(
+              422,
+              '阶段只能引用单项方法技能，不能嵌套执行组合',
+            )
+          if (
+            helper.requiredToolIds.some(
+              (tool) => !input.requiredToolIds.includes(tool),
+            )
+          )
+            throw new ApiError(422, '引用技能依赖的工具未全部关联')
+        }
+      }
     })
+  }
+
+  async publishSkill(account: Account, id: string, version: number) {
+    requirePermission(account, 'agents.manage')
+    const [row] = await this.options.db.query(
+      'SELECT definition_json FROM business_agent_skills WHERE owner_user_id=$1 AND id=$2 AND deleted_at IS NULL',
+      [account.userId, id],
+    )
+    if (!row) throw new ApiError(404, '技能不存在')
+    const skill = view<AgentSkill>(row)
+    if (!skill.programDraft) throw new ApiError(422, '没有待发布的阶段配置')
+    return this.saveSkill(
+      account,
+      { ...skill, version, program: skill.programDraft, programDraft: null },
+      id,
+    )
   }
 
   async saveTool(
     account: Account,
     body: Row,
-    id: string,
+    id?: string,
   ): Promise<AgentToolConfig> {
     requirePermission(account, 'agents.manage')
-    if (!tools.has(id)) throw new ApiError(404, '工具不存在')
-    const input = { ...common(body), settings: toolSettings(id, body.settings) }
-    return this.save('tools', account, body, input, id)
+    if (id) {
+      const [existing] = await this.options.db.query(
+        'SELECT id FROM business_agent_tools WHERE owner_user_id=$1 AND id=$2 AND deleted_at IS NULL',
+        [account.userId, id],
+      )
+      if (!existing) throw new ApiError(404, '工具不存在')
+    }
+    const registry = this.options.extensions
+    const bound = registry
+      ? await registry.bind(body.implementation, id)
+      : builtinBinding(id ?? '')
+    const settings = { ...object(body.settings ?? {}) }
+    const secrets =
+      id && registry ? await registry.secrets(account.userId, id) : {}
+    const properties = object(
+      bound.descriptor.configurationSchema.properties ?? {},
+    )
+    for (const [key, property] of Object.entries(properties)) {
+      if (object(property).writeOnly !== true) continue
+      if (settings[key] !== undefined) {
+        if (settings[key] === '') delete secrets[key]
+        else secrets[key] = settings[key]
+        delete settings[key]
+      }
+    }
+    validateValue(
+      bound.descriptor.configurationSchema,
+      { ...settings, ...secrets },
+      '工具配置',
+    )
+    const input = {
+      ...common(body),
+      ...bound,
+      settings,
+      configuredSecrets: Object.keys(secrets),
+    }
+    if (Object.keys(secrets).length && !registry)
+      throw new ApiError(503, '工具凭据存储不可用')
+    return this.save(
+      'tools',
+      account,
+      body,
+      input,
+      id,
+      undefined,
+      async (db, item) => {
+        if (registry)
+          await registry.storeSecrets(
+            db,
+            account.userId,
+            item.id,
+            secrets,
+            item.version,
+          )
+      },
+    )
   }
 
   private async save<T extends AgentResource>(
@@ -250,6 +426,7 @@ export class AgentResourceService {
     input: Omit<T, 'id' | 'version' | 'createdAt' | 'updatedAt'>,
     id?: string,
     validate?: (connection: SqlConnection) => Promise<void>,
+    afterSave?: (connection: SqlConnection, item: T) => Promise<void>,
   ): Promise<T> {
     return this.options.db.transaction(async (db) => {
       // Agent writers acquire the same owner lock before validating references.
@@ -269,7 +446,15 @@ export class AgentResourceService {
       const now = utcNow()
       const item = {
         ...input,
-        id: id || identifier(kind === 'skills' ? 'skill' : 'knowledge'),
+        id:
+          id ||
+          identifier(
+            kind === 'tools'
+              ? 'tool'
+              : kind === 'skills'
+                ? 'skill'
+                : 'knowledge',
+          ),
         version: old ? Number(old.version) + 1 : 1,
         createdAt: old ? text(old.created_at) : now,
         updatedAt: now,
@@ -287,6 +472,30 @@ export class AgentResourceService {
           now,
         ],
       )
+      await db.query(
+        'INSERT INTO agent_resource_versions(owner_user_id,kind,resource_id,version,definition_json,created_at) VALUES($1,$2,$3,$4,$5,$6) ON CONFLICT DO NOTHING',
+        [
+          account.userId,
+          kind,
+          item.id,
+          item.version,
+          JSON.stringify(item),
+          now,
+        ],
+      )
+      if (old)
+        await db.query(
+          'INSERT INTO agent_resource_versions(owner_user_id,kind,resource_id,version,definition_json,created_at) VALUES($1,$2,$3,$4,$5,$6) ON CONFLICT DO NOTHING',
+          [
+            account.userId,
+            kind,
+            item.id,
+            Number(old.version),
+            text(old.definition_json),
+            text(old.updated_at),
+          ],
+        )
+      await afterSave?.(db, item)
       await this.options.audit(
         account.userId,
         `agent.${kind}.${id ? 'update' : 'create'}`,
@@ -298,8 +507,83 @@ export class AgentResourceService {
     })
   }
 
+  async history(
+    kind: AgentResourceKind,
+    account: Account,
+    id: string,
+    query: URLSearchParams,
+  ) {
+    requirePermission(account, 'agents.manage')
+    const [current] = await this.options.db.query(
+      `SELECT definition_json FROM ${tables[kind]} WHERE owner_user_id=$1 AND id=$2 AND deleted_at IS NULL`,
+      [account.userId, id],
+    )
+    if (!current) throw new ApiError(404, `${labels[kind]}不存在`)
+    const page = integer(query.get('page'), 1, 1, 100000)
+    const pageSize = integer(query.get('pageSize'), 10, 1, 50)
+    const latest = view<AgentResource>(current)
+    const [count] = await this.options.db.query(
+      'SELECT COUNT(*) AS total FROM agent_resource_versions WHERE owner_user_id=$1 AND kind=$2 AND resource_id=$3 AND version<>$4',
+      [account.userId, kind, id, latest.version],
+    )
+    const rows = await this.options.db.query(
+      'SELECT version,definition_json FROM (SELECT version,definition_json FROM agent_resource_versions WHERE owner_user_id=$1 AND kind=$2 AND resource_id=$3 AND version<>$4 UNION ALL SELECT $4::integer,$5::text) AS versions ORDER BY version DESC LIMIT $6 OFFSET $7',
+      [
+        account.userId,
+        kind,
+        id,
+        latest.version,
+        JSON.stringify(latest),
+        pageSize,
+        (page - 1) * pageSize,
+      ],
+    )
+    return {
+      items: rows.map((row) => view<AgentResource>(row)),
+      total: Number(count?.total ?? 0) + 1,
+      page,
+      pageSize,
+      currentVersion: latest.version,
+    }
+  }
+
+  async restore(
+    kind: AgentResourceKind,
+    account: Account,
+    id: string,
+    body: Row,
+  ) {
+    requirePermission(account, 'agents.manage')
+    const [row] = await this.options.db.query(
+      'SELECT definition_json FROM agent_resource_versions WHERE owner_user_id=$1 AND kind=$2 AND resource_id=$3 AND version=$4',
+      [account.userId, kind, id, integer(body.sourceVersion, 0, 1, 1000000)],
+    )
+    if (!row) throw new ApiError(404, '资源版本不存在')
+    const previous = view<AgentResource & Row>(row)
+    const input: Row = { ...previous, version: body.version }
+    if (kind === 'tools') {
+      const registry = this.options.extensions
+      const secrets = registry
+        ? await registry.secrets(account.userId, id, previous.version)
+        : {}
+      const currentSecrets = registry
+        ? await registry.secrets(account.userId, id)
+        : {}
+      input.settings = {
+        ...object(previous.settings),
+        ...Object.fromEntries(
+          Object.keys(currentSecrets).map((key) => [key, '']),
+        ),
+        ...secrets,
+      }
+      return this.saveTool(account, input, id)
+    }
+    if (kind === 'skills') return this.saveSkill(account, input, id)
+    return this.saveKnowledge(account, input, id)
+  }
+
   async remove(
-    kind: 'knowledge-bases' | 'skills',
+    kind: AgentResourceKind,
     account: Account,
     id: string,
   ): Promise<void> {
@@ -313,13 +597,42 @@ export class AgentResourceService {
         [account.userId, id],
       )
       if (!old) throw new ApiError(404, `${labels[kind]}不存在`)
-      const field = kind === 'skills' ? 'skillIds' : 'knowledgeBaseIds'
+      const field =
+        kind === 'tools'
+          ? 'toolIds'
+          : kind === 'skills'
+            ? 'skillIds'
+            : 'knowledgeBaseIds'
       const [used] = await db.query(
         `SELECT id FROM business_agents WHERE owner_user_id=$1 AND deleted_at IS NULL AND (definition_json::jsonb->$3) ? $2 LIMIT 1`,
         [account.userId, id, field],
       )
       if (used)
         throw new ApiError(409, `${labels[kind]}仍被智能体引用，请先解除关联`)
+      if (kind === 'tools') {
+        const [skill] = await db.query(
+          "SELECT id FROM business_agent_skills WHERE owner_user_id=$1 AND deleted_at IS NULL AND (definition_json::jsonb->'requiredToolIds') ? $2 LIMIT 1",
+          [account.userId, id],
+        )
+        if (skill) throw new ApiError(409, '工具仍被技能引用，请先解除关联')
+      }
+      if (kind === 'skills') {
+        const rows = await db.query(
+          'SELECT definition_json FROM business_agent_skills WHERE owner_user_id=$1 AND deleted_at IS NULL',
+          [account.userId],
+        )
+        if (
+          rows.some((row) =>
+            [
+              view<AgentSkill>(row).program,
+              view<AgentSkill>(row).programDraft,
+            ].some((program) =>
+              program?.stages.some((stage) => stage.skillId === id),
+            ),
+          )
+        )
+          throw new ApiError(409, '技能仍被执行组合引用，请先解除关联')
+      }
       await db.query(
         `UPDATE ${tables[kind]} SET deleted_at=$3,enabled=0 WHERE owner_user_id=$1 AND id=$2`,
         [account.userId, id, utcNow()],
@@ -380,8 +693,52 @@ export class AgentResourceService {
       'knowledge-bases',
       knowledgeBaseIds,
     )
-    const skills = await get<AgentSkill>('skills', skillIds)
+    const selectedSkills = await get<AgentSkill>('skills', skillIds)
+    const helperIds = [
+      ...new Set(
+        selectedSkills.flatMap(
+          (skill) =>
+            skill.program?.stages.flatMap((stage) =>
+              stage.skillId ? [stage.skillId] : [],
+            ) ?? [],
+        ),
+      ),
+    ].filter((id) => !skillIds.includes(id))
+    const helpers = helperIds.length
+      ? await get<AgentSkill>('skills', helperIds)
+      : []
+    if (
+      [...selectedSkills, ...helpers].some(
+        (skill) =>
+          helperIds.includes(skill.id) && (skill.program || skill.programDraft),
+      ) ||
+      selectedSkills.some((skill) =>
+        skill.program?.stages.some((stage) =>
+          selectedSkills.some(
+            (candidate) =>
+              candidate.id === stage.skillId &&
+              (candidate.program || candidate.programDraft),
+          ),
+        ),
+      )
+    )
+      throw new ApiError(422, '不允许嵌套执行组合')
+    const skills = [...selectedSkills, ...helpers]
     const configuredTools = await get<AgentToolConfig>('tools', toolIds)
+    for (const tool of configuredTools) {
+      const bound = this.options.extensions
+        ? await this.options.extensions.bind(tool.implementation, tool.id)
+        : builtinBinding(tool.id)
+      Object.assign(tool, bound)
+      const secrets = this.options.extensions
+        ? await this.options.extensions.secrets(owner, tool.id, tool.version)
+        : {}
+      validateValue(
+        bound.descriptor.configurationSchema,
+        { ...tool.settings, ...secrets },
+        `工具“${tool.name}”配置`,
+      )
+    }
     for (const skill of skills)
       if (skill.requiredToolIds.some((id) => !toolIds.includes(id)))
         throw new ApiError(422, `技能“${skill.name}”所需工具未全部关联`)

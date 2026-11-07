@@ -45,6 +45,9 @@ export function platformAgentDefinitions(
       instructions:
         typeof item.instructions === 'string' ? item.instructions : '',
       knowledgeAssetIds: list('knowledgeAssetIds'),
+      recommendedPrompts: list('recommendedPrompts'),
+      inputRequirements: list('inputRequirements'),
+      outputExamples: list('outputExamples'),
       templateAssetIds: list('templateAssetIds'),
       skillIds: list('skillIds'),
       toolIds: list('toolIds'),

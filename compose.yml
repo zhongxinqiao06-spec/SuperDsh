@@ -12,6 +12,7 @@ services:
     volumes:
       - config-data:/data/config
       - postgres-data:/var/lib/postgresql/data:ro
+      - minio-data:/minio-data
 
   platform:
     build:
@@ -31,6 +32,8 @@ services:
       POSTGRES_PASSWORD_FILE: /data/config/postgres-password
       AGENT_SERVER_REDIS_URL: redis://redis:6379/0
       SUPERDSH_QDRANT_URL: http://qdrant:6333
+      SUPERDSH_KNOWLEDGE_EMBEDDING_TRUSTED_ORIGINS: ${SUPERDSH_KNOWLEDGE_EMBEDDING_TRUSTED_ORIGINS:-}
+      SUPERDSH_PERSONAL_MODEL_ALLOWED_ORIGINS: ${SUPERDSH_PERSONAL_MODEL_ALLOWED_ORIGINS:-}
       AGENT_SERVER_PUBLIC_ORIGIN: ${SUPERDSH_PUBLIC_ORIGIN:-}
       AGENT_SERVER_CORS_ORIGINS: ${SUPERDSH_CORS_ORIGINS:-}
       AGENT_SERVER_SECRET: ${AGENT_SERVER_SECRET:-}
@@ -50,6 +53,8 @@ services:
         condition: service_healthy
       qdrant:
         condition: service_healthy
+      minio-init:
+        condition: service_completed_successfully
     healthcheck:
       test:
         - CMD
@@ -113,6 +118,48 @@ services:
       start_period: 5s
       retries: 20
 
+  minio:
+    build:
+      context: apps/admin/deployment/minio
+    image: superdsh-minio:2025-10-15
+    restart: unless-stopped
+    entrypoint: ['/bin/sh', '-ec']
+    command:
+      [
+        'export MINIO_ROOT_USER="$$(cat /run/config/minio-root-user)" MINIO_ROOT_PASSWORD="$$(cat /run/config/minio-root-password)"; exec minio server /data --console-address :9001',
+      ]
+    volumes:
+      - config-data:/run/config:ro
+      - minio-data:/data
+    depends_on:
+      config-init:
+        condition: service_completed_successfully
+    healthcheck:
+      test:
+        [
+          'CMD',
+          'wget',
+          '-q',
+          '-O',
+          '/dev/null',
+          'http://127.0.0.1:9000/minio/health/live',
+        ]
+      interval: 5s
+      timeout: 3s
+      retries: 20
+  minio-init:
+    image: superdsh-minio:2025-10-15
+    user: '0:0'
+    restart: 'no'
+    entrypoint: ['/bin/sh', '/usr/local/bin/superdsh-minio-init']
+    environment:
+      MINIO_CONFIG_DIRECTORY: /run/config
+    volumes:
+      - config-data:/run/config:ro
+    depends_on:
+      minio:
+        condition: service_healthy
+
 volumes:
   config-data:
   platform-data:
@@ -120,3 +167,4 @@ volumes:
   postgres-data:
   redis-data:
   qdrant-data:
+  minio-data:

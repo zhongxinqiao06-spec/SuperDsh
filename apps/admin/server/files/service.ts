@@ -26,6 +26,8 @@ import {
 import type { ConnectorHub } from '../devices/connector-hub.ts'
 import { createFileStorage } from './storage.ts'
 import type { FileStorage } from './storage.ts'
+import type { FileLibrary } from './file-library.ts'
+import { sendLibraryFile } from './library-routes.ts'
 
 interface Access {
   token: string
@@ -117,6 +119,7 @@ export class FileService {
     '/api/v2/connectors/{connector_id}/terminals-v2/{terminal_id}/stream',
     '/api/v2/sessions/{session_id}/terminals/{terminal_id}/stream',
   ]
+  library?: FileLibrary
   constructor(
     hub: ConnectorHub,
     root: string,
@@ -130,7 +133,44 @@ export class FileService {
     sessionId: string,
     fileId: string,
   ): Promise<{ data: Buffer; metadata: Row }> {
+    // Office bytes are staged before their SQL commit. A predictable file ID
+    // must not expose an uncommitted or abandoned artifact through attachments.
+    if (/^artifact_[a-f0-9]{40}$/.test(fileId)) {
+      const rows = await this.hub.store.db.query(
+        'SELECT id FROM business_agent_artifacts WHERE id=$1 AND session_id=$2',
+        [fileId, sessionId],
+      )
+      if (!rows.length) throw new ApiError(404, 'file not found')
+    } else if (/^preview_[a-f0-9]{40}$/.test(fileId)) {
+      const rows = await this.hub.store.db.query(
+        "SELECT id FROM business_agent_artifacts WHERE session_id=$1 AND metadata_json::jsonb->'preview'->>'fileId'=$2 AND metadata_json::jsonb->'preview'->>'state'='ready'",
+        [sessionId, fileId],
+      )
+      if (!rows.length) throw new ApiError(404, 'file not found')
+    }
     let data: Buffer, metadata: Row
+    const mapped = await this.library?.legacy('session', sessionId, fileId)
+    if (mapped && this.library) {
+      const saved = await this.library.readBuffer(
+        text(mapped.owner_user_id),
+        text(mapped.file_id),
+      )
+      return {
+        data: saved.content,
+        metadata: {
+          fileId,
+          sessionId,
+          path: '',
+          name: saved.entry.name,
+          size: saved.entry.size,
+          sha256: saved.entry.sha256,
+          mediaType: saved.entry.mediaType,
+          origin: 'user',
+          createdAt: saved.entry.createdAt,
+          libraryFileId: saved.entry.id,
+        },
+      }
+    }
     try {
       ;({ data, metadata } = await this.storage.read(
         safeId(sessionId),
@@ -169,6 +209,7 @@ export class FileService {
     data: Buffer,
     mediaType = 'application/octet-stream',
     fileId = identifier('file'),
+    previousFileId?: string,
   ): Promise<Row> {
     await this.hub.store.session(sessionId, userId)
     if (data.length > 32 * 1024 * 1024)
@@ -184,9 +225,56 @@ export class FileService {
       origin: 'user',
       createdAt: utcNow(),
     }
-    await this.storage.write(safeId(sessionId), safeId(fileId), data, metadata)
+    const libraryFileId = this.library
+      ? await this.library.saveLegacy(
+          userId,
+          'session',
+          sessionId,
+          fileId,
+          name,
+          data,
+          mediaType,
+        )
+      : undefined
+    if (this.library && libraryFileId && previousFileId) {
+      let previous = await this.library.legacy(
+        'session',
+        sessionId,
+        previousFileId,
+      )
+      if (!previous) {
+        const old = await this.read(sessionId, previousFileId)
+        await this.library.saveLegacy(
+          userId,
+          'session',
+          sessionId,
+          previousFileId,
+          text(old.metadata.name),
+          old.data,
+          text(old.metadata.mediaType),
+        )
+        previous = await this.library.legacy(
+          'session',
+          sessionId,
+          previousFileId,
+        )
+      }
+      await this.library.linkRevision(
+        userId,
+        libraryFileId,
+        text(previous!.file_id),
+      )
+    }
+    if (!this.library)
+      await this.storage.write(
+        safeId(sessionId),
+        safeId(fileId),
+        data,
+        metadata,
+      )
     return {
       ...metadata,
+      ...(libraryFileId ? { libraryFileId } : {}),
       downloadUrl: `/api/v2/sessions/${sessionId}/attachments/${fileId}`,
       openUrl: `/api/v2/sessions/${sessionId}/attachments/${fileId}/open`,
     }
@@ -202,6 +290,11 @@ export class FileService {
       const fileId = requiredText(attachment.fileId, 'fileId', 64)
       let metadata: Row
       if (typeof attachment.contentBase64 === 'string') {
+        if (/^(?:artifact|preview|office_input)_/.test(fileId))
+          throw new ApiError(
+            422,
+            'generated file IDs cannot be overwritten by an upload',
+          )
         const encoded = attachment.contentBase64
         if (
           !encoded ||
@@ -355,6 +448,23 @@ export class FileService {
       { permission: 'files.write', rawBody: true },
     )
     router.add(
+      'POST',
+      '/sessions/{session_id}/attachments/from-file',
+      async (ctx) => {
+        if (!this.library) throw new ApiError(503, '统一文件服务不可用')
+        await store.session(ctx.params.session_id!, ctx.account!.userId)
+        requirePermission(ctx.account!, 'files.read')
+        return {
+          attachment: await this.library.attach(
+            ctx.account!.userId,
+            requiredText(ctx.body.fileId, '文件 ID'),
+            ctx.params.session_id!,
+          ),
+        }
+      },
+      { permission: 'files.write' },
+    )
+    router.add(
       'GET',
       '/sessions/{session_id}/attachments/{file_id}',
       async (ctx) => {
@@ -409,6 +519,20 @@ export class FileService {
           access.fileId !== ctx.params.file_id
         )
           throw new ApiError(404, 'file not found')
+        const mapped = await this.library?.legacy(
+          'session',
+          ctx.params.session_id!,
+          ctx.params.file_id!,
+        )
+        if (mapped && this.library) {
+          ctx.url.searchParams.set('inline', 'true')
+          return sendLibraryFile(
+            this.library,
+            access.userId,
+            text(mapped.file_id),
+            ctx,
+          )
+        }
         const { data, metadata } = await this.read(
           ctx.params.session_id!,
           ctx.params.file_id!,

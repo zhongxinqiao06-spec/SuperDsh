@@ -10,8 +10,17 @@ import { dirname, join, resolve } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import test from 'node:test'
 import WebSocket from 'ws'
+import ExcelJS from 'exceljs'
 import { withTestDatabase } from './support/database.mjs'
-import { verifyBusinessAgentManagement } from './support/business-agents-web.mjs'
+import {
+  verifyBusinessAgentManagement,
+  verifyRenderedPage,
+} from './support/business-agents-web.mjs'
+import { prepareOfficeRuntimeEmbedding } from './support/office-runtime-embedding.mjs'
+import {
+  decodeOfficeToolResult,
+  officeFixturePlan,
+} from './support/office-runtime-model.mjs'
 
 const production = process.env.SUPERDSH_NODE_WEB_TEST === 'production'
 
@@ -24,12 +33,12 @@ async function availablePort() {
 }
 
 test(
-  'unified CLI manages business agents in real browser dialogs and renders a real Host streamed reply',
+  'unified CLI manages agents, confirms Office plans and renders real Host evidence, files and previews',
   {
     skip: !['1', 'production'].includes(process.env.SUPERDSH_NODE_WEB_TEST)
       ? 'run the complete isolated integration runner'
       : false,
-    timeout: 300_000,
+    timeout: 480_000,
   },
   async (t) => {
     let cleanupDatabase, child, browser
@@ -48,6 +57,8 @@ test(
       releaseReply = done
     })
     let modelRequests = 0
+    let spreadsheetInputs
+    const toolFailures = []
     const model = createHttpServer(async (request, response) => {
       const chunks = []
       for await (const chunk of request) chunks.push(chunk)
@@ -73,11 +84,64 @@ test(
         return
       }
       response.setHeader('content-type', 'text/event-stream')
+      const toolNames = body.tools?.map((item) => item.function?.name) ?? []
+      const tool = toolNames.includes('spreadsheet_report')
+        ? 'spreadsheet_report'
+        : toolNames.includes('knowledge_search')
+          ? 'knowledge_search'
+          : null
+      const lastUser =
+        body.messages?.findLastIndex((message) => message.role === 'user') ?? -1
+      const lastTool = body.messages
+        ?.slice(lastUser + 1)
+        .findLast((message) => message.role === 'tool')
+      let result
+      if (lastTool) {
+        try {
+          result = decodeOfficeToolResult(lastTool.content)
+        } catch {
+          toolFailures.push(JSON.stringify(lastTool.content))
+        }
+      }
+      if (tool && (!lastTool || result?.inspection)) {
+        const args =
+          tool === 'knowledge_search'
+            ? { query: '经营原则' }
+            : result?.inspection
+              ? {
+                  action: 'plan',
+                  inputsJson: JSON.stringify(spreadsheetInputs),
+                  planJson: JSON.stringify(officeFixturePlan(tool, result)),
+                }
+              : {
+                  action: 'inspect',
+                  inputsJson: JSON.stringify(spreadsheetInputs),
+                }
+        response.write(
+          `data: ${JSON.stringify({ choices: [{ index: 0, delta: { role: 'assistant', tool_calls: [{ index: 0, id: `web_tool_${modelRequests}`, type: 'function', function: { name: tool, arguments: JSON.stringify(args) } }] }, finish_reason: null }] })}\n\n`,
+        )
+        response.write(
+          `data: ${JSON.stringify({ choices: [{ index: 0, delta: {}, finish_reason: 'tool_calls' }] })}\n\n`,
+        )
+        response.end('data: [DONE]\n\n')
+        return
+      }
+      if (tool && !result?.sources && !result?.artifact)
+        toolFailures.push(JSON.stringify(result ?? lastTool?.content))
+      const source = result?.sources?.[0]
+      const finalText = source
+        ? `BROWSER_AGENT_REPLY_OK\n\n“${source.content
+            .split('\n')
+            .find((line) => line.trim())
+            .slice(0, 120)}”[${source.id ?? source.sourceId}]`
+        : result?.artifact
+          ? 'BROWSER_OFFICE_FILE_OK'
+          : 'BROWSER_AGENT_REPLY_OK'
       for (const chunk of [
         {
           choices: [
             {
-              delta: { role: 'assistant', content: 'BROWSER_AGENT_REPLY_OK' },
+              delta: { role: 'assistant', content: finalText },
               finish_reason: null,
             },
           ],
@@ -128,6 +192,7 @@ test(
       )
     })
     const port = await availablePort()
+    await prepareOfficeRuntimeEmbedding(root)
     const origin = `http://127.0.0.1:${port}`
     const envFile = join(root, 'development.env')
     await writeFile(envFile, '# Isolated integration environment\n')
@@ -205,6 +270,8 @@ test(
     )('playwright')
     browser = await chromium.launch({ headless: true })
     const page = await browser.newPage()
+    page.setDefaultTimeout(30_000)
+    page.setDefaultNavigationTimeout(60_000)
     const failures = []
     page.on('pageerror', (error) => failures.push(error.message))
     try {
@@ -278,13 +345,14 @@ test(
     })
     assert.equal(code, 401)
     await page.reload({ waitUntil: 'domcontentloaded' })
-    const configuredAgentId = await verifyBusinessAgentManagement(page).catch(
+    const configuredAgents = await verifyBusinessAgentManagement(page).catch(
       async (error) => {
         t.diagnostic((await page.locator('body').innerText()).slice(-6000))
         t.diagnostic(logs.slice(-4000))
         throw error
       },
     )
+    spreadsheetInputs = configuredAgents.spreadsheetInputs
     assert.equal(
       (await db.query('SELECT * FROM server_agents')).length,
       0,
@@ -351,11 +419,17 @@ test(
       })
     })
     await page.reload({ waitUntil: 'domcontentloaded' })
-    await page.evaluate(() => {
-      window.location.hash = '#/workspace'
-    })
+    await page.locator('aside a[href="#/workspace"]').click()
     const prompt = page.getByPlaceholder(/描述任务|Describe the task/)
-    await prompt.waitFor({ state: 'visible', timeout: 130_000 })
+    await prompt
+      .waitFor({ state: 'visible', timeout: 130_000 })
+      .catch(async (error) => {
+        t.diagnostic(`Workspace URL: ${page.url()}`)
+        t.diagnostic((await page.locator('body').innerText()).slice(-6000))
+        t.diagnostic(logs.slice(-4000))
+        t.diagnostic(JSON.stringify(failures))
+        throw error
+      })
     await page
       .waitForFunction(
         () => {
@@ -376,8 +450,11 @@ test(
     const agentPicker = page.getByRole('combobox', {
       name: /^(业务智能体|Business agent)$/,
     })
-    await agentPicker.selectOption(configuredAgentId)
-    assert.equal(await agentPicker.inputValue(), configuredAgentId)
+    await agentPicker.selectOption(configuredAgents.knowledgeAgentId)
+    assert.equal(
+      await agentPicker.inputValue(),
+      configuredAgents.knowledgeAgentId,
+    )
     const send = page.getByRole('button', { name: /^(发送任务|Send task)$/ })
     await page.waitForFunction(
       () => {
@@ -433,6 +510,96 @@ test(
           event.payload?.item?.role === 'assistant',
       ),
     )
+    const evidence = page.getByRole('region', {
+      name: /^(回答依据|Answer evidence)$/,
+    })
+    await evidence.waitFor({ state: 'visible', timeout: 30_000 })
+    await evidence.locator('summary').first().click()
+    await evidence
+      .getByText(/按已确认订单安排备货/)
+      .first()
+      .waitFor()
+    await page.getByText(/已核对 .* 个来源编号/).waitFor()
+
+    // A second real conversation exercises the notice form and actual generated
+    // artifact. No browser responses are intercepted and no plan is auto-approved.
+    await page.getByRole('button', { name: /^(新会话|New session)$/ }).click()
+    await prompt.waitFor({ state: 'visible' })
+    await agentPicker.selectOption(configuredAgents.spreadsheetAgentId)
+    await prompt.fill(
+      '明确使用星河商贸脱敏销售示例和绑定的 Excel 模板，生成可编辑汇总。请先检查输入并等待我确认方案。',
+    )
+    await send.click()
+    const planCard = page.locator('[data-plan-review="true"]')
+    await planCard
+      .waitFor({ state: 'visible', timeout: 60_000 })
+      .catch(async (error) => {
+        t.diagnostic(`Office tools: ${JSON.stringify(toolFailures)}`)
+        t.diagnostic((await page.locator('body').innerText()).slice(-8000))
+        t.diagnostic(logs.slice(-4000))
+        throw error
+      })
+    await planCard.getByText('配置中心默认标题', { exact: true }).waitFor()
+    await planCard.getByText('输入资料', { exact: true }).waitFor()
+    const confirm = page.getByRole('button', { name: /^(提交|Submit)$/ })
+    assert.equal(
+      await confirm.isDisabled(),
+      true,
+      'plan confirmation must require an explicit selection',
+    )
+    const outputs = page.getByRole('region', {
+      name: /^(智能体生成成果|Agent outputs)$/,
+    })
+    assert.equal(
+      await outputs.getByRole('button', { name: /^(下载|Download)$/ }).count(),
+      0,
+    )
+    await planCard.getByRole('radio', { name: '确认生成', exact: true }).click()
+    await confirm.click()
+    await page
+      .locator('p')
+      .filter({ hasText: 'BROWSER_OFFICE_FILE_OK' })
+      .first()
+      .waitFor({ state: 'visible', timeout: 60_000 })
+    await interrupt.waitFor({ state: 'hidden', timeout: 15_000 })
+    await outputs.getByText('用户资料经营分析.xlsx', { exact: true }).waitFor()
+    const completedPlan = outputs
+      .locator('summary')
+      .filter({ hasText: /配置中心默认标题.*v1.*已生成/ })
+    await completedPlan.waitFor()
+    await completedPlan.click()
+    await outputs.getByText('工作表与计算口径', { exact: true }).waitFor()
+    const downloadPending = page.waitForEvent('download')
+    await outputs.getByRole('button', { name: /^(下载|Download)$/ }).click()
+    const download = await downloadPending
+    const workbook = new ExcelJS.Workbook()
+    await workbook.xlsx.load(await readFile(await download.path()))
+    assert.equal(workbook.getWorksheet('现场销售明细').rowCount, 101)
+    assert.match(
+      workbook.getWorksheet('现场销售明细').getCell('H2').formula,
+      /E2\*F2/,
+    )
+    assert.ok(workbook.getWorksheet('现场经营汇总').getCell('A2').value > 0)
+    const artifactPreviewResponse = page.waitForResponse(
+      (response) =>
+        /\/api\/v2\/sessions\/[^/]+\/agent-artifacts\/[^/]+\/preview$/.test(
+          response.url(),
+        ),
+      { timeout: 90_000 },
+    )
+    await outputs.getByRole('button', { name: /^(预览|Preview)$/ }).click()
+    const previewResponse = await artifactPreviewResponse
+    assert.equal(previewResponse.status(), 200, await previewResponse.text())
+    const artifactPreview = page.getByRole('dialog', {
+      name: '用户资料经营分析.xlsx',
+      exact: true,
+    })
+    await verifyRenderedPage(artifactPreview, 1)
+    await artifactPreview
+      .getByRole('button', { name: 'Close', exact: true })
+      .click()
+    await artifactPreview.waitFor({ state: 'hidden' })
+    assert.deepEqual(toolFailures, [])
     assert.deepEqual(failures, [])
     await browser.close()
     browser = undefined

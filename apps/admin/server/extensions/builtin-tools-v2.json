@@ -1,0 +1,476 @@
+[
+  {
+    "id": "knowledge_search",
+    "name": "查询公司资料",
+    "description": "检索授权资料并返回可核对的原文证据。",
+    "mode": "read",
+    "inputSchema": {
+      "type": "object",
+      "required": [
+        "query"
+      ],
+      "additionalProperties": false,
+      "properties": {
+        "query": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 2000
+        }
+      }
+    },
+    "configurationSchema": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "maxResults": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 8,
+          "title": "检索结果数量",
+          "default": 8
+        }
+      }
+    },
+    "permissions": [
+      "sessions.read"
+    ],
+    "artifactTypes": [],
+    "timeoutSeconds": 90
+  },
+  {
+    "id": "spreadsheet_report",
+    "name": "处理办公 Excel",
+    "description": "检查资料、确认计算口径并生成可编辑 Excel。",
+    "mode": "office",
+    "inputSchema": {
+      "type": "object"
+    },
+    "configurationSchema": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "companyName": {
+          "type": "string",
+          "maxLength": 120,
+          "title": "公司名称"
+        },
+        "title": {
+          "type": "string",
+          "maxLength": 160,
+          "title": "默认标题"
+        }
+      }
+    },
+    "permissions": [
+      "sessions.run",
+      "files.write"
+    ],
+    "artifactTypes": [
+      "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+    ],
+    "timeoutSeconds": 300,
+    "guide": "通用 Excel 工具，先 action=inspect 检查输入，再 action=plan 提交 planJson。系统会暂停等待用户确认，确认后才保存成果。\ninputsJson 是数组，每项仅指定 assetId、artifactId 或 attachmentName（可加 attachmentHash）之一，role 为 input/template/knowledge/image。不要自动选用示例资料。无输入时可以创建空白工作表。\nplanJson: {title,filename?,sources?:[{fileIndex,sheet?,headerRow?,mapping?:{原字段:新字段}}],allowValueExtraction?:boolean,sheets:[{name,source,operations?,charts?}]}。\nsource 是 inspect 返回的 table.id 或 {columns:[字段名],rows:[[值]]}。\noperations 支持：select {columns:string[]}；rename {columns:{原名:新名}}；trim {columns:string[]}；convert {column,to:number|text|date|boolean,onInvalid:error|blank}；filter {conditions:[{column,operator:eq|ne|gt|gte|lt|lte|contains|empty|notEmpty,value?}],match:all|any}；sort {by:[{column,direction:asc|desc}]}；dedup {columns}；concat {tables:tableId[]}；join {table,leftKey,rightKey,how:left|inner,columns:{右字段:输出字段}}；group {by:string[],aggregates:[{column,as,operation:sum|average|min|max|count|countDistinct}],currencyColumn?}；pivot {rows:string[],columns:字段名,value:字段名,operation:sum|count,currencyColumn?}；formula {column,expression,numberFormat?}。每项均需 type。\nexpression 是 {literal:值}、{column:字段名}、{op:+|-|*|/|=|<>|<|<=|>|>=,left:expression,right:expression}、{fn:IF|ROUND|ABS|YEAR|MONTH|DAY|DATE|DAYS|CONCAT|TRIM|UPPER|LOWER,args:expression[]}、{aggregate:sum|average|min|max|count|countDistinct,column,where?:condition} 或 {lookup:{table,keyColumn,value:expression,returnColumn,missing?}}，禁止脚本。金额用工具计算，不手填计算结果。\ncharts:[{type:column|line|pie,title,category:字段名,values:[字段名]}]。不同币种需分组。订单编号不等于明细唯一键。没有成本不能计算利润。\n修改成果时指定 previousArtifactId，必要时通过 inputsJson 引用原 artifactId；新结果不覆盖旧文件。"
+  },
+  {
+    "id": "presentation_report",
+    "name": "制作办公 PPT",
+    "description": "策划叙事、品牌版式、图表与配图，生成可编辑 PPT。",
+    "mode": "office",
+    "inputSchema": {
+      "type": "object"
+    },
+    "configurationSchema": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "companyName": {
+          "type": "string",
+          "maxLength": 120,
+          "title": "公司名称"
+        },
+        "title": {
+          "type": "string",
+          "maxLength": 160,
+          "title": "默认标题"
+        },
+        "designTheme": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "id": {
+              "type": "string",
+              "maxLength": 100
+            },
+            "name": {
+              "type": "string",
+              "maxLength": 100
+            },
+            "version": {
+              "type": "string",
+              "maxLength": 100
+            },
+            "fontFace": {
+              "type": "string",
+              "maxLength": 100
+            },
+            "background": {
+              "type": "string",
+              "minLength": 6,
+              "maxLength": 6
+            },
+            "foreground": {
+              "type": "string",
+              "minLength": 6,
+              "maxLength": 6
+            },
+            "accent": {
+              "type": "string",
+              "minLength": 6,
+              "maxLength": 6
+            },
+            "secondary": {
+              "type": "string",
+              "minLength": 6,
+              "maxLength": 6
+            },
+            "surface": {
+              "type": "string",
+              "minLength": 6,
+              "maxLength": 6
+            },
+            "muted": {
+              "type": "string",
+              "minLength": 6,
+              "maxLength": 6
+            },
+            "density": {
+              "type": "string",
+              "enum": [
+                "comfortable",
+                "compact"
+              ]
+            }
+          },
+          "title": "设计主题（可修改的版本资源）"
+        }
+      }
+    },
+    "permissions": [
+      "sessions.run",
+      "files.write"
+    ],
+    "artifactTypes": [
+      "application/vnd.openxmlformats-officedocument.presentationml.presentation"
+    ],
+    "timeoutSeconds": 300,
+    "guide": "通用 PPT 工具，可生成公司介绍、方案、培训及经营汇报，不要求销售表。先 action=inspect 阅读资料和模板结构，再 action=plan 提交 planJson，系统等待用户确认后保存成果。\ninputsJson 是数组，每项仅指定 assetId、artifactId 或 attachmentName（可加 attachmentHash）之一；role 为 input/template/knowledge/image。文件只能来自已绑定资料、已接收附件或本会话成果，不能填写路径。不得自动使用示例资料。\nplanJson:{title,audience?,purpose?,brand?:{company?,fontFace?,accentColor?,textColor?,backgroundColor?},slides:[{id,kind:title|content|table|chart|image,title,body?:string[],notes?,sourceIds?:string[],table?:{columns:string[],rows:(string|number)[][]},chart?:{type:bar|line|pie,categories:string[],series:[{name,values:number[]}],valueUnit?},imageId?,template?:{slide:实际页码,titleShape?,bodyShape?,contentRegion?:{x,y,w,h}}}]}。brand 颜色为六位十六进制字符串，不包含#。\n使用模板时每页明确选择 inspect 返回的可见页码，映射标题/正文形状名，图表和表格可指定 contentRegion（英寸）。不假定模板物理文件顺序。数字只能来自输入或用户明确提供，不编造数据和引文。\n优先使用结构化设计页 kind=design，design:{layout:split|grid|process|timeline|compare|canvas,columns?:2|3,blocks:[{id,type:text|metric|image|table|chart|shape,title?,text?,value?,caption?,imageId?,table?,chart?,shape?:rect|roundRect|ellipse|line|chevron|rightArrow,color?,decorative?,region?:{x,y,w,h}}]}。table/chart 结构同上。canvas 的区域使用正文区域 0–1 比例；其他布局自动分区，最多 6 个组件，长内容应拆页。装饰 shape 可显式标注 decorative，其他组件不能相互遮挡。指标 value 使用来源中的数字，不自行编造；图表保持原生可编辑。避免全篇密集项目符号，按受众建立“问题/背景→关键发现→证据→建议/行动”的叙事，每页只有一个主结论。\n组件支持 appearance:plain|panel|accent，用于无底色、浅色面板或强调区域；不要所有页面都堆叠同样的卡片。kind=design 页的正文仅写入 design.blocks，不同时填写顶层 body。自动 split/compare 建议只放两个正文组件；额外组件会分到下一行并压缩每行高度。页脚、来源和备注不要作为额外正文组件参与网格分区，来源放 sourceIds，详细说明放 notes；表格行数较多时使用独立 kind=table 页，流程配图需要大面积时使用 kind=image 页。设计主题由已配置工具提供，用户可改 designTheme:{id,version,name,fontFace,background,foreground,accent,secondary,surface,muted,density:comfortable|compact}。不要擅自更换企业品牌。需要流程、组织、时间线、对比或指标配图时，优先通过已授权的 illustration_render 工具提交结构化 JSON；获得 PNG 成果后用 inputsJson:[{artifactId,role:\"image\"}] 引用并 inspect 获取 imageId，不需要额外生图模型。此工具不可用时不要假装已生成图片。正文和精确数字图表使用文档原生可编辑组件，不整页截图。\n修订时提交完整修订后的幻灯片方案及 previousArtifactId，仅替换需要修改的页，保留其他页内容。",
+    "configurationPresets": [
+      {
+        "id": "business-clean",
+        "name": "商务简洁",
+        "version": "1.0.0",
+        "values": {
+          "designTheme": {
+            "id": "business-clean",
+            "version": "1.0.0",
+            "name": "商务简洁",
+            "fontFace": "Noto Sans CJK SC",
+            "background": "F8FAFC",
+            "foreground": "173044",
+            "accent": "087F8C",
+            "secondary": "326B9B",
+            "surface": "EAF0F5",
+            "muted": "627688",
+            "density": "comfortable"
+          }
+        }
+      },
+      {
+        "id": "brand-proposal",
+        "name": "品牌提案",
+        "version": "1.0.0",
+        "values": {
+          "designTheme": {
+            "id": "brand-proposal",
+            "version": "1.0.0",
+            "name": "品牌提案",
+            "fontFace": "Noto Sans CJK SC",
+            "background": "17212B",
+            "foreground": "F3F1EB",
+            "accent": "F0BE78",
+            "secondary": "80B9AE",
+            "surface": "263540",
+            "muted": "B4C1C8",
+            "density": "comfortable"
+          }
+        }
+      },
+      {
+        "id": "training",
+        "name": "培训说明",
+        "version": "1.0.0",
+        "values": {
+          "designTheme": {
+            "id": "training",
+            "version": "1.0.0",
+            "name": "培训说明",
+            "fontFace": "Noto Sans CJK SC",
+            "background": "FBFAF6",
+            "foreground": "27344B",
+            "accent": "525DC1",
+            "secondary": "238C83",
+            "surface": "EEF0F9",
+            "muted": "6B7285",
+            "density": "comfortable"
+          }
+        }
+      }
+    ]
+  },
+  {
+    "id": "document_report",
+    "name": "制作 Word 文档",
+    "description": "根据授权资料生成正式方案、报告、制度、培训手册和会议纪要。",
+    "mode": "office",
+    "inputSchema": {
+      "type": "object"
+    },
+    "configurationSchema": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "companyName": {
+          "type": "string",
+          "maxLength": 120,
+          "title": "公司名称"
+        },
+        "title": {
+          "type": "string",
+          "maxLength": 160,
+          "title": "默认标题"
+        }
+      }
+    },
+    "permissions": [
+      "sessions.run",
+      "files.write"
+    ],
+    "artifactTypes": [
+      "application/vnd.openxmlformats-officedocument.wordprocessingml.document"
+    ],
+    "timeoutSeconds": 300,
+    "guide": "先 inspect 资料，再提交 planJson：{title,subtitle?,purpose?,brand?:{company?,accentColor?,fontFace?},tableOfContents?:boolean,sections:[{id,title,level?:1|2|3,pageBreakBefore?:boolean,blocks:[{type:\"paragraph\",text}|{type:\"list\",items:string[],ordered?:boolean}|{type:\"table\",columns:string[],rows:string[][]}|{type:\"image\",imageId,caption?}|{type:\"quote\",text,sourceId?}]}]}。标题和正文必须来自用户需求与授权资料。引用图片使用检查返回的 id。流程、组织关系、时间线或对比配图优先调用已授权的 illustration_render 提交结构化 JSON；确认后将返回的 PNG artifactId 作为 inputsJson:[{artifactId,role:\"image\"}] 输入并 inspect 获取 imageId，无需另配生图模型或 Key。修改时提供 previousArtifactId 并保留未修改章节。"
+  },
+  {
+    "id": "image_generate",
+    "name": "生成配图",
+    "description": "用明确配置的生图供应商生成会话素材，不替代精确正文和图表。",
+    "mode": "office",
+    "inputSchema": {
+      "type": "object"
+    },
+    "configurationSchema": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "baseUrl",
+        "model",
+        "apiKey"
+      ],
+      "properties": {
+        "baseUrl": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 2048,
+          "title": "Images API 基础地址"
+        },
+        "model": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 200,
+          "title": "模型 ID"
+        },
+        "apiKey": {
+          "type": "string",
+          "maxLength": 4096,
+          "title": "API Key",
+          "writeOnly": true
+        },
+        "size": {
+          "type": "string",
+          "enum": [
+            "1024x1024",
+            "1536x1024",
+            "1024x1536"
+          ],
+          "default": "1536x1024",
+          "title": "默认尺寸"
+        },
+        "responseFormat": {
+          "type": "string",
+          "enum": [
+            "auto",
+            "b64_json"
+          ],
+          "default": "auto",
+          "title": "响应格式"
+        }
+      }
+    },
+    "permissions": [
+      "sessions.run",
+      "files.write"
+    ],
+    "artifactTypes": [
+      "image/png"
+    ],
+    "timeoutSeconds": 300,
+    "guide": "planJson 为 {title,prompt,size?:\"1024x1024\"|\"1536x1024\"|\"1024x1536\",purpose?}。先确认用途与内容，成功后返回的 artifactId 可作为后续 PPT/Word 的 image 输入。不要把正文、公司标识或精确数据交给生图模型绘制。"
+  },
+  {
+    "id": "illustration_render",
+    "name": "JSON 可靠配图",
+    "description": "由聊天模型提交结构化内容，工具确定性生成流程、时间线、组织关系、对比和指标配图。",
+    "mode": "office",
+    "inputSchema": {
+      "type": "object"
+    },
+    "configurationSchema": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "designTheme": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "id": {
+              "type": "string",
+              "maxLength": 100
+            },
+            "name": {
+              "type": "string",
+              "maxLength": 100
+            },
+            "version": {
+              "type": "string",
+              "maxLength": 100
+            },
+            "fontFace": {
+              "type": "string",
+              "maxLength": 100
+            },
+            "background": {
+              "type": "string",
+              "minLength": 6,
+              "maxLength": 6
+            },
+            "foreground": {
+              "type": "string",
+              "minLength": 6,
+              "maxLength": 6
+            },
+            "accent": {
+              "type": "string",
+              "minLength": 6,
+              "maxLength": 6
+            },
+            "secondary": {
+              "type": "string",
+              "minLength": 6,
+              "maxLength": 6
+            },
+            "surface": {
+              "type": "string",
+              "minLength": 6,
+              "maxLength": 6
+            },
+            "muted": {
+              "type": "string",
+              "minLength": 6,
+              "maxLength": 6
+            },
+            "density": {
+              "type": "string",
+              "enum": [
+                "comfortable",
+                "compact"
+              ]
+            }
+          },
+          "title": "配图设计主题"
+        }
+      }
+    },
+    "permissions": [
+      "sessions.run",
+      "files.write"
+    ],
+    "artifactTypes": [
+      "image/png"
+    ],
+    "timeoutSeconds": 90,
+    "guide": "先用 action=plan 提交 planJson:{title,purpose?,layout:flow|timeline|organization|compare|metrics,nodes:[{id,title,detail?,value?,parentId?}],designTheme?}。2–9 个节点；organization 使用 parentId，单根且最多三层；metrics 的 value 必须来自资料。layout 不需要额外生图模型或 API Key。不能提交 SVG、代码、文件路径、外部 URL。控制中文密度，长内容拆图。确认后得到真实 PNG artifactId，可在 PPT/Word 的 inputsJson 中以 {artifactId,role:\"image\"} 复用，先 inspect 获取 imageId。配图用于概念、关系与流程；正式表格和数字图表优先保持文档原生可编辑。",
+    "configurationPresets": [
+      {
+        "id": "business-clean",
+        "name": "商务简洁",
+        "version": "1.0.0",
+        "values": {
+          "designTheme": {
+            "id": "business-clean",
+            "version": "1.0.0",
+            "name": "商务简洁",
+            "fontFace": "Noto Sans CJK SC",
+            "background": "F8FAFC",
+            "foreground": "173044",
+            "accent": "087F8C",
+            "secondary": "326B9B",
+            "surface": "EAF0F5",
+            "muted": "627688",
+            "density": "comfortable"
+          }
+        }
+      },
+      {
+        "id": "brand-proposal",
+        "name": "品牌提案",
+        "version": "1.0.0",
+        "values": {
+          "designTheme": {
+            "id": "brand-proposal",
+            "version": "1.0.0",
+            "name": "品牌提案",
+            "fontFace": "Noto Sans CJK SC",
+            "background": "17212B",
+            "foreground": "F3F1EB",
+            "accent": "F0BE78",
+            "secondary": "80B9AE",
+            "surface": "263540",
+            "muted": "B4C1C8",
+            "density": "comfortable"
+          }
+        }
+      },
+      {
+        "id": "training",
+        "name": "培训说明",
+        "version": "1.0.0",
+        "values": {
+          "designTheme": {
+            "id": "training",
+            "version": "1.0.0",
+            "name": "培训说明",
+            "fontFace": "Noto Sans CJK SC",
+            "background": "FBFAF6",
+            "foreground": "27344B",
+            "accent": "525DC1",
+            "secondary": "238C83",
+            "surface": "EEF0F9",
+            "muted": "6B7285",
+            "density": "comfortable"
+          }
+        }
+      }
+    ]
+  }
+]

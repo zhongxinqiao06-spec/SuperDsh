@@ -131,13 +131,54 @@ export const consoleModules: readonly ConsoleModule[] = [
   {
     id: 'models',
     route: '#/models',
-    title: '模型管理',
+    title: '聊天模型',
     englishTitle: 'Platform models',
     icon: 'key',
     permissions: ['models.manage'],
     component: lazy(() =>
-      import('@/components/management/models-panel').then((m) => ({
-        default: m.ModelsPanel,
+      import('@/components/management/model-configurations-panel').then(
+        (m) => ({
+          default: m.ModelConfigurationsPanel,
+        }),
+      ),
+    ),
+  },
+  {
+    id: 'models.multimodal',
+    route: '#/models/multimodal',
+    title: '多模态模型',
+    englishTitle: 'Multimodal models',
+    icon: 'sparkles',
+    permissions: ['models.manage'],
+    component: lazy(() =>
+      import('@/components/management/model-configurations-panel').then(
+        (m) => ({ default: m.MultimodalModelsPanel }),
+      ),
+    ),
+  },
+  {
+    id: 'system.storage',
+    route: '#/system/storage',
+    title: '文件存储',
+    englishTitle: 'File storage',
+    icon: 'folder',
+    permissions: ['storage.manage'],
+    component: lazy(() =>
+      import('@/components/management/storage-panel').then((m) => ({
+        default: m.StoragePanel,
+      })),
+    ),
+  },
+  {
+    id: 'account.files',
+    route: '#/account/files',
+    title: '我的文件',
+    englishTitle: 'My files',
+    icon: 'folder',
+    permissions: ['files.read'],
+    component: lazy(() =>
+      import('@/components/management/files-panel').then((m) => ({
+        default: m.FilesPanel,
       })),
     ),
   },

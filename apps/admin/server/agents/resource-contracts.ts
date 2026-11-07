@@ -1,3 +1,5 @@
+import type { BoundToolImplementation } from '@superdsh/core/contracts/extensions'
+
 export interface AgentResource {
   id: string
   name: string
@@ -13,16 +15,22 @@ export interface KnowledgeBase extends AgentResource {
 }
 
 export interface AgentSkill extends AgentResource {
+  program?: import('@superdsh/core/contracts/skills').SkillProgram
+  programDraft?: import('@superdsh/core/contracts/skills').SkillProgram | null
   instructions: string
   requiredToolIds: string[]
+  references?: { path: string; assetId: string; sha256: string }[]
+  packageSha256?: string
 }
 
-export type AgentToolId =
-  'knowledge_search' | 'spreadsheet_report' | 'presentation_report'
+export type AgentToolId = string
 
-export interface AgentToolConfig extends AgentResource {
+export interface AgentToolConfig
+  extends AgentResource, Partial<BoundToolImplementation> {
   id: AgentToolId
+  configuredSecrets?: string[]
   settings: {
+    [key: string]: unknown
     companyName?: string
     title?: string
     maxResults?: number

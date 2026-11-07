@@ -21,5 +21,8 @@ export const permissions: Record<string, string> = {
   'models.manage': 'Manage platform models',
   'audit.read': 'Read management audit',
   'agents.manage': 'Configure and publish business agents and company assets',
+  'extensions.manage':
+    'Install and administer executable tool extensions and MCP sources',
+  'storage.manage': 'Manage file storage connections and policies without content access',
 }
 export const memberPermissions = Object.keys(permissions).slice(0, 11)

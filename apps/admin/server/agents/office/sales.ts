@@ -33,7 +33,10 @@ const aliases: Record<string, string> = {
   单位成本: 'unitCost',
 }
 
-export function parseCsv(content: Buffer) {
+export function parseCsv(
+  content: Buffer,
+  options: { preserveEmptyRows?: boolean } = {},
+) {
   let input: string
   try {
     input = new TextDecoder('utf-8', { fatal: true })
@@ -55,8 +58,12 @@ export function parseCsv(content: Buffer) {
   }
   const finishRow = () => {
     finishField()
-    if (row.some((cell) => cell.trim())) rows.push(row)
-    if (rows.length > OFFICE_LIMITS.rows + 1)
+    if (row.some((cell) => cell.trim()) || options.preserveEmptyRows)
+      rows.push(row)
+    if (
+      rows.length >
+      OFFICE_LIMITS.rows + (options.preserveEmptyRows ? 100 : 1)
+    )
       throw new OfficeInputError('数据不能超过 5000 行')
     row = []
   }

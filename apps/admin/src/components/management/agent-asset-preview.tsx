@@ -1,6 +1,7 @@
 'use client'
 
 import * as React from 'react'
+import { Button } from '@/components/ui/button'
 import {
   agentsApi,
   type AgentAsset,
@@ -57,6 +58,18 @@ function OfficeAssetPreview({ asset }: { asset: AgentAsset }) {
   React.useEffect(() => {
     const controller = new AbortController()
     const identity = sessionIdentityRevision()
+    // A proxy or disconnected backend can outlive the server's conversion limit.
+    // Bound the browser wait too, including implementations that ignore abort.
+    const timeout = setTimeout(() => {
+      controller.abort()
+      if (identity === sessionIdentityRevision())
+        setError(
+          tr(
+            '预览服务响应超时，请重试，或下载原文件查看。',
+            'The preview service did not respond in time. Retry or download the original file.',
+          ),
+        )
+    }, 75_000)
     setFile(null)
     setError('')
     const load = async () => {
@@ -85,10 +98,15 @@ function OfficeAssetPreview({ asset }: { asset: AgentAsset }) {
                   'Could not generate the preview. Please retry.',
                 ),
           )
+      } finally {
+        clearTimeout(timeout)
       }
     }
     void load()
-    return () => controller.abort()
+    return () => {
+      clearTimeout(timeout)
+      controller.abort()
+    }
   }, [asset.id, attempt, tr])
 
   if (error)
@@ -110,6 +128,7 @@ function OfficeAssetPreview({ asset }: { asset: AgentAsset }) {
     )
   return (
     <div className="min-w-0 space-y-2">
+      <BrowserPdfLink file={file} />
       {!!file.missingFonts?.length && (
         <p className="text-xs text-muted-foreground">
           {tr(
@@ -119,6 +138,37 @@ function OfficeAssetPreview({ asset }: { asset: AgentAsset }) {
         </p>
       )}
       <AgentPdfPreview contentBase64={file.contentBase64} name={asset.name} />
+    </div>
+  )
+}
+
+function BrowserPdfLink({ file }: { file: PreviewFile }) {
+  const tr = useManagementText()
+  const [url, setUrl] = React.useState('')
+  React.useEffect(() => {
+    let next = ''
+    try {
+      const bytes = Uint8Array.from(atob(file.contentBase64), (value) =>
+        value.charCodeAt(0),
+      )
+      if (new TextDecoder().decode(bytes.subarray(0, 5)) !== '%PDF-') return
+      next = URL.createObjectURL(new Blob([bytes], { type: 'application/pdf' }))
+      setUrl(next)
+    } catch {
+      // The inline viewer reports invalid PDF data; this escape hatch is optional.
+    }
+    return () => {
+      if (next) URL.revokeObjectURL(next)
+    }
+  }, [file.contentBase64])
+  if (!url) return null
+  return (
+    <div className="flex justify-end">
+      <Button asChild variant="outline" size="sm">
+        <a href={url} target="_blank" rel="noopener noreferrer">
+          {tr('在浏览器中打开预览', 'Open preview in browser')}
+        </a>
+      </Button>
     </div>
   )
 }

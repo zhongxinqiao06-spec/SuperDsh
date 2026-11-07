@@ -21,6 +21,7 @@ export function AttachmentDownload({
       onClick={() => {
         void run(async () => {
           const value = object(await download(string(file.fileId)))
+          if (typeof value.saved === 'boolean') return
           const bytes = Uint8Array.from(
             atob(string(value.contentBase64)),
             (character) => character.charCodeAt(0),

@@ -20,7 +20,8 @@ test('Chinese questions retrieve matching company evidence instead of unrelated 
   ]
   const result = knowledgeExcerpts(rows, '公司的经营原则是什么？')
   assert.equal(result[0].assetId, 'policy')
-  assert.equal(result[0].paragraph, 1)
+  assert.equal(result[0].paragraph, 0)
+  assert.deepEqual(result[0].location, {})
   assert.equal(result[0].sha256, 'policy-hash')
   assert.match(result[0].content, /已确认订单/)
   assert.deepEqual(knowledgeExcerpts(rows, 'quantum teleportation'), [])

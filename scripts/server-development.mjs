@@ -30,6 +30,13 @@ export function prepareDevelopmentEnv(root, environment = process.env) {
       'SUPERDSH_DEV_PG_PORT=15432',
       'SUPERDSH_DEV_REDIS_PORT=16379',
       'SUPERDSH_DEV_QDRANT_PORT=16333',
+      'SUPERDSH_DEV_MINIO_PORT=19000',
+      'SUPERDSH_DEV_MINIO_CONSOLE_PORT=19001',
+      `SUPERDSH_MINIO_ROOT_USER=root-${randomBytes(8).toString('hex')}`,
+      `SUPERDSH_MINIO_ROOT_PASSWORD=${randomBytes(32).toString('hex')}`,
+      `SUPERDSH_MINIO_APP_USER=app-${randomBytes(8).toString('hex')}`,
+      `SUPERDSH_MINIO_APP_PASSWORD=${randomBytes(32).toString('hex')}`,
+      'AGENT_SERVER_FILES_BACKEND=s3',
       `AGENT_SERVER_SECRET=${randomBytes(32).toString('hex')}`,
       `SUPERDSH_MODEL_ENCRYPTION_KEY=${randomBytes(32).toString('base64url')}=`,
       'AGENT_SERVER_PUBLIC_ORIGIN=http://127.0.0.1:5174',
@@ -38,6 +45,55 @@ export function prepareDevelopmentEnv(root, environment = process.env) {
     ].join('\n'),
     { encoding: 'utf8', mode: 0o600, flag: 'wx' },
   )
+  return file
+}
+
+export function prepareDevelopmentStorageEnv(
+  root,
+  environment = process.env,
+  { existingVolume = false } = {},
+) {
+  const file = developmentEnvFile(root, environment)
+  const original = readFileSync(file, 'utf8')
+  const saved = parseEnv(original)
+  const names = [
+    'SUPERDSH_MINIO_ROOT_USER',
+    'SUPERDSH_MINIO_ROOT_PASSWORD',
+    'SUPERDSH_MINIO_APP_USER',
+    'SUPERDSH_MINIO_APP_PASSWORD',
+  ]
+  if (names.every((name) => saved[name])) return file
+  if (existingVolume)
+    throw new Error(
+      'MinIO data exists without its complete saved credentials; restore the original development environment file.',
+    )
+  const defaults = {
+    SUPERDSH_MINIO_ROOT_USER: 'root-' + randomBytes(8).toString('hex'),
+    SUPERDSH_MINIO_ROOT_PASSWORD: randomBytes(32).toString('hex'),
+    SUPERDSH_MINIO_APP_USER: 'app-' + randomBytes(8).toString('hex'),
+    SUPERDSH_MINIO_APP_PASSWORD: randomBytes(32).toString('hex'),
+    SUPERDSH_DEV_MINIO_PORT: '19000',
+    SUPERDSH_DEV_MINIO_CONSOLE_PORT: '19001',
+    // Existing deployments keep their storage until explicitly migrated.
+    AGENT_SERVER_FILES_BACKEND: 'local',
+  }
+  const additions = Object.entries(defaults)
+    .filter(([name]) => !saved[name])
+    .map(([name, value]) => `${name}=${value}`)
+  const temporary = `${file}.${randomBytes(8).toString('hex')}.tmp`
+  try {
+    writeFileSync(
+      temporary,
+      original +
+        (original.endsWith('\n') ? '' : '\n') +
+        additions.join('\n') +
+        '\n',
+      { mode: 0o600, flag: 'wx' },
+    )
+    renameSync(temporary, file)
+  } finally {
+    if (existsSync(temporary)) unlinkSync(temporary)
+  }
   return file
 }
 
@@ -54,7 +110,10 @@ export function persistDevelopmentPorts(
     'SUPERDSH_DEV_PG_PORT',
     'SUPERDSH_DEV_REDIS_PORT',
     'SUPERDSH_DEV_QDRANT_PORT',
+    'SUPERDSH_DEV_MINIO_PORT',
+    'SUPERDSH_DEV_MINIO_CONSOLE_PORT',
   ]) {
+    if (ports[name] === undefined) continue
     const value = port(ports[name], name)
     const entry = new RegExp(
       `^([ \\t]*(?:export[ \\t]+)?${name}[ \\t]*=)[^\\r\\n]*`,
@@ -131,6 +190,25 @@ export function developmentEnvironment(root, environment = process.env) {
     SUPERDSH_DEV_PG_PORT: pgPort,
     SUPERDSH_DEV_REDIS_PORT: redisPort,
     SUPERDSH_DEV_QDRANT_PORT: qdrantPort,
+    SUPERDSH_DEV_MINIO_PORT: port(
+      settings.SUPERDSH_DEV_MINIO_PORT || '19000',
+      'SUPERDSH_DEV_MINIO_PORT',
+    ),
+    SUPERDSH_DEV_MINIO_CONSOLE_PORT: port(
+      settings.SUPERDSH_DEV_MINIO_CONSOLE_PORT || '19001',
+      'SUPERDSH_DEV_MINIO_CONSOLE_PORT',
+    ),
+    AGENT_SERVER_FILES_S3_ENDPOINT_URL:
+      settings.AGENT_SERVER_FILES_S3_ENDPOINT_URL ||
+      `http://127.0.0.1:${settings.SUPERDSH_DEV_MINIO_PORT || '19000'}`,
+    AGENT_SERVER_FILES_S3_BUCKET:
+      settings.AGENT_SERVER_FILES_S3_BUCKET || 'superdsh-files',
+    AGENT_SERVER_FILES_S3_ACCESS_KEY:
+      settings.AGENT_SERVER_FILES_S3_ACCESS_KEY ||
+      settings.SUPERDSH_MINIO_APP_USER,
+    AGENT_SERVER_FILES_S3_SECRET_KEY:
+      settings.AGENT_SERVER_FILES_S3_SECRET_KEY ||
+      settings.SUPERDSH_MINIO_APP_PASSWORD,
     SUPERDSH_QDRANT_URL:
       settings.SUPERDSH_QDRANT_URL || `http://127.0.0.1:${qdrantPort}`,
     // Only the database created by our local dependency command gets a known

@@ -29,6 +29,7 @@
 
 - 工程迁移：[桌面迁移](superdsh-migration-validation.md)、[管理端／服务端／安卓迁移](apps-migration-validation.md)。
 - 平台能力：[身份与 RBAC](platform-identity-validation.md)、[桌面原位登录](desktop-inline-login-validation.md)、[服务端 Agent](server-agent-validation.md)。
+- 办公助手：[Excel、PPT 与企业知识升级](office-assistants-validation.md)，区分确定性链路、真实渲染与尚未完成的模型/发布验收。
 - Windows 安装：[NSIS A/B 方法](evidence/windows-nsis-ab-methodology.md)、[升级验证](evidence/windows-installer-upgrade-2026-08-25.md)。
 
 验收记录只说明当时的环境、结果与限制，原路径和结论保留。当前启动方式与验证边界以 [README](../README.md#排障与验证边界) 为准；固定上游子模块的文档属于各自项目。

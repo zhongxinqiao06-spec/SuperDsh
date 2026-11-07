@@ -1,5 +1,6 @@
 import { ApiError, requiredText, text } from '../http/api-router.ts'
-import { agentTools, type AgentDefinition } from './contracts.ts'
+import type { AgentDefinition } from './contracts.ts'
+import { validateSkillPolicy } from '../skills/definitions.ts'
 
 function ids(
   value: unknown,
@@ -12,7 +13,7 @@ function ids(
     value.some(
       (id) =>
         typeof id !== 'string' ||
-        !/^[\w-]{1,100}$/.test(id) ||
+        !/^[\w.-]{1,100}$/.test(id) ||
         (allowed && !allowed.includes(id)),
     )
   )
@@ -28,23 +29,47 @@ export function agentInput(
   if (typeof body.published !== 'boolean')
     throw new ApiError(422, 'published 必须是布尔值')
   const result = {
+    ...(body.skillPolicy === undefined
+      ? {}
+      : { skillPolicy: validateSkillPolicy(body.skillPolicy) }),
     name: requiredText(body.name, '智能体名称', 80).trim(),
     description: text(body.description).trim(),
     instructions: requiredText(body.instructions, '任务说明', 6000).trim(),
+    recommendedPrompts: textLines(body.recommendedPrompts, '推荐指令', 8, 500),
+    inputRequirements: textLines(body.inputRequirements, '输入要求', 12, 500),
+    outputExamples: textLines(body.outputExamples, '输出示例', 8, 500),
     knowledgeBaseIds: ids(body.knowledgeBaseIds ?? [], '知识库'),
     knowledgeAssetIds: ids(body.knowledgeAssetIds ?? [], '知识资料'),
     templateAssetIds: ids(body.templateAssetIds ?? [], '模板'),
     skillIds: ids(body.skillIds ?? [], '技能'),
-    toolIds: ids(
-      body.toolIds ?? [],
-      '工具',
-      agentTools.map((item) => item.id),
-    ),
+    toolIds: ids(body.toolIds ?? [], '工具'),
     published: body.published,
   }
   if (!result.name || !result.instructions || result.description.length > 500)
     throw new ApiError(422, '名称、说明或用途长度无效')
   return result
+}
+
+function textLines(
+  value: unknown,
+  label: string,
+  maximum: number,
+  length: number,
+): string[] {
+  if (value === undefined) return []
+  if (
+    !Array.isArray(value) ||
+    value.length > maximum ||
+    value.some(
+      (item) =>
+        typeof item !== 'string' || !item.trim() || item.length > length,
+    )
+  )
+    throw new ApiError(
+      422,
+      `${label}格式无效，最多 ${maximum} 条，每条最多 ${length} 字`,
+    )
+  return value.map((item) => String(item).trim())
 }
 
 export function decodedAsset(value: unknown): Buffer {

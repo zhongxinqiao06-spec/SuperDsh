@@ -128,10 +128,18 @@ export async function ensureManagedDshRuntime(
   }
   const base = '/connectors/' + encodeURIComponent(connectorId) + '/runtimes'
   assertCurrent?.()
-  const result = (await account.json(base)) as {
+  let result = (await account.json(base)) as {
     runtimes?: ManagedRuntime[]
   }
   assertCurrent?.()
+  // A fresh connection becomes online before background discovery finishes.
+  // Await the inventory instead of attempting registration against an empty one.
+  if (!result.runtimes?.some((runtime) => runtime.runtimeType === 'dsh')) {
+    result = (await account.json(base + '/discover', 'POST', {})) as {
+      runtimes?: ManagedRuntime[]
+    }
+    assertCurrent?.()
+  }
   const dsh = result.runtimes?.find((runtime) => runtime.runtimeType === 'dsh')
   let current: ManagedRuntime
   if (!dsh) {

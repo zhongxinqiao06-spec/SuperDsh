@@ -1,6 +1,7 @@
 export const IPC = {
   platformAccount: 'superdsh:platform-account',
   platformRemote: 'superdsh:platform-remote',
+  platformSaveAttachment: 'superdsh:platform-save-attachment',
   platformWatch: 'superdsh:platform-watch',
   platformEvent: 'superdsh:platform-event',
   platformUpload: 'superdsh:platform-upload',

@@ -15,6 +15,7 @@ const string = (value: PlatformJson | undefined): string =>
   typeof value === 'string' ? value : ''
 function text(value: PlatformJson | undefined): string {
   if (typeof value === 'string') return value
+  if (value === null || typeof value !== 'object') return ''
   if (Array.isArray(value)) return value.map(text).filter(Boolean).join('\n')
   const content = object(value)
   return (

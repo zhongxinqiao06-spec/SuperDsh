@@ -37,6 +37,7 @@ RUN --mount=type=cache,target=/root/.yarn/berry/cache \
     && corepack yarn install --immutable
 COPY . .
 RUN node scripts/server.mjs build
+RUN node apps/admin/server/agents/embedding-model.ts /app/models/bge-small-zh-v1.5
 
 FROM node:24-bookworm-slim AS runtime
 RUN apt-get update && apt-get install -y --no-install-recommends \
@@ -56,6 +57,7 @@ ENV NODE_ENV=production \
     AGENT_SERVER_PORT=5174 \
     SUPERDSH_DEPLOYMENT_DATA_DIR=/data \
     SUPERDSH_SERVER_DATA_DIR=/data/runtime \
+    SUPERDSH_EMBEDDING_MODEL_DIR=/app/models/bge-small-zh-v1.5 \
     AGENT_SERVER_FILES_LOCAL_ROOT=/data/files
 USER node
 EXPOSE 5174

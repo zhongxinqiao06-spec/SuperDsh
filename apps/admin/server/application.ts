@@ -1,5 +1,7 @@
 import { randomBytes, randomUUID } from 'node:crypto'
 import { join } from 'node:path'
+import { ExtensionService } from './extensions/service.ts'
+import { registerExtensionRoutes } from './extensions/routes.ts'
 import { ApiError, ApiRouter, utcNow } from './http/api-router.ts'
 import { apiMiddleware } from './http/api-middleware.ts'
 import type { PlatformService, UpgradeHandler } from './http/platform-server.ts'
@@ -19,7 +21,13 @@ import { registerDeviceRoutes } from './devices/routes.ts'
 import { NativeDevice } from './devices/native-device.ts'
 import { registerConversationRoutes } from './conversations/routes.ts'
 import { FileService } from './files/service.ts'
+import { FileLibrary } from './files/file-library.ts'
+import { StorageRegistry } from './files/storage-registry.ts'
+import { registerFileLibraryRoutes } from './files/library-routes.ts'
 import { ModelService } from './models/model-service.ts'
+import { ModelConfigurationService } from './models/configuration-service.ts'
+import { ModelCapabilityService } from './models/capability-service.ts'
+import { registerModelConfigurationRoutes } from './models/configuration-routes.ts'
 import { ModelProxy, registerModelRoutes } from './models/model-routes.ts'
 import {
   ServerAgentService,
@@ -28,10 +36,15 @@ import {
 import { BusinessAgentService } from './agents/service.ts'
 import { registerBusinessAgentRoutes } from './agents/routes.ts'
 import { executeAgentTool } from './agents/execution.ts'
+import { SkillRuntime } from './skills/runtime.ts'
 import { AgentResourceService } from './agents/resources.ts'
 import { registerAgentResourceRoutes } from './agents/resource-routes.ts'
 import { registerKnowledgeIndexRoutes } from './agents/knowledge-routes.ts'
 import { QdrantKnowledgeIndex } from './agents/knowledge-index.ts'
+import {
+  KnowledgeEmbeddingProfiles,
+  registerEmbeddingProfileRoutes,
+} from './agents/embedding-profiles.ts'
 
 export interface ApplicationOptions {
   configuration: ServerConfiguration
@@ -81,14 +94,46 @@ export function createApplication(options: ApplicationOptions) {
     connection?: import('./infrastructure/database.ts').SqlConnection,
   ) => identity.audit(actor, action, target, detail, connection)
   const files = new FileService(hub, config.filesDirectory)
+  const storageRegistry = new StorageRegistry({
+    db,
+    root: config.filesDirectory,
+    encryptionKey: config.encryptionKey,
+  })
+  const fileLibrary = new FileLibrary({
+    db,
+    registry: storageRegistry,
+    stagingDirectory: join(config.dataDirectory, 'file-uploads'),
+  })
+  files.library = fileLibrary
+  const embeddingProfiles = new KnowledgeEmbeddingProfiles({
+    db,
+    getAccount: (id) => identity.getUser(id),
+    trustedOrigins: process.env.SUPERDSH_KNOWLEDGE_EMBEDDING_TRUSTED_ORIGINS,
+    encryptionKey: config.encryptionKey,
+    localModelDirectory:
+      process.env.SUPERDSH_EMBEDDING_MODEL_DIR ||
+      join(config.dataDirectory, 'models', 'bge-small-zh-v1.5'),
+    allowedOrigins: process.env.SUPERDSH_PERSONAL_MODEL_ALLOWED_ORIGINS,
+    audit,
+  })
+  const knowledgeIndex = new QdrantKnowledgeIndex(
+    config.qdrantUrl || 'http://127.0.0.1:16333',
+    config.qdrantApiKey,
+    embeddingProfiles.embedding,
+  )
+  const extensions = new ExtensionService({
+    db,
+    directory: join(config.dataDirectory, 'extensions'),
+    encryptionKey: config.encryptionKey,
+    allowedOrigins: process.env.SUPERDSH_EXTENSION_ALLOWED_ORIGINS || '',
+    audit,
+  })
   const business = new BusinessAgentService({
     db,
     hub,
     files,
-    knowledgeIndex: new QdrantKnowledgeIndex(
-      config.qdrantUrl || 'http://127.0.0.1:16333',
-      config.qdrantApiKey,
-    ),
+    knowledgeIndex,
+    extensions,
     getAccount: (id) => identity.getUser(id),
     audit,
   })
@@ -97,6 +142,27 @@ export function createApplication(options: ApplicationOptions) {
     encryptionKey: config.encryptionKey,
     audit,
   })
+  const modelConfigurations = new ModelConfigurationService({
+    db,
+    encryptionKey: config.encryptionKey,
+    changed: () => models.changed(null),
+  })
+  const capabilities = new ModelCapabilityService({
+    db,
+    models: modelConfigurations,
+    files: fileLibrary,
+    getAccount: (id) => identity.getUser(id),
+    authorizeSession: async (owner, session) => {
+      const row = await hub.store.session(session, owner)
+      await hub.connectorAllowed(String(row.connector_id))
+      const account = await identity.getUser(owner)
+      if (!account.permissions.includes('sessions.run'))
+        throw new ApiError(403, '会话执行权限已撤销')
+    },
+    allowedOrigins: process.env.SUPERDSH_PERSONAL_MODEL_ALLOWED_ORIGINS,
+  })
+  business.options.modelConfigurations = modelConfigurations
+  business.options.capabilities = capabilities
   const proxy = new ModelProxy({
     models,
     auth: {
@@ -127,8 +193,16 @@ export function createApplication(options: ApplicationOptions) {
       },
     },
   })
+  proxy.authorizeConfiguration = async (owner, provider, model) =>
+    modelConfigurations.authorizeChat(
+      await identity.getUser(owner),
+      provider,
+      model,
+    )
   const agents = new ServerAgentService({
     business: {
+      settled: (owner, context, reason) =>
+        new SkillRuntime(business).settled(owner, context, reason),
       bindings: (owner) => business.bindings(owner),
       binding: (owner, session) => business.binding(owner, session),
       execute: (owner, session, tool, args, signal, context) =>
@@ -172,13 +246,17 @@ export function createApplication(options: ApplicationOptions) {
   registerDeviceRoutes(router, hub)
   registerConversationRoutes(router, hub, files, business)
   registerBusinessAgentRoutes(router, business)
+  registerExtensionRoutes(router, extensions)
   registerAgentResourceRoutes(
     router,
     new AgentResourceService(business.options),
   )
   registerKnowledgeIndexRoutes(router, business)
+  registerEmbeddingProfileRoutes(router, embeddingProfiles, knowledgeIndex)
   files.register(router)
+  registerFileLibraryRoutes(router, fileLibrary, audit)
   registerModelRoutes(router, models, proxy)
+  registerModelConfigurationRoutes(router, modelConfigurations, audit)
   registerServerAgentRoutes(router, agents)
   for (const path of ['/health', '/health/live'])
     router.add(
@@ -226,6 +304,7 @@ export function createApplication(options: ApplicationOptions) {
       // make a second platform eligible to reuse the same writable Home.
       await agents.close()
       await files.close()
+      storageRegistry.close()
       await hub.close()
       await ownership?.release()
       ownership = null
@@ -248,6 +327,8 @@ export function createApplication(options: ApplicationOptions) {
         }
       })
       await ensureSchema(db)
+      await new SkillRuntime(business).recoverAfterRestart()
+      await embeddingProfiles.initialize()
       await identity.seedBuiltinRoles()
       const empty = !(await db.query('SELECT id FROM users LIMIT 1')).length
       if (empty && options.bootstrapDevelopment) {

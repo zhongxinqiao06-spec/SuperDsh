@@ -4,6 +4,7 @@ import { PlatformModelGateway } from './platform-model-gateway.ts'
 import { PlatformAccount } from './platform-account.ts'
 import { PlatformConnector } from './platform-connector.ts'
 import { PlatformRemote } from './platform-remote.ts'
+import { savePlatformAttachment } from './platform-attachment-save.ts'
 import { cleanupExpiredPlatformIdentity } from '../application/platform-identity-cleanup.ts'
 import type {
   PlatformIdentitySnapshot,
@@ -1453,6 +1454,23 @@ async function main(): Promise<void> {
     assertSender(event, mainWindow, APP_URL)
     return managedRemote.request(request)
   })
+  ipcMain.handle(
+    IPC.platformSaveAttachment,
+    (event, request: Parameters<typeof savePlatformAttachment>[0]) => {
+      assertSender(event, mainWindow, APP_URL)
+      return savePlatformAttachment(request, {
+        identity: () => managedAccount.identity(),
+        request: (input) => managedRemote.request(input),
+        choose: async (name) => {
+          const options = { title: '保存会话成果', defaultPath: name }
+          const result = mainWindow
+            ? await dialog.showSaveDialog(mainWindow, options)
+            : await dialog.showSaveDialog(options)
+          return result.canceled ? undefined : result.filePath
+        },
+      })
+    },
+  )
   ipcMain.handle(IPC.platformWatch, (event, value: unknown) => {
     assertSender(event, mainWindow, APP_URL)
     if (typeof value === 'string' || value === null)

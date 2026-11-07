@@ -62,6 +62,25 @@ it('normalizes authoritative AA items without inventing native journal events', 
   expect(messages[1]).not.toHaveProperty('seq')
   expect(messages[1]).not.toHaveProperty('turnId')
 })
+it('renders tools and empty timeline content without recursing into missing blocks', () => {
+  const content: (PlatformJson | undefined)[] = [
+    undefined,
+    null,
+    {},
+    { output: 'generated.pptx' },
+    { message: 'failed' },
+    { blocks: [{ type: 'image' }, { text: 'caption' }] },
+  ]
+  expect(
+    platformConversationMessages(
+      content.map((value, index) => ({
+        id: String(index),
+        orderSeq: index,
+        ...(value === undefined ? {} : { content: value }),
+      })),
+    ).map((message) => message.text),
+  ).toEqual(['', '', '', 'generated.pptx', 'failed', 'caption'])
+})
 it('rejects stale identities before dispatch and discards late history', async () => {
   let identity = { identityKey: target.identityKey, identityGeneration: 1 }
   let settle: (value: PlatformJson) => void = () => {}

@@ -5,6 +5,8 @@ import { registerBusinessAgentRoutes } from '../agents/routes.ts'
 import { AgentResourceService } from '../agents/resources.ts'
 import { IdentityService } from '../identity/service.ts'
 import { withTestDatabase } from './support/database.mjs'
+import { presentationSkillIds } from '../agents/presentation-skills.ts'
+import { previousPresentationExample } from '../agents/demo-definitions.ts'
 
 async function fixture(t) {
   const db = await withTestDatabase(t)
@@ -34,7 +36,9 @@ async function fixture(t) {
     files: new Proxy(
       {},
       {
-        get() {
+        get(_target, key) {
+          // This fixture exercises the supported legacy DB-blob storage branch.
+          if (key === 'library') return undefined
           throw new Error('Demo initialization must not write runtime files')
         },
       },
@@ -79,8 +83,9 @@ async function fixture(t) {
     db,
     account,
     service,
-    seed: () => seed({ account }),
-    legacySeed: () => legacySeed({ account }),
+    seed: () => seed({ account, body: {} }),
+    legacySeed: () => legacySeed({ account, body: {} }),
+    copyLatest: () => legacySeed({ account, body: { copyLatest: true } }),
     state,
   }
 }
@@ -95,14 +100,129 @@ const emptyState = {
   audits: 0,
 }
 const seededState = {
-  agents: 3,
+  agents: 4,
   assets: 4,
   libraries: 3,
-  skills: 3,
-  tools: 3,
+  skills: 9,
+  tools: 5,
   markers: 2,
-  audits: 10,
+  audits: 11,
 }
+
+test('PPT skill upgrade preserves edited and deleted skills, versions and customized assistants', async (t) => {
+  const f = await fixture(t)
+  const initial = await f.seed()
+  const resources = new AgentResourceService(f.service.options)
+  const ppt = initial.agents[1]
+  const previous = await f.service.save(
+    f.account,
+    { ...ppt, ...previousPresentationExample, skillPolicy: { mode: 'legacy' } },
+    ppt.id,
+  )
+  const catalog = await resources.catalog(f.account)
+  const planning = catalog.skills.find(
+    (skill) => skill.id === presentationSkillIds[0],
+  )
+  const custom = await resources.saveSkill(
+    f.account,
+    { ...planning, instructions: '公司的策划标准' },
+    planning.id,
+  )
+  await resources.remove('skills', f.account, 'presentation-flow')
+  await resources.remove('skills', f.account, presentationSkillIds[2])
+  const markerKey = `business-agent-demo:${f.account.userId}`
+  const [row] = await f.db.query(
+    'SELECT value FROM instance_settings WHERE key=$1',
+    [markerKey],
+  )
+  const marker = JSON.parse(row.value)
+  marker.version = 5
+  await f.db.query('UPDATE instance_settings SET value=$2 WHERE key=$1', [
+    markerKey,
+    JSON.stringify(marker),
+  ])
+  await f.db.query('DELETE FROM instance_settings WHERE key=$1', [
+    `business-agent-resources:${f.account.userId}:presentation-skills-v1`,
+  ])
+  const upgraded = await f.seed()
+  assert.deepEqual(
+    upgraded.agents.find((agent) => agent.id === ppt.id),
+    previous,
+    'deleted required skill prevents upgrade',
+  )
+  const after = await resources.catalog(f.account)
+  assert.deepEqual(
+    after.skills.find((skill) => skill.id === planning.id),
+    custom,
+  )
+  assert.ok(
+    !after.skills.some((skill) => skill.id === presentationSkillIds[2]),
+    'deleted seed is not resurrected',
+  )
+  assert.equal(
+    (
+      await resources.history(
+        'skills',
+        f.account,
+        planning.id,
+        new URLSearchParams(),
+      )
+    ).total,
+    2,
+  )
+  await assert.rejects(
+    resources.assertActive(f.account.userId, [], [presentationSkillIds[2]], []),
+    { status: 403 },
+  )
+})
+
+test('untouched v5 PPT example adopts three skills once; edited example is preserved', async (t) => {
+  const f = await fixture(t)
+  const initial = await f.seed()
+  const ppt = initial.agents[1]
+  const previous = await f.service.save(
+    f.account,
+    { ...ppt, ...previousPresentationExample, skillPolicy: { mode: 'legacy' } },
+    ppt.id,
+  )
+  const key = `business-agent-demo:${f.account.userId}`
+  const [row] = await f.db.query(
+    'SELECT value FROM instance_settings WHERE key=$1',
+    [key],
+  )
+  const old = { ...JSON.parse(row.value), version: 5 }
+  await f.db.query('UPDATE instance_settings SET value=$2 WHERE key=$1', [
+    key,
+    JSON.stringify(old),
+  ])
+  const upgraded = (await f.seed()).agents.find((agent) => agent.id === ppt.id)
+  assert.deepEqual(upgraded.skillIds, [
+    'company-knowledge',
+    ...presentationSkillIds,
+  ])
+  assert.equal(upgraded.version, previous.version + 1)
+  assert.deepEqual(
+    (await f.seed()).agents.find((agent) => agent.id === ppt.id),
+    upgraded,
+  )
+  const custom = await f.service.save(
+    f.account,
+    {
+      ...upgraded,
+      ...previousPresentationExample,
+      instructions: '公司定制演示流程',
+    },
+    ppt.id,
+  )
+  await f.db.query('UPDATE instance_settings SET value=$2 WHERE key=$1', [
+    key,
+    JSON.stringify(old),
+  ])
+  assert.deepEqual(
+    (await f.seed()).agents.find((agent) => agent.id === ppt.id),
+    custom,
+  )
+})
 
 for (const failureAt of [2, 3]) {
   test(`demo seed rolls back assets, agents, audits and marker when Agent insert ${failureAt} fails, then retries once`, async (t) => {
@@ -139,10 +259,10 @@ for (const failureAt of [2, 3]) {
     )
 
     const successful = await f.seed()
-    assert.equal(successful.agents.length, 3)
+    assert.equal(successful.agents.length, 4)
     assert.equal(successful.assets.length, 4)
     assert.equal(successful.knowledgeBases.length, 3)
-    assert.equal(new Set(successful.agents.map((item) => item.id)).size, 3)
+    assert.equal(new Set(successful.agents.map((item) => item.id)).size, 4)
     assert.equal(new Set(successful.assets.map((item) => item.id)).size, 4)
     assert.deepEqual(await f.state(), seededState)
 
@@ -158,23 +278,44 @@ for (const failureAt of [2, 3]) {
           )
         )[0].last_value,
       ),
-      failureAt + 3,
+      failureAt + 4,
       'retry after success must return the committed marker without inserting',
     )
     assert.equal((await f.db.query('SELECT * FROM server_agents')).length, 0)
   })
 }
 
-test('initial page preparation persists three linked examples and never recreates intentionally removed resources', async (t) => {
+test('initial page preparation persists four editable examples and never recreates intentionally removed resources', async (t) => {
   const f = await fixture(t)
   const initial = await f.seed()
+  assert.deepEqual(
+    initial.agents.map((item) => item.name),
+    ['Excel 办公助手', 'PPT 演示助手', '企业知识助手', 'Word 文档助手'],
+  )
+  assert.ok(
+    initial.agents.every(
+      (item) =>
+        item.recommendedPrompts.length &&
+        item.inputRequirements.length &&
+        item.outputExamples.length,
+    ),
+  )
   assert.deepEqual(await f.state(), seededState)
   const catalog = await f.service.catalog(f.account)
-  assert.equal(catalog.skills.length, 3)
-  assert.equal(catalog.tools.length, 3)
+  assert.equal(catalog.skills.length, 9)
+  for (const index of [1, 3]) {
+    const definition = initial.agents[index]
+    assert.equal(definition.skillPolicy.mode, 'auto')
+    assert.equal(
+      catalog.skills.find((skill) => skill.id === definition.skillIds[0])
+        .program.stages.length,
+      6,
+    )
+  }
+  assert.equal(catalog.tools.length, 5)
   assert.deepEqual(
     initial.agents.map((agent) => agent.knowledgeBaseIds.length),
-    [2, 2, 1],
+    [2, 2, 1, 1],
   )
   for (const agent of initial.agents) {
     assert.equal(agent.published, true)
@@ -193,7 +334,7 @@ test('initial page preparation persists three linked examples and never recreate
     libraryId,
   )
   const next = await f.seed()
-  assert.equal(next.agents.length, 2)
+  assert.equal(next.agents.length, 3)
   assert.equal(next.knowledgeBases.length, 2)
   assert.equal(
     next.agents.some((item) => item.id === removed.id),
@@ -201,10 +342,54 @@ test('initial page preparation persists three linked examples and never recreate
   )
   assert.equal(
     (await f.state()).agents,
-    3,
+    4,
     'soft-deleted examples must never be inserted again',
   )
   assert.equal((await f.db.query('SELECT * FROM server_agents')).length, 0)
+})
+
+test('copying updated examples creates separate unpublished records once without overwriting custom or deleted originals', async (t) => {
+  const f = await fixture(t)
+  const initial = await f.seed()
+  const custom = await f.service.save(
+    f.account,
+    {
+      ...initial.agents[0],
+      name: '公司自己的办公助手',
+      instructions: '企业定制规则，不覆盖。',
+    },
+    initial.agents[0].id,
+  )
+  await f.service.remove(f.account, initial.agents[1].id)
+  await f.copyLatest()
+  const listed = await f.service.list(
+    f.account,
+    new URLSearchParams({ pageSize: '100' }),
+    true,
+  )
+  assert.equal(listed.total, 7)
+  const copies = listed.items.filter((item) => item.name.endsWith('新版副本'))
+  assert.equal(copies.length, 4)
+  assert.ok(copies.every((item) => !item.published))
+  assert.ok(
+    copies.every((item) =>
+      item.skillIds.every(
+        (id) =>
+          ![
+            'sales-analysis',
+            'company-knowledge',
+            'business-presentation',
+          ].includes(id),
+      ),
+    ),
+  )
+  assert.deepEqual(
+    listed.items.find((item) => item.id === custom.id),
+    custom,
+  )
+  const before = await f.state()
+  await f.copyLatest()
+  assert.deepEqual(await f.state(), before)
 })
 
 test('legacy demo marker upgrades resource associations without recreating deleted Agents or overwriting customized definitions', async (t) => {
@@ -242,13 +427,16 @@ test('legacy demo marker upgrades resource associations without recreating delet
     JSON.stringify({ agents: legacy, assets: original.assets }),
   ])
   const upgraded = await f.seed()
-  assert.equal(upgraded.agents.length, 2)
+  assert.equal(upgraded.agents.length, 3)
   assert.equal(upgraded.assets.length, 4)
   assert.equal(upgraded.knowledgeBases.length, 3)
   for (const agent of upgraded.agents) {
     assert.match(agent.name, /我的定制/)
     assert.equal(agent.instructions, '保留企业自己的业务规则。')
-    assert.equal(agent.knowledgeBaseIds.length, 2)
+    assert.equal(
+      agent.knowledgeBaseIds.length,
+      agent.id === legacy[3].id ? 1 : 2,
+    )
     assert.equal(agent.version, 2)
   }
   const before = await f.state()
@@ -281,7 +469,7 @@ test('legacy examples with a deliberately disabled tool do not block resource ma
   )
   await resources.saveTool(f.account, { ...tool, enabled: false }, tool.id)
   const upgraded = await f.seed()
-  assert.equal(upgraded.agents.length, 3)
+  assert.equal(upgraded.agents.length, 4)
   assert.equal(upgraded.knowledgeBases.length, 3)
   const preserved = upgraded.agents.find((item) => item.id === legacy[1].id)
   assert.equal(preserved.version, 1)

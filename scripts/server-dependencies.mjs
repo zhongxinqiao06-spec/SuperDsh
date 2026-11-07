@@ -64,10 +64,25 @@ export async function planDevelopmentDependencies(
   environment,
   { portAvailable = isLoopbackPortAvailable, explicitEnvironment = {} } = {},
 ) {
+  const configuredDependencies = environment.SUPERDSH_MINIO_APP_USER
+    ? [
+        ...dependencies,
+        {
+          service: 'minio',
+          setting: 'SUPERDSH_DEV_MINIO_PORT',
+          internalPort: '9000/tcp',
+        },
+        {
+          service: 'minio',
+          setting: 'SUPERDSH_DEV_MINIO_CONSOLE_PORT',
+          internalPort: '9001/tcp',
+        },
+      ]
+    : dependencies
   const plan = { ports: {}, ready: [], start: [], wait: [] }
   const reserved = new Set()
   const owned = new Map()
-  for (const dependency of dependencies) {
+  for (const dependency of configuredDependencies) {
     const { service, setting, internalPort } = dependency
     const matches = containers.filter((container) => {
       const labels = container.Config?.Labels
@@ -115,7 +130,7 @@ export async function planDevelopmentDependencies(
       service,
     )
   }
-  for (const { service, setting } of dependencies) {
+  for (const { service, setting } of configuredDependencies) {
     if (owned.get(service)?.State?.Running) continue
     const requested = checkedPort(environment[setting], setting)
     let selected
@@ -142,6 +157,8 @@ export async function planDevelopmentDependencies(
     plan.ports[setting] = selected
     plan.start.push(service)
   }
+  for (const key of ['start', 'ready', 'wait'])
+    plan[key] = [...new Set(plan[key])]
   return plan
 }
 

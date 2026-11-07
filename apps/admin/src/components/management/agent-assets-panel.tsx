@@ -69,13 +69,16 @@ export function AgentAssetsPanel({
       knowledge: tr('知识资料', 'Knowledge'),
       'spreadsheet-template': tr('Excel 模板', 'Spreadsheet template'),
       'presentation-template': tr('PPT 模板', 'Presentation template'),
+      'document-template': tr('Word 模板', 'Word template'),
     })[value]
   const accept =
     kind === 'knowledge'
-      ? '.txt,.md,.csv,.xlsx,.docx'
+      ? '.txt,.md,.csv,.xlsx,.docx,.pdf'
       : kind === 'spreadsheet-template'
         ? '.xlsx'
-        : '.pptx'
+        : kind === 'document-template'
+          ? '.docx'
+          : '.pptx'
   const upload = async (event: React.FormEvent) => {
     event.preventDefault()
     if (!file || busy || disabled) return
@@ -286,8 +289,8 @@ export function AgentAssetsPanel({
         busy={busy}
         error={error}
         description={tr(
-          '知识资料支持 TXT、Markdown、CSV、XLSX 和 DOCX；输出模板支持 XLSX 或 PPTX。文件最大 4 MB。',
-          'Knowledge supports TXT, Markdown, CSV, XLSX and DOCX; output templates support XLSX or PPTX. Maximum file size: 4 MB.',
+          '知识资料支持 TXT、Markdown、CSV、XLSX、DOCX 和文字型 PDF；扫描件需先 OCR。输出模板支持 XLSX 或 PPTX。文件最大 4 MB。',
+          'Knowledge supports TXT, Markdown, CSV, XLSX, DOCX and text PDFs; scanned files require OCR first. Output templates support XLSX or PPTX. Maximum file size: 4 MB.',
         )}
       >
         <form onSubmit={upload} className="space-y-4">
@@ -306,6 +309,7 @@ export function AgentAssetsPanel({
                     'knowledge',
                     'spreadsheet-template',
                     'presentation-template',
+                    'document-template',
                   ] as const
                 ).map((value) => (
                   <option key={value} value={value}>

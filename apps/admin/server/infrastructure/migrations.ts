@@ -1,6 +1,7 @@
 import type { SqlConnection } from './database.ts'
 import {
   defaultMenuItems,
+  addFoundationMenuItems,
   groupAgentMenuItems,
   type MenuNode,
 } from '../management/navigation.ts'
@@ -35,7 +36,7 @@ export async function migrateProductSchema(
   revision: string,
   ddl: string,
 ): Promise<void> {
-  const match = /^v2_(3[5-9]|4[0-2])$/.exec(revision)
+  const match = /^v2_(3[5-9]|4[0-6])$/.exec(revision)
   if (!match)
     throw new Error(
       `Unsupported database revision ${revision}; upgrade pre-product databases to v2_35 with their original release before switching to Node`,
@@ -274,5 +275,104 @@ export async function migrateProductSchema(
         )
     }
     await connection.query("UPDATE alembic_version SET version_num='v2_42'")
+  }
+  if (current < 43) {
+    await connection.query(
+      'ALTER TABLE business_agent_assets ADD COLUMN IF NOT EXISTS source_segments_json JSONB',
+    )
+    await tables(connection, ddl, [
+      'business_office_plans',
+      'business_agent_evidence',
+    ])
+    await connection.query("UPDATE alembic_version SET version_num='v2_43'")
+  }
+  if (current < 44) {
+    await tables(connection, ddl, [
+      'agent_extension_sources',
+      'agent_extension_versions',
+      'agent_tool_secrets',
+      'agent_resource_versions',
+      'agent_tool_runs',
+      'agent_session_bindings',
+    ])
+    await connection.query(`INSERT INTO agent_session_bindings
+      (session_id,owner_user_id,version,binding_json,created_at)
+      SELECT session_id,owner_user_id,1,binding_json,created_at
+      FROM business_agent_sessions ON CONFLICT (session_id,version) DO NOTHING`)
+    const [admin] = await connection.query<{ permissions_json: string }>(
+      "SELECT permissions_json FROM roles WHERE id='admin' AND builtin=1 FOR UPDATE",
+    )
+    if (admin) {
+      const grants: unknown = JSON.parse(admin.permissions_json)
+      if (
+        !Array.isArray(grants) ||
+        grants.some((value) => typeof value !== 'string')
+      )
+        throw new Error('Builtin administrator permissions are invalid')
+      await connection.query(
+        "UPDATE roles SET permissions_json=$1,updated_at=$2 WHERE id='admin'",
+        [JSON.stringify([...new Set([...grants, 'extensions.manage'])]), now()],
+      )
+    }
+    await connection.query("UPDATE alembic_version SET version_num='v2_44'")
+  }
+  if (current < 45) {
+    await connection.query(
+      "ALTER TABLE business_agent_assets ADD COLUMN IF NOT EXISTS file_storage_state TEXT NOT NULL DEFAULT 'legacy'",
+    )
+    await tables(connection, ddl, [
+      'model_connections',
+      'model_configurations',
+      'model_configuration_versions',
+      'model_capability_defaults',
+      'model_provider_operations',
+      'file_storage_connections',
+      'file_storage_settings',
+      'file_objects',
+      'file_entries',
+      'file_references',
+      'file_uploads',
+      'file_upload_parts',
+      'file_legacy_mappings',
+      'file_migration_items',
+    ])
+    for (const match of ddl.matchAll(/CREATE INDEX (foundation_\w+) ([^;]+);/g))
+      await connection.query(
+        `CREATE INDEX IF NOT EXISTS ${match[1]} ${match[2]}`,
+      )
+    const [admin] = await connection.query<{ permissions_json: string }>(
+      "SELECT permissions_json FROM roles WHERE id='admin' AND builtin=1 FOR UPDATE",
+    )
+    if (admin) {
+      const grants: string[] = JSON.parse(admin.permissions_json)
+      if (
+        !Array.isArray(grants) ||
+        grants.some((grant) => typeof grant !== 'string')
+      )
+        throw new Error('Builtin administrator permissions are invalid')
+      await connection.query(
+        "UPDATE roles SET permissions_json=$1,updated_at=$2 WHERE id='admin'",
+        [JSON.stringify([...new Set([...grants, 'storage.manage'])]), now()],
+      )
+    }
+    const [menu] = await connection.query<{ items_json: string }>(
+      "SELECT items_json FROM navigation_settings WHERE id='global' FOR UPDATE",
+    )
+    if (menu)
+      await connection.query(
+        "UPDATE navigation_settings SET items_json=$1,version=version+1,updated_at=$2 WHERE id='global'",
+        [
+          JSON.stringify(addFoundationMenuItems(JSON.parse(menu.items_json))),
+          now(),
+        ],
+      )
+    await connection.query("UPDATE alembic_version SET version_num='v2_45'")
+  }
+  if (current < 46) {
+    await tables(connection, ddl, ['agent_skill_runs', 'agent_skill_events'])
+    await connection.query(
+      'CREATE INDEX IF NOT EXISTS skill_runs_session ON agent_skill_runs(owner_user_id,session_id,created_at)',
+    )
+    await connection.query("UPDATE alembic_version SET version_num='v2_46'")
   }
 }

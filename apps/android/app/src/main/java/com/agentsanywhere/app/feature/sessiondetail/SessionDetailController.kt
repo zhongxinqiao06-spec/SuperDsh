@@ -27,6 +27,44 @@ class SessionDetailController(
 ) {
     private val optimisticStore = SessionOptimisticMessageStore()
     private val attachmentTransfer = SessionAttachmentTransfer(sessionsApi)
+    fun officeIdentity(): String = sessionStore.readServerUrl() + ":" + sessionStore.readUserId().ifBlank { sessionStore.readAccessToken() }
+
+    suspend fun officeAgents(sessionId: String): Result<Pair<List<com.agentsanywhere.app.api.BusinessAgentDefinition>, Int>> = withContext(Dispatchers.IO) {
+        runCatching {
+            val identity = officeIdentity(); val auth = authSession()
+            val result = sessionsApi.agentDefinitions(auth.serverUrl, auth.accessToken) to sessionsApi.agentBinding(auth.serverUrl, auth.accessToken, sessionId)
+            check(identity == officeIdentity()) { "账号已切换" }; result
+        }.onFailure { if (it is kotlinx.coroutines.CancellationException) throw it }
+    }
+
+    suspend fun officeBindAgent(sessionId: String, agentId: String, version: Int): Result<Unit> = withContext(Dispatchers.IO) {
+        runCatching {
+            val identity = officeIdentity(); val auth = authSession()
+            sessionsApi.bindAgent(auth.serverUrl, auth.accessToken, sessionId, agentId, version)
+            check(identity == officeIdentity()) { "账号已切换" }
+        }.onFailure { if (it is kotlinx.coroutines.CancellationException) throw it }
+    }
+
+    suspend fun officeResources(sessionId: String): Result<com.agentsanywhere.app.api.OfficeSessionResources> = withContext(Dispatchers.IO) {
+        runCatching {
+            val identity = officeIdentity()
+            val auth = authSession()
+            val result = sessionsApi.officeResources(auth.serverUrl, auth.accessToken, sessionId)
+            check(identity == officeIdentity()) { "账号已切换，请重新打开会话" }
+            result
+        }.onFailure { if (it is kotlinx.coroutines.CancellationException) throw it }
+    }
+
+    suspend fun officeDownload(sessionId: String, fileId: String, name: String, mediaType: String, expectedSha256: String): Result<DownloadedAttachment> = withContext(Dispatchers.IO) {
+        runCatching {
+            val identity = officeIdentity()
+            val auth = authSession()
+            val file = attachmentTransfer.download(auth.serverUrl, auth.accessToken, sessionId, TimelineAttachment(fileId, name, mediaType, 0, expectedSha256))
+            check(identity == officeIdentity()) { "账号已切换，旧文件下载已丢弃" }
+            check(file.sha256.equals(expectedSha256, ignoreCase = true)) { "文件版本校验失败，请刷新成果列表" }
+            file
+        }.onFailure { if (it is kotlinx.coroutines.CancellationException) throw it }
+    }
 
     suspend fun load(
         sessionId: String,

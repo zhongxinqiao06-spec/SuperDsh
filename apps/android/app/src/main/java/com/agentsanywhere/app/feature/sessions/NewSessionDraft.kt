@@ -24,6 +24,7 @@ data class NewSessionDraft(
     val projectId: String = "",
     val executorKind: String = "desktop",
     val workspaceLabel: String = cwd.orEmpty(),
+    val agentDefinitionId: String? = null,
 ) {
     fun previewSession(): AgentSession {
         return AgentSession(
@@ -83,4 +84,5 @@ internal fun NewSessionDraft.firstMessageRequest(
     runtimeType = runtimeType,
     projectId = projectId,
     executorKind = executorKind,
+    agentDefinitionId = agentDefinitionId,
 )

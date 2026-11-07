@@ -1,5 +1,5 @@
 /** Allowlisted API v2 operations. Account credentials and socket tickets remain in main. */
-import { randomUUID } from 'node:crypto'
+import { createHash, randomUUID } from 'node:crypto'
 import type {
   PlatformEvent,
   PlatformJson,
@@ -28,8 +28,25 @@ export function remoteRoute(request: PlatformRequest): {
     case 'agents':
       path = '/agents'
       break
+    case 'agent-binding':
+    case 'set-agent-binding':
+      path = `/sessions/${artifactId(request.sessionId)}/agent-binding`
+      method = request.operation === 'set-agent-binding' ? 'PUT' : 'GET'
+      break
     case 'agent-artifacts':
       path = `/sessions/${artifactId(request.sessionId)}/agent-artifacts`
+      break
+    case 'agent-artifact-preview':
+      path = `/sessions/${artifactId(request.sessionId)}/agent-artifacts/${artifactId(request.artifactId ?? request.attachmentId)}/preview`
+      break
+    case 'agent-evidence':
+      path = `/sessions/${artifactId(request.sessionId)}/agent-evidence`
+      break
+    case 'office-plans':
+      path = `/sessions/${artifactId(request.sessionId)}/office-plans`
+      break
+    case 'skill-runs':
+      path = `/sessions/${artifactId(request.sessionId)}/skill-runs`
       break
     case 'download-attachment':
       path = `/sessions/${artifactId(request.sessionId)}/attachments/${artifactId(request.attachmentId)}`
@@ -268,13 +285,23 @@ export class PlatformRemote {
         attachment.size !== bytes.length
       )
         throw new Error('附件内容与大小不匹配')
+      const digest = createHash('sha256').update(bytes).digest('hex')
+      if (
+        attachment.sha256 != null &&
+        (typeof attachment.sha256 !== 'string' ||
+          !/^[a-f0-9]{64}$/i.test(attachment.sha256) ||
+          attachment.sha256.toLowerCase() !== digest)
+      )
+        throw new Error('附件内容校验失败，请重新下载；文件尚未保存')
       return {
         contentBase64: encoded,
+        name: typeof attachment.name === 'string' ? attachment.name : '附件',
         mediaType:
           typeof attachment.mediaType === 'string'
             ? attachment.mediaType
             : 'application/octet-stream',
         size: bytes.length,
+        sha256: digest,
       }
     }
     const response = await this.account.json(

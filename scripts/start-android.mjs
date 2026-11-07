@@ -31,6 +31,8 @@ function options() {
     'port',
     'server',
     'gpu',
+    'memory',
+    'boot-timeout',
   ])
   const args = process.argv.slice(2)
   for (let index = 0; index < args.length; index++) {
@@ -111,6 +113,8 @@ Local settings: .superdsh-work/android-launcher.json (not committed).
 --server URL        Check AA server; reverse its port for localhost URLs
                     This does not change the server saved inside the App
 --gpu MODE          Emulator GPU mode (default: host)
+--memory MB         Requested emulator RAM, 1536..8192 (default: 2048)
+--boot-timeout SEC  System startup deadline, 60..900 (default: 180)
 --headless          Run without an emulator window, for automation
 --help              Show this help
 
@@ -172,6 +176,14 @@ This launcher does not build the APK, download SDKs, clear App data or start Doc
   if (!Number.isInteger(port) || port < 5554 || port > 5682 || port % 2 !== 0)
     throw new Error('--port must be an even number between 5554 and 5682')
   const serverValue = setting('server')
+  const memory = Number(setting('memory', 2048))
+  const bootTimeout = Number(setting('boot-timeout', 180))
+  if (!Number.isInteger(memory) || memory < 1536 || memory > 8192)
+    throw new Error('--memory must be an integer between 1536 and 8192 MB')
+  if (!Number.isInteger(bootTimeout) || bootTimeout < 60 || bootTimeout > 900)
+    throw new Error(
+      '--boot-timeout must be an integer between 60 and 900 seconds',
+    )
   const server = serverValue ? new URL(serverValue) : undefined
   if (
     server &&
@@ -233,7 +245,7 @@ This launcher does not build the APK, download SDKs, clear App data or start Doc
       '-feature',
       '-Vulkan',
       '-memory',
-      '2048',
+      String(memory),
       '-cores',
       '2',
     ]
@@ -246,7 +258,7 @@ This launcher does not build the APK, download SDKs, clear App data or start Doc
         env,
         detached: true,
         stdio: ['ignore', stdout, stderr],
-        windowsHide: false,
+        windowsHide: Boolean(args.headless),
       })
       child.on('error', (error) => {
         childFailure = error.message
@@ -259,7 +271,7 @@ This launcher does not build the APK, download SDKs, clear App data or start Doc
       closeSync(stdout)
       closeSync(stderr)
     }
-    console.log(`Booting ${serial}; waiting up to 180 seconds...`)
+    console.log(`Booting ${serial}; waiting up to ${bootTimeout} seconds...`)
   }
   await waitFor(
     async () => {
@@ -274,7 +286,7 @@ This launcher does not build the APK, download SDKs, clear App data or start Doc
       }
     },
     'Android boot',
-    180_000,
+    bootTimeout * 1000,
   )
   const actualAvd = (await onDevice(['emu', 'avd', 'name']))
     .split(/[\r\n]+/u)[0]

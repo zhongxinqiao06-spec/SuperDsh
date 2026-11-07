@@ -4,8 +4,20 @@ import { json, type Row } from '../infrastructure/database.ts'
 import { BusinessAgentService, assetView } from './service.ts'
 import { AgentResourceService } from './resources.ts'
 import { createDemoAssets } from './office/index.ts'
-import type { AgentAsset, AgentDefinition } from './contracts.ts'
+import {
+  agentSkills,
+  agentTools,
+  defaultSkillTools,
+  type AgentAsset,
+  type AgentDefinition,
+} from './contracts.ts'
 import type { KnowledgeBase } from './resource-contracts.ts'
+import {
+  isPristineBuiltinResource,
+  isPristineLegacyExample,
+  officeAgentExamples,
+  previousPresentationExample,
+} from './demo-definitions.ts'
 
 interface DemoMarker {
   version?: number
@@ -14,12 +26,15 @@ interface DemoMarker {
   knowledgeBaseIds?: string[]
   agents?: AgentDefinition[]
   assets?: AgentAsset[]
+  copiedVersion?: number
+  copiedAgentIds?: string[]
 }
 
 /** First entry creates usable, persisted examples; subsequent entry only reads. */
 export async function initializeAgentExamples(
   service: BusinessAgentService,
   account: Account,
+  options: { copyLatest?: boolean } = {},
 ) {
   requirePermission(account, 'agents.manage')
   const lease = await service.options.db.lease(
@@ -40,14 +55,18 @@ export async function initializeAgentExamples(
         audit: (actor, action, target, detail) =>
           service.options.audit(actor, action, target, detail, connection),
       })
-      return initialize(scoped, account)
+      return initialize(scoped, account, options)
     })
   } finally {
     await lease.release()
   }
 }
 
-async function initialize(service: BusinessAgentService, account: Account) {
+async function initialize(
+  service: BusinessAgentService,
+  account: Account,
+  options: { copyLatest?: boolean },
+) {
   const resources = new AgentResourceService(service.options)
   await resources.ensureDefaults(account)
   const key = `business-agent-demo:${account.userId}`
@@ -56,7 +75,102 @@ async function initialize(service: BusinessAgentService, account: Account) {
     [key],
   )
   const old = previous ? json<DemoMarker>(previous.value, {}) : null
-  if (old?.version === 2) return currentExamples(service, account, old)
+  if (old && (old.version ?? 0) >= 2) {
+    if (old.version === 2) await upgradePristineExamples(service, account, old)
+    if ((old.version ?? 0) < 4) {
+      const example = officeAgentExamples[3]!
+      // This example did not exist in earlier releases. The marker prevents
+      // recreating it after a maintainer subsequently deletes it.
+      const created = await service.save(account, {
+        ...example,
+        knowledgeBaseIds: [],
+        knowledgeAssetIds: [],
+        templateAssetIds: [],
+        published: true,
+      })
+      old.agentIds = [...(old.agentIds ?? []), created.id]
+      old.version = 4
+      await saveMarker(service, account, old)
+    }
+    if ((old.version ?? 0) < 5) {
+      for (const index of [1, 3]) {
+        const id = old.agentIds?.[index]
+        if (!id) continue
+        const [row] = await service.options.db.query(
+          'SELECT definition_json FROM business_agents WHERE id=$1 AND owner_user_id=$2 AND deleted_at IS NULL',
+          [id, account.userId],
+        )
+        if (!row) continue
+        const current = json<AgentDefinition>(
+          row.definition_json,
+          {} as AgentDefinition,
+        )
+        const latest =
+          index === 1
+            ? previousPresentationExample
+            : officeAgentExamples[index]!
+        const original = {
+          ...latest,
+          toolIds: latest.toolIds.filter((id) => id !== 'illustration_render'),
+        }
+        if (
+          current.version !== 1 ||
+          !current.published ||
+          !Object.entries(original).every(
+            ([key, value]) =>
+              JSON.stringify(current[key as keyof AgentDefinition]) ===
+              JSON.stringify(value),
+          )
+        )
+          continue
+        await service.save(account, { ...current, ...latest }, id)
+      }
+      old.version = 5
+      await saveMarker(service, account, old)
+    }
+    if ((old.version ?? 0) < 6) {
+      const id = old.agentIds?.[1]
+      const [row] = id
+        ? await service.options.db.query(
+            'SELECT definition_json FROM business_agents WHERE id=$1 AND owner_user_id=$2 AND deleted_at IS NULL',
+            [id, account.userId],
+          )
+        : []
+      if (row) {
+        const current = json<AgentDefinition>(
+          row.definition_json,
+          {} as AgentDefinition,
+        )
+        if (
+          current.published &&
+          Object.entries(previousPresentationExample).every(
+            ([key, value]) =>
+              JSON.stringify(current[key as keyof AgentDefinition]) ===
+              JSON.stringify(value),
+          )
+        ) {
+          try {
+            await service.save(
+              account,
+              { ...current, ...officeAgentExamples[1] },
+              id,
+            )
+          } catch (error) {
+            // Explicitly disabled/deleted resources must not be restored by an upgrade.
+            if (
+              !(error instanceof ApiError) ||
+              ![404, 422].includes(error.status)
+            )
+              throw error
+          }
+        }
+      }
+      old.version = 6
+      await saveMarker(service, account, old)
+    }
+    if (options.copyLatest) await copyLatestExamples(service, account, old)
+    return currentExamples(service, account, old)
+  }
 
   // A legacy completion marker remains authoritative: edited or deleted
   // examples are never recreated. Only the missing resource organization is added.
@@ -103,6 +217,7 @@ async function initialize(service: BusinessAgentService, account: Account) {
     [libraries[0]!.id, libraries[1]!.id],
     [libraries[0]!.id, libraries[2]!.id],
     [libraries[0]!.id],
+    [libraries[0]!.id],
   ]
   const agents = old
     ? await upgradeLegacyAgents(
@@ -113,7 +228,7 @@ async function initialize(service: BusinessAgentService, account: Account) {
       )
     : await createAgents(service, account, associations)
   const marker: DemoMarker = {
-    version: 2,
+    version: 6,
     agentIds:
       old?.agents?.map((item) => item.id) || agents.map((item) => item.id),
     assetIds: sourceIds,
@@ -197,37 +312,11 @@ async function createAgents(
   associations: string[][],
 ) {
   const agents: AgentDefinition[] = []
-  for (const [index, input] of [
-    {
-      name: '经营分析助手',
-      description:
-        '使用星河商贸虚构销售台账，按公司模板生成可编辑 Excel。可换成你的 CSV/XLSX。',
-      instructions:
-        '先核对销售数据，生成经营分析Excel，概述地区、产品收入与毛利。默认公司名称为星河商贸（虚构演示）。',
-      skillIds: ['sales-analysis'],
-      toolIds: ['knowledge_search', 'spreadsheet_report'],
-    },
-    {
-      name: '企业汇报 PPT 助手',
-      description: '使用公司资料、真实输入台账和品牌模板生成可编辑 PPT。',
-      instructions:
-        '按星河商贸（虚构演示）公司模板生成经营汇报PPT。先查询公司介绍，再根据销售数据生成文件，说明数据来源并给出定性建议。',
-      skillIds: ['company-knowledge', 'business-presentation'],
-      toolIds: ['knowledge_search', 'presentation_report'],
-    },
-    {
-      name: '企业资料助手',
-      description:
-        '查询已绑定公司资料，回答附文件和段落来源，没有依据时明确说明。',
-      instructions:
-        '根据已发布公司资料回答问题。必须先检索并引用文件与段落；不得编造业务制度。',
-      skillIds: ['company-knowledge'],
-      toolIds: ['knowledge_search'],
-    },
-  ].entries()) {
+  for (const [index, input] of officeAgentExamples.entries()) {
     agents.push(
       await service.save(account, {
         ...input,
+        ...newExampleFlow(index),
         knowledgeBaseIds: associations[index]!,
         knowledgeAssetIds: [],
         templateAssetIds: [],
@@ -236,6 +325,158 @@ async function createAgents(
     )
   }
   return agents
+}
+
+/** New/copied examples opt in. Existing definitions and session snapshots stay unchanged. */
+function newExampleFlow(index: number) {
+  if (index !== 1 && index !== 3) return {}
+  return {
+    skillIds: [index === 1 ? 'presentation-flow' : 'document-flow'],
+    skillPolicy: { mode: 'auto' as const },
+  }
+}
+
+async function saveMarker(
+  service: BusinessAgentService,
+  account: Account,
+  marker: DemoMarker,
+) {
+  await service.options.db.query(
+    'UPDATE instance_settings SET value=$2,updated_at=$3 WHERE key=$1',
+    [
+      `business-agent-demo:${account.userId}`,
+      JSON.stringify(marker),
+      new Date().toISOString(),
+    ],
+  )
+}
+
+async function upgradePristineExamples(
+  service: BusinessAgentService,
+  account: Account,
+  marker: DemoMarker,
+) {
+  const ids = marker.knowledgeBaseIds ?? []
+  const associations = [[ids[0], ids[1]], [ids[0], ids[2]], [ids[0]]].map(
+    (list) => list.filter((id): id is string => Boolean(id)),
+  )
+  // Built-in resources are independently versioned: do not replace an edited or disabled skill/tool.
+  const resources = new AgentResourceService(service.options)
+  const catalog = await resources.catalog(account)
+  for (const skill of catalog.skills) {
+    const latest = agentSkills.find((item) => item.id === skill.id)
+    if (latest && isPristineBuiltinResource(skill))
+      await resources.saveSkill(account, { ...skill, ...latest }, skill.id)
+  }
+  for (const tool of catalog.tools) {
+    const latest = agentTools.find((item) => item.id === tool.id)
+    if (latest && isPristineBuiltinResource(tool))
+      await resources.saveTool(account, { ...tool, ...latest }, tool.id)
+  }
+  for (const [index, id] of (marker.agentIds ?? []).entries()) {
+    const [row] = await service.options.db.query(
+      'SELECT definition_json FROM business_agents WHERE owner_user_id=$1 AND id=$2 AND deleted_at IS NULL FOR UPDATE',
+      [account.userId, id],
+    )
+    if (!row) continue
+    const current = json<AgentDefinition>(
+      row.definition_json,
+      {} as AgentDefinition,
+    )
+    if (!isPristineLegacyExample(current, index, associations[index] ?? []))
+      continue
+    try {
+      await service.save(
+        account,
+        { ...current, ...officeAgentExamples[index] },
+        id,
+      )
+    } catch (error) {
+      // Disabled/deleted linked resources remain under the maintainer's control.
+      if (!(error instanceof ApiError) || ![404, 422].includes(error.status))
+        throw error
+    }
+  }
+  marker.version = 3
+  await saveMarker(service, account, marker)
+}
+
+async function copyLatestExamples(
+  service: BusinessAgentService,
+  account: Account,
+  marker: DemoMarker,
+) {
+  if (marker.copiedVersion === 7) return
+  const resources = new AgentResourceService(service.options)
+  const catalog = await resources.catalog(account)
+  const skillIds = new Map<string, string>()
+  // New skills are separate records; existing customized skills and disabled tools stay untouched.
+  for (const skill of [...agentSkills].sort(
+    (a, b) => Number('program' in a) - Number('program' in b),
+  )) {
+    const requiredToolIds = defaultSkillTools[skill.id]!
+    if (
+      requiredToolIds.some(
+        (id) => !catalog.tools.some((tool) => tool.id === id && tool.enabled),
+      )
+    )
+      throw new ApiError(
+        422,
+        '新版示例需要的工具已停用，请先在工具管理中明确启用后再复制',
+      )
+    const saved = await resources.saveSkill(account, {
+      ...skill,
+      ...('program' in skill
+        ? {
+            program: {
+              ...skill.program,
+              stages: skill.program.stages.map((stage) => ({
+                ...stage,
+                ...(stage.skillId
+                  ? { skillId: skillIds.get(stage.skillId)! }
+                  : {}),
+              })),
+            },
+          }
+        : {}),
+      name: `${skill.name} · 办公版`,
+      enabled: true,
+      requiredToolIds,
+    })
+    skillIds.set(skill.id, saved.id)
+  }
+  const existingKnowledge = new Set(
+    catalog.knowledgeBases
+      .filter((base) => base.enabled)
+      .map((base) => base.id),
+  )
+  const ids = marker.knowledgeBaseIds ?? []
+  const associations = [[ids[0], ids[1]], [ids[0], ids[2]], [ids[0]]].map(
+    (list) =>
+      list.filter((id): id is string =>
+        Boolean(id && existingKnowledge.has(id)),
+      ),
+  )
+  const copies: AgentDefinition[] = []
+  for (const [index, example] of officeAgentExamples.entries()) {
+    copies.push(
+      await service.save(account, {
+        ...example,
+        ...newExampleFlow(index),
+        name: `${example.name} · 新版副本`,
+        skillIds: (newExampleFlow(index).skillIds ?? example.skillIds).map(
+          (id) => skillIds.get(id)!,
+        ),
+        knowledgeBaseIds: associations[index] ?? [],
+        knowledgeAssetIds: [],
+        templateAssetIds: [],
+        published: false,
+      }),
+    )
+  }
+  marker.copiedVersion = 7
+  marker.copiedAgentIds = copies.map((item) => item.id)
+  await saveMarker(service, account, marker)
 }
 
 async function upgradeLegacyAgents(

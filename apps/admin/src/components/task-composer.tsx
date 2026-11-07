@@ -374,6 +374,33 @@ function ScopedTaskComposer() {
     'new-session/runtime',
     agentOptions[0]?.id ?? '',
   )
+  const [agentTrial, setAgentTrial] = useWorkbenchState(
+    'new-session/agent-trial',
+    '',
+  )
+  React.useEffect(() => {
+    if (!agentTrial) return
+    const server = onlineConnectors.find(
+      (connector) => connector.executorKind === 'server-agent',
+    )
+    if (!server) return
+    const runtime = activeRuntimes(runtimeInventory[server.id]).find(
+      (runtime) => runtime.runtimeId === 'dsh',
+    )
+    if (!runtime) return
+    setSelectedDevice(server.id)
+    setSelectedAgent(runtime.runtimeId)
+    setAgentDefinitionId(agentTrial)
+    setAgentTrial('')
+  }, [
+    agentTrial,
+    onlineConnectors,
+    runtimeInventory,
+    setSelectedDevice,
+    setSelectedAgent,
+    setAgentDefinitionId,
+    setAgentTrial,
+  ])
   const selectedRuntime =
     activeRuntimes(runtimeInventory[selectedConnectorId]).find(
       (runtime) => runtime.runtimeId === selectedAgent,
@@ -1359,6 +1386,11 @@ function ScopedTaskComposer() {
             error={agentDefinitions.error}
             onRetry={agentDefinitions.reload}
             disabled={creating}
+            onPrompt={(suggestion) =>
+              setPrompt((current) =>
+                current.trim() ? `${current}\n${suggestion}` : suggestion,
+              )
+            }
           />
         )}
         <h1

@@ -18,7 +18,9 @@ import {
 import { NoticePrompt } from './NoticePrompt.tsx'
 import { NewSessionOptions } from './NewSessionOptions.tsx'
 import { AgentDefinitionSelect } from './AgentDefinitionSelect.tsx'
+import { SessionAgentSelect } from './SessionAgentSelect.tsx'
 import { AttachmentDownload } from './AttachmentDownload.tsx'
+import { AgentArtifacts } from './AgentArtifacts.tsx'
 import { RemoteFiles } from './RemoteFiles.tsx'
 import { RemoteTerminal } from './RemoteTerminal.tsx'
 import { PlatformSelect } from './PlatformSelect.tsx'
@@ -267,38 +269,7 @@ function PlatformConversationBody({
         {!!sessionId &&
           model.isServerAgent &&
           (model.agentBinding || model.artifacts.items.length > 0) && (
-            <section className="productAgentArtifacts" aria-label="生成成果">
-              <div className="platformActions">
-                <strong>生成成果</strong>
-                <Button
-                  size="sm"
-                  disabled={model.artifacts.loading}
-                  onClick={model.artifacts.refresh}
-                >
-                  刷新成果
-                </Button>
-              </div>
-              {model.artifacts.items.map((file) => (
-                <AttachmentDownload
-                  key={string(file.fileId)}
-                  file={file}
-                  disabled={busy}
-                  download={model.downloadAttachment}
-                  run={run}
-                />
-              ))}
-              {model.artifacts.loading && <small>正在读取成果…</small>}
-              {!model.artifacts.loading &&
-                !model.artifacts.error &&
-                model.artifacts.items.length === 0 && (
-                  <small>智能体生成的文件会显示在这里。</small>
-                )}
-              {model.artifacts.error && (
-                <p role="alert" className="platformError">
-                  {model.artifacts.error}
-                </p>
-              )}
-            </section>
+            <AgentArtifacts model={model} />
           )}
       </div>
       <div className="productRemoteComposer">
@@ -314,14 +285,23 @@ function PlatformConversationBody({
           />
         ))}
         <ComposerCard>
+          {!!sessionId && model.isServerAgent && (
+            <SessionAgentSelect
+              key={`${sessionId}:${model.account?.identityGeneration}`}
+              model={model}
+            />
+          )}
           <AgentDefinitionSelect
             agents={model.agents}
             disabled={busy || !online}
+            onSuggestion={(prompt) =>
+              setDraft(draft ? `${draft}\n${prompt}` : prompt)
+            }
           />
           {!!sessionId && model.isServerAgent && model.agentBinding && (
             <small className="productAgentBinding">
               智能体：{model.agentBinding.name} · v{model.agentBinding.version}
-              （本会话已固定）
+              （后续任务使用当前绑定版本）
             </small>
           )}
           {!sessionId && (

@@ -1,5 +1,6 @@
 import { apiClient } from '@/lib/api'
 import { sessionIdentityRevision } from '@/features/auth/session'
+import type { BoundToolImplementation } from '@superdsh/core/contracts/extensions'
 
 export type AgentResource = {
   id: string
@@ -12,12 +13,22 @@ export type AgentResource = {
 }
 export type KnowledgeBase = AgentResource & { assetIds: string[] }
 export type AgentSkill = AgentResource & {
+  program?: import('@superdsh/core/contracts/skills').SkillProgram
+  programDraft?: import('@superdsh/core/contracts/skills').SkillProgram | null
   instructions: string
   requiredToolIds: string[]
+  references?: { path: string; assetId: string; sha256: string }[]
+  packageSha256?: string
 }
-export type AgentTool = AgentResource & {
-  settings: { companyName?: string; title?: string; maxResults?: number }
-}
+export type AgentTool = AgentResource &
+  Partial<BoundToolImplementation> & {
+    configuredSecrets?: string[]
+    settings: Record<string, unknown> & {
+      companyName?: string
+      title?: string
+      maxResults?: number
+    }
+  }
 export type ResourceWrite<T extends AgentResource> = Omit<
   T,
   'id' | 'createdAt' | 'updatedAt' | 'version'
@@ -60,6 +71,16 @@ function resourceApi<T extends AgentResource>(path: string) {
         : apiClient.post<unknown>(path, body),
     remove: (id: string) =>
       apiClient.delete(`${path}/${encodeURIComponent(id)}`),
+    versions: (id: string, page: number, pageSize: number) =>
+      apiClient.get<ResourcePage<T> & { currentVersion: number }>(
+        `${path}/${encodeURIComponent(id)}/versions`,
+        { query: { page, pageSize } },
+      ),
+    restore: (id: string, sourceVersion: number, version: number) =>
+      apiClient.post(`${path}/${encodeURIComponent(id)}/restore`, {
+        sourceVersion,
+        version,
+      }),
   }
 }
 
@@ -75,14 +96,37 @@ export const knowledgeBasesApi = {
       {},
     ),
 }
-export const agentSkillsApi = resourceApi<AgentSkill>('/admin/skills')
-export const agentToolsApi = {
-  list: async (page: number, pageSize: number, search: string) => {
-    await ensureAgentResources()
-    return apiClient.get<ResourcePage<AgentTool>>('/admin/tools', {
-      query: { page, pageSize, search },
-    })
-  },
-  save: (id: string, body: ResourceWrite<AgentTool>) =>
-    apiClient.put<unknown>(`/admin/tools/${encodeURIComponent(id)}`, body),
+export const agentSkillsApi = {
+  publish: (id: string, version: number) =>
+    apiClient.post(`/admin/skills/${encodeURIComponent(id)}/publish`, {
+      version,
+    }),
+  matchPreview: (request: string) =>
+    apiClient.post<{
+      candidates: {
+        id: string
+        name: string
+        score: number
+        reasons: string[]
+      }[]
+    }>('/admin/skills/match-preview', { request }),
+  ...resourceApi<AgentSkill>('/admin/skills'),
+  importExtension: (
+    sourceId: string,
+    sourceVersion: string,
+    skillId: string,
+    requiredToolIds: string[],
+  ) =>
+    apiClient.post<{ skill: AgentSkill }>('/admin/skills/import-extension', {
+      sourceId,
+      sourceVersion,
+      skillId,
+      requiredToolIds,
+    }),
+  importPackage: (contentBase64: string, requiredToolIds: string[]) =>
+    apiClient.post<{ skill: AgentSkill }>('/admin/skills/import', {
+      contentBase64,
+      requiredToolIds,
+    }),
 }
+export const agentToolsApi = resourceApi<AgentTool>('/admin/tools')

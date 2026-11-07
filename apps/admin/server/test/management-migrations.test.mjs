@@ -1,8 +1,20 @@
 import assert from 'node:assert/strict'
 import test from 'node:test'
+import { readFile } from 'node:fs/promises'
 import { withTestDatabase } from './support/database.mjs'
-import { ensureSchema } from '../infrastructure/schema.ts'
+import { ensureSchema, schemaRevision } from '../infrastructure/schema.ts'
 import { IdentityService } from '../identity/service.ts'
+
+async function removeFoundationSchema(db) {
+  const ddl = await readFile(
+    new URL('../infrastructure/schema-v2-45.sql', import.meta.url),
+    'utf8',
+  )
+  const names = [...ddl.matchAll(/CREATE TABLE (\w+)\s*\(/g)].map(
+    (match) => match[1],
+  )
+  await db.query('DROP TABLE ' + names.join(','))
+}
 
 async function oldSchema(t, revision) {
   const db = await withTestDatabase(t),
@@ -21,11 +33,20 @@ async function oldSchema(t, revision) {
     await db.query('SELECT * FROM users WHERE id=$1', [user.userId])
   )[0]
   const now = new Date().toISOString()
+  await removeFoundationSchema(db)
   await db.query(
     "INSERT INTO connectors(id,user_id,name,status,token_hash,token_prefix,created_at,updated_at) VALUES('old_connector',$1,'Old device','offline','synthetic-old-key','prefix',$2,$2)",
     [user.userId, now],
   )
   for (const table of [
+    'agent_session_bindings',
+    'agent_tool_runs',
+    'agent_resource_versions',
+    'agent_tool_secrets',
+    'agent_extension_versions',
+    'agent_extension_sources',
+    'business_office_plans',
+    'business_agent_evidence',
     'business_knowledge_bases',
     'business_agent_skills',
     'business_agent_tools',
@@ -77,6 +98,75 @@ async function oldSchema(t, revision) {
   return { db, identity, user, original }
 }
 
+test('v2_42 upgrade creates binding history and preserves the frozen session configuration', async (t) => {
+  const db = await withTestDatabase(t)
+  await removeFoundationSchema(db)
+  const identity = new IdentityService(db, {
+    secret: 'synthetic-binding-secret',
+  })
+  await identity.seedBuiltinRoles()
+  const user = await identity.createUser({
+    username: 'bindingowner',
+    displayName: 'Binding owner',
+    password: 'synthetic-password',
+  })
+  const now = new Date().toISOString()
+  const binding = JSON.stringify({
+    definition: {
+      id: 'old-agent',
+      version: 7,
+      instructions: 'Preserve my custom instructions',
+    },
+  })
+  await db.query(
+    "INSERT INTO connectors(id,user_id,name,status,token_hash,token_prefix,created_at,updated_at) VALUES('binding-device',$1,'Device','offline','synthetic-token','prefix',$2,$2)",
+    [user.userId, now],
+  )
+  await db.query(
+    "INSERT INTO sessions(id,connector_id,runtime,runtime_id,status,takeover,seq,updated_seq,created_at,updated_at) VALUES('binding-session','binding-device','dsh','dsh','idle',1,0,0,$1,$1)",
+    [now],
+  )
+  await db.query(
+    "INSERT INTO business_agents(id,owner_user_id,name,version,definition_json,created_at,updated_at) VALUES('old-agent',$1,'Custom agent',7,'{}',$2,$2)",
+    [user.userId, now],
+  )
+  await db.query(
+    "INSERT INTO business_agent_sessions(session_id,owner_user_id,agent_id,binding_json,created_at) VALUES('binding-session',$1,'old-agent',$2,$3)",
+    [user.userId, binding, now],
+  )
+  for (const table of [
+    'agent_session_bindings',
+    'agent_tool_runs',
+    'agent_resource_versions',
+    'agent_tool_secrets',
+    'agent_extension_versions',
+    'agent_extension_sources',
+    'business_office_plans',
+    'business_agent_evidence',
+  ])
+    await db.query(`DROP TABLE ${table}`)
+  await db.query(
+    'ALTER TABLE business_agent_assets DROP COLUMN source_segments_json',
+  )
+  await db.query("UPDATE alembic_version SET version_num='v2_42'")
+  await ensureSchema(db)
+  await ensureSchema(db)
+  assert.deepEqual(await db.query('SELECT * FROM agent_session_bindings'), [
+    {
+      session_id: 'binding-session',
+      owner_user_id: user.userId,
+      version: 1,
+      binding_json: binding,
+      created_at: now,
+    },
+  ])
+  assert.equal(
+    (await db.query('SELECT binding_json FROM business_agent_sessions'))[0]
+      .binding_json,
+    binding,
+  )
+})
+
 for (const revision of [35, 36, 37, 38])
   test(`Node upgrades product v2_${revision} without changing owner IDs, password hashes or model ciphertext`, async (t) => {
     const f = await oldSchema(t, revision)
@@ -84,7 +174,7 @@ for (const revision of [35, 36, 37, 38])
     assert.equal(
       (await f.db.query('SELECT version_num FROM alembic_version'))[0]
         .version_num,
-      'v2_42',
+      schemaRevision,
     )
     const user = (
       await f.db.query('SELECT * FROM users WHERE id=$1', [f.user.userId])
@@ -114,7 +204,7 @@ for (const revision of [35, 36, 37, 38])
           "SELECT version FROM navigation_settings WHERE id='global'",
         )
       )[0].version,
-      1,
+      2,
     )
     if (revision >= 37)
       assert.equal(

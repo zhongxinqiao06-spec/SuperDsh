@@ -3,7 +3,7 @@ import { mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import test from 'node:test'
-import { initializeDatabasePassword } from './init-config.mjs'
+import { initializeDatabasePassword, initializeStorageConfiguration } from './init-config.mjs'
 
 function fixture(t) {
   const directory = mkdtempSync(join(tmpdir(), 'starbridge-config-'))
@@ -15,6 +15,19 @@ function fixture(t) {
     password: '',
   }
 }
+
+test('MinIO initializes private independent credentials once and preserves an existing local backend', (t) => {
+  const options = fixture(t)
+  const settings = { ...options, storageDirectory: join(options.directory, 'objects'), storageOwner: process.getuid?.(), existingDatabase: true }
+  initializeStorageConfiguration(settings)
+  const read = (name) => readFileSync(join(options.directory, name), 'utf8')
+  const original = read('minio-app-password')
+  assert.notEqual(original, read('minio-root-password'))
+  assert.equal(read('storage-backend'), 'local')
+  initializeStorageConfiguration({ ...settings, existingDatabase: false })
+  assert.equal(read('minio-app-password'), original)
+  assert.equal(read('storage-backend'), 'local')
+})
 
 test('fresh deployment generates one persistent random database password', (t) => {
   const options = fixture(t)

@@ -11,9 +11,9 @@ export async function readSalesAttachment(args, execution, attachments) {
     !name ||
     name.length > 200 ||
     /[\\/\x00-\x1f]/u.test(name) ||
-    !/\.(csv|xlsx)$/iu.test(name)
+    !/\.(csv|xlsx|pptx|txt|md|docx|pdf|png|jpe?g)$/iu.test(name)
   )
-    throw new Error('请填写本会话 CSV/XLSX 附件的完整文件名，不要填写路径')
+    throw new Error('请填写本会话办公附件的完整文件名，不要填写路径')
   const prefix = args.attachmentHash
   if (
     prefix !== undefined &&
@@ -38,7 +38,7 @@ export async function readSalesAttachment(args, execution, attachments) {
         ref.bytes <= 0 ||
         ref.bytes > agentAttachmentMaxBytes
       )
-        throw new Error('销售附件无效或超过 4 MiB')
+        throw new Error('办公附件无效或超过 4 MiB')
       const hash = ref.attachmentId.slice('sha256:'.length)
       if (prefix && !hash.startsWith(prefix.toLowerCase())) continue
       if (!matches.has(hash))
@@ -71,7 +71,7 @@ export async function readSalesAttachment(args, execution, attachments) {
     const chunk = Buffer.from(value)
     size += chunk.length
     if (size > selected.ref.bytes || size > agentAttachmentMaxBytes)
-      throw new Error('销售附件大小与会话记录不一致')
+      throw new Error('办公附件大小与会话记录不一致')
     chunks.push(chunk)
   }
   execution.signal.throwIfAborted()
@@ -80,7 +80,7 @@ export async function readSalesAttachment(args, execution, attachments) {
     size !== selected.ref.bytes ||
     createHash('sha256').update(bytes).digest('hex') !== selected.hash
   )
-    throw new Error('销售附件内容与会话记录不一致')
+    throw new Error('办公附件内容与会话记录不一致')
   return {
     name,
     size,
@@ -89,4 +89,31 @@ export async function readSalesAttachment(args, execution, attachments) {
     sourceMessageId: selected.sourceMessageId,
     sourceSeq: selected.sourceSeq,
   }
+}
+
+export async function readOfficeAttachments(args, execution, attachments) {
+  const refs =
+    typeof args.inputsJson === 'string' ? JSON.parse(args.inputsJson) : []
+  if (!Array.isArray(refs) || refs.length > 10)
+    throw new Error('每次最多选择 10 个输入文件')
+  if (args.attachmentName)
+    refs.push({
+      attachmentName: args.attachmentName,
+      attachmentHash: args.attachmentHash,
+    })
+  const output = []
+  for (const ref of refs) {
+    if (!ref || typeof ref !== 'object') throw new Error('输入文件引用无效')
+    if (ref.attachmentName !== undefined || ref.attachmentHash !== undefined) {
+      const file = await readSalesAttachment(ref, execution, attachments)
+      if (
+        file &&
+        !output.some(
+          (item) => item.name === file.name && item.sha256 === file.sha256,
+        )
+      )
+        output.push(file)
+    }
+  }
+  return output
 }

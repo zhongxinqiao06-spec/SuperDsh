@@ -3,11 +3,13 @@ import { existsSync, readFileSync } from 'node:fs'
 import { dirname, join, resolve } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { parseEnv } from 'node:util'
+import { prepareOfficeFonts } from './prepare-office-fonts.mjs'
 import {
   developmentComposeArgs,
   developmentEnvFile,
   developmentEnvironment,
   prepareDevelopmentEnv,
+  prepareDevelopmentStorageEnv,
   persistDevelopmentPorts,
   verifyDevelopmentDatabaseContainer,
 } from './server-development.mjs'
@@ -158,6 +160,7 @@ function requireHarnessBuild() {
 async function main() {
   switch (action) {
     case 'sync':
+      await prepareOfficeFonts()
       await run(
         process.platform === 'win32' ? 'corepack.cmd' : 'corepack',
         ['yarn', 'install', '--immutable'],
@@ -178,12 +181,14 @@ async function main() {
           env,
         })
       requireHarnessBuild()
+      await prepareOfficeFonts()
       return run(process.execPath, [join(adminRoot, 'server/main.ts')], {
         env: { ...env, NODE_ENV: 'development', SUPERDSH_NATIVE_PLATFORM: '1' },
         managedPlatform: true,
       })
     }
     case 'build':
+      await prepareOfficeFonts()
       await buildHarness()
       return run(
         process.execPath,
@@ -211,7 +216,7 @@ async function main() {
       })
     case 'down':
       console.log(
-        'The platform runs in the foreground. Stop its terminal with Ctrl+C, or stop its configured system service. Use server:deps:down to stop only PG/Redis/Qdrant; data volumes are retained.',
+        'The platform runs in the foreground. Stop its terminal with Ctrl+C, or stop its configured system service. Use server:deps:down to stop only PG/Redis/Qdrant/MinIO; data volumes are retained.',
       )
       return
     case 'test':
@@ -279,6 +284,27 @@ async function main() {
           )
       }
       prepareDevelopmentEnv(repositoryRoot)
+      const minioVolumes = spawnSync(
+        'docker',
+        [
+          'volume',
+          'ls',
+          '--filter',
+          'label=com.docker.compose.project=superdsh-dev',
+          '--filter',
+          'label=com.docker.compose.volume=minio-data',
+          '--format',
+          '{{.Name}}',
+        ],
+        { encoding: 'utf8', timeout: 10000, windowsHide: true },
+      )
+      if (minioVolumes.error || minioVolumes.status !== 0)
+        throw new Error(
+          'Cannot inspect MinIO volumes; no storage credentials were changed.',
+        )
+      prepareDevelopmentStorageEnv(repositoryRoot, process.env, {
+        existingVolume: Boolean(minioVolumes.stdout.trim()),
+      })
       let env = developmentEnvironment(repositoryRoot)
       if (env.SUPERDSH_BOOTSTRAP_DEV_ADMIN !== '1') {
         console.log(
@@ -326,6 +352,17 @@ async function main() {
         )
       }
       if (env.SUPERDSH_BOOTSTRAP_DEV_ADMIN === '1') {
+        await run(
+          'docker',
+          [
+            ...developmentComposeArgs(repositoryRoot, file),
+            'run',
+            '--rm',
+            '--no-deps',
+            'minio-init',
+          ],
+          { cwd: repositoryRoot, env },
+        )
         verifyManagedDatabase(env)
         await run(process.execPath, [join(adminRoot, 'server/migrate.ts')], {
           env,
@@ -336,7 +373,7 @@ async function main() {
         )
       }
       console.log(
-        `Development PostgreSQL: 127.0.0.1:${env.SUPERDSH_DEV_PG_PORT}; Redis: 127.0.0.1:${env.SUPERDSH_DEV_REDIS_PORT}; Qdrant: ${env.SUPERDSH_QDRANT_URL}. Start server:dev for the web, Node API and native Agents together.`,
+        `Development PostgreSQL: 127.0.0.1:${env.SUPERDSH_DEV_PG_PORT}; Redis: 127.0.0.1:${env.SUPERDSH_DEV_REDIS_PORT}; Qdrant: ${env.SUPERDSH_QDRANT_URL}; MinIO: http://127.0.0.1:${env.SUPERDSH_DEV_MINIO_PORT}. Start server:dev for the web, Node API and native Agents together.`,
       )
       return
     }
@@ -358,8 +395,17 @@ async function main() {
           'postgres',
           'redis',
           'qdrant',
+          'minio',
         ],
-        { env: developmentEnvironment(repositoryRoot) },
+        {
+          env: {
+            SUPERDSH_MINIO_ROOT_USER: 'unused-stop',
+            SUPERDSH_MINIO_ROOT_PASSWORD: 'unused-stop',
+            SUPERDSH_MINIO_APP_USER: 'unused-stop',
+            SUPERDSH_MINIO_APP_PASSWORD: 'unused-stop',
+            ...developmentEnvironment(repositoryRoot),
+          },
+        },
       )
     }
     default:

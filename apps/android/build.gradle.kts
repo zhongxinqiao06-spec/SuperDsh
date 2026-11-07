@@ -191,7 +191,9 @@ abstract class LegacyRoutesTask : DefaultTask() {
                     segments.lastOrNull() == "settings"
             },
             LegacyRouteRule("runtime", "root-agent-route") { segments ->
-                segments.getOrNull(1) == "agents"
+                // The published business-assistant catalog is a product API v2 extension.
+                // Legacy /agents/{runtime}/... execution routes remain forbidden.
+                segments.getOrNull(1) == "agents" && segments.size > 2
             },
         )
     }

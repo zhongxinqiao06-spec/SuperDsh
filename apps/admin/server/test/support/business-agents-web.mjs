@@ -1,4 +1,6 @@
 import assert from 'node:assert/strict'
+import { mkdir, writeFile } from 'node:fs/promises'
+import { join, resolve } from 'node:path'
 import { createPreviewDocx } from './office-preview-fixture.mjs'
 
 // Disposable Next server, real APIs and browser DOM; no request interception.
@@ -16,8 +18,9 @@ export async function verifyBusinessAgentManagement(page) {
   await page.locator('aside a[href="#/agents"]').click()
   const seededResponse = await seeded
   assert.equal(seededResponse.status(), 200, await seededResponse.text())
-  await page.getByRole('cell', { name: /企业资料助手/ }).waitFor()
-  assert.equal(await page.locator('table tbody tr').count(), 3)
+  const examples = await seededResponse.json()
+  await page.getByRole('cell', { name: /企业知识助手/ }).waitFor()
+  assert.equal(await page.locator('table tbody tr').count(), 4)
   assert.equal(
     await page
       .getByRole('button', { name: /初始化演示内容|Initialize demo content/ })
@@ -27,7 +30,7 @@ export async function verifyBusinessAgentManagement(page) {
   for (const route of ['#/agents', '#/knowledge', '#/skills', '#/tools'])
     assert.equal(await page.locator(`aside a[href="${route}"]`).count(), 1)
 
-  const row = page.locator('table tbody tr').filter({ hasText: '企业资料助手' })
+  const row = page.locator('table tbody tr').filter({ hasText: '企业知识助手' })
   await row.getByRole('button', { name: /^(编辑|Edit)$/ }).click()
   let dialog = page.getByRole('dialog')
   await dialog
@@ -148,7 +151,7 @@ export async function verifyBusinessAgentManagement(page) {
     .locator('table tbody tr')
     .filter({ hasText: '公司资料问答' })
   await skillRow.waitFor()
-  assert.equal(await page.locator('table tbody tr').count(), 3)
+  assert.equal(await page.locator('table tbody tr').count(), 4)
   await skillRow.getByRole('button', { name: /^(编辑|Edit)$/ }).click()
   dialog = page.getByRole('dialog')
   await dialog
@@ -169,12 +172,10 @@ export async function verifyBusinessAgentManagement(page) {
     .locator('table tbody tr')
     .filter({ hasText: 'knowledge_search' })
   await toolRow.waitFor()
-  assert.equal(await page.locator('table tbody tr').count(), 3)
+  assert.equal(await page.locator('table tbody tr').count(), 5)
   await toolRow.getByRole('button', { name: /^(编辑|Edit)$/ }).click()
   dialog = page.getByRole('dialog')
-  await dialog
-    .getByRole('spinbutton', { name: /最多返回段落数|Maximum result passages/ })
-    .fill('3')
+  await dialog.getByRole('spinbutton', { name: '检索结果数量' }).fill('3')
   const editedTool = await saveAndExpect(
     page,
     dialog,
@@ -216,10 +217,63 @@ export async function verifyBusinessAgentManagement(page) {
   assert.deepEqual(agent.skillIds, ['company-knowledge'])
   assert.deepEqual(agent.toolIds, ['knowledge_search'])
   await page.getByRole('cell', { name: /Browser configured agent/ }).waitFor()
-  return agent.id
+  return {
+    knowledgeAgentId: agent.id,
+    spreadsheetAgentId: examples.agents.find((item) =>
+      item.toolIds.includes('spreadsheet_report'),
+    ).id,
+    spreadsheetInputs: [
+      {
+        assetId: examples.assets.find((item) => item.name.endsWith('.csv')).id,
+        role: 'input',
+      },
+      {
+        assetId: examples.assets.find(
+          (item) => item.kind === 'spreadsheet-template',
+        ).id,
+        role: 'template',
+      },
+    ],
+  }
 }
 
 async function verifyOfficePreview(page, filesDialog, name, totalPages) {
+  const diagnostics = { console: [], errors: [], network: [], workers: [] }
+  const record = (items, entry) => {
+    items.push(entry)
+    if (items.length > 50) items.shift()
+  }
+  const onConsole = (message) =>
+    record(diagnostics.console, {
+      type: message.type(),
+      text: message.text().slice(0, 2000),
+    })
+  const onError = (error) => record(diagnostics.errors, error.message)
+  const requestPath = (url) => {
+    const { origin, pathname } = new URL(url)
+    return `${origin}${pathname}`
+  }
+  const onRequestFailed = (request) =>
+    record(diagnostics.network, {
+      path: requestPath(request.url()),
+      method: request.method(),
+      failure: request.failure()?.errorText,
+    })
+  const onResponse = (response) => {
+    if (response.status() >= 400 || response.url().endsWith('/preview'))
+      record(diagnostics.network, {
+        path: requestPath(response.url()),
+        status: response.status(),
+      })
+  }
+  const onWorker = (worker) =>
+    record(diagnostics.workers, requestPath(worker.url()))
+  page.on('console', onConsole)
+  page.on('pageerror', onError)
+  page.on('requestfailed', onRequestFailed)
+  page.on('response', onResponse)
+  page.on('worker', onWorker)
+  let stage = 'opening preview'
   const responsePending = page.waitForResponse(
     (response) =>
       /\/api\/v2\/admin\/agents\/assets\/[^/]+\/preview$/.test(
@@ -236,6 +290,7 @@ async function verifyOfficePreview(page, filesDialog, name, totalPages) {
       .filter({ hasText: name })
       .getByRole('button', { name: /^(查看|View)$/ })
       .click()
+    stage = 'waiting for document conversion'
     const response = await responsePending
     assert.equal(response.status(), 200, await response.text())
     const rendered = await response.json()
@@ -244,11 +299,15 @@ async function verifyOfficePreview(page, filesDialog, name, totalPages) {
       Buffer.from(rendered.contentBase64, 'base64').subarray(0, 5).toString(),
       '%PDF-',
     )
+    stage = 'loading PDF document in the browser'
     const previewDialog = page.getByRole('dialog', { name, exact: true })
     await previewDialog
       .getByText(`1 / ${totalPages}`, { exact: true })
       .waitFor()
+    stage = 'rendering the first page'
     await verifyRenderedPage(previewDialog, 1)
+    await captureOfficePreview(page, previewDialog, name, rendered, diagnostics)
+    stage = 'changing pages'
     const previous = previewDialog.getByRole('button', {
       name: /^(上一页|Previous page)$/,
     })
@@ -267,6 +326,7 @@ async function verifyOfficePreview(page, filesDialog, name, totalPages) {
       .getByText(`1 / ${totalPages}`, { exact: true })
       .waitFor()
     await verifyRenderedPage(previewDialog, 1)
+    stage = 'changing preview zoom'
     await previewDialog
       .getByRole('button', { name: /^(放大|Zoom in)$/ })
       .click()
@@ -283,12 +343,100 @@ async function verifyOfficePreview(page, filesDialog, name, totalPages) {
       .click()
     await previewDialog.waitFor({ state: 'hidden' })
     assert.equal(await filesDialog.locator('canvas').count(), 0)
+  } catch (cause) {
+    const detail = {
+      name,
+      stage,
+      ...diagnostics,
+      dialogs: await page
+        .getByRole('dialog')
+        .allTextContents()
+        .catch(() => []),
+      alerts: await page
+        .getByRole('alert')
+        .allTextContents()
+        .catch(() => []),
+    }
+    if (process.env.OFFICE_PREVIEW_SCREENSHOT_DIR) {
+      const directory = resolve(process.env.OFFICE_PREVIEW_SCREENSHOT_DIR)
+      const stem = name.endsWith('.docx') ? 'docx' : 'pptx'
+      await mkdir(directory, { recursive: true })
+      await page
+        .screenshot({ path: join(directory, `${stem}-failure.png`) })
+        .catch(() => undefined)
+      await writeFile(
+        join(directory, `${stem}-failure.json`),
+        `${JSON.stringify(detail, null, 2)}\n`,
+      )
+    }
+    throw new Error(`Office preview failed: ${JSON.stringify(detail)}`, {
+      cause,
+    })
   } finally {
     page.off('download', onDownload)
+    page.off('console', onConsole)
+    page.off('pageerror', onError)
+    page.off('requestfailed', onRequestFailed)
+    page.off('response', onResponse)
+    page.off('worker', onWorker)
   }
 }
 
-async function verifyRenderedPage(dialog, pageNumber) {
+async function captureOfficePreview(page, dialog, name, rendered, diagnostics) {
+  if (!process.env.OFFICE_PREVIEW_SCREENSHOT_DIR) return
+  const directory = resolve(process.env.OFFICE_PREVIEW_SCREENSHOT_DIR)
+  await mkdir(directory, { recursive: true })
+  const stem = name.endsWith('.docx') ? 'docx' : 'pptx'
+  const canvas = dialog.locator('canvas')
+  const image = await canvas.evaluate((element) =>
+    element.toDataURL('image/png'),
+  )
+  const geometry = await canvas.evaluate((element) => {
+    const viewport = element.closest(
+      '[aria-label="Document pages"], [aria-label="文档页面"]',
+    )
+    const bounds = (node) => {
+      const { x, y, width, height, top, right, bottom, left } =
+        node.getBoundingClientRect()
+      return { x, y, width, height, top, right, bottom, left }
+    }
+    return {
+      canvas: bounds(element),
+      viewport: viewport && {
+        ...bounds(viewport),
+        clientWidth: viewport.clientWidth,
+        clientHeight: viewport.clientHeight,
+        scrollWidth: viewport.scrollWidth,
+        scrollHeight: viewport.scrollHeight,
+        scrollLeft: viewport.scrollLeft,
+        scrollTop: viewport.scrollTop,
+      },
+      browser: { width: window.innerWidth, height: window.innerHeight },
+    }
+  })
+  await page.screenshot({
+    path: join(directory, `${stem}-preview.png`),
+    animations: 'disabled',
+  })
+  await writeFile(
+    join(directory, `${stem}-page-1.png`),
+    Buffer.from(image.split(',')[1], 'base64'),
+  )
+  await writeFile(
+    join(directory, `${stem}-preview.pdf`),
+    Buffer.from(rendered.contentBase64, 'base64'),
+  )
+  await writeFile(
+    join(directory, `${stem}-geometry.json`),
+    `${JSON.stringify(geometry, null, 2)}\n`,
+  )
+  await writeFile(
+    join(directory, `${stem}-diagnostics.json`),
+    `${JSON.stringify(diagnostics, null, 2)}\n`,
+  )
+}
+
+export async function verifyRenderedPage(dialog, pageNumber) {
   const canvas = dialog.locator('canvas')
   await canvas.waitFor({ state: 'visible', timeout: 30_000 })
   assert.match(

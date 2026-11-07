@@ -56,7 +56,7 @@ export function publicAddress(address: string): boolean {
     ? !nonPublic.check(address, 'ipv4')
     : globalV6.check(address, 'ipv6') && !nonPublicV6.check(address, 'ipv6')
 }
-function validUrl(value: string): URL {
+function validUrl(value: string, allowQuery = false): URL {
   let url: URL
   try {
     url = new URL(value)
@@ -67,7 +67,7 @@ function validUrl(value: string): URL {
     !['http:', 'https:'].includes(url.protocol) ||
     url.username ||
     url.password ||
-    url.search ||
+    (url.search && !allowQuery) ||
     url.hash
   )
     throw new ApiError(422, 'personal model address is invalid')
@@ -78,8 +78,9 @@ export async function resolveProviderAddress(
   allowedOrigins: string,
   resolver: AddressResolver = async (hostname) =>
     (await lookup(hostname, { all: true })).map((entry) => entry.address),
+  allowQuery = false,
 ): Promise<{ url: URL; address: string; family: number }> {
-  const url = validUrl(value)
+  const url = validUrl(value, allowQuery)
   const allowed = new Set<string>()
   for (const entry of allowedOrigins
     .split(',')
@@ -130,15 +131,23 @@ export async function providerRequest(options: {
   allowedOrigins: string
   signal: AbortSignal
   resolver?: AddressResolver
+  /** Signed provider output URLs only; never permit query credentials on model submission. */
+  mediaDownload?: boolean
 }): Promise<IncomingMessage> {
   const pin = options.personal
     ? await resolveProviderAddress(
         options.url,
         options.allowedOrigins,
         options.resolver,
+        options.mediaDownload === true && options.method === 'GET',
       )
     : null
-  const url = pin?.url ?? validUrl(options.url)
+  const url =
+    pin?.url ??
+    validUrl(
+      options.url,
+      options.mediaDownload === true && options.method === 'GET',
+    )
   options.signal.throwIfAborted()
   return new Promise((resolve, reject) => {
     const request = (url.protocol === 'https:' ? httpsRequest : httpRequest)(
@@ -147,7 +156,7 @@ export async function providerRequest(options: {
         hostname: pin?.address ?? url.hostname.replace(/^\[|\]$/g, ''),
         port: url.port || undefined,
         servername: url.hostname.replace(/^\[|\]$/g, ''),
-        path: url.pathname,
+        path: url.pathname + url.search,
         method: options.method,
         headers: {
           ...options.headers,

@@ -8,6 +8,7 @@ import {
   sparseKnowledgeVector,
   knowledgeChunks,
 } from '../agents/knowledge-index.ts'
+import { syntheticKnowledgeEmbedding } from './support/knowledge-embedding.mjs'
 
 test('local sparse encoding is deterministic, Chinese-aware and bounded by normalized terms', () => {
   const left = sparseKnowledgeVector('销售华东 revenue')
@@ -26,14 +27,19 @@ test('local sparse encoding is deterministic, Chinese-aware and bounded by norma
   })
   assert.ok(parts.length > 1)
   assert.ok(parts.every((part) => part.content.length <= 900))
-  assert.equal(parts[1].paragraph, 2)
+  assert.equal(parts[1].paragraph, 0)
+  assert.deepEqual(parts[1].location, {})
 })
 
 test('real Qdrant persists chunks, retrieves Chinese sources, filters ownership and can rebuild its index', async () => {
   const url = process.env.SUPERDSH_NODE_TEST_QDRANT_URL
   assert.ok(url, 'Use scripts/test-node-server.mjs for disposable Qdrant')
   assert.equal(new URL(url).hostname, '127.0.0.1')
-  const index = new QdrantKnowledgeIndex(url)
+  const index = new QdrantKnowledgeIndex(
+    url,
+    undefined,
+    syntheticKnowledgeEmbedding,
+  )
   const owner = randomUUID()
   const other = randomUUID()
   const row = (id, name, content) => ({
@@ -60,13 +66,11 @@ test('real Qdrant persists chunks, retrieves Chinese sources, filters ownership 
   await index.index(other, [forbidden])
   await index.index(owner, [permitted, unrelated])
   const signal = AbortSignal.timeout(15000)
-  const sources = await new QdrantKnowledgeIndex(url).search(
-    owner,
-    [permitted],
-    '报销需要什么',
-    2,
-    signal,
-  )
+  const sources = await new QdrantKnowledgeIndex(
+    url,
+    undefined,
+    syntheticKnowledgeEmbedding,
+  ).search(owner, [permitted], '报销需要什么', 2, signal)
   assert.equal(sources.length, 1)
   assert.equal(sources[0].filename, '差旅制度.md')
   assert.match(sources[0].content, /发票和审批单/)

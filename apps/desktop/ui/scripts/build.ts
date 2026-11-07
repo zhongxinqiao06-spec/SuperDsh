@@ -6,7 +6,11 @@ import { fileURLToPath } from 'node:url'
 import { build as bundle, type UserConfig } from 'tsdown'
 import { build as viteBuild } from 'vite'
 import { clientConfig } from '../build/client-bundle.ts'
-import documentPreviewConfig from '../src/features/sidebar-documentpreview/tsdown.config.ts'
+import documentPreviewConfig, {
+  pdfAssets,
+  pdfLicenseBanner,
+  pdfWorker,
+} from '../src/features/sidebar-documentpreview/tsdown.config.ts'
 import { ownedSourcePlugin, readSourceManifest } from './source-ownership.mjs'
 import { createWebConfig } from './web-config.ts'
 import { createNativeConfig } from './native-config.ts'
@@ -50,15 +54,29 @@ async function build(): Promise<void> {
             config.name?.endsWith('/client'),
           )
         : undefined
+    const officePreview = row.entry === 'src/features/conversation/index.ts'
     const config: UserConfig =
-      special ?? clientConfig(id, resolve(root, row.entry))
+      special ??
+      clientConfig(
+        id,
+        resolve(root, row.entry),
+        officePreview ? pdfLicenseBanner : undefined,
+      )
     const relativeOutput = `client/${id.replace('@deepseek-ai/', '').replace('@superdsh/', 'superdsh-')}`
     await bundle({
       ...config,
       config: false,
       entry: { client: resolve(root, row.entry) },
       outDir: resolve(root, relativeOutput),
-      plugins: [config.plugins, ownedSourcePlugin(root, manifest, inputs)],
+      plugins: [
+        config.plugins,
+        ...(officePreview ? [pdfWorker] : []),
+        ownedSourcePlugin(root, manifest, inputs),
+      ],
+      define: {
+        ...config.define,
+        ...(officePreview ? { __DSH_PDFJS_ASSETS__: pdfAssets() } : {}),
+      },
       logLevel: 'warn',
       report: false,
     })

@@ -29,6 +29,7 @@ Design references retain their stated scope. Historical imports, API examples, a
 
 - Source migrations: [desktop](superdsh-migration-validation.md) and [admin, server, and Android](apps-migration-validation.md).
 - Platform capabilities: [identity and RBAC](platform-identity-validation.md), [desktop inline login](desktop-inline-login-validation.md), and [server Agent](server-agent-validation.md).
+- Office assistants: [Excel, PPT and enterprise knowledge upgrade](office-assistants-validation.md), separating deterministic execution, real rendering and outstanding model/release acceptance.
 - Windows installation: [NSIS A/B methodology](evidence/windows-nsis-ab-methodology.md) and [upgrade validation](evidence/windows-installer-upgrade-2026-08-25.md).
 
 Validation records describe their original environments, results, and limits; original paths and conclusions remain intact. Use the [README](../README.en.md#troubleshooting-and-validation) for current startup and validation boundaries. Documentation in pinned upstream submodules belongs to those projects.

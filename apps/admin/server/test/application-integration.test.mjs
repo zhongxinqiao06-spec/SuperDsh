@@ -1,5 +1,5 @@
 import assert from 'node:assert/strict'
-import { randomBytes } from 'node:crypto'
+import { createHash, randomBytes } from 'node:crypto'
 import { mkdtemp, rm } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { dirname, join, resolve } from 'node:path'
@@ -66,6 +66,169 @@ const integration =
   process.env.SUPERDSH_NODE_TEST_REDIS_URL
     ? {}
     : { skip: 'disposable PostgreSQL and Redis runner required' }
+
+test(
+  'file and model foundation HTTP routes enforce ownership, Range, CAS and secret redaction',
+  integration,
+  async (t) => {
+    const { platform, request } = await fixture(t)
+    const registered = await request('/auth/register', {
+      method: 'POST',
+      body: JSON.stringify({
+        username: 'storageadmin',
+        displayName: 'Storage',
+        password: 'synthetic-password',
+        setupToken: 'synthetic-setup-token',
+      }),
+    })
+    assert.equal(
+      registered.response.status,
+      200,
+      JSON.stringify(registered.data),
+    )
+    const headers = { Authorization: 'Bearer ' + registered.data.accessToken }
+    await platform.app.identity.createUser(
+      {
+        username: 'filemember',
+        displayName: 'Member',
+        password: 'synthetic-password',
+      },
+      { role: 'member' },
+    )
+    const login = await request('/auth/login', {
+      method: 'POST',
+      body: JSON.stringify({
+        identifier: 'filemember',
+        password: 'synthetic-password',
+        clientType: 'native',
+      }),
+    })
+    const member = { Authorization: 'Bearer ' + login.data.accessToken }
+    const bytes = Buffer.from('账户文件与 Range 下载'),
+      sha256 = createHash('sha256').update(bytes).digest('hex')
+    const upload = await request('/files/uploads', {
+      method: 'POST',
+      headers: member,
+      body: JSON.stringify({
+        name: '公司.txt',
+        size: bytes.length,
+        sha256,
+        idempotencyKey: 'http-upload',
+      }),
+    })
+    assert.equal(upload.response.status, 200, JSON.stringify(upload.data))
+    assert.equal(
+      (
+        await request(`/files/uploads/${upload.data.id}/parts/1`, {
+          method: 'PUT',
+          headers: { ...member, 'Content-Type': 'application/octet-stream' },
+          body: bytes,
+        })
+      ).response.status,
+      200,
+    )
+    const finished = await request(
+      `/files/uploads/${upload.data.id}/complete`,
+      { method: 'POST', headers: member, body: '{}' },
+    )
+    assert.equal(finished.response.status, 200, JSON.stringify(finished.data))
+    assert.equal(
+      (
+        await request(`/files/uploads/${upload.data.id}/complete`, {
+          method: 'POST',
+          headers: member,
+          body: '{}',
+        })
+      ).data.id,
+      finished.data.id,
+    )
+    const url = `http://127.0.0.1:${platform.address.port}/api/v2/files/${finished.data.id}/content`
+    const download = await fetch(url, {
+      headers: { ...member, Range: 'bytes=1-6' },
+    })
+    assert.equal(download.status, 206)
+    assert.equal(
+      download.headers.get('content-range'),
+      `bytes 1-6/${bytes.length}`,
+    )
+    assert.deepEqual(
+      Buffer.from(await download.arrayBuffer()),
+      bytes.subarray(1, 7),
+    )
+    assert.equal(
+      (await fetch(url, { headers })).status,
+      404,
+      'storage administrator cannot read another account file',
+    )
+    assert.equal(
+      (await fetch(url, { headers: { ...member, Range: 'bytes=999999-' } }))
+        .status,
+      416,
+    )
+    assert.equal(
+      (await request('/admin/storage', { headers: member })).response.status,
+      403,
+    )
+    const storage = await request('/admin/storage', { headers })
+    assert.equal(storage.response.status, 200, JSON.stringify(storage.data))
+    const connection = await request('/admin/models/connections', {
+      method: 'POST',
+      headers,
+      body: JSON.stringify({
+        name: 'Ark test',
+        adapter: 'volcengine-ark',
+        baseUrl: 'https://ark.cn-beijing.volces.com/api/v3',
+        apiKey: 'synthetic-http-key',
+      }),
+    })
+    assert.equal(
+      connection.response.status,
+      200,
+      JSON.stringify(connection.data),
+    )
+    assert.equal(connection.data.credentialConfigured, true)
+    assert.doesNotMatch(
+      JSON.stringify(connection.data),
+      /synthetic-http-key|ciphertext/,
+    )
+    const configuration = await request('/admin/models/configurations', {
+      method: 'POST',
+      headers,
+      body: JSON.stringify({
+        name: 'Image',
+        connectionId: connection.data.id,
+        capability: 'image.generate',
+        modelId: 'doubao-seedream-4-5-251128',
+        parameters: { size: '2K' },
+      }),
+    })
+    assert.equal(
+      configuration.response.status,
+      200,
+      JSON.stringify(configuration.data),
+    )
+    assert.equal(
+      (
+        await request('/admin/models/configurations/' + configuration.data.id, {
+          method: 'PATCH',
+          headers,
+          body: JSON.stringify({ ...configuration.data, revision: 0 }),
+        })
+      ).response.status,
+      409,
+    )
+    assert.equal(
+      (await request('/models/capabilities', { headers: member })).response
+        .status,
+      200,
+    )
+    assert.equal(
+      (await request('/admin/models/configurations', { headers: member }))
+        .response.status,
+      403,
+    )
+  },
+)
 
 test(
   'composed Node platform logs in browser/native clients, rotates credentials and defers Agent preparation',

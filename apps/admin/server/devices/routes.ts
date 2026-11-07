@@ -250,11 +250,13 @@ export function registerDeviceRoutes(
       )
       if (!provider) throw new ApiError(404, 'runtime type not found')
       const config = record(ctx.body.config)
+      const id = identifier(type)
+      const configRevision = Date.parse(now)
       const validated = record(
         await hub.call(
           text(connector.id),
           'runtime.validateConfig',
-          { runtime: type, runtimeId: type, config },
+          { runtime: type, runtimeId: id, name, config, configRevision },
           { signal: ctx.signal },
         ),
       )
@@ -272,7 +274,6 @@ export function registerDeviceRoutes(
         Number(count!.count) >= Number(provider.max_instances)
       )
         throw new ApiError(409, 'runtime instance limit reached')
-      const id = identifier(type)
       const [row] = await db.query(
         "INSERT INTO device_runtimes(connector_id,runtime_id,runtime_type,name,name_key,config_json,active,status,created_at,updated_at) VALUES($1,$2,$3,$4,$5,$7,$8,'stopped',$6,$6) RETURNING *",
         [
@@ -292,7 +293,7 @@ export function registerDeviceRoutes(
             await hub.call(
               text(connector.id),
               'runtime.start',
-              { runtime: type, runtimeId: id, name, config },
+              { runtime: type, runtimeId: id, name, config, configRevision },
               { signal: ctx.signal },
             ),
           )
@@ -350,10 +351,18 @@ export function registerDeviceRoutes(
           throw new ApiError(409, 'managed runtime cannot be edited')
         if (part === 'config') {
           const config = record(ctx.body.config || ctx.body)
+          const updatedAt = utcNow()
+          const configRevision = Date.parse(updatedAt)
           await hub.call(
             text(row.connector_id),
             'runtime.validateConfig',
-            { runtime: row.runtime_type, runtimeId: row.runtime_id, config },
+            {
+              runtime: row.runtime_type,
+              runtimeId: row.runtime_id,
+              name: row.name,
+              config,
+              configRevision,
+            },
             { signal: ctx.signal },
           )
           await db.query(
@@ -362,7 +371,7 @@ export function registerDeviceRoutes(
               row.connector_id,
               row.runtime_id,
               JSON.stringify(config),
-              utcNow(),
+              updatedAt,
             ],
           )
           if (row.active) {
@@ -375,6 +384,7 @@ export function registerDeviceRoutes(
               runtimeId: row.runtime_id,
               name: row.name,
               config,
+              configRevision,
             })
           }
         } else {
@@ -390,8 +400,13 @@ export function registerDeviceRoutes(
             {
               runtime: row.runtime_type,
               runtimeId: row.runtime_id,
-              name: row.name,
-              config: json(row.config_json, {}),
+              ...(active
+                ? {
+                    name: row.name,
+                    config: json(row.config_json, {}),
+                    configRevision: Date.parse(text(row.updated_at)),
+                  }
+                : {}),
             },
             { signal: ctx.signal },
           )

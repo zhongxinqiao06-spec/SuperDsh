@@ -2,7 +2,6 @@ import assert from 'node:assert/strict'
 import { createHash } from 'node:crypto'
 import { EventEmitter } from 'node:events'
 import test from 'node:test'
-import ExcelJS from 'exceljs'
 import { readSalesAttachment } from '../agents/host-attachments.mjs'
 import { BusinessHostChannel } from '../agents/host-channel.ts'
 import { executeAgentTool } from '../agents/execution.ts'
@@ -160,7 +159,7 @@ test('captured references survive later uploads and names cannot become arbitrar
     '../sales.csv',
     'C:\\secret.csv',
     '/tmp/file.xlsx',
-    'key.txt',
+    'key.exe',
     'file.csv\u0000',
   ])
     await assert.rejects(
@@ -326,11 +325,60 @@ test('IPC ignores model-forged context and binds owner/session independently of 
   }
 })
 
+test('Host deadline preserves a timeout reason while a user cancellation remains separate', async () => {
+  const child = new EventEmitter()
+  child.connected = true
+  child.send = (_message, done) => done?.()
+  const aborted = []
+  const channel = new BusinessHostChannel(child, 'owner-real', {
+    async execute(_owner, _session, _tool, _args, signal) {
+      return new Promise((_resolve, reject) =>
+        signal.addEventListener(
+          'abort',
+          () => {
+            aborted.push(signal.reason)
+            reject(signal.reason)
+          },
+          { once: true },
+        ),
+      )
+    },
+  })
+  try {
+    const context = await attachedContext()
+    for (const [id, reason] of [
+      ['timeout-call', 'timeout'],
+      ['cancel-call', undefined],
+    ]) {
+      child.emit('message', {
+        type: 'business-tool',
+        id,
+        sessionId: context.sessionId,
+        tool: 'spreadsheet_report',
+        args: {},
+        context,
+      })
+      await new Promise(setImmediate)
+      child.emit('message', { type: 'business-tool-cancel', id, reason })
+      await new Promise(setImmediate)
+    }
+    assert.deepEqual(
+      aborted.map((error) => error.status),
+      [504, 499],
+    )
+    assert.match(aborted[0].message, /超时/)
+    assert.doesNotMatch(aborted[0].message, /取消/)
+  } finally {
+    channel.close()
+  }
+})
+
 function serviceFixture() {
   const saved = []
   const sourceReads = []
   let allowed = true
   const binding = {
+    sessionId: 'session-one',
     presetId: 'business-one',
     resourceOwnerId: 'owner-real',
     definition: {
@@ -409,7 +457,7 @@ function serviceFixture() {
   }
 }
 
-test('Office executes actual chat attachment bytes, not bound demo sales, and retains plain bound mode', async () => {
+test('Office inspects actual accepted attachment bytes and never defaults to bound demo data', async () => {
   const fixture = serviceFixture()
   const context = await attachedContext()
   const result = await executeAgentTool(
@@ -419,27 +467,23 @@ test('Office executes actual chat attachment bytes, not bound demo sales, and re
     'spreadsheet_report',
     { attachmentName: '销售台账.csv' },
     new AbortController().signal,
-    context,
+    { ...context, phase: 'inspect' },
   )
-  assert.equal(result.summary.revenue, 750)
-  assert.equal(result.summary.profit, 450)
+  assert.equal(result.inspection.tables[0].rows[0][4], '3')
+  assert.equal(result.sources[0].sha256, context.attachment.sha256)
   assert.equal(fixture.sourceReads.length, 0)
-  const workbook = new ExcelJS.Workbook()
-  await workbook.xlsx.load(fixture.saved[0].bytes)
-  assert.equal(
-    workbook.getWorksheet('销售明细').getCell('H3').value.result,
-    750,
-  )
-  const bound = await executeAgentTool(
+  const empty = await executeAgentTool(
     fixture.service,
     'owner-real',
     'session-one',
     'spreadsheet_report',
-    { __callId: 'bound-call' },
+    {},
     new AbortController().signal,
+    { ...context, attachment: undefined, phase: 'inspect' },
   )
-  assert.equal(bound.summary.revenue, 2)
-  assert.equal(fixture.sourceReads.length, 1)
+  assert.equal(empty.inspection.tables.length, 0)
+  assert.equal(fixture.sourceReads.length, 0)
+  assert.ok(fixture.saved.every((file) => !file.name.endsWith('.xlsx')))
 })
 
 test('missing or forged attachment never falls back; owner, scope and permission guards remain', async () => {

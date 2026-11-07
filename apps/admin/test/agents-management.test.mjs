@@ -38,6 +38,12 @@ const { NextIntlClientProvider } = await import('next-intl')
 const source = registerSource()
 const override = registerHooks({
   load(url, context, nextLoad) {
+    if (url.endsWith('/components/management/agent-pdf-preview.tsx'))
+      return {
+        format: 'module',
+        shortCircuit: true,
+        source: `import {createElement} from 'react'; export function AgentPdfPreview(props) { globalThis.officePreviewProps = props; return createElement('div', {'data-office-preview':true}, props.name) }`,
+      }
     if (url.endsWith('/components/auth/auth-context.tsx'))
       return {
         format: 'module',
@@ -57,6 +63,8 @@ const { ToolsPanel } =
   await import('../src/components/management/tools-panel.tsx')
 const { knowledgeBasesApi, agentSkillsApi, agentToolsApi } =
   await import('../src/features/agents/resources-api.ts')
+const { extensionsApi } =
+  await import('../src/features/agents/extensions-api.ts')
 const { AgentSessionArtifacts } =
   await import('../src/components/session/agent-session-artifacts.tsx')
 const { agentsApi } = await import('../src/features/agents/api.ts')
@@ -159,6 +167,8 @@ function setup() {
   agentsApi.save = async () => ({ agent })
   agentsApi.remove = async () => undefined
   agentsApi.seedDemo = async () => ({ agents: [agent], assets: catalog.assets })
+  agentsApi.officePlans = async () => ({ items: [] })
+  agentsApi.evidence = async () => ({ items: [] })
   knowledgeBasesApi.list = async () => ({
     items: catalog.knowledgeBases,
     total: 1,
@@ -188,6 +198,39 @@ function setup() {
     pageSize: 10,
   })
   agentToolsApi.save = async () => ({ tool: catalog.tools[0] })
+  extensionsApi.list = async () => ({
+    items: [
+      {
+        id: 'superdsh.builtin',
+        name: '内置办公工具',
+        enabled: true,
+        activeVersion: '1.0.0',
+        revision: 1,
+        versions: [{ version: '1.0.0', digest: 'fixture' }],
+        tools: [
+          {
+            id: 'knowledge_search',
+            name: '知识检索',
+            description: '检索已绑定资料',
+            permissions: ['sessions.read'],
+            timeoutSeconds: 30,
+            configurationSchema: {
+              type: 'object',
+              additionalProperties: false,
+              properties: {
+                maxResults: {
+                  type: 'integer',
+                  minimum: 1,
+                  maximum: 20,
+                  title: '最大结果数',
+                },
+              },
+            },
+          },
+        ],
+      },
+    ],
+  })
 }
 async function render(component = AgentsPanel, props = {}) {
   if (!root) {
@@ -364,7 +407,9 @@ test('knowledge base files upload to the selected collection and rebuild its sea
     dialog
       .querySelector('form')
       .dispatchEvent(new Event('submit', { bubbles: true, cancelable: true }))
-    await new Promise((resolve) => setTimeout(resolve, 30))
+    const deadline = Date.now() + 5000
+    while (!uploaded && Date.now() < deadline)
+      await new Promise((resolve) => setTimeout(resolve, 20))
   })
   assert.equal(uploaded.kind, 'knowledge')
   assert.equal(uploaded.name, 'sales.csv')
@@ -409,6 +454,47 @@ test('skill editor persists reusable instructions and required tool IDs independ
   assert.equal(document.querySelector('[role="dialog"]'), null)
 })
 
+test('skill flow editor saves editable stages as a draft with required tool dependencies', async () => {
+  setup()
+  let saved
+  agentSkillsApi.save = async (id, body) => {
+    saved = { id, body }
+    return { skill: catalog.skills[0] }
+  }
+  await render(SkillsPanel)
+  await click('编辑')
+  const dialog = document.querySelector('[role="dialog"]')
+  await click('使用 PPT 流程起点', dialog)
+  const fields = [...dialog.querySelectorAll('label')]
+  const matching = fields
+    .find((item) => item.textContent.includes('匹配词'))
+    .querySelector('textarea')
+  await change(matching, '客户演示\nPPT\n')
+  const stageName = fields
+    .find((item) => item.textContent.includes('阶段名称'))
+    .querySelector('input')
+  await change(stageName, '公司资料与权限检查')
+  await click('保存', dialog)
+  assert.equal(
+    saved.body.program,
+    undefined,
+    'saving must not silently publish',
+  )
+  assert.equal(saved.body.programDraft.stages.length, 6)
+  assert.equal(saved.body.programDraft.stages[0].name, '公司资料与权限检查')
+  assert.deepEqual(saved.body.programDraft.match.phrases, [
+    '客户演示',
+    'PPT',
+    '',
+  ])
+  assert.ok(saved.body.requiredToolIds.includes('presentation_report'))
+  assert.deepEqual(saved.body.programDraft.stages.at(-1).checks, [
+    'schema',
+    'artifact',
+    'rendered-quality',
+  ])
+})
+
 test('tool settings persist separately and only expose approved implementations', async () => {
   setup()
   let saved
@@ -417,8 +503,7 @@ test('tool settings persist separately and only expose approved implementations'
     return { tool: catalog.tools[0] }
   }
   await render(ToolsPanel)
-  assert.equal(button('新增工具'), undefined)
-  assert.match(container.textContent, /内置实现/)
+  assert.ok(button('新增工具'))
   await click('编辑')
   const dialog = document.querySelector('[role="dialog"]')
   await change(dialog.querySelector('input[type="number"]'), '3')
@@ -506,4 +591,173 @@ test('session outputs refresh when execution becomes idle and stale account down
     })
   })
   assert.equal(saved, 0)
+})
+
+test('office session displays scoped plans and source evidence without automatically previewing or approving', async () => {
+  setup()
+  const calls = []
+  agentsApi.artifacts = async () => ({
+    agentDefinition: { id: agent.id, name: agent.name, version: 2 },
+    items: [
+      {
+        fileId: 'ppt-1',
+        name: '公司介绍.pptx',
+        size: 1024,
+        revision: { planVersion: 3, previousArtifactId: 'ppt-old' },
+        preview: { state: 'failed', missingFonts: [] },
+        diagnostics: ['预览验证失败，可编辑文件已保留'],
+      },
+    ],
+  })
+  agentsApi.officePlans = async (id) => {
+    calls.push(['plans', id])
+    return {
+      items: [
+        {
+          id: 'plan-1',
+          title: '公司介绍',
+          version: 3,
+          state: 'prepared',
+          summary: '## 页面安排\n\n公司介绍、服务范围',
+          warnings: ['保留模板字体'],
+          sources: [
+            {
+              id: 'source-1',
+              name: '公司制度.pdf',
+              sha256: 'verified-source-hash',
+            },
+          ],
+        },
+      ],
+    }
+  }
+  agentsApi.evidence = async (id) => {
+    calls.push(['evidence', id])
+    return {
+      items: [
+        {
+          id: 'evidence-1',
+          sourceId: 'ref-1',
+          filename: '公司制度.pdf',
+          content: '报销应由部门负责人审批。',
+          sha256: 'verified-source-hash',
+          location: { page: 4 },
+        },
+      ],
+    }
+  }
+  let previewCalls = 0
+  agentsApi.previewArtifact = async () => {
+    previewCalls++
+    throw new Error('must be explicit')
+  }
+  await render(AgentSessionArtifacts, {
+    sessionId: 'office-session',
+    status: 'waiting_input',
+  })
+  assert.deepEqual(calls, [
+    ['plans', 'office-session'],
+    ['evidence', 'office-session'],
+  ])
+  assert.match(container.textContent, /方案 v3 · 修订成果/u)
+  assert.match(container.textContent, /预览验证失败，可编辑文件已保留/u)
+  assert.ok(button('重试预览'))
+  assert.match(container.textContent, /等待方案确认/u)
+  assert.match(container.textContent, /报销应由部门负责人审批/u)
+  assert.match(container.textContent, /页 4/u)
+  assert.equal(previewCalls, 0)
+  assert.equal(button('确认生成'), undefined)
+})
+
+test('office preview fetches authorized bytes on demand and closes on account loss', async () => {
+  setup()
+  const file = { fileId: 'office-file', name: '培训.pptx', size: 1024 }
+  agentsApi.artifacts = async () => ({
+    agentDefinition: { id: agent.id, name: agent.name, version: 2 },
+    items: [file],
+  })
+  const calls = []
+  agentsApi.previewArtifact = async (...args) => {
+    calls.push(args)
+    return {
+      name: '培训.pdf',
+      mediaType: 'application/pdf',
+      contentBase64: 'JVBERi0xLjcK',
+    }
+  }
+  await render(AgentSessionArtifacts, {
+    sessionId: 'preview-session',
+    status: 'idle',
+  })
+  await click('预览')
+  assert.equal(calls.length, 1)
+  assert.deepEqual(calls[0].slice(0, 2), ['preview-session', 'office-file'])
+  assert.equal(calls[0][2].aborted, false)
+  assert.ok(document.querySelector('[data-office-preview]'))
+  await act(async () => clearStoredSession())
+  assert.equal(document.querySelector('[data-office-preview]'), null)
+  assert.equal(calls[0][2].aborted, true)
+})
+
+test('late preview response cannot appear in the next conversation', async () => {
+  setup()
+  agentsApi.artifacts = async () => ({
+    agentDefinition: { id: agent.id, name: agent.name, version: 2 },
+    items: [{ fileId: 'old-file', name: '旧方案.pptx', size: 1024 }],
+  })
+  let release
+  let signal
+  agentsApi.previewArtifact = async (_session, _file, stopped) => {
+    signal = stopped
+    return new Promise((resolve) => {
+      release = resolve
+    })
+  }
+  await render(AgentSessionArtifacts, {
+    sessionId: 'old-session',
+    status: 'idle',
+  })
+  await click('预览')
+  await render(AgentSessionArtifacts, {
+    sessionId: 'new-session',
+    status: 'idle',
+  })
+  assert.equal(signal.aborted, true)
+  await act(async () =>
+    release({
+      name: '旧方案.pdf',
+      mediaType: 'application/pdf',
+      contentBase64: 'JVBERi0xLjcK',
+    }),
+  )
+  assert.equal(document.querySelector('[data-office-preview]'), null)
+  assert.equal(document.querySelector('[role="dialog"]'), null)
+})
+
+test('structured artwork uses the authenticated PNG preview and clears on signout', async () => {
+  setup()
+  agentsApi.artifacts = async () => ({
+    agentDefinition: { id: agent.id, name: agent.name, version: 1 },
+    items: [{ fileId: 'artwork', name: '配图.png', size: 1200 }],
+  })
+  agentsApi.previewArtifact = async (session, file) => {
+    assert.equal(session, 'graphics-session')
+    assert.equal(file, 'artwork')
+    return {
+      name: '配图.png',
+      mediaType: 'image/png',
+      contentBase64: 'iVBORw0KGgo=',
+    }
+  }
+  await render(AgentSessionArtifacts, {
+    sessionId: 'graphics-session',
+    status: 'idle',
+  })
+  await click('预览')
+  assert.equal(
+    document.querySelector('img[alt="配图.png"]')?.getAttribute('src'),
+    'data:image/png;base64,iVBORw0KGgo=',
+  )
+  await act(async () => clearStoredSession())
+  assert.equal(document.querySelector('img[alt="配图.png"]'), null)
 })

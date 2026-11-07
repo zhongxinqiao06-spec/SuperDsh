@@ -1,19 +1,22 @@
 'use client'
 
 import * as React from 'react'
-import type {
-  PDFDocumentLoadingTask,
-  PDFDocumentProxy,
-  PDFWorker,
-  RenderTask,
-} from 'pdfjs-dist'
+import type { PDFDocumentProxy, RenderTask } from 'pdfjs-dist'
 import { Button } from '@/components/ui/button'
 import { useManagementText } from './controls'
+import {
+  createPdfPreviewDocument,
+  pdfPreviewErrorCode,
+  reportPdfPreviewError,
+  waitForPdfTask,
+  type PdfPreviewErrorCode,
+  type PdfPreviewStage,
+} from './agent-pdf-runtime'
 
 type LoadedDocument = {
   source: string
   document: PDFDocumentProxy | null
-  failed: boolean
+  error: PdfPreviewErrorCode | null
 }
 
 export function AgentPdfPreview({
@@ -28,6 +31,7 @@ export function AgentPdfPreview({
   const [page, setPage] = React.useState(1)
   const [zoom, setZoom] = React.useState(1)
   const [attempt, setAttempt] = React.useState(0)
+  const [stage, setStage] = React.useState<PdfPreviewStage>('engine')
   const [width, setWidth] = React.useState(0)
   const viewport = React.useRef<HTMLDivElement>(null)
   const current = loaded?.source === contentBase64 ? loaded : null
@@ -35,72 +39,29 @@ export function AgentPdfPreview({
 
   React.useEffect(() => {
     let active = true
-    let disposed = false
-    let nativeWorker: Worker | undefined
-    let pdfWorker: PDFWorker | undefined
-    let loadingTask: PDFDocumentLoadingTask | undefined
-    const dispose = () => {
-      if (disposed) return
-      disposed = true
-      const terminate = () => {
-        pdfWorker?.destroy()
-        nativeWorker?.terminate()
-      }
-      if (!loadingTask) {
-        terminate()
-        return
-      }
-      // Let PDF.js release page/font resources before ending its owned worker.
-      // A failed worker cannot acknowledge destruction, so bound that wait.
-      const timeout = window.setTimeout(terminate, 1000)
-      void loadingTask
-        .destroy()
-        .catch(() => undefined)
-        .finally(() => {
-          window.clearTimeout(timeout)
-          terminate()
-        })
-    }
-    const fail = () => {
-      if (active)
-        setLoaded({ source: contentBase64, document: null, failed: true })
-      dispose()
+    const fail = (cause: unknown) => {
+      if (!active) return
+      reportPdfPreviewError('document', cause)
+      setLoaded({
+        source: contentBase64,
+        document: null,
+        error: pdfPreviewErrorCode(cause),
+      })
     }
     setLoaded(null)
     setPage(1)
     setZoom(1)
-    const load = async () => {
-      try {
-        // PDF.js needs browser globals; keep it out of server rendering.
-        const pdfjs = await import('pdfjs-dist')
-        if (!active) return
-        const data = Uint8Array.from(atob(contentBase64), (value) =>
-          value.charCodeAt(0),
-        )
-        nativeWorker = new Worker(
-          new URL('pdfjs-dist/build/pdf.worker.min.mjs', import.meta.url),
-          { type: 'module', name: 'agent-document-preview' },
-        )
-        nativeWorker.addEventListener('error', fail, { once: true })
-        nativeWorker.addEventListener('messageerror', fail, { once: true })
-        pdfWorker = pdfjs.PDFWorker.create({ port: nativeWorker })
-        loadingTask = pdfjs.getDocument({
-          data,
-          worker: pdfWorker,
-          useWasm: false,
-          useSystemFonts: true,
-        })
-        const next = await loadingTask.promise
-        if (active && !disposed)
-          setLoaded({ source: contentBase64, document: next, failed: false })
-      } catch {
-        fail()
-      }
-    }
-    void load()
+    const task = createPdfPreviewDocument(
+      contentBase64,
+      (next) => active && setStage(next),
+      fail,
+    )
+    void task.promise.then((document) => {
+      if (active) setLoaded({ source: contentBase64, document, error: null })
+    }, fail)
     return () => {
       active = false
-      dispose()
+      task.destroy()
     }
   }, [contentBase64, attempt])
 
@@ -195,17 +156,16 @@ export function AgentPdfPreview({
             role="status"
             className="py-8 text-center text-sm text-muted-foreground"
           >
-            {tr('正在加载文档预览…', 'Loading document preview…')}
+            {stage === 'fallback'
+              ? tr('正在切换备用预览…', 'Starting an alternative preview…')
+              : stage === 'document'
+                ? tr('正在读取文档内容…', 'Reading document contents…')
+                : tr('正在加载文档预览…', 'Loading document preview…')}
           </p>
         )}
-        {current?.failed && (
+        {current?.error && (
           <div role="alert" className="space-y-3 py-8 text-center text-sm">
-            <p>
-              {tr(
-                '文档预览加载失败，请重试。',
-                'Could not load this document preview. Please retry.',
-              )}
-            </p>
+            <p>{previewErrorMessage(current.error, tr)}</p>
             <Button
               type="button"
               variant="outline"
@@ -246,14 +206,21 @@ function PdfPage({
     'loading',
   )
   const [attempt, setAttempt] = React.useState(0)
+  const [error, setError] = React.useState<PdfPreviewErrorCode>('page')
 
   React.useEffect(() => {
     let active = true
     let task: RenderTask | undefined
+    const controller = new AbortController()
     setStatus('loading')
     const render = async () => {
       try {
-        const page = await document.getPage(pageNumber)
+        const page = await waitForPdfTask(
+          document.getPage(pageNumber),
+          controller.signal,
+          20_000,
+          'page-timeout',
+        )
         const element = canvas.current
         if (!active || !element) return
         const original = page.getViewport({ scale: 1 })
@@ -273,15 +240,30 @@ function PdfPage({
           viewport,
           transform: [ratio, 0, 0, ratio, 0, 0],
         })
-        await task.promise
+        await waitForPdfTask(
+          task.promise,
+          controller.signal,
+          20_000,
+          'page-timeout',
+        )
         if (active) setStatus('ready')
-      } catch {
-        if (active) setStatus('error')
+      } catch (cause) {
+        task?.cancel()
+        if (active) {
+          reportPdfPreviewError('page', cause)
+          setError(
+            pdfPreviewErrorCode(cause) === 'page-timeout'
+              ? 'page-timeout'
+              : 'page',
+          )
+          setStatus('error')
+        }
       }
     }
     void render()
     return () => {
       active = false
+      controller.abort()
       task?.cancel()
     }
   }, [document, pageNumber, width, attempt])
@@ -298,7 +280,7 @@ function PdfPage({
       )}
       {status === 'error' && (
         <div role="alert" className="space-y-3 py-8 text-center text-sm">
-          <p>{tr('此页暂时无法显示。', 'This page could not be displayed.')}</p>
+          <p>{previewErrorMessage(error, tr)}</p>
           <Button
             type="button"
             variant="outline"
@@ -319,5 +301,45 @@ function PdfPage({
         hidden={status !== 'ready'}
       />
     </div>
+  )
+}
+
+function previewErrorMessage(
+  code: PdfPreviewErrorCode,
+  tr: (zh: string, en: string) => string,
+) {
+  if (code === 'engine-timeout' || code === 'worker-timeout')
+    return tr(
+      '预览组件加载超时，请重试或下载原文件查看。',
+      'The preview engine took too long to load. Retry or download the original file.',
+    )
+  if (code === 'engine' || code === 'worker')
+    return tr(
+      '预览组件未能启动，请重试或下载原文件查看。',
+      'The preview engine could not start. Retry or download the original file.',
+    )
+  if (code === 'document-timeout')
+    return tr(
+      '读取文档超时，请重试或下载原文件查看。',
+      'Reading this document timed out. Retry or download the original file.',
+    )
+  if (code === 'password')
+    return tr(
+      '此文档需要密码，请下载原文件后打开。',
+      'This document requires a password. Download the original file to open it.',
+    )
+  if (code === 'page-timeout')
+    return tr(
+      '此页渲染超时，可重试或切换其他页面。',
+      'This page took too long to render. Retry or switch to another page.',
+    )
+  if (code === 'page')
+    return tr(
+      '此页暂时无法显示，请重试或切换其他页面。',
+      'This page could not be displayed. Retry or switch to another page.',
+    )
+  return tr(
+    '无法读取文档预览，文件可能损坏，请重试或下载原文件查看。',
+    'Could not read this document preview. It may be damaged. Retry or download the original file.',
   )
 }

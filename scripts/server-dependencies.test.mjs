@@ -28,6 +28,17 @@ const defaultPorts = {
   SUPERDSH_DEV_QDRANT_PORT: '16333',
 }
 
+test('MinIO uses both verified loopback bindings and starts only once when absent', async () => {
+  const environment = { ...defaultPorts, SUPERDSH_MINIO_APP_USER: 'synthetic', SUPERDSH_DEV_MINIO_PORT: '19000', SUPERDSH_DEV_MINIO_CONSOLE_PORT: '19001' }
+  const missing = await planDevelopmentDependencies([], environment, { portAvailable: async () => true })
+  assert.equal(missing.start.filter((service) => service === 'minio').length, 1)
+  const minio = container('minio')
+  minio.NetworkSettings.Ports = { '9000/tcp': [{ HostIp: '127.0.0.1', HostPort: '19000' }], '9001/tcp': [{ HostIp: '127.0.0.1', HostPort: '19001' }] }
+  const running = await planDevelopmentDependencies([minio], environment, { portAvailable: async () => true })
+  assert.equal(running.ready.filter((service) => service === 'minio').length, 1)
+  assert.equal(running.start.includes('minio'), false)
+})
+
 function container(service, options = {}) {
   const port =
     { postgres: '5432/tcp', redis: '6379/tcp', qdrant: '6333/tcp' }[service] ||

@@ -38,13 +38,24 @@ export function useAgentArtifacts(
       error: '',
       loading: true,
     }))
-    void request({ operation: 'agent-artifacts', sessionId }).then(
-      (value) => {
+    void Promise.all([
+      request({ operation: 'agent-artifacts', sessionId }),
+      request({ operation: 'office-plans', sessionId }),
+      request({ operation: 'agent-evidence', sessionId }),
+      request({ operation: 'skill-runs', sessionId }),
+    ]).then(
+      ([value, plans, evidence, skillRuns]) => {
         if (!disposed)
           setState({
             scope,
             request,
-            value: object(value),
+            value: {
+              ...object(value),
+              plans: object(plans).items ?? [],
+              evidence: object(evidence).items ?? [],
+              skillRuns: object(skillRuns).items ?? [],
+              answerVerification: object(evidence).answerVerification ?? {},
+            },
             error: '',
             loading: false,
           })
@@ -62,10 +73,19 @@ export function useAgentArtifacts(
       disposed = true
     }
   }, [scope, request, sessionId, runtimeStatus, version])
+  useEffect(() => {
+    if (!scope) return
+    const timer = setInterval(() => setVersion((value) => value + 1), 5000)
+    return () => clearInterval(timer)
+  }, [scope])
   const current =
     scope && state.scope === scope && state.request === request ? state : null
   return {
     items: rows(current?.value.items).filter((file) => !!string(file.fileId)),
+    plans: rows(current?.value.plans),
+    skillRuns: rows(current?.value.skillRuns),
+    evidence: rows(current?.value.evidence),
+    answerVerification: object(current?.value.answerVerification),
     binding: platformAgentBinding(current?.value.agentDefinition),
     loading: !!scope && (current?.loading ?? true),
     error: current?.error ?? '',

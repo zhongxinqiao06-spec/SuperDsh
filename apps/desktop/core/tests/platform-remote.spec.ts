@@ -203,6 +203,56 @@ it('preserves API v2 runtime rejection details for messages and new sessions', a
   ).rejects.toThrow('目标工作区已变化')
 })
 
+it('checks downloaded bytes before saving, including same-size corruption, while accepting legacy metadata', async () => {
+  const original = Buffer.from('中文文档内容')
+  const sha256 = createHash('sha256').update(original).digest('hex')
+  let payload: Record<string, unknown> = {
+    name: '中文成果.docx',
+    contentBase64: original.toString('base64'),
+    size: original.length,
+    sha256,
+  }
+  const server = createServer((_request, response) => {
+    response.setHeader('Content-Type', 'application/json')
+    response.end(JSON.stringify(payload))
+  })
+  server.listen(0, '127.0.0.1')
+  await once(server, 'listening')
+  const origin = `http://127.0.0.1:${(server.address() as AddressInfo).port}`
+  const account = {
+    identity: () => ({ key: 'a'.repeat(64), generation: 1 }),
+    fetch: (path: string) => fetch(origin + path),
+  }
+  const remote = new PlatformRemote(
+    account as unknown as PlatformAccount,
+    vi.fn(),
+  )
+  const request = {
+    operation: 'download-attachment' as const,
+    sessionId: 'session',
+    attachmentId: 'artifact',
+  }
+  try {
+    expect(await remote.request(request)).toMatchObject({
+      name: '中文成果.docx',
+      sha256,
+    })
+    const damaged = Buffer.from(original)
+    damaged[0] = damaged[0]! ^ 1
+    payload = { ...payload, contentBase64: damaged.toString('base64') }
+    await expect(remote.request(request)).rejects.toThrow('附件内容校验失败')
+    payload = { ...payload, contentBase64: original.toString('base64') }
+    delete payload.sha256
+    expect(await remote.request(request)).toMatchObject({ sha256 })
+    payload.sha256 = 'malformed'
+    await expect(remote.request(request)).rejects.toThrow('附件内容校验失败')
+  } finally {
+    await remote.close()
+    server.closeAllConnections()
+    await new Promise<void>((resolve) => server.close(() => resolve()))
+  }
+})
+
 it('rejects stale identity targets before any request, upload or subscription can reach a replacement account', async () => {
   const oldIdentity = { key: 'a'.repeat(64), generation: 1 }
   const identity = { key: 'b'.repeat(64), generation: 2 }

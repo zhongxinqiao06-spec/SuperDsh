@@ -331,7 +331,7 @@ it('creates only a missing DSH runtime and never replaces an already active loca
       _method?: string,
       _body?: PlatformJson,
     ): Promise<PlatformJson> =>
-      _method === 'POST'
+      _method === 'POST' && !_path.endsWith('/discover')
         ? {
             runtimeId: 'new-dsh',
             runtimeType: 'dsh',
@@ -342,6 +342,11 @@ it('creates only a missing DSH runtime and never replaces an already active loca
   )
   await ensureManagedDshRuntime({ json }, 'my-device', 'local')
   expect(json.mock.calls[1]).toEqual([
+    '/connectors/my-device/runtimes/discover',
+    'POST',
+    {},
+  ])
+  expect(json.mock.calls[2]).toEqual([
     '/connectors/my-device/runtimes',
     'POST',
     {
@@ -365,6 +370,24 @@ it('creates only a missing DSH runtime and never replaces an already active loca
   })
   await ensureManagedDshRuntime({ json }, 'my-device', 'local')
   expect(json).toHaveBeenCalledOnce()
+})
+it('waits for discovery on a fresh Connector and reuses its discovered runtime', async () => {
+  const runtime = {
+    runtimeType: 'dsh',
+    runtimeId: 'discovered',
+    config: { dshHome: 'local' },
+    active: true,
+    status: 'running',
+  }
+  const json = vi
+    .fn()
+    .mockResolvedValueOnce({ runtimes: [] })
+    .mockResolvedValueOnce({ runtimes: [runtime] })
+  await ensureManagedDshRuntime({ json }, 'fresh', 'local')
+  expect(json.mock.calls).toEqual([
+    ['/connectors/fresh/runtimes'],
+    ['/connectors/fresh/runtimes/discover', 'POST', {}],
+  ])
 })
 it('never treats an active but starting or errored runtime as a ready native Bridge', async () => {
   for (const status of ['starting', 'error']) {

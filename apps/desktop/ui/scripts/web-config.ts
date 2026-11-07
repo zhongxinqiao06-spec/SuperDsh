@@ -4,6 +4,10 @@ import type { InlineConfig } from 'vite'
 import { clientBuildEnvironmentDefines } from '../build/harness/client-build-environment.ts'
 import { ownedSourcePlugin } from './source-ownership.mjs'
 import { PLATFORM_MODULES } from '../src/compatibility/harness/web/platform.ts'
+import {
+  pdfAssets,
+  pdfLicenseBanner,
+} from '../src/features/sidebar-documentpreview/tsdown.config.ts'
 
 export function createWebConfig(
   root: string,
@@ -102,10 +106,19 @@ export function createWebConfig(
           'platform-primitives': primitivesEntry,
         },
         preserveEntrySignatures: 'strict',
+        output: {
+          banner: (chunk) =>
+            chunk.moduleIds.some((id) =>
+              id.includes('/sidebar-documentpreview/pdf/'),
+            )
+              ? pdfLicenseBanner()
+              : '',
+        },
       },
     },
     define: {
       ...clientBuildEnvironmentDefines(process.env),
+      __DSH_PDFJS_ASSETS__: pdfAssets(),
       'process.versions.node': '"0.0.0"',
       'process.execArgv': '[]',
       'process.env.CORDIS_SHARED': 'undefined',

@@ -33,19 +33,45 @@ globalThis.ResizeObserver = class {
 globalThis.Worker = class extends EventTarget {
   constructor(url, options) {
     super()
+    if (globalThis.agentPdfFixture.workerConstructionError)
+      throw globalThis.agentPdfFixture.workerConstructionError
     this.url = url
     this.options = options
     this.terminated = false
     globalThis.agentPdfFixture.workers.push(this)
+    if (globalThis.agentPdfFixture.workerReady)
+      queueMicrotask(() => {
+        this.dispatchEvent(
+          new MessageEvent('message', {
+            data: { sourceName: 'worker', targetName: 'main', action: 'ready' },
+          }),
+        )
+      })
   }
   terminate() {
     this.terminated = true
   }
 }
+globalThis.MessageChannel = class {
+  constructor() {
+    const port = () =>
+      Object.assign(new EventTarget(), {
+        closed: false,
+        postMessage() {},
+        start() {},
+        close() {
+          this.closed = true
+        },
+      })
+    this.port1 = port()
+    this.port2 = port()
+    globalThis.agentPdfFixture.channels.push(this)
+  }
+}
 const sourceHooks = registerSource()
 const mockHooks = registerHooks({
   resolve(specifier, context, nextResolve) {
-    if (specifier === 'pdfjs-dist') {
+    if (specifier === 'pdfjs-dist/legacy/build/pdf.mjs') {
       return {
         url: `data:text/javascript,${encodeURIComponent(
           'export const getDocument=(options)=>globalThis.agentPdfFixture.getDocument(options); export const PDFWorker={create:(options)=>globalThis.agentPdfFixture.createWorker(options)}',
@@ -53,6 +79,11 @@ const mockHooks = registerHooks({
         shortCircuit: true,
       }
     }
+    if (specifier === 'pdfjs-dist/legacy/build/pdf.worker.mjs')
+      return {
+        url: `data:text/javascript,${encodeURIComponent('export const WorkerMessageHandler={initializeFromPort:(port)=>globalThis.agentPdfFixture.initializeFallback(port)}')}`,
+        shortCircuit: true,
+      }
     return nextResolve(specifier, context)
   },
 })
@@ -75,7 +106,15 @@ function deferred() {
 async function fixture(t) {
   availableWidth = 832
   const state = {
+    diagnostics: [],
     workers: [],
+    channels: [],
+    workerReady: true,
+    workerConstructionError: null,
+    fallbackError: null,
+    initializeFallback() {
+      if (this.fallbackError) throw this.fallbackError
+    },
     pdfWorkers: [],
     loads: [],
     renders: [],
@@ -137,6 +176,7 @@ async function fixture(t) {
       return task
     },
   }
+  t.mock.method(console, 'warn', (...args) => state.diagnostics.push(args))
   globalThis.agentPdfFixture = state
   const host = document.createElement('div')
   document.body.append(host)
@@ -187,7 +227,7 @@ test('PDF preview renders pages with responsive fit, bounded zoom and navigation
   assert.equal(f.state.workers.length, 1)
   assert.match(
     f.state.workers[0].url.href,
-    /pdfjs-dist\/build\/pdf\.worker\.min\.mjs$/,
+    /pdfjs-dist\/legacy\/build\/pdf\.worker\.min\.mjs$/,
   )
   assert.equal(f.state.workers[0].options.type, 'module')
   assert.equal(f.state.loads[0].options.worker.port, f.state.workers[0])
@@ -271,7 +311,7 @@ test('load errors and worker failures display a retry that starts a fresh worker
   await f.render()
   assert.match(
     f.host.querySelector('[role="alert"]').textContent,
-    /Could not load/,
+    /Could not read/,
   )
   assert.equal(f.state.workers[0].terminated, true)
   f.state.loadDocument = null
@@ -282,7 +322,7 @@ test('load errors and worker failures display a retry that starts a fresh worker
   )
   assert.match(
     f.host.querySelector('[role="alert"]').textContent,
-    /Could not load/,
+    /preview engine could not start/,
   )
   await f.click('Retry')
   assert.equal(f.state.workers.length, 3)
@@ -302,6 +342,105 @@ test('page errors offer a retry without reloading the document', async (t) => {
   await f.click('Retry')
   assert.equal(f.host.querySelector('canvas').hidden, false)
   assert.equal(f.state.loads.length, 1)
+})
+
+test('a worker that never becomes ready times out and renders through the local fallback', async (t) => {
+  t.mock.timers.enable({ apis: ['setTimeout'] })
+  const f = await fixture(t)
+  f.state.workerReady = false
+  await f.render()
+  assert.match(f.host.textContent, /Loading document preview/)
+  assert.equal(f.state.loads.length, 0)
+  await act(async () => t.mock.timers.tick(8000))
+  assert.equal(f.state.workers[0].terminated, true)
+  assert.equal(f.state.channels.length, 1)
+  assert.equal(f.state.pdfWorkers[0].port, f.state.channels[0].port1)
+  assert.equal(f.host.querySelector('canvas').hidden, false)
+  assert.equal(f.host.querySelector('[role="alert"]'), null)
+  assert.equal(f.state.diagnostics[0][1].code, 'worker-timeout')
+  await f.unmount()
+  assert.equal(f.state.channels[0].port1.closed, true)
+  assert.equal(f.state.channels[0].port2.closed, true)
+})
+
+test('a synchronous Worker SecurityError uses the local fallback without changing global worker settings', async (t) => {
+  const f = await fixture(t)
+  f.state.workerConstructionError = new DOMException(
+    'Worker blocked',
+    'SecurityError',
+  )
+  await f.render()
+  assert.equal(f.state.workers.length, 0)
+  assert.equal(f.state.channels.length, 1)
+  assert.equal(f.host.querySelector('canvas').hidden, false)
+  assert.equal(f.state.diagnostics[0][1].cause, 'SecurityError')
+})
+
+test('failed native and local startup leave loading state and offer a working retry', async (t) => {
+  t.mock.timers.enable({ apis: ['setTimeout'] })
+  const f = await fixture(t)
+  f.state.workerReady = false
+  f.state.fallbackError = new Error(
+    'Local preview module initialization failed',
+  )
+  await f.render()
+  await act(async () => t.mock.timers.tick(8000))
+  assert.match(
+    f.host.querySelector('[role="alert"]').textContent,
+    /preview engine could not start/,
+  )
+  assert.equal(f.host.querySelector('[role="status"]'), null)
+  assert.equal(f.state.channels[0].port1.closed, true)
+  assert.equal(f.state.channels[0].port2.closed, true)
+  f.state.workerReady = true
+  f.state.fallbackError = null
+  await f.click('Retry')
+  assert.equal(f.host.querySelector('canvas').hidden, false)
+})
+
+test('a nonresponding parser reports a document timeout instead of remaining busy', async (t) => {
+  t.mock.timers.enable({ apis: ['setTimeout'] })
+  const f = await fixture(t)
+  f.state.loadDocument = () => new Promise(() => {})
+  await f.render()
+  assert.match(f.host.textContent, /Reading document contents/)
+  await act(async () => t.mock.timers.tick(30_000))
+  assert.match(
+    f.host.querySelector('[role="alert"]').textContent,
+    /Reading this document timed out/,
+  )
+  assert.equal(f.host.querySelector('[role="status"]'), null)
+  assert.equal(f.state.loads[0].destroyed, true)
+  assert.equal(f.state.workers[0].terminated, true)
+})
+
+test('a page that never finishes is cancelled and exposes a page retry', async (t) => {
+  t.mock.timers.enable({ apis: ['setTimeout'] })
+  const f = await fixture(t)
+  f.state.renderPage = () => new Promise(() => {})
+  await f.render()
+  await act(async () => t.mock.timers.tick(20_000))
+  assert.match(
+    f.host.querySelector('[role="alert"]').textContent,
+    /page took too long to render/,
+  )
+  assert.equal(f.state.renders[0].cancelled, true)
+  assert.equal(f.host.querySelector('[aria-busy="true"]'), null)
+  f.state.renderPage = null
+  await f.click('Retry')
+  assert.equal(f.host.querySelector('canvas').hidden, false)
+})
+
+test('closing a preview during native startup cancels the timeout without starting a fallback', async (t) => {
+  t.mock.timers.enable({ apis: ['setTimeout'] })
+  const f = await fixture(t)
+  f.state.workerReady = false
+  await f.render()
+  await f.unmount()
+  await act(async () => t.mock.timers.tick(60_000))
+  assert.equal(f.state.workers[0].terminated, true)
+  assert.equal(f.state.channels.length, 0)
+  assert.equal(f.state.loads.length, 0)
 })
 
 test.after(() => {

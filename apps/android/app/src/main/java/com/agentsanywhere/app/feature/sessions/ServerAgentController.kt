@@ -23,6 +23,7 @@ class ServerAgentController(
     }
 
     suspend fun get() = request(agents::get)
+    suspend fun definitions() = request(agents::definitions)
     suspend fun prepare() = request(agents::prepare)
     suspend fun providers() = request(models::list)
     suspend fun save(providerId: String?, write: PersonalProviderWrite) = request { origin, token ->

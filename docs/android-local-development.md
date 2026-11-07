@@ -66,6 +66,8 @@ Android Studio 直接打开 `apps/android`。分层规则见该目录的 `ARCHIT
 
 自定义 AVD 可增加 `avd-home`、`user-home`。SDK 和 AVD 尽量使用英文路径；当前机器通过 `D:/SuperDshAndroidTest` 访问已有缓存。`--avd`、`--port`、`--apk` 可覆盖配置，`--headless` 用于无窗口验证。
 
+`--boot-timeout` 可指定系统启动等待秒数（60–900，默认 180）；`--memory` 可指定请求的模拟器内存 MB（1536–8192，默认 2048，系统镜像可能提高最低值）。两项也可写入本机启动配置。延长等待只用于慢启动，不表示系统 ANR 已解决；Windows 内存紧张时应先释放资源，不能不断重复启动模拟器。启动参数依据 [Android 官方命令行说明](https://developer.android.com/studio/run/emulator-commandline)，不会清除 AVD 数据或更改 APK 配置。
+
 脚本核对设备编号和 AVD 名称后复用已有模拟器，并保留原窗口模式；不会卸载 App、清数据或结束其他设备。启动参数 `--server` 或配置中的 `server` 只用于健康检查与本机 `adb reverse`，不会改写 App 已保存的服务器地址，也不会启动 Docker。切换环境后，必须在 App 登录页选择对应地址。
 
 | 环境         | App 的平台服务地址          | 用途                                            |

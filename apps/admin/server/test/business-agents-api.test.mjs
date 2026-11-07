@@ -11,6 +11,8 @@ import { ensureSchema } from '../infrastructure/schema.ts'
 import { IdentityService } from '../identity/service.ts'
 import { defaultMenuItems } from '../management/navigation.ts'
 import { executeAgentTool } from '../agents/execution.ts'
+import { QdrantKnowledgeIndex } from '../agents/knowledge-index.ts'
+import { syntheticKnowledgeEmbedding } from './support/knowledge-embedding.mjs'
 import { withTestDatabase } from './support/database.mjs'
 
 async function fixture(t) {
@@ -59,6 +61,11 @@ async function fixture(t) {
     dev: true,
   }
   app = createApplication({ configuration, database: db, redis, log() {} })
+  app.business.options.knowledgeIndex = new QdrantKnowledgeIndex(
+    configuration.qdrantUrl,
+    undefined,
+    syntheticKnowledgeEmbedding,
+  )
   await app.identity.seedBuiltinRoles()
   const admin = await app.identity.createUser(
     {
@@ -389,11 +396,11 @@ test('demo initialization is idempotent and produces actual retrievable Office t
     second.body.assets.map((item) => item.id),
     first.body.assets.map((item) => item.id),
   )
-  assert.equal(first.body.agents.length, 3)
+  assert.equal(first.body.agents.length, 4)
   assert.equal(first.body.assets.length, 4)
   assert.equal(
     (await f.request('/agents', 'GET', undefined, f.member)).body.items.length,
-    3,
+    4,
   )
   assert.equal((await f.request('/admin/agents/catalog')).body.assets.length, 4)
   for (const asset of first.body.assets.filter((item) =>
@@ -506,6 +513,40 @@ test('published Agent usage does not grant administrators access to another user
   )
   assert.equal(result.sources[0].assetId, asset.id)
   assert.match(result.sources[0].content, /receipt/)
+  const source = result.sources[0]
+  const writeAnswer = async (answer) =>
+    f.db.query(
+      "INSERT INTO timeline_items(session_id,id,type,status,role,order_seq,updated_seq,item_time,payload_json) VALUES($1,'knowledge-answer','message','completed','assistant',1,1,$2,$3) ON CONFLICT(session_id,id) DO UPDATE SET payload_json=EXCLUDED.payload_json",
+      [session.id, now, JSON.stringify({ content: { text: answer } })],
+    )
+  const evidencePath = '/sessions/private-session/agent-evidence'
+  await writeAnswer(`“${source.content}”[${source.id}]`)
+  const checked = await f.request(evidencePath, 'GET', undefined, f.member)
+  assert.equal(checked.status, 200, JSON.stringify(checked.body))
+  assert.equal(checked.body.answerVerification.status, 'references-checked')
+  assert.equal(checked.body.answerVerification.checkedQuotes, 1)
+  for (const forbidden of [f.admin, f.otherAdmin])
+    assert.equal(
+      (await f.request(evidencePath, 'GET', undefined, forbidden)).status,
+      404,
+    )
+  await writeAnswer(
+    `“伪造：无需审批即可报销”[${source.id}] [evidence_other_account]`,
+  )
+  const forged = await f.request(evidencePath, 'GET', undefined, f.member)
+  assert.equal(forged.body.answerVerification.status, 'invalid')
+  assert.equal(forged.body.items[0].content, source.content)
+  assert.equal(
+    (
+      await f.request(
+        `${evidencePath}/${source.id}?quote=${encodeURIComponent('伪造')}`,
+        'GET',
+        undefined,
+        f.member,
+      )
+    ).status,
+    422,
+  )
   await assert.rejects(
     executeAgentTool(
       f.app.business,
@@ -597,7 +638,7 @@ test('v2_39 migration adds Agent navigation and permission without altering owne
   await ensureSchema(db)
   assert.equal(
     (await db.query('SELECT version_num FROM alembic_version'))[0].version_num,
-    'v2_42',
+    'v2_44',
   )
   assert.ok(
     (await identity.getUser(user.userId)).permissions.includes('agents.manage'),

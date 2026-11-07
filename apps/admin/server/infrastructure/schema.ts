@@ -2,17 +2,23 @@ import { readFile } from 'node:fs/promises'
 import type { Database, SqlConnection } from './database.ts'
 import { migrateProductSchema } from './migrations.ts'
 
-export const schemaRevision = 'v2_42'
-export const schemaVersion = '2.42'
+export const schemaRevision = 'v2_46'
+export const schemaVersion = '2.46'
 const migrationLock = BigInt('0x414147454E545332').toString()
 
 /** Never replace a populated database with an empty Node-owned database. */
 export async function ensureSchema(db: Database): Promise<void> {
   const ddl = (
     await Promise.all(
-      ['./schema-v2-39.sql', './schema-v2-40.sql', './schema-v2-41.sql'].map(
-        (file) => readFile(new URL(file, import.meta.url), 'utf8'),
-      ),
+      [
+        './schema-v2-39.sql',
+        './schema-v2-40.sql',
+        './schema-v2-41.sql',
+        './schema-v2-43.sql',
+        './schema-v2-44.sql',
+        './schema-v2-45.sql',
+        './schema-v2-46.sql',
+      ].map((file) => readFile(new URL(file, import.meta.url), 'utf8')),
     )
   ).join('\n')
   await db.transaction(async (connection) => {

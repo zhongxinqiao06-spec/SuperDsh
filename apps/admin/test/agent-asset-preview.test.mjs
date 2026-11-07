@@ -220,6 +220,115 @@ test('failed preview requests show the error and retry only on user action', asy
   assert.doesNotMatch(view.container.textContent, /Preview service unavailable/)
 })
 
+test('a preview request that ignores abort still times out, ignores late success and allows retry', async (t) => {
+  t.mock.timers.enable({ apis: ['setTimeout'] })
+  const stalled = deferred()
+  const retry = deferred()
+  const requests = []
+  t.mock.method(agentsApi, 'previewAsset', (id, signal) => {
+    requests.push({ id, signal })
+    return requests.length === 1 ? stalled.promise : retry.promise
+  })
+  const view = await render(t, AgentAssetPreview, { asset: presentation })
+  assert.match(view.container.textContent, /Preparing document preview/)
+  await act(async () => t.mock.timers.tick(74_999))
+  assert.equal(requests[0].signal.aborted, false)
+  assert.equal(view.container.querySelector('[role="alert"]'), null)
+  await act(async () => t.mock.timers.tick(1))
+  assert.equal(requests[0].signal.aborted, true)
+  assert.match(
+    view.container.querySelector('[role="alert"]').textContent,
+    /preview service did not respond in time/,
+  )
+  assert.equal(view.container.querySelector('[role="status"]'), null)
+  assert.equal(preview(), null)
+  await act(async () => stalled.resolve(pdf(presentation, 'late-pdf')))
+  assert.equal(preview(), null)
+  assert.match(
+    view.container.textContent,
+    /preview service did not respond in time/,
+  )
+
+  await click('Retry', view.container)
+  assert.equal(requests.length, 2)
+  assert.equal(requests[1].signal.aborted, false)
+  assert.equal(view.container.querySelector('[role="alert"]'), null)
+  assert.match(view.container.textContent, /Preparing document preview/)
+  await act(async () => retry.resolve(pdf(presentation, 'retried-pdf')))
+  assert.equal(preview()?.textContent, 'retried-pdf')
+  await act(async () => t.mock.timers.tick(75_000))
+  assert.equal(requests[1].signal.aborted, false)
+  assert.equal(preview()?.textContent, 'retried-pdf')
+  assert.equal(view.container.querySelector('[role="alert"]'), null)
+})
+
+test('browser preview links contain PDF blobs and survive token refresh until close or signout', async (t) => {
+  const content = '%PDF-1.7\nSynthetic browser preview fixture\n%%EOF\n'
+  t.mock.method(agentsApi, 'previewAsset', async () =>
+    pdf(presentation, Buffer.from(content).toString('base64')),
+  )
+  const created = t.mock.method(URL, 'createObjectURL')
+  const revoked = t.mock.method(URL, 'revokeObjectURL')
+  await render(t, AgentAssetsPanel, {
+    assets: [presentation],
+    onUploaded() {},
+  })
+  await click('View')
+  const link = dialog().querySelector('a')
+  assert.equal(link.textContent, 'Open preview in browser')
+  assert.match(link.href, /^blob:/)
+  assert.equal(link.target, '_blank')
+  assert.deepEqual(
+    new Set(link.rel.split(' ')),
+    new Set(['noopener', 'noreferrer']),
+  )
+  assert.equal(link.hasAttribute('download'), false)
+  const firstUrl = link.href
+  assert.equal(created.mock.callCount(), 1)
+  const blob = created.mock.calls[0].arguments[0]
+  assert.ok(blob instanceof Blob)
+  assert.equal(blob.type, 'application/pdf')
+  assert.equal(await blob.text(), content)
+  assert.equal(await (await fetch(firstUrl)).text(), content)
+
+  await act(async () =>
+    saveStoredSession({
+      ...account('account-a'),
+      accessToken: 'refreshed-token',
+    }),
+  )
+  assert.equal(dialog().querySelector('a').href, firstUrl)
+  assert.equal(created.mock.callCount(), 1)
+  assert.equal(revoked.mock.callCount(), 0)
+  await click('Close', dialog())
+  assert.equal(revoked.mock.callCount(), 1)
+  assert.deepEqual(revoked.mock.calls[0].arguments, [firstUrl])
+  await assert.rejects(fetch(firstUrl))
+
+  await click('View')
+  const secondUrl = dialog().querySelector('a').href
+  assert.notEqual(secondUrl, firstUrl)
+  assert.equal(created.mock.callCount(), 2)
+  await act(async () => clearStoredSession())
+  assert.equal(dialog().querySelector('a'), null)
+  assert.equal(revoked.mock.callCount(), 2)
+  assert.deepEqual(revoked.mock.calls[1].arguments, [secondUrl])
+  await assert.rejects(fetch(secondUrl))
+})
+
+test('non-PDF bytes never become a browser preview link', async (t) => {
+  const created = t.mock.method(URL, 'createObjectURL')
+  t.mock.method(agentsApi, 'previewAsset', async () =>
+    pdf(
+      presentation,
+      Buffer.from('<html>invalid document</html>').toString('base64'),
+    ),
+  )
+  const view = await render(t, AgentAssetPreview, { asset: presentation })
+  assert.equal(view.container.querySelector('a'), null)
+  assert.equal(created.mock.callCount(), 0)
+})
+
 test('invalid preview content is rejected before reaching the PDF renderer', async (t) => {
   const responses = [
     { ...pdf(presentation), mediaType: 'text/html' },

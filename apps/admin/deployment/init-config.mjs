@@ -51,10 +51,59 @@ if (
   import.meta.url === pathToFileURL(process.argv[1]).href
 ) {
   try {
+    const existingDatabase = existsSync('/var/lib/postgresql/data/PG_VERSION')
     initializeDatabasePassword()
+    initializeStorageConfiguration({ existingDatabase })
     console.log('Persistent database configuration is ready.')
   } catch (error) {
     console.error(error.message)
     process.exitCode = 1
+  }
+}
+
+export function initializeStorageConfiguration({
+  directory = '/data/config',
+  storageDirectory = '/minio-data',
+  existingDatabase = false,
+  owner = process.platform === 'win32' ? undefined : 1000,
+  storageOwner = process.platform === 'win32' ? undefined : 10001,
+} = {}) {
+  mkdirSync(directory, { recursive: true, mode: 0o755 })
+  const entries = [
+    [
+      'minio-root-user',
+      'superdsh-' + randomBytes(8).toString('hex'),
+      storageOwner,
+    ],
+    ['minio-root-password', randomBytes(32).toString('hex'), storageOwner],
+    ['minio-app-user', 'application-' + randomBytes(8).toString('hex'), owner],
+    ['minio-app-password', randomBytes(32).toString('hex'), owner],
+  ]
+  const existing = existsSync(join(storageDirectory, '.minio.sys'))
+  if (!existing) {
+    mkdirSync(storageDirectory, { recursive: true, mode: 0o700 })
+    if (storageOwner !== undefined) chownSync(storageDirectory, storageOwner, storageOwner)
+  }
+  for (const [name, value, uid] of entries) {
+    const path = join(directory, name)
+    if (existsSync(path)) {
+      if (!readFileSync(path, 'utf8').trim())
+        throw new Error('Empty storage credential file: ' + name)
+      continue
+    }
+    if (existing)
+      throw new Error(
+        'Existing MinIO data has incomplete credentials; restore the config-data backup.',
+      )
+    writeFileSync(path, value, { flag: 'wx', mode: 0o600 })
+    if (uid !== undefined) chownSync(path, uid, uid)
+  }
+  const selection = join(directory, 'storage-backend')
+  if (!existsSync(selection)) {
+    writeFileSync(selection, existingDatabase ? 'local' : 's3', {
+      flag: 'wx',
+      mode: 0o644,
+    })
+    if (owner !== undefined) chownSync(selection, owner, owner)
   }
 }

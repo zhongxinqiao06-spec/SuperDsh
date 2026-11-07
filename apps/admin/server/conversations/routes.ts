@@ -582,6 +582,95 @@ export function registerConversationRoutes(
     { permission: 'sessions.read' },
   )
   router.add(
+    'GET',
+    '/sessions/{session_id}/agent-binding',
+    async (ctx) => {
+      const row = await session(ctx)
+      const binding = await business?.binding(ctx.account!.userId, text(row.id))
+      return {
+        agentDefinition: binding
+          ? {
+              id: binding.definition.id,
+              name: binding.definition.name,
+              version: binding.definition.version,
+            }
+          : null,
+        bindingVersion: binding ? (binding.bindingVersion ?? 1) : 0,
+      }
+    },
+    { permission: 'sessions.read' },
+  )
+  router.add(
+    'PUT',
+    '/sessions/{session_id}/agent-binding',
+    async (ctx) => {
+      if (!business) throw new ApiError(503, '智能体服务未配置')
+      const row = await session(ctx)
+      if (row.executor_kind !== 'server-agent')
+        throw new ApiError(422, '仅服务端会话支持选择平台智能体')
+      if (row.archived || !row.takeover)
+        throw new ApiError(409, '请先接管并恢复此会话')
+      const lease = await db.lease(`session-dispatch:${row.id}`)
+      if (!lease) throw new ApiError(409, '会话正在提交操作，请稍后重试')
+      let lost = false
+      void lease.lost.then(() => {
+        lost = true
+      })
+      try {
+        const observed = record(
+          await hub.call(
+            text(row.connector_id),
+            'session.state',
+            rpcParams(row),
+            { signal: ctx.signal, timeoutMs: 15000 },
+          ),
+        )
+        const status = text(
+          record(observed.state).status ||
+            observed.status ||
+            hub.liveState.get(text(row.id))?.status ||
+            row.status,
+        )
+        if (!['idle', 'error'].includes(status))
+          throw new ApiError(
+            409,
+            '请等待当前任务完成，或先确认取消任务，再切换智能体',
+          )
+        const [run] = await db.query(
+          "SELECT id FROM agent_tool_runs WHERE session_id=$1 AND state='running' AND lease_expires_at>$2",
+          [row.id, utcNow()],
+        )
+        if (run)
+          throw new ApiError(409, '本会话仍有工具正在执行，请先取消或等待完成')
+        const selected = await business.available(
+          ctx.account!,
+          requiredText(ctx.body.agentDefinitionId, 'agentDefinitionId'),
+        )
+        const version = ctx.body.bindingVersion
+        if (!Number.isSafeInteger(version) || Number(version) < 0)
+          throw new ApiError(422, '缺少有效绑定版本')
+        if (lost) throw new ApiError(409, '会话操作归属已失效，请重试')
+        await business.bind(ctx.account!, row, selected, Number(version))
+        await db.query(
+          'UPDATE sessions SET seq=seq+1,updated_seq=seq+1,updated_at=$2 WHERE id=$1',
+          [row.id, utcNow()],
+        )
+        await publish(row)
+        return {
+          agentDefinition: {
+            id: selected.id,
+            name: selected.name,
+            version: selected.version,
+          },
+          bindingVersion: Number(version) + 1,
+        }
+      } finally {
+        await lease.release()
+      }
+    },
+    { permission: 'sessions.run' },
+  )
+  router.add(
     'PATCH',
     '/sessions/{session_id}/meta',
     async (ctx) => {
@@ -883,31 +972,48 @@ export function registerConversationRoutes(
       async (ctx) => {
         const row = await session(ctx),
           params = { ...ctx.body }
-        if (route === 'messages' && files && Array.isArray(params.attachments))
-          params.attachments = await files.stage(
-            ctx.account!.userId,
-            text(row.id),
-            array(params.attachments),
+        const lease =
+          route === 'messages'
+            ? await db.lease(`session-dispatch:${row.id}`)
+            : undefined
+        if (route === 'messages' && !lease)
+          throw new ApiError(409, '会话正在修改或发送，请稍后重试')
+        try {
+          if (
+            route === 'messages' &&
+            files &&
+            Array.isArray(params.attachments)
           )
-        const result = await call(row, method!, params, ctx.signal)
-        if (record(result).ok === false) {
-          const error = record(record(result).error)
-          return {
-            ok: false,
-            result: record(result).result ?? null,
-            error: {
-              code: text(record(result).code || error.code, 'runtime_rejected'),
-              message: text(
-                record(result).message || error.message,
-                'runtime rejected the operation',
-              ),
-            },
+            params.attachments = await files.stage(
+              ctx.account!.userId,
+              text(row.id),
+              array(params.attachments),
+            )
+          const result = await call(row, method!, params, ctx.signal)
+          if (record(result).ok === false) {
+            const error = record(record(result).error)
+            return {
+              ok: false,
+              result: record(result).result ?? null,
+              error: {
+                code: text(
+                  record(result).code || error.code,
+                  'runtime_rejected',
+                ),
+                message: text(
+                  record(result).message || error.message,
+                  'runtime rejected the operation',
+                ),
+              },
+            }
           }
+          await publish(row)
+          return route === 'commands'
+            ? { ...record(result), serverTime: utcNow() }
+            : { ok: true, result, error: null }
+        } finally {
+          await lease?.release()
         }
-        await publish(row)
-        return route === 'commands'
-          ? { ...record(result), serverTime: utcNow() }
-          : { ok: true, result, error: null }
       },
       { permission: 'sessions.run' },
     )

@@ -23,17 +23,26 @@ import {
   type AgentBinding,
   type AgentDefinition,
 } from './contracts.ts'
-import { extractKnowledgeText, validateOfficeTemplate } from './office/index.ts'
+import { extractKnowledgeText } from './office/index.ts'
+import { officeWork } from './office-worker-client.ts'
+import type { KnowledgeSegment } from './knowledge-contracts.ts'
 import { AgentResourceService } from './resources.ts'
 import { resolveAgentAssets } from './composition.ts'
 import type { QdrantKnowledgeIndex } from './knowledge-index.ts'
 import { renderOfficeAssetPreview } from './office/preview.ts'
+import { checkAgentDefinitionReadiness } from './definition-readiness.ts'
+import type { ExtensionService } from '../extensions/service.ts'
+import { builtinSourceId } from '../extensions/builtin-tools.ts'
+import { readAssetContent } from '../files/asset-storage.ts'
 
 export interface AgentServiceOptions {
+  modelConfigurations?: import('../models/configuration-service.ts').ModelConfigurationService
+  capabilities?: import('../models/capability-service.ts').ModelCapabilityService
   db: Database
   hub: ConnectorHub
   files: FileService
   knowledgeIndex?: QdrantKnowledgeIndex
+  extensions?: ExtensionService
   renderOfficePreview?: typeof renderOfficeAssetPreview
   getAccount(id: string): Promise<Account>
   audit(
@@ -99,8 +108,12 @@ export class BusinessAgentService {
     }
   }
 
-  async available(account: Account, id: string): Promise<AgentDefinition> {
-    requirePermission(account, 'sessions.run')
+  async available(
+    account: Account,
+    id: string,
+    permission = 'sessions.run',
+  ): Promise<AgentDefinition> {
+    requirePermission(account, permission)
     const [row] = await this.options.db.query(
       'SELECT * FROM business_agents WHERE id=$1 AND deleted_at IS NULL AND published=1',
       [id],
@@ -138,12 +151,37 @@ export class BusinessAgentService {
         input.skillIds,
         input.toolIds,
       )
-      await resolveAgentAssets(
+      const composed = await resolveAgentAssets(
         scopedDb,
         account.userId,
         input,
         resolved.knowledgeBases,
+        resolved.skills,
       )
+      if (input.skillPolicy && input.skillPolicy.mode !== 'legacy') {
+        const candidates = resolved.skills.filter(
+          (skill) => input.skillIds.includes(skill.id) && skill.program,
+        )
+        if (
+          !candidates.length ||
+          (input.skillPolicy.mode === 'fixed' &&
+            !candidates.some(
+              (skill) => skill.id === input.skillPolicy!.fixedSkillId,
+            ))
+        )
+          throw new ApiError(422, '请关联已发布的阶段技能或选择有效的固定技能')
+      }
+      const readiness = checkAgentDefinitionReadiness(
+        input,
+        resolved,
+        composed.assets.map((asset) => ({
+          id: asset.id,
+          kind: asset.kind,
+          name: asset.name,
+        })),
+      )
+      if (input.published && !readiness.ready)
+        throw new ApiError(422, readiness.errors.join('；'))
       const [old] = id
         ? await db.query(
             'SELECT * FROM business_agents WHERE id=$1 AND owner_user_id=$2 AND deleted_at IS NULL FOR UPDATE',
@@ -195,6 +233,37 @@ export class BusinessAgentService {
     await this.options.audit(account.userId, 'agent.delete', id)
   }
 
+  async readiness(account: Account, id: string) {
+    requirePermission(account, 'agents.manage')
+    const [row] = await this.options.db.query(
+      'SELECT * FROM business_agents WHERE id=$1 AND owner_user_id=$2 AND deleted_at IS NULL',
+      [id, account.userId],
+    )
+    if (!row) throw new ApiError(404, '智能体不存在')
+    const agent = definition(row)
+    const resources = await new AgentResourceService(this.options).catalog(
+      account,
+    )
+    const composed = await resolveAgentAssets(
+      this.options.db,
+      account.userId,
+      agent,
+      resources.knowledgeBases.filter((base) =>
+        agent.knowledgeBaseIds.includes(base.id),
+      ),
+      resources.skills.filter((skill) => agent.skillIds.includes(skill.id)),
+    )
+    return checkAgentDefinitionReadiness(
+      agent,
+      resources,
+      composed.assets.map((asset) => ({
+        id: asset.id,
+        kind: asset.kind,
+        name: asset.name,
+      })),
+    )
+  }
+
   async catalog(account: Account) {
     requirePermission(account, 'agents.manage')
     const resources = new AgentResourceService(this.options)
@@ -209,7 +278,19 @@ export class BusinessAgentService {
     }
   }
 
-  async upload(account: Account, body: Row): Promise<AgentAsset> {
+  async upload(
+    account: Account,
+    body: Row,
+    signal = new AbortController().signal,
+  ): Promise<AgentAsset> {
+    return this.savePreparedUpload(
+      account,
+      await this.prepareUpload(account, body, signal),
+    )
+  }
+
+  /** Parsing runs before a skill import's short commit transaction. */
+  async prepareUpload(account: Account, body: Row, signal: AbortSignal) {
     requirePermission(account, 'agents.manage')
     const name = requiredText(body.name, '文件名', 150)
     if (/[\\/\x00-\x1f]/.test(name))
@@ -220,17 +301,67 @@ export class BusinessAgentService {
     const input = { filename: name, content }
     let extracted = '',
       mediaType = 'text/plain; charset=utf-8'
+    let segments: KnowledgeSegment[] = []
     try {
       if (kind === 'knowledge') {
-        if (!['.txt', '.md', '.csv', '.xlsx', '.docx'].includes(extension))
-          throw new Error('知识资料支持 TXT、Markdown、CSV、XLSX、DOCX')
-        extracted = (await extractKnowledgeText(input)).text
+        if (
+          !['.txt', '.md', '.csv', '.xlsx', '.docx', '.pdf'].includes(extension)
+        )
+          throw new Error(
+            '知识资料支持 TXT、Markdown、CSV、XLSX、DOCX、文字型 PDF',
+          )
+        const parsed = await extractKnowledgeText(input, signal)
+        extracted = parsed.text
+        segments = parsed.segments
       } else if (kind === 'spreadsheet-template' && extension === '.xlsx') {
-        await validateOfficeTemplate(input, 'xlsx')
-      } else if (kind === 'presentation-template' && extension === '.pptx') {
-        await validateOfficeTemplate(input, 'pptx')
+        await officeWork(
+          'inspect',
+          'spreadsheet_report',
+          [
+            {
+              file: input,
+              reference: {
+                id: 'upload',
+                kind: 'asset',
+                role: 'input',
+                name,
+                size: content.length,
+                sha256: createHash('sha256').update(content).digest('hex'),
+              },
+            },
+          ],
+          null,
+          signal,
+        )
+      } else if (
+        (kind === 'presentation-template' && extension === '.pptx') ||
+        (kind === 'document-template' && extension === '.docx')
+      ) {
+        await officeWork(
+          'inspect',
+          kind === 'document-template'
+            ? 'document_report'
+            : 'presentation_report',
+          [
+            {
+              file: input,
+              reference: {
+                id: 'upload',
+                kind: 'asset',
+                role: 'template',
+                name,
+                size: content.length,
+                sha256: createHash('sha256').update(content).digest('hex'),
+              },
+            },
+          ],
+          null,
+          signal,
+        )
       } else throw new Error('请选择与文件匹配的资料或模板类型')
     } catch (error) {
+      if (error instanceof ApiError) throw error
+      signal.throwIfAborted()
       throw new ApiError(
         422,
         error instanceof Error ? error.message : '文件解析失败',
@@ -246,10 +377,20 @@ export class BusinessAgentService {
       mediaType =
         'application/vnd.openxmlformats-officedocument.wordprocessingml.document'
     if (extension === '.csv') mediaType = 'text/csv; charset=utf-8'
+    if (extension === '.pdf') mediaType = 'application/pdf'
+    return { name, kind, content, mediaType, extracted, segments }
+  }
+
+  async savePreparedUpload(
+    account: Account,
+    prepared: Awaited<ReturnType<BusinessAgentService['prepareUpload']>>,
+  ): Promise<AgentAsset> {
+    requirePermission(account, 'agents.manage')
+    const { name, kind, content, mediaType, extracted, segments } = prepared
     const hash = createHash('sha256').update(content).digest('hex')
     const id = identifier('asset')
     const [row] = await this.options.db.query(
-      `INSERT INTO business_agent_assets(id,owner_user_id,name,kind,size,media_type,sha256,content,extracted_text,created_at) VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9,$10) ON CONFLICT(owner_user_id,kind,name,sha256) DO UPDATE SET name=EXCLUDED.name RETURNING *`,
+      `INSERT INTO business_agent_assets(id,owner_user_id,name,kind,size,media_type,sha256,content,extracted_text,created_at,source_segments_json,file_storage_state) VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11::jsonb,$12) ON CONFLICT(owner_user_id,kind,name,sha256) DO UPDATE SET name=EXCLUDED.name RETURNING *`,
       [
         id,
         account.userId,
@@ -261,6 +402,8 @@ export class BusinessAgentService {
         content,
         extracted,
         utcNow(),
+        JSON.stringify(segments),
+        this.options.files.library ? 'pending' : 'legacy',
       ],
     )
     await this.options.audit(
@@ -269,6 +412,21 @@ export class BusinessAgentService {
       text(row!.id),
       { kind, name, size: content.length },
     )
+    if (this.options.files.library) {
+      await this.options.files.library.saveLegacy(
+        account.userId,
+        kind === 'knowledge' ? 'knowledge' : 'template',
+        text(row!.id),
+        text(row!.id),
+        name,
+        content,
+        mediaType,
+      )
+      await this.options.db.query(
+        "UPDATE business_agent_assets SET file_storage_state='ready' WHERE id=$1",
+        [row!.id],
+      )
+    }
     return assetView(row!)
   }
 
@@ -285,7 +443,10 @@ export class BusinessAgentService {
   async previewAsset(account: Account, id: string, signal?: AbortSignal) {
     const row = await this.assetRow(account, id)
     return (this.options.renderOfficePreview ?? renderOfficeAssetPreview)(
-      { filename: text(row.name), content: row.content as Buffer },
+      {
+        filename: text(row.name),
+        content: await readAssetContent(this.options.files.library, row),
+      },
       signal,
     )
   }
@@ -294,7 +455,9 @@ export class BusinessAgentService {
     const row = await this.assetRow(account, id)
     return {
       ...assetView(row),
-      contentBase64: (row.content as Buffer).toString('base64'),
+      contentBase64: (
+        await readAssetContent(this.options.files.library, row)
+      ).toString('base64'),
     }
   }
 
@@ -302,6 +465,7 @@ export class BusinessAgentService {
     account: Account,
     session: Row,
     selected: AgentDefinition,
+    expectedVersion?: number,
   ): Promise<void> {
     if (session.executor_kind !== 'server-agent')
       throw new ApiError(422, '业务智能体需要使用服务端 Agent')
@@ -325,6 +489,7 @@ export class BusinessAgentService {
       resourceOwnerId,
       selected,
       resolved.knowledgeBases,
+      resolved.skills,
     )
     const binding: AgentBinding = {
       sessionId: text(session.id),
@@ -339,13 +504,85 @@ export class BusinessAgentService {
       resourceOwnerId,
       ...resolved,
     }
+    if (this.options.modelConfigurations) {
+      binding.capabilityBindings = {}
+      for (const tool of resolved.tools) {
+        const implementation = tool.implementation
+        if (
+          implementation?.sourceId !== builtinSourceId ||
+          !['image_generate', 'vision_analyze'].includes(implementation.toolId)
+        )
+          continue
+        if (
+          implementation.toolId === 'image_generate' &&
+          tool.settings.baseUrl &&
+          tool.settings.model &&
+          this.options.extensions
+        ) {
+          const secrets = await this.options.extensions.secrets(
+            resourceOwnerId,
+            tool.id,
+            tool.version,
+          )
+          binding.capabilityBindings[tool.id] =
+            await this.options.modelConfigurations.importLegacyImage(
+              resourceOwnerId,
+              tool.id,
+              tool.version,
+              tool.settings,
+              text(secrets.apiKey),
+            )
+          continue
+        }
+        // Absence remains explicit: an unrelated office assistant can still be used without image generation.
+        try {
+          binding.capabilityBindings[tool.id] =
+            await this.options.modelConfigurations.bind(
+              account,
+              text(tool.settings.modelConfigurationId) || undefined,
+              implementation.toolId === 'image_generate'
+                ? 'image.generate'
+                : 'vision.analyze',
+            )
+        } catch (error) {
+          if (text(tool.settings.modelConfigurationId)) throw error
+        }
+      }
+    }
     await this.options.db.transaction(async (db) => {
+      await db.query('SELECT id FROM sessions WHERE id=$1 FOR UPDATE', [
+        session.id,
+      ])
+      const [previous] = await db.query(
+        'SELECT binding_json FROM business_agent_sessions WHERE session_id=$1 AND owner_user_id=$2',
+        [session.id, account.userId],
+      )
+      const previousBinding = previous
+        ? json<AgentBinding>(previous.binding_json, {} as AgentBinding)
+        : null
+      const version = previousBinding
+        ? (previousBinding.bindingVersion ?? 1)
+        : 0
+      if (expectedVersion === undefined && previousBinding) return
+      if (expectedVersion !== undefined && expectedVersion !== version)
+        throw new ApiError(409, '智能体绑定已被修改，请刷新后重试')
+      binding.bindingVersion = version + 1
       await db.query(
-        'INSERT INTO business_agent_sessions(session_id,owner_user_id,agent_id,binding_json,created_at) VALUES($1,$2,$3,$4,$5) ON CONFLICT DO NOTHING',
+        'INSERT INTO business_agent_sessions(session_id,owner_user_id,agent_id,binding_json,created_at) VALUES($1,$2,$3,$4,$5) ON CONFLICT(session_id) DO UPDATE SET agent_id=EXCLUDED.agent_id,binding_json=EXCLUDED.binding_json',
         [
           session.id,
           account.userId,
           selected.id,
+          JSON.stringify(binding),
+          utcNow(),
+        ],
+      )
+      await db.query(
+        'INSERT INTO agent_session_bindings(session_id,owner_user_id,version,binding_json,created_at) VALUES($1,$2,$3,$4,$5)',
+        [
+          session.id,
+          account.userId,
+          binding.bindingVersion,
           JSON.stringify(binding),
           utcNow(),
         ],
@@ -358,6 +595,7 @@ export class BusinessAgentService {
             id: selected.id,
             name: selected.name,
             version: selected.version,
+            bindingVersion: binding.bindingVersion,
           }),
         ],
       )

@@ -29,6 +29,7 @@ import {
 import { cn } from '@/lib/utils'
 import type { Notice, NoticeAction } from '@/features/dashboard/types'
 import { useTranslations } from 'next-intl'
+import { MarkdownText } from '@/components/markdown-text'
 
 type InteractionCardProps = {
   notice: Notice
@@ -232,17 +233,24 @@ function InputRequestQuestionFields({
   const fieldId = `${noticeId}-${question.id}`
 
   return (
-    <fieldset className="min-w-0 border-0 p-0">
+    <fieldset
+      className="min-w-0 border-0 p-0"
+      data-plan-review={question.intent?.kind === 'plan-review' || undefined}
+    >
       <legend className="mb-2 min-w-0">
+        <span className="sr-only">{question.prompt.split('\n')[0]}</span>
         {question.header ? (
           <span className="block text-xs font-medium text-muted-foreground">
             {question.header}
           </span>
         ) : null}
-        <span className="mt-0.5 block wrap-break-word text-sm text-foreground">
-          {question.prompt}
-        </span>
       </legend>
+      <div className="mb-3 max-h-96 overflow-y-auto break-words rounded-lg bg-muted/30 p-3 text-sm text-foreground">
+        <MarkdownText text={question.prompt} />
+        {question.detail && !question.prompt.includes(question.detail) && (
+          <MarkdownText text={question.detail} />
+        )}
+      </div>
       {question.multiple ? (
         <div className="grid gap-1.5">
           {question.options.map((option) => {

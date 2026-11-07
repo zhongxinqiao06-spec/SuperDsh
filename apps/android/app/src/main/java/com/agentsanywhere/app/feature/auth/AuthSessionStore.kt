@@ -24,7 +24,7 @@ class AuthSessionStore(context: Context) : AuthSessionReader {
 
     override fun readServerUrl(): String = normalizeServerOrigin(preferences.getString("server_url", "").orEmpty()).orEmpty()
     override fun readAccessToken(): String = tokens.snapshot()?.accessToken.orEmpty()
-    fun readUserId(): String = preferences.getString("user_id", "").orEmpty()
+    override fun readUserId(): String = preferences.getString("user_id", "").orEmpty()
     fun readRole(): String = preferences.getStringSet("roles", emptySet()).orEmpty().joinToString(", ")
         .ifBlank { preferences.getString("role", "").orEmpty() }
     override fun readPermissions(): Set<String> = preferences.getStringSet("permissions", emptySet()).orEmpty().toSet()
@@ -108,6 +108,7 @@ class AuthSessionStore(context: Context) : AuthSessionReader {
 }
 
 interface AuthSessionReader {
+    fun readUserId(): String = ""
     fun readServerUrl(): String
     fun readAccessToken(): String
     fun readPermissions(): Set<String> = emptySet()

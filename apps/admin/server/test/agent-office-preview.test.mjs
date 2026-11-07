@@ -16,7 +16,11 @@ async function officeFile(extension = 'docx', extraEntries = {}) {
   const zip = new JSZip()
   zip.file('[Content_Types].xml', '<Types/>')
   zip.file(
-    extension === 'docx' ? 'word/document.xml' : 'ppt/presentation.xml',
+    extension === 'docx'
+      ? 'word/document.xml'
+      : extension === 'xlsx'
+        ? 'xl/workbook.xml'
+        : 'ppt/presentation.xml',
     '<document/>',
   )
   for (const [name, content] of Object.entries(extraEntries))
@@ -30,8 +34,8 @@ async function officeFile(extension = 'docx', extraEntries = {}) {
   }
 }
 
-test('Office preview converts both supported originals to bounded PDFs and removes private scratch files', async () => {
-  for (const extension of ['docx', 'pptx']) {
+test('Office preview converts DOCX, PPTX and XLSX to bounded PDFs and removes private scratch files', async () => {
+  for (const extension of ['docx', 'pptx', 'xlsx']) {
     const file = await officeFile(extension)
     const original = Buffer.from(file.content)
     let request,

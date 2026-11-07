@@ -71,7 +71,7 @@ function pdfLicenseFiles(root: string): string[] {
 }
 
 /** Keep every bundled PDF.js license visible in the published client artifact. */
-function pdfLicenseBanner(): string {
+export function pdfLicenseBanner(): string {
   const root = dirname(require.resolve('pdfjs-dist/package.json'))
   const notice = pdfLicenseFiles(root)
     .map(
@@ -86,7 +86,7 @@ function pdfLicenseBanner(): string {
 }
 
 /** Keep font mappings and image decoders in the same artifact as their PDF.js runtime. */
-function pdfAssets(): string {
+export function pdfAssets(): string {
   const root = dirname(require.resolve('pdfjs-dist/package.json'))
   return JSON.stringify(
     Object.fromEntries(
@@ -111,7 +111,7 @@ function pdfAssets(): string {
 }
 
 /** The dynamic client factory has no module URL from which to resolve a Worker file. */
-const pdfWorker: NonNullable<UserConfig['plugins']> = [
+export const pdfWorker: NonNullable<UserConfig['plugins']> = [
   {
     name: 'dsh-pdf-worker-source',
     resolveId(source) {

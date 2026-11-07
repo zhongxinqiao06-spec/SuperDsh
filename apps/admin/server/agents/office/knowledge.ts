@@ -1,67 +1,64 @@
-import {
-  OfficeInputError,
-  type KnowledgeText,
-  type OfficeInputFile,
-} from './types.ts'
-import {
-  OFFICE_LIMITS,
-  parseXml,
-  readOfficeArchive,
-  validateInput,
-} from './validation.ts'
-import { readTable } from './sales.ts'
+import { Worker } from 'node:worker_threads'
+import { OfficeInputError, type OfficeInputFile } from './types.ts'
+import type { KnowledgeSegment } from '../knowledge-contracts.ts'
+import { validateInput } from './validation.ts'
+
+export interface ExtractedKnowledge {
+  filename: string
+  text: string
+  segments: KnowledgeSegment[]
+}
 
 export async function extractKnowledgeText(
   file: OfficeInputFile,
-): Promise<KnowledgeText> {
-  const extension = validateInput(file, [
-    '.txt',
-    '.md',
-    '.csv',
-    '.xlsx',
-    '.docx',
-  ])
-  let text: string
-  if (extension === '.csv' || extension === '.xlsx') {
-    text = (await readTable(file)).map((row) => row.join('\t')).join('\n')
-  } else if (extension === '.docx') {
-    const archive = readOfficeArchive(file)
-    const part = archive.file('word/document.xml')
-    if (!part) throw new OfficeInputError('文件不是有效的 DOCX 文档')
-    const document = parseXml(await part.async('string'))
-    text = Array.from(
-      document.getElementsByTagNameNS(
-        'http://schemas.openxmlformats.org/wordprocessingml/2006/main',
-        'p',
+  signal?: AbortSignal,
+): Promise<ExtractedKnowledge> {
+  validateInput(file, ['.txt', '.md', '.csv', '.xlsx', '.docx', '.pdf'])
+  signal?.throwIfAborted()
+  const worker = new Worker(new URL('./knowledge-worker.ts', import.meta.url), {
+    execArgv: [],
+    workerData: { filename: file.filename, content: file.content },
+    resourceLimits: { maxOldGenerationSizeMb: 256 },
+  })
+  return new Promise((resolve, reject) => {
+    let done = false
+    const finish = (error?: Error, value?: ExtractedKnowledge) => {
+      if (done) return
+      done = true
+      clearTimeout(timeout)
+      signal?.removeEventListener('abort', cancel)
+      void worker.terminate()
+      if (error) reject(error)
+      else resolve(value!)
+    }
+    const cancel = () =>
+      finish(
+        signal?.reason instanceof Error
+          ? signal.reason
+          : new DOMException('知识解析已取消', 'AbortError'),
+      )
+    const timeout = setTimeout(
+      () =>
+        finish(new OfficeInputError('知识解析超过 30 秒，请拆分资料后重试')),
+      30000,
+    )
+    signal?.addEventListener('abort', cancel, { once: true })
+    worker.once(
+      'message',
+      (message: { value?: ExtractedKnowledge; error?: string }) =>
+        finish(
+          message.error ? new OfficeInputError(message.error) : undefined,
+          message.value,
+        ),
+    )
+    worker.once('error', () =>
+      finish(
+        new OfficeInputError('知识解析进程失败，请检查格式或拆分资料后重试'),
       ),
     )
-      .map((paragraph) =>
-        Array.from(
-          paragraph.getElementsByTagNameNS(
-            'http://schemas.openxmlformats.org/wordprocessingml/2006/main',
-            't',
-          ),
-        )
-          .map((node) => node.textContent)
-          .join(''),
-      )
-      .join('\n')
-  } else {
-    try {
-      text = new TextDecoder('utf-8', { fatal: true }).decode(file.content)
-    } catch {
-      throw new OfficeInputError('知识文本必须使用 UTF-8 编码')
-    }
-  }
-  text = text.replace(/^\uFEFF/u, '').trim()
-  if (
-    !text ||
-    text.length > OFFICE_LIMITS.textCharacters ||
-    /[\x00-\x08\x0b\x0c\x0e-\x1f]/u.test(text)
-  ) {
-    throw new OfficeInputError(
-      '知识文本为空、含控制字符或超过 100000 字符，请拆分后上传',
-    )
-  }
-  return { filename: file.filename, text }
+    worker.once('exit', (code) => {
+      if (!done) finish(new OfficeInputError(`知识解析进程提前退出（${code}）`))
+    })
+    if (signal?.aborted) cancel()
+  })
 }

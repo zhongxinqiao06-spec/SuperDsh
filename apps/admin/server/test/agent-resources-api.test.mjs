@@ -6,9 +6,10 @@ import { IdentityService } from '../identity/service.ts'
 import { BusinessAgentService } from '../agents/service.ts'
 import { AgentResourceService } from '../agents/resources.ts'
 import { registerAgentResourceRoutes } from '../agents/resource-routes.ts'
-import { ensureSchema } from '../infrastructure/schema.ts'
+import { ensureSchema, schemaRevision } from '../infrastructure/schema.ts'
 import { defaultMenuItems } from '../management/navigation.ts'
 import { withTestDatabase } from './support/database.mjs'
+import JSZip from 'jszip'
 
 async function fixture(t) {
   const db = await withTestDatabase(t)
@@ -39,7 +40,11 @@ async function fixture(t) {
       user.userId,
       (await identity.issueLogin(user.userId)).accessToken,
     )
-  const options = { db, audit: identity.audit.bind(identity) }
+  const options = {
+    db,
+    files: { library: undefined }, // Explicit legacy DB-blob storage fixture.
+    audit: identity.audit.bind(identity),
+  }
   const resources = new AgentResourceService(options)
   const business = new BusinessAgentService(options)
   await resources.ensureDefaults(admin)
@@ -111,6 +116,104 @@ const skill = (changes = {}) => ({
   instructions: 'Search company policy and cite source paragraphs.',
   requiredToolIds: ['knowledge_search'],
   ...changes,
+})
+
+test('skill import commits references atomically and a stale update leaves no orphan files', async (t) => {
+  const f = await fixture(t)
+  const archive = async (name) => {
+    const zip = new JSZip()
+    zip.file(
+      'SKILL.md',
+      '---\nname: 公司流程\ndescription: 核验资料\nrequiredToolIds: [knowledge_search]\n---\n按引用的制度执行核查。',
+    )
+    zip.file(
+      `references/${name}.md`,
+      `Source ${name}: verify each input before use.`,
+    )
+    return zip.generateAsync({ type: 'base64' })
+  }
+  const imported = await f.request('/admin/skills/import', 'POST', {
+    contentBase64: await archive('first'),
+  })
+  assert.equal(imported.status, 201, JSON.stringify(imported.body))
+  assert.equal(imported.body.skill.references.length, 1)
+  const before = await f.db.query(
+    'SELECT id FROM business_agent_assets WHERE owner_user_id=$1',
+    [f.admin.userId],
+  )
+  const rejected = await f.request('/admin/skills/import', 'POST', {
+    id: imported.body.skill.id,
+    version: 0,
+    contentBase64: await archive('rejected'),
+  })
+  assert.equal(rejected.status, 409, JSON.stringify(rejected.body))
+  assert.deepEqual(
+    await f.db.query(
+      'SELECT id FROM business_agent_assets WHERE owner_user_id=$1',
+      [f.admin.userId],
+    ),
+    before,
+  )
+})
+
+test('resource history is owner-scoped and restoring validates references and optimistic versions', async (t) => {
+  const f = await fixture(t)
+  const file = await f.asset()
+  const original = await f.resources.saveSkill(
+    f.admin,
+    skill({
+      references: [
+        { path: 'references/policy.md', assetId: file.id, sha256: file.sha256 },
+      ],
+    }),
+  )
+  const updated = await f.resources.saveSkill(
+    f.admin,
+    skill({ instructions: 'New policy workflow', version: original.version }),
+    original.id,
+  )
+  assert.deepEqual(
+    updated.references,
+    original.references,
+    'editing instructions retains imported reference files',
+  )
+  const path = `/admin/skills/${original.id}`
+  const history = await f.request(`${path}/versions?pageSize=1`)
+  assert.equal(history.body.total, 2)
+  assert.equal(history.body.items.length, 1)
+  assert.equal(history.body.currentVersion, 2)
+  assert.equal(
+    (await f.request(`${path}/versions`, 'GET', undefined, f.other)).status,
+    404,
+  )
+  assert.equal(
+    (
+      await f.request(`${path}/restore`, 'POST', {
+        sourceVersion: 1,
+        version: 1,
+      })
+    ).status,
+    409,
+  )
+  const restored = await f.request(`${path}/restore`, 'POST', {
+    sourceVersion: 1,
+    version: 2,
+  })
+  assert.equal(restored.status, 200, JSON.stringify(restored.body))
+  assert.equal(restored.body.resource.version, 3)
+  assert.equal(restored.body.resource.instructions, original.instructions)
+  assert.deepEqual(restored.body.resource.references, original.references)
+  await f.db.query('DELETE FROM business_agent_assets WHERE id=$1', [file.id])
+  assert.equal(
+    (
+      await f.request(`${path}/restore`, 'POST', {
+        sourceVersion: 1,
+        version: 3,
+      })
+    ).status,
+    422,
+    'a historical version cannot revive a removed source',
+  )
 })
 
 test('independent knowledge and skill lists paginate, persist edits and enforce manager ownership', async (t) => {
@@ -222,7 +325,13 @@ test('independent knowledge and skill lists paginate, persist edits and enforce 
 test('configured tools have versioned persisted defaults, validate supported settings and cannot register executable code', async (t) => {
   const f = await fixture(t)
   const catalog = await f.resources.catalog(f.admin)
-  assert.equal(catalog.tools.length, 3)
+  assert.deepEqual(catalog.tools.map((tool) => tool.id).sort(), [
+    'document_report',
+    'illustration_render',
+    'knowledge_search',
+    'presentation_report',
+    'spreadsheet_report',
+  ])
   const tool = catalog.tools.find((item) => item.id === 'spreadsheet_report')
   const change = await f.request(`/admin/tools/${tool.id}`, 'PUT', {
     ...tool,
@@ -489,7 +598,7 @@ test('v2_40 resources migration preserves legacy agents and custom menus and add
   assert.equal(
     (await f.db.query('SELECT version_num FROM alembic_version'))[0]
       .version_num,
-    'v2_42',
+    schemaRevision,
   )
   assert.equal(
     (
@@ -521,7 +630,8 @@ test('v2_40 resources migration preserves legacy agents and custom menus and add
   const settings = (
     await f.db.query("SELECT * FROM navigation_settings WHERE id='global'")
   )[0]
-  assert.equal(settings.version, 10)
+  // Resource menus and the subsequent grouped navigation migration each advance once.
+  assert.equal(settings.version, 11)
   const menus = JSON.parse(settings.items_json)
   assert.deepEqual(
     menus.find((item) => item.id === 'agents'),

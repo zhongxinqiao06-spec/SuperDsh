@@ -15,7 +15,7 @@ test(
     const before = await db.query(
       'SELECT tablename FROM pg_tables WHERE schemaname=current_schema()',
     )
-    assert.equal(before.length, 43)
+    assert.equal(before.length, 51)
     await db.query(
       "INSERT INTO instance_settings (key,value,updated_at) VALUES ('compatibility-test','preserve-me','2026-10-15T00:00:00Z')",
     )
@@ -31,7 +31,7 @@ test(
     )
     assert.deepEqual(
       await db.query('SELECT version_num FROM alembic_version'),
-      [{ version_num: 'v2_42' }],
+      [{ version_num: 'v2_44' }],
     )
   },
 )
@@ -138,7 +138,7 @@ for (const [table, column] of [
       assert.equal(
         (await db.query('SELECT version_num FROM alembic_version'))[0]
           .version_num,
-        'v2_42',
+        'v2_44',
       )
       assert.equal(
         (

@@ -5,9 +5,11 @@ import type { useAgentDefinitions } from './use-agent-definitions.ts'
 export function AgentDefinitionSelect({
   agents,
   disabled,
+  onSuggestion,
 }: {
   agents: ReturnType<typeof useAgentDefinitions>
   disabled: boolean
+  onSuggestion?: (prompt: string) => void
 }) {
   if (!agents.visible) return null
   const selected = agents.items.find((agent) => agent.id === agents.selectedId)
@@ -41,7 +43,28 @@ export function AgentDefinitionSelect({
         </Button>
       </div>
       {selected && (
-        <small>{selected.description} · 会话创建后固定此智能体版本</small>
+        <>
+          <small>{selected.description} · 会话创建后固定此智能体版本</small>
+          {!!selected.inputRequirements?.length && (
+            <small>输入要求：{selected.inputRequirements.join('；')}</small>
+          )}
+          {!!selected.outputExamples?.length && (
+            <small>输出：{selected.outputExamples.join('；')}</small>
+          )}
+          <div className="platformActions">
+            {selected.recommendedPrompts?.map((prompt) => (
+              <Button
+                type="button"
+                key={prompt}
+                size="sm"
+                disabled={disabled || !onSuggestion}
+                onClick={() => onSuggestion?.(prompt)}
+              >
+                {prompt}
+              </Button>
+            ))}
+          </div>
+        </>
       )}
       {!agents.loading && !agents.error && !agents.items.length && (
         <small>暂无已发布智能体，可继续使用通用服务端助手。</small>

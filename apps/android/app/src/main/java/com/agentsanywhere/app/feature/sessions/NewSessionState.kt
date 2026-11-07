@@ -41,6 +41,7 @@ data class NewSessionCreateDraft(
     val runtimeType: String = runtime,
     val projectId: String = "",
     val executorKind: String = "desktop",
+    val agentDefinitionId: String? = null,
 )
 
 sealed interface NewSessionCreateOutcome {

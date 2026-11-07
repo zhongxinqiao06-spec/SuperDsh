@@ -190,6 +190,7 @@ class SessionsController(
                         clientMessageId = draft.clientMessageId,
                         runtimeId = draft.runtimeId,
                         runtimeType = draft.runtimeType,
+                        agentDefinitionId = draft.agentDefinitionId,
                     ),
                 )
                 NewSessionCreateOutcome.Created(

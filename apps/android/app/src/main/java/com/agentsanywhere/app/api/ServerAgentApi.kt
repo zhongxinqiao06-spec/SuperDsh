@@ -14,6 +14,18 @@ data class ServerAgent(
 }
 
 class ServerAgentApi(private val client: ApiClient = ApiClient()) {
+    fun definitions(serverUrl: String, token: String): List<BusinessAgentDefinition> {
+        val result = mutableListOf<BusinessAgentDefinition>()
+        var page = 1
+        while (page <= 100) {
+            val response = client.getJson(serverUrl, "/agents?page=$page&pageSize=100", token)
+            val items = response.optJSONArray("items") ?: break
+            for (index in 0 until items.length()) result += items.getJSONObject(index).toBusinessAgent()
+            if (result.size >= response.optInt("total", result.size) || items.length() == 0) break
+            page++
+        }
+        return result
+    }
     fun get(serverUrl: String, token: String): ServerAgent = parse(
         client.getJson(serverUrl, "/server-agent", token),
     )

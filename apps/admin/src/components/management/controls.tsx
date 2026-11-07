@@ -189,6 +189,9 @@ export function FieldLabel({
 export const tableClass =
   'w-full min-w-[640px] text-left text-sm [&_th]:whitespace-nowrap [&_th]:p-3 [&_th]:font-medium [&_th]:text-muted-foreground [&_td]:p-3 [&_td]:align-top [&_tr]:border-b'
 
+export const selectClass =
+  'h-9 w-full rounded-md border bg-background px-3 text-sm'
+
 export function dateLabel(value: string | null | undefined): string {
   if (!value) return '—'
   const date = new Date(value)

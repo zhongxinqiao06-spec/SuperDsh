@@ -207,7 +207,7 @@ export class ModelService {
     this.listeners.add(listener)
     return () => this.listeners.delete(listener)
   }
-  private changed(owner: string | null): void {
+  changed(owner: string | null): void {
     for (const listener of this.listeners) listener(owner)
   }
   private async lock(conn: SqlConnection): Promise<void> {

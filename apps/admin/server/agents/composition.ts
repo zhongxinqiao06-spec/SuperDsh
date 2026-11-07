@@ -1,7 +1,7 @@
 import { ApiError, text } from '../http/api-router.ts'
 import type { Database } from '../infrastructure/database.ts'
 import type { AgentDefinition } from './contracts.ts'
-import type { KnowledgeBase } from './resource-contracts.ts'
+import type { KnowledgeBase, AgentSkill } from './resource-contracts.ts'
 
 /** Resolve collection membership at session creation, then freeze asset IDs. */
 export async function resolveAgentAssets(
@@ -9,12 +9,16 @@ export async function resolveAgentAssets(
   owner: string,
   input: Pick<AgentDefinition, 'knowledgeAssetIds' | 'templateAssetIds'>,
   knowledgeBases: KnowledgeBase[],
+  skills: AgentSkill[] = [],
 ) {
   const directIds = [...input.knowledgeAssetIds, ...input.templateAssetIds]
   const ids = [
     ...new Set([
       ...directIds,
       ...knowledgeBases.flatMap((base) => base.assetIds),
+      ...skills.flatMap((skill) =>
+        (skill.references ?? []).map((reference) => reference.assetId),
+      ),
     ]),
   ]
   const assets = await db.query(
@@ -32,7 +36,11 @@ export async function resolveAgentAssets(
     )
       throw new ApiError(422, '资料和模板分类不匹配')
   }
-  for (const kind of ['spreadsheet-template', 'presentation-template'])
+  for (const kind of [
+    'spreadsheet-template',
+    'presentation-template',
+    'document-template',
+  ])
     if (assets.filter((asset) => asset.kind === kind).length > 1)
       throw new ApiError(422, '关联知识库中同类输出只能绑定一个模板')
   return {

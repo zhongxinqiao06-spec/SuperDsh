@@ -8,12 +8,8 @@ import {
   type OfficeInputFile,
   type SalesReportInput,
 } from './types.ts'
-import {
-  OFFICE_LIMITS,
-  parseXml,
-  readOfficeArchive,
-  textValue,
-} from './validation.ts'
+import { OFFICE_LIMITS, parseXml, textValue } from './validation.ts'
+import { inspectOfficePresentationTemplate } from './presentation-template.ts'
 
 export const PPTX_MEDIA_TYPE =
   'application/vnd.openxmlformats-officedocument.presentationml.presentation'
@@ -38,52 +34,13 @@ const presentationNamespace =
   'http://schemas.openxmlformats.org/presentationml/2006/main'
 
 export async function inspectPresentationTemplate(file: OfficeInputFile) {
-  const archive = readOfficeArchive(file)
-  if (!archive.file('ppt/presentation.xml'))
-    throw new OfficeInputError('文件不是 PPTX 演示文稿')
-  const parts = archive
-    .file(/^ppt\/slides\/slide\d+\.xml$/u)
-    .sort(
-      (a, b) =>
-        Number(a.name.match(/slide(\d+)/u)?.[1]) -
-        Number(b.name.match(/slide(\d+)/u)?.[1]),
-    )
-  if (parts.length < 1 || parts.length > OFFICE_LIMITS.slides)
-    throw new OfficeInputError('PPT 模板需为 1–20 页')
-  const presentation = parseXml(
-    await archive.file('ppt/presentation.xml')!.async('string'),
-  )
-  const relations = archive.file('ppt/_rels/presentation.xml.rels')
-  if (!relations) throw new OfficeInputError('PPT 模板缺少页面关系')
-  const relationMap = new Map(
-    Array.from(
-      parseXml(await relations.async('string')).getElementsByTagNameNS(
-        '*',
-        'Relationship',
-      ),
-    ).map((item) => [item.getAttribute('Id'), item.getAttribute('Target')]),
-  )
-  const pageIds = Array.from(
-    presentation.getElementsByTagNameNS(presentationNamespace, 'sldId'),
-  )
-  if (
-    pageIds.length !== parts.length ||
-    pageIds.some(
-      (item, index) =>
-        relationMap.get(item.getAttribute('r:id')) !==
-        `slides/slide${index + 1}.xml`,
-    )
-  ) {
-    throw new OfficeInputError(
-      '演示版模板要求连续页面顺序，请另存为新的 PPTX 后上传',
-    )
-  }
+  const { archive, slides: orderedSlides } =
+    await inspectOfficePresentationTemplate(file)
   const placeholders = new Set<string>()
   const slides: { number: number; shapes: { name: string; text: string }[] }[] =
     []
-  for (const [index, part] of parts.entries()) {
-    if (part.name !== `ppt/slides/slide${index + 1}.xml`)
-      throw new OfficeInputError('PPT 模板页编号不连续，请另存为新的 PPTX')
+  for (const orderedSlide of orderedSlides) {
+    const part = archive.file(orderedSlide.partName)!
     const document = parseXml(await part.async('string'))
     if (
       document.getElementsByTagNameNS(presentationNamespace, 'timing').length ||
@@ -137,7 +94,7 @@ export async function inspectPresentationTemplate(file: OfficeInputFile) {
           'PPT 占位符请放在普通文本框中，暂不支持表格占位符',
         )
     }
-    slides.push({ number: index + 1, shapes })
+    slides.push({ number: orderedSlide.partNumber, shapes })
   }
   for (const key of ['title', 'revenue']) {
     if (!placeholders.has(key))
@@ -262,8 +219,8 @@ export async function generateSalesPresentation(
     (groups.length > 5
       ? `\n仅展示前五项，共 ${groups.length} 项，完整记录见 Excel 明细。`
       : '')
-  if (input.knowledge && input.knowledge.length > 3)
-    throw new OfficeInputError('报告最多引用三份公司资料')
+  if (input.knowledge && input.knowledge.length > 50)
+    throw new OfficeInputError('报告最多引用五十份公司资料')
   const references =
     input.knowledge?.map((source) => {
       const filename = textValue(source.filename, '资料来源名称', 200)
@@ -292,7 +249,7 @@ export async function generateSalesPresentation(
     regionSummary: describe(summary.regions),
     productSummary: describe(summary.products),
     knowledge: references.length
-      ? `资料摘录（原文）：\n${references.join('\n')}`
+      ? `资料摘录（原文）：\n${references.slice(0, 6).join('\n')}${references.length > 6 ? `\n另有 ${references.length - 6} 份资料，请在会话资料来源中查看。` : ''}`
       : '未提供公司资料，本报告仅依据上传的销售数据。',
   }
   const automizer = new Automizer({

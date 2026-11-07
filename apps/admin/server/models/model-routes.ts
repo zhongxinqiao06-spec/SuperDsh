@@ -21,6 +21,11 @@ export interface ModelAuthorization {
   getAccount(id: string): Promise<Account | null>
 }
 export class ModelProxy {
+  authorizeConfiguration?: (
+    owner: string,
+    provider: string,
+    model: string,
+  ) => Promise<boolean | undefined>
   readonly models: ModelService
   readonly auth: ModelAuthorization
   readonly allowedOrigins: string
@@ -138,7 +143,18 @@ export class ModelProxy {
       protocol,
       body.model,
     )
-    const bytes = Buffer.from(JSON.stringify(body))
+    const ark = await this.authorizeConfiguration?.(
+      options.owner,
+      options.providerId,
+      body.model,
+    )
+    const bytes = Buffer.from(
+      JSON.stringify(
+        ark && protocol === 'openai-responses'
+          ? { ...body, store: false }
+          : body,
+      ),
+    )
     if (bytes.length > 8 * 1024 * 1024)
       throw new ApiError(413, 'model request is too large')
     const controller = new AbortController()
@@ -163,6 +179,11 @@ export class ModelProxy {
       checking = true
       void (async () => {
         if (options.verifyUser) await options.verifyUser()
+        await this.authorizeConfiguration?.(
+          options.owner,
+          options.providerId,
+          String(body.model),
+        )
         if (
           !(await this.allowed(
             options.owner,

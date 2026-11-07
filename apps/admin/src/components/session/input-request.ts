@@ -13,6 +13,8 @@ export type InputRequestQuestion = {
   multiple: boolean
   allowCustom: boolean
   options: InputRequestOption[]
+  intent?: { kind: 'plan-review'; approveOptionId: string }
+  detail?: string
 }
 
 export type InputRequestForm = {
@@ -116,6 +118,16 @@ function readQuestion(value: unknown): InputRequestQuestion | null {
     })
   }
 
+  const rawIntent = recordOf(question.intent)
+  const approveOptionId = nonEmptyText(rawIntent?.approveOptionId)
+  const intent =
+    rawIntent?.kind === 'plan-review' &&
+    approveOptionId &&
+    optionIds.has(approveOptionId)
+      ? { kind: 'plan-review' as const, approveOptionId }
+      : undefined
+  if (rawIntent && !intent) return null
+
   return {
     id,
     prompt,
@@ -123,6 +135,10 @@ function readQuestion(value: unknown): InputRequestQuestion | null {
     multiple: question.multiple === true,
     allowCustom: question.allowCustom !== false,
     options,
+    ...(intent ? { intent } : {}),
+    ...(nonEmptyText(question.detail)
+      ? { detail: nonEmptyText(question.detail)! }
+      : {}),
   }
 }
 

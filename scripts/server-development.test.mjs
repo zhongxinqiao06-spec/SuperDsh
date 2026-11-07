@@ -15,6 +15,7 @@ import {
   developmentComposeArgs,
   developmentEnvironment,
   prepareDevelopmentEnv,
+  prepareDevelopmentStorageEnv,
   verifyDevelopmentDatabaseContainer,
 } from './server-development.mjs'
 
@@ -27,6 +28,21 @@ function temporaryRepository(t) {
   })
   return root
 }
+
+test('adding MinIO preserves old storage and secrets and refuses a volume with missing credentials', (t) => {
+  const root = temporaryRepository(t)
+  const file = prepareDevelopmentEnv(root, {})
+  const saved = readFileSync(file, 'utf8')
+  writeFileSync(file, saved.split('\n').filter((line) => !line.startsWith('SUPERDSH_MINIO_') && !line.startsWith('AGENT_SERVER_FILES_BACKEND=')).join('\n'))
+  assert.throws(() => prepareDevelopmentStorageEnv(root, {}, { existingVolume: true }), /credential|凭据/i)
+  prepareDevelopmentStorageEnv(root, {})
+  const environment = developmentEnvironment(root, {})
+  assert.equal(environment.AGENT_SERVER_FILES_BACKEND, 'local')
+  assert.equal(environment.AGENT_SERVER_SECRET, parseEnv(saved).AGENT_SERVER_SECRET)
+  const upgraded = readFileSync(file, 'utf8')
+  prepareDevelopmentStorageEnv(root, {}, { existingVolume: true })
+  assert.equal(readFileSync(file, 'utf8'), upgraded)
+})
 
 test('development credentials persist and use an independent project and data directory', (t) => {
   const root = temporaryRepository(t)

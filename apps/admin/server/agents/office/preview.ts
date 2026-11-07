@@ -2,6 +2,7 @@ import { mkdtemp, open, rm, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { basename, dirname, extname, join, resolve } from 'node:path'
 import type { Converter, ConverterOptions } from '@deepseek-ai/libreoffice-kit'
+import { officeFontDirectory } from './font-metrics.ts'
 import { ApiError } from '../../http/api-router.ts'
 import { OfficeInputError, type OfficeInputFile } from './types.ts'
 import {
@@ -128,11 +129,17 @@ export class OfficeAssetPreviewRenderer {
     let directory: string | undefined
     let converter: Converter | undefined
     try {
-      const extension = validateInput(file, ['.pptx', '.docx'])
-      const archive = readOfficeArchive(file)
+      const extension = validateInput(file, ['.pptx', '.docx', '.xlsx'])
+      const archive = readOfficeArchive(file, {
+        allowChartWorkbooks: extension === '.pptx',
+      })
       if (
         !archive.file(
-          extension === '.docx' ? 'word/document.xml' : 'ppt/presentation.xml',
+          extension === '.docx'
+            ? 'word/document.xml'
+            : extension === '.xlsx'
+              ? 'xl/workbook.xml'
+              : 'ppt/presentation.xml',
         )
       )
         throw new OfficeInputError('文件内容与 Office 文档格式不匹配')
@@ -152,6 +159,13 @@ export class OfficeAssetPreviewRenderer {
         maxArchiveEntries: OFFICE_LIMITS.entries,
         maxUncompressedBytes: OFFICE_LIMITS.expandedBytes,
         maxLoadedFontBytes: 128 * 1024 * 1024,
+        fontDirectories: [
+          officeFontDirectory,
+          ...(process.platform === 'win32'
+            ? ['C:/Windows/Fonts']
+            : ['/usr/share/fonts', '/usr/local/share/fonts']),
+        ],
+        initialFontFamilies: ['Noto Sans CJK SC'],
       })
       stopped.throwIfAborted()
       const result = await converter.render({ inputPath, outputPath }, stopped)

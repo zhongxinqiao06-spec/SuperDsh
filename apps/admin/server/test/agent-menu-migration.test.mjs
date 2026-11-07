@@ -86,6 +86,6 @@ test('v2_41 stored standalone Agent menus become one group without losing custom
   )
   assert.equal(
     (await db.query('SELECT version_num FROM alembic_version'))[0].version_num,
-    'v2_42',
+    'v2_44',
   )
 })
