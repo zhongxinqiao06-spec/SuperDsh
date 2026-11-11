@@ -19,6 +19,21 @@ from app.modules.models.service.model_service import Audit
 from app.modules.models.service.provider_transport import ProviderTransport
 
 
+def external_profile(body: EmbeddingInput) -> dict[str, object]:
+    """配置启动默认值和手动切换使用同一模型标识，索引代际可复用。"""
+    if not body.model.strip() or not body.revision.strip() or not body.baseUrl:
+        raise DomainError(422, "外部 Embedding 需要地址、模型与模型修订")
+    identity = f"{body.baseUrl}:{body.model}:{body.revision}:{body.dimensions}"
+    return {
+        "id": "external_" + hashlib.sha256(identity.encode()).hexdigest()[:20],
+        "kind": body.kind,
+        "model": body.model.strip(),
+        "revision": body.revision.strip(),
+        "dimensions": body.dimensions,
+        "baseUrl": body.baseUrl,
+    }
+
+
 class KnowledgeProfileService:
     """配置持久修订由数据库比较交换，无进程缓存导致的跨实例旧配置。"""
 
@@ -42,6 +57,17 @@ class KnowledgeProfileService:
         """密钥只进入服务器编码客户端，公开 profile 不包含明文或密文。"""
         key = self.cipher.open(credential, "knowledge-embedding") if credential else ""
         return EmbeddingService(profile, self.directory, self.transport, key, self.trusted_origins)
+
+    async def initialize_default(self, values: dict[str, object]) -> None:
+        """只初始化没有索引和活动配置的库，保留管理员已选择的模型。"""
+        body = EmbeddingInput.model_validate({**values, "kind": "openai-compatible", "version": 0})
+        profile = external_profile(body)
+        self.build(profile, None).authorize_origin()
+        async with self.database.sessions() as session, session.begin():
+            await lock_transaction(session, "knowledge-embedding-profile")
+            dao = KnowledgeDao(session)
+            if await dao.profile() is None and not await dao.has_documents():
+                dao.add(KnowledgeProfileRow(id="active", profile=profile, version=1))
 
     async def current(self) -> EmbeddingService:
         """每次用例读取活动修订，长任务持有自己的不可变配置对象。"""
@@ -85,20 +111,10 @@ class KnowledgeProfileService:
         credential: str | None = None
         profile = dict(LOCAL_PROFILE)
         if body.kind != "local":
-            if not body.model.strip() or not body.revision.strip() or not body.baseUrl:
-                raise DomainError(422, "外部 Embedding 需要地址、模型与模型修订")
+            profile = external_profile(body)
             key = body.apiKey.get_secret_value() if body.apiKey else ""
             if len(key) > 8192 or key and body.clearApiKey:
                 raise DomainError(422, "密钥长度或清空选项无效")
-            identity = f"{body.baseUrl}:{body.model}:{body.revision}:{body.dimensions}"
-            profile = {
-                "id": "external_" + hashlib.sha256(identity.encode()).hexdigest()[:20],
-                "kind": body.kind,
-                "model": body.model.strip(),
-                "revision": body.revision.strip(),
-                "dimensions": body.dimensions,
-                "baseUrl": body.baseUrl,
-            }
             before, after = urlsplit(str(old_profile.get("baseUrl", ""))), urlsplit(body.baseUrl)
             if before.scheme == after.scheme and before.netloc == after.netloc:
                 credential = old_credential

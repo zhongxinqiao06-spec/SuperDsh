@@ -2,7 +2,7 @@
 
 from datetime import datetime
 
-from sqlalchemy import update
+from sqlalchemy import select, update
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.modules.knowledge.entity.do.knowledge_do import KnowledgeDocumentRow, KnowledgeProfileRow
@@ -13,6 +13,10 @@ class KnowledgeDao:
 
     def __init__(self, session: AsyncSession) -> None:
         self.session = session
+
+    async def has_documents(self) -> bool:
+        """历史索引未记录显式模型时仍属于原模型，必须通过重建流程切换。"""
+        return await self.session.scalar(select(KnowledgeDocumentRow.asset_id).limit(1)) is not None
 
     async def profile(self) -> KnowledgeProfileRow | None:
         """只保存一个全局配置对象。"""

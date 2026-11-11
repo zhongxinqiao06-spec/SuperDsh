@@ -67,9 +67,11 @@ class KnowledgeService:
             account_lookup,
         )
 
-    async def initialize(self) -> None:
+    async def initialize(self, embedding_default: dict[str, object] | None = None) -> None:
         """启动清理中断任务状态，不静默下载模型或重发外部计费请求。"""
         await self.indexes.initialize()
+        if embedding_default is not None:
+            await self.profiles.initialize_default(embedding_default)
 
     async def list(self, account: Account, page: int, size: int, search: str) -> dict[str, object]:
         """按账户与名称搜索知识库。"""

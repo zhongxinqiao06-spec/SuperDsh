@@ -359,7 +359,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
             await navigation.initialize()
             await files.initialize()
             await devices.operations.initialize()
-            await knowledge.initialize()
+            await knowledge.initialize(settings.embedding_default)
             await skills.recover()
             yield
         finally:

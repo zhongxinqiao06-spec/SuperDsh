@@ -28,7 +28,13 @@ services:
     extends:
       file: apps/web-admin/deployment/compose.dependencies.yml
       service: minio-init
+  ollama:
+    extends: { file: compose.yml, service: ollama }
+  ollama-init:
+    extends: { file: compose.yml, service: ollama-init }
   backend:
+    image: starbridge-web-admin-backend:${WEB_ADMIN_SOURCE_COMMIT:?Use web-admin command}
+    pull_policy: never
     build:
       context: .
       dockerfile: apps/web-admin/deployment/Dockerfile.backend
@@ -37,6 +43,7 @@ services:
         PYTHON_IMAGE: ${WEB_ADMIN_IMAGE_PYTHON:?Use web-admin command}
         UV_VERSION: ${WEB_ADMIN_UV_VERSION:?Use web-admin command}
         SOURCE_COMMIT: ${WEB_ADMIN_SOURCE_COMMIT:?Use web-admin command}
+    env_file: apps/admin/deployment/ollama/embedding.env
     init: true
     restart: unless-stopped
     stop_grace_period: 90s
@@ -50,7 +57,8 @@ services:
       WEB_ADMIN_INITIAL_ADMIN_DISPLAY_NAME: ${WEB_ADMIN_INITIAL_ADMIN_DISPLAY_NAME}
       WEB_ADMIN_PUBLIC_ORIGIN: ${WEB_ADMIN_PUBLIC_ORIGIN}
       WEB_ADMIN_ALLOWED_ORIGINS: ${WEB_ADMIN_ALLOWED_ORIGINS}
-      WEB_ADMIN_PROVIDER_ALLOWED_ORIGINS: ${WEB_ADMIN_PROVIDER_ALLOWED_ORIGINS}
+      WEB_ADMIN_PROVIDER_ALLOWED_ORIGINS: http://ollama:11434${WEB_ADMIN_PROVIDER_ALLOWED_ORIGINS:+,}${WEB_ADMIN_PROVIDER_ALLOWED_ORIGINS:-}
+      WEB_ADMIN_EMBEDDING_TRUSTED_ORIGINS: http://ollama:11434${WEB_ADMIN_EMBEDDING_TRUSTED_ORIGINS:+,}${WEB_ADMIN_EMBEDDING_TRUSTED_ORIGINS:-}
       WEB_ADMIN_MODEL_DEFAULTS_FILE: /app/apps/web-admin/backend/config/model-defaults.json
       WEB_ADMIN_QDRANT_URL: ${WEB_ADMIN_QDRANT_URL}
       WEB_ADMIN_QDRANT_API_KEY: ${WEB_ADMIN_QDRANT_API_KEY}
@@ -63,6 +71,7 @@ services:
       redis: { condition: service_healthy }
       qdrant: { condition: service_started }
       minio-init: { condition: service_completed_successfully }
+      ollama-init: { condition: service_completed_successfully }
     volumes:
       - runtime-data:/data/runtime
       - files-data:/data/files
@@ -75,6 +84,8 @@ services:
         bind:
           create_host_path: false
   fronted:
+    image: starbridge-web-admin-fronted:${WEB_ADMIN_SOURCE_COMMIT:?Use web-admin command}
+    pull_policy: never
     build:
       context: .
       dockerfile: apps/web-admin/deployment/Dockerfile.fronted
@@ -87,6 +98,7 @@ services:
     depends_on:
       backend: { condition: service_healthy }
 volumes:
+  ollama-data:
   postgres-data:
   redis-data:
   qdrant-data:

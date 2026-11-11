@@ -235,6 +235,7 @@ export async function composeEnvironment(
     WEB_ADMIN_MC_SOURCE: deploymentMetadata.storage.mcSource,
     WEB_ADMIN_MC_SHA256: deploymentMetadata.storage.mcSha256,
   }
+  if (mode === 'production') values.COMPOSE_FILE = 'compose.web-admin.yml'
   for (const [name, value] of Object.entries(deploymentMetadata.images))
     values[`WEB_ADMIN_IMAGE_${name.toUpperCase()}`] = value
   const output = resolve(root, 'config/compose.env')

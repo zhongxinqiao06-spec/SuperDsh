@@ -38,6 +38,9 @@ class Settings(BaseSettings):
         Path(__file__).resolve().parents[2] / "config/model-defaults.json"
     )
     embedding_trusted_origins: str = ""
+    embedding_default: dict[str, object] | None = Field(
+        default=None, validation_alias="SUPERDSH_KNOWLEDGE_EMBEDDING_DEFAULT"
+    )
     qdrant_url: str = "http://localhost:56334"
     qdrant_api_key: SecretStr = SecretStr("")
     office_executable: str = ""
