@@ -6,7 +6,7 @@ CMD ["node", "init-config.mjs"]
 
 FROM node:24-bookworm-slim AS ollama-init
 WORKDIR /app
-COPY apps/admin/deployment/ollama-model.mjs ./ollama-model.mjs
+COPY --chmod=0444 apps/admin/deployment/ollama-model.mjs ./ollama-model.mjs
 USER node
 CMD ["node", "ollama-model.mjs"]
 
@@ -42,7 +42,10 @@ RUN --mount=type=cache,target=/root/.yarn/berry/cache \
     corepack yarn config set --json supportedArchitectures.cpu '["current"]' \
     && corepack yarn install --immutable
 COPY . .
-RUN node scripts/server.mjs build
+# COPY preserves checkout permissions, including a deployment user's private umask.
+# The runtime user needs read access to sources and traversal of their directories.
+RUN find . -name node_modules -prune -o ! -type l -exec chmod a+rX {} + \
+    && node scripts/server.mjs build
 ARG SUPERDSH_BUNDLE_LOCAL_EMBEDDING=1
 RUN case "$SUPERDSH_BUNDLE_LOCAL_EMBEDDING" in \
       1) node apps/admin/server/agents/embedding-model.ts /app/models/bge-small-zh-v1.5 ;; \

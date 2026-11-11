@@ -5,10 +5,6 @@ if [ "${1:-}" = serve ]; then
   models=${OLLAMA_MODELS:-/root/.ollama/models}
   tag="$models/manifests/registry.ollama.ai/quentinz/bge-small-zh-v1.5/q8_0"
   mkdir -p "$models/blobs" "$(dirname "$tag")"
-  if [ -e "$tag" ] && ! cmp -s /opt/embedding/manifest "$tag"; then
-    echo '已有 Ollama 模型标签的摘要与项目版本不一致' >&2
-    exit 1
-  fi
 
   # 数据先于清单落盘。中断后可重跑，其他模型和服务密钥保留在原卷中。
   install_file() {
@@ -23,6 +19,7 @@ if [ "${1:-}" = serve ]; then
     install_file "$blob" "$models/blobs/${blob##*/}"
   done
   install_file /opt/embedding/manifest "$models/blobs/sha256-$(sha256sum /opt/embedding/manifest | cut -d' ' -f1)"
-  install_file /opt/embedding/manifest "$tag"
+  # ollama pull 会在本地标签中记录附加元数据。已有标签由 ollama-init 通过 API 核对实际摘要。
+  if [ ! -e "$tag" ]; then install_file /opt/embedding/manifest "$tag"; fi
 fi
 exec /bin/ollama "$@"

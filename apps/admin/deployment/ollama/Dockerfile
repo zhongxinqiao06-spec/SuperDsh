@@ -9,7 +9,7 @@ ADD --checksum=sha256:3fd5f729a230062c5d253e4a2fbe701e5b94f8bd102373900dbe587145
 ADD --checksum=sha256:b507b9c2f6ca642bffcd06665ea7c91f235fd32daeefdf875a0f938db05fb315 ${REGISTRY}/blobs/sha256:b507b9c2f6ca642bffcd06665ea7c91f235fd32daeefdf875a0f938db05fb315 /opt/embedding/blobs/sha256-b507b9c2f6ca642bffcd06665ea7c91f235fd32daeefdf875a0f938db05fb315
 ADD --checksum=sha256:b837481ff8556a29d9bb27ac280c23495a491e7268d8f043f2e617f7f795d089 ${REGISTRY}/blobs/sha256:b837481ff8556a29d9bb27ac280c23495a491e7268d8f043f2e617f7f795d089 /opt/embedding/blobs/sha256-b837481ff8556a29d9bb27ac280c23495a491e7268d8f043f2e617f7f795d089
 
-COPY BGE-LICENSE /usr/share/licenses/bge-small-zh-v1.5/LICENSE
+COPY --chmod=0444 BGE-LICENSE /usr/share/licenses/bge-small-zh-v1.5/LICENSE
 COPY --chmod=755 start.sh /usr/local/bin/superdsh-ollama
 ENTRYPOINT ["/usr/local/bin/superdsh-ollama"]
 CMD ["serve"]
