@@ -4,6 +4,12 @@ WORKDIR /app
 COPY apps/admin/deployment/init-config.mjs ./init-config.mjs
 CMD ["node", "init-config.mjs"]
 
+FROM node:24-bookworm-slim AS ollama-init
+WORKDIR /app
+COPY apps/admin/deployment/ollama-model.mjs ./ollama-model.mjs
+USER node
+CMD ["node", "ollama-model.mjs"]
+
 FROM node:24-bookworm-slim AS build
 RUN apt-get update && apt-get install -y --no-install-recommends \
     ca-certificates git python3 make g++ pkg-config \
@@ -37,7 +43,12 @@ RUN --mount=type=cache,target=/root/.yarn/berry/cache \
     && corepack yarn install --immutable
 COPY . .
 RUN node scripts/server.mjs build
-RUN node apps/admin/server/agents/embedding-model.ts /app/models/bge-small-zh-v1.5
+ARG SUPERDSH_BUNDLE_LOCAL_EMBEDDING=1
+RUN case "$SUPERDSH_BUNDLE_LOCAL_EMBEDDING" in \
+      1) node apps/admin/server/agents/embedding-model.ts /app/models/bge-small-zh-v1.5 ;; \
+      0) : ;; \
+      *) exit 2 ;; \
+    esac
 
 FROM node:24-bookworm-slim AS runtime
 RUN apt-get update && apt-get install -y --no-install-recommends \

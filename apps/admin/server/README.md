@@ -104,9 +104,9 @@ Next 网页 / 桌面 / 安卓
 
 旧资料缺少位置元数据时不会虚构页码。维护者在「索引与检索」选择「重试索引」，从保存的原文件重新解析，补充定位并保留资料 ID、原字节及哈希；失败保留原记录并显示具体原因。
 
-默认本地 Embedding 为 `Xenova/bge-small-zh-v1.5`，revision `75c43b069aac4d136ba6bc1122f995fedcfd2781`，q8 ONNX、512 维。根目录执行 `corepack.cmd yarn server:knowledge:prepare` 提前下载并逐文件校验 SHA256；读取开发环境中的数据目录，允许 `SUPERDSH_EMBEDDING_MODEL_DIR` 覆盖。首次问答不下载模型；Compose 构建预装。知识库通过 `/admin/knowledge-embedding` 独立配置本地或 OpenAI 兼容 Embedding；保存和全局重建要求同时拥有 `models.manage` 与 `agents.manage`，每批请求及配置提交前复验权限。Key 加密且只写入。
+原生部署的默认本地 Embedding 为 `Xenova/bge-small-zh-v1.5`，revision `75c43b069aac4d136ba6bc1122f995fedcfd2781`，q8 ONNX、512 维。根目录执行 `corepack.cmd yarn server:knowledge:prepare` 提前下载并逐文件校验 SHA256；读取开发环境中的数据目录，允许 `SUPERDSH_EMBEDDING_MODEL_DIR` 覆盖。根 Compose 默认使用 Ollama，启动时校验 `quentinz/bge-small-zh-v1.5:q8_0` 的摘要和 512 维向量输出。知识库通过 `/admin/knowledge-embedding` 独立配置本地或 OpenAI 兼容 Embedding；保存和全局重建要求同时拥有 `models.manage` 与 `agents.manage`，每批请求及配置提交前复验权限。Key 加密且只写入。
 
-外部资料外发许可由部署环境 `SUPERDSH_KNOWLEDGE_EMBEDDING_TRUSTED_ORIGINS` 控制，默认空，即只允许本地模型。配置示例为 `https://embedding.example.com,https://approved-provider.example`；值只能是完整 origin，无路径、凭据、参数或通配符。网页无权修改信任列表。该设置表示企业部署方批准平台知识向这些服务发送，不能把网络连通性当作资料授权。网络层仍独立校验所有 DNS 地址并固定连接目标，拒绝重定向；私网端点还需 `SUPERDSH_PERSONAL_MODEL_ALLOWED_ORIGINS`，后者不能替代外发许可。已有外部配置在新环境未被信任时，平台仍启动，但知识调用返回明确的 403，不发送 Key 或资料，不自动换供应商。
+外部资料外发许可由部署环境 `SUPERDSH_KNOWLEDGE_EMBEDDING_TRUSTED_ORIGINS` 控制。原生部署默认为空，根 Compose 默认允许项目内的 `http://ollama:11434`。配置示例为 `https://embedding.example.com,https://approved-provider.example`；值只能是完整 origin，无路径、凭据、参数或通配符。网页无权修改信任列表。该设置表示企业部署方批准平台知识向这些服务发送，不能把网络连通性当作资料授权。网络层仍独立校验所有 DNS 地址并固定连接目标，拒绝重定向；私网端点还需 `SUPERDSH_PERSONAL_MODEL_ALLOWED_ORIGINS`，后者不能替代外发许可。已有外部配置在新环境未被信任时，平台仍启动，但知识调用返回明确的 403，不发送 Key 或资料，不自动换供应商。
 
 更换 Embedding 会构建独立索引代次，成功才切换；失败保留原模型及索引，不自动更换费用来源。引用 ID、来源权限与摘录由服务端核验；证据只能支持其对应内容，不能把未经核验的整篇模型回答标为可信。原文不可用、权限变化、资料冲突或无依据须在回答中明确。
 

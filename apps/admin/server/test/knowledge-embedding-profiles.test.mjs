@@ -105,6 +105,31 @@ async function fixture(t) {
   return { profiles, input, store, options, requests }
 }
 
+test('deployment embedding is the unsaved default and a saved profile takes precedence after restart', async (t) => {
+  const { options, input, store } = await fixture(t)
+  const configured = {
+    ...options,
+    deploymentDefault: JSON.stringify({ ...input, model: 'deployment-model' }),
+  }
+  const profiles = new KnowledgeEmbeddingProfiles(configured)
+  await profiles.initialize()
+  assert.equal(profiles.embedding().profile.model, 'deployment-model')
+  assert.equal(profiles.view().version, 0)
+  assert.equal(profiles.view().profile.apiKeyConfigured, false)
+  assert.equal(store.stored(), null)
+
+  await profiles.save(
+    'admin',
+    input,
+    { index: async () => {} },
+    AbortSignal.timeout(5000),
+  )
+  const restarted = new KnowledgeEmbeddingProfiles(configured)
+  await restarted.initialize()
+  assert.equal(restarted.embedding().profile.model, input.model)
+  assert.equal(restarted.view().version, 1)
+})
+
 test('profile activation stages a distinct candidate, encrypts its key and survives process reload', async (t) => {
   const { profiles, input, store, options } = await fixture(t)
   const activeBefore = profiles.embedding()

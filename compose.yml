@@ -1,5 +1,9 @@
 name: starbridge
 
+# 固定模型摘要也作为知识库索引的版本号，初始化和平台必须使用相同配置。
+x-embedding: &embedding >-
+  {"model":"quentinz/bge-small-zh-v1.5:q8_0","revision":"40f5d717a8c0d9b1eedced30ff7460f27fbb7414fd0f2559160d74ccd04a82c9","dimensions":512,"baseUrl":"http://ollama:11434/v1"}
+
 services:
   config-init:
     build:
@@ -19,6 +23,8 @@ services:
       context: .
       dockerfile: apps/admin/deployment/Dockerfile
       target: runtime
+      args:
+        SUPERDSH_BUNDLE_LOCAL_EMBEDDING: '0'
     init: true
     restart: unless-stopped
     stop_grace_period: 90s
@@ -32,8 +38,10 @@ services:
       POSTGRES_PASSWORD_FILE: /data/config/postgres-password
       AGENT_SERVER_REDIS_URL: redis://redis:6379/0
       SUPERDSH_QDRANT_URL: http://qdrant:6333
-      SUPERDSH_KNOWLEDGE_EMBEDDING_TRUSTED_ORIGINS: ${SUPERDSH_KNOWLEDGE_EMBEDDING_TRUSTED_ORIGINS:-}
-      SUPERDSH_PERSONAL_MODEL_ALLOWED_ORIGINS: ${SUPERDSH_PERSONAL_MODEL_ALLOWED_ORIGINS:-}
+      SUPERDSH_KNOWLEDGE_EMBEDDING_DEFAULT: *embedding
+      SUPERDSH_KNOWLEDGE_EMBEDDING_TRUSTED_ORIGINS: http://ollama:11434${SUPERDSH_KNOWLEDGE_EMBEDDING_TRUSTED_ORIGINS:+,}${SUPERDSH_KNOWLEDGE_EMBEDDING_TRUSTED_ORIGINS:-}
+      SUPERDSH_PERSONAL_MODEL_ALLOWED_ORIGINS: http://ollama:11434${SUPERDSH_PERSONAL_MODEL_ALLOWED_ORIGINS:+,}${SUPERDSH_PERSONAL_MODEL_ALLOWED_ORIGINS:-}
+      SUPERDSH_EMBEDDING_MODEL_DIR: /data/runtime/models/bge-small-zh-v1.5
       AGENT_SERVER_PUBLIC_ORIGIN: ${SUPERDSH_PUBLIC_ORIGIN:-}
       AGENT_SERVER_CORS_ORIGINS: ${SUPERDSH_CORS_ORIGINS:-}
       AGENT_SERVER_SECRET: ${AGENT_SERVER_SECRET:-}
@@ -54,6 +62,8 @@ services:
       qdrant:
         condition: service_healthy
       minio-init:
+        condition: service_completed_successfully
+      ollama-init:
         condition: service_completed_successfully
     healthcheck:
       test:
@@ -122,6 +132,7 @@ services:
     build:
       context: apps/admin/deployment/minio
     image: superdsh-minio:2025-10-15
+    pull_policy: never
     restart: unless-stopped
     entrypoint: ['/bin/sh', '-ec']
     command:
@@ -149,6 +160,7 @@ services:
       retries: 20
   minio-init:
     image: superdsh-minio:2025-10-15
+    pull_policy: never
     user: '0:0'
     restart: 'no'
     entrypoint: ['/bin/sh', '/usr/local/bin/superdsh-minio-init']
@@ -160,6 +172,37 @@ services:
       minio:
         condition: service_healthy
 
+  ollama:
+    image: ollama/ollama:0.40.16@sha256:910d0d8107b538fb0894e63163eb195de0cc7aefcbc666dc62d3b18f71124592
+    restart: unless-stopped
+    environment:
+      OLLAMA_HOST: 0.0.0.0:11434
+      OLLAMA_NO_CLOUD: '1'
+      OLLAMA_NUM_PARALLEL: '1'
+      OLLAMA_MAX_LOADED_MODELS: '1'
+      OLLAMA_CONTEXT_LENGTH: '512'
+      OLLAMA_KEEP_ALIVE: 2m
+    mem_limit: 512m
+    volumes:
+      - ollama-data:/root/.ollama
+    healthcheck:
+      test: ['CMD', 'ollama', 'list']
+      interval: 10s
+      timeout: 5s
+      retries: 10
+
+  ollama-init:
+    build:
+      context: .
+      dockerfile: apps/admin/deployment/Dockerfile
+      target: ollama-init
+    restart: 'no'
+    environment:
+      SUPERDSH_KNOWLEDGE_EMBEDDING_DEFAULT: *embedding
+    depends_on:
+      ollama:
+        condition: service_healthy
+
 volumes:
   config-data:
   platform-data:
@@ -168,3 +211,4 @@ volumes:
   redis-data:
   qdrant-data:
   minio-data:
+  ollama-data:

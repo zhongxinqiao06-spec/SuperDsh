@@ -36,6 +36,7 @@ interface Options {
   localModelDirectory: string
   allowedOrigins?: string
   trustedOrigins?: string
+  deploymentDefault?: string
   getAccount(userId: string): Promise<Account>
   audit(
     actor: string,
@@ -66,6 +67,20 @@ export class KnowledgeEmbeddingProfiles {
     if (stored) {
       this.current = stored
       this.provider = this.build(stored)
+    } else if (this.options.deploymentDefault) {
+      // 部署默认值只用于尚未保存检索设置的实例。管理员保存后始终使用数据库内的版本。
+      const { model, revision, dimensions, baseUrl } = JSON.parse(
+        this.options.deploymentDefault,
+      )
+      const candidate = this.candidate({
+        kind: 'openai-compatible',
+        model,
+        revision,
+        dimensions,
+        baseUrl,
+      })
+      this.provider = this.build(candidate)
+      this.current = { ...candidate, version: 0 }
     }
   }
   embedding = () => this.provider

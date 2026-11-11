@@ -109,6 +109,7 @@ export function createApplication(options: ApplicationOptions) {
     db,
     getAccount: (id) => identity.getUser(id),
     trustedOrigins: process.env.SUPERDSH_KNOWLEDGE_EMBEDDING_TRUSTED_ORIGINS,
+    deploymentDefault: process.env.SUPERDSH_KNOWLEDGE_EMBEDDING_DEFAULT,
     encryptionKey: config.encryptionKey,
     localModelDirectory:
       process.env.SUPERDSH_EMBEDDING_MODEL_DIR ||

@@ -2,7 +2,7 @@
 
 SuperDsh 包含桌面 Agent 应用、Next.js + Node.js 全栈管理后台和安卓应用。后台以总览、权限、模型、设备和系统管理为主体，聊天是 Agent 工作台模块；DeepSeek Harness 是由产品调度的必需引擎插件。
 
-**服务器部署：** 拉取代码后在仓库根执行 `docker compose up -d --build`，默认配置自动初始化，访问 `http://服务器IP:5174`。初始账号为 **`admin` / `admin123`**，登录后请修改密码。旧 Compose 部署仍使用原始随机初始密码时，首次升级启动会自动对齐；已经自行修改的密码保留。完整步骤见[Compose 部署与更新](apps/admin/deployment/README.md)。
+**服务器部署：** 首次部署在仓库根执行 `docker compose up -d`。Compose 自动构建平台、启动 Ollama 并校验中文知识检索模型。服务就绪后，访问 `http://服务器IP:5174`。初始账号为 **`admin` / `admin123`**，登录后请修改密码。旧 Compose 部署仍使用原始随机初始密码时，首次升级启动会自动对齐；已经自行修改的密码保留。完整步骤见[Compose 部署与更新](apps/admin/deployment/README.md)。
 
 **日常开发以本页为准。** [English](README.en.md) · [来源](#基于哪些项目改造) · [理念](#设计理念) · [进度](#目前完成进度) · [代码位置](#项目结构) · [启动](#日常开发) · [联调](#三端联调) · [检查](#检查与打包)
 
@@ -109,7 +109,7 @@ corepack.cmd yarn server:dev
 
 `server:deps:up` **只启动 PostgreSQL / Redis / Qdrant / MinIO 容器**；`server:dev` 在本机启动 Next.js、Node API 和 Agent 生命周期管理。用户需要服务端 Agent 时自动启动完整 Harness 子进程，无需 Supervisor、Python API 或额外 Agent 命令。`admin:dev` 是同一入口的别名，不要同时启动。
 
-`server:knowledge:prepare` 提前下载并校验固定版 `bge-small-zh-v1.5` ONNX，已有正确文件直接复用；只使用聊天可暂不准备。模型保存在 Agent 数据目录的 `models` 下，可用 `SUPERDSH_EMBEDDING_MODEL_DIR` 指定目录。首次提问不会临时联网下载；Compose 镜像在构建时准备该模型。
+`server:knowledge:prepare` 提前下载并校验固定版 `bge-small-zh-v1.5` ONNX，已有正确文件直接复用；只使用聊天可暂不准备。模型保存在 Agent 数据目录的 `models` 下，可用 `SUPERDSH_EMBEDDING_MODEL_DIR` 指定目录。原生开发按需使用此命令。根 Compose 在启动时通过 Ollama 拉取并校验中文向量模型，模型保存在 `ollama-data` 卷。
 
 | 服务                                  | 默认地址                                                  |
 | ------------------------------------- | --------------------------------------------------------- |

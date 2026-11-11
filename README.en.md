@@ -2,7 +2,7 @@
 
 SuperDsh includes a desktop Agent application, a full-stack Next.js + Node.js management platform, and an Android application. The platform centers on overview, access, models, devices and system management; chat is its Agent Workbench module. DeepSeek Harness is a required engine plugin managed by the product.
 
-**Server deployment:** after cloning, run `docker compose up -d --build` at the repository root. Required configuration initializes automatically; open `http://SERVER_IP:5174`. Initial credentials are **`admin` / `admin123`**; change the password after signing in. Older Compose deployments still using their original random initial password are upgraded automatically once at startup; passwords changed by users are retained. See [Compose deployment and updates](apps/admin/deployment/README.md).
+**Server deployment:** after cloning, run `docker compose up -d` at the repository root. Compose builds the platform, starts Ollama and verifies the Chinese knowledge retrieval model. Once the platform is ready, open `http://SERVER_IP:5174`. Initial credentials are **`admin` / `admin123`**; change the password after signing in. Older Compose deployments still using their original random initial password are upgraded automatically once at startup; passwords changed by users are retained. See [Compose deployment and updates](apps/admin/deployment/README.md).
 
 **Use this page for daily development.** [中文](README.md) · [Origins](#upstream-foundations) · [Principles](#design-principles) · [Progress](#current-progress) · [Code](#project-structure) · [Startup](#daily-development) · [Integration](#three-client-integration) · [Checks](#checks-and-packaging)
 
@@ -109,7 +109,7 @@ corepack.cmd yarn server:dev
 
 `server:deps:up` **starts only PostgreSQL / Redis / Qdrant / MinIO containers**. `server:dev` runs Next.js, Node API and Agent lifecycle management on the host. Full Harness children start when a user needs a server Agent; no Supervisor, Python API or extra Agent command is required. `admin:dev` is an alias for the same entry; do not run both.
 
-`server:knowledge:prepare` downloads and verifies the pinned `bge-small-zh-v1.5` ONNX model in advance, reusing valid files. Chat-only use can skip this preparation. Models live under the Agent data directory's `models` folder; `SUPERDSH_EMBEDDING_MODEL_DIR` overrides it. Questions never trigger a first-use download. Compose images prepare this model during build.
+`server:knowledge:prepare` downloads and verifies the pinned `bge-small-zh-v1.5` ONNX model in advance, reusing valid files. Chat-only use can skip this preparation. Models live under the Agent data directory's `models` folder; `SUPERDSH_EMBEDDING_MODEL_DIR` overrides it. Native development can use this command as needed. The root Compose stack pulls and verifies the Chinese embedding model through Ollama at startup and stores it in the `ollama-data` volume.
 
 | Service                                               | Default address                                           |
 | ----------------------------------------------------- | --------------------------------------------------------- |

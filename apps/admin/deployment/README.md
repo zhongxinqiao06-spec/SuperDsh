@@ -1,8 +1,14 @@
 # 星桥智能平台：Docker Compose 部署与更新
 
-拉取代码后，在仓库根执行 **`docker compose up -d --build`** 即可构建并启动官网、工作台、Node API、服务端 Harness、PostgreSQL、Redis、Qdrant 和 MinIO。默认配置已齐全，**无需复制 `.env`、手工填写数据库地址或安装宿主机 Node / Yarn**。应用启动后自动迁移数据库，并在全新空库创建首个管理员。
+首次部署在仓库根执行 **`docker compose up -d`**。Compose 构建平台镜像，启动网页、Node API、Harness、PostgreSQL、Redis、Qdrant、MinIO 和 Ollama，并准备知识库向量模型。可直接使用默认配置，平台自动迁移数据库并在空库创建首个管理员。
 
 代码仓库：[zhongxinqiao06-spec/SuperDsh](https://github.com/zhongxinqiao06-spec/SuperDsh)，默认分支 `main`。已有 Compose 部署看[常规更新](#常规更新)；已有原生、systemd 或旧 Python 部署先看[迁移边界](#旧-python-部署切换边界)。日常源码开发继续使用根 [README](../../../README.md#日常开发) 的命令。
+
+## 在项目服务器上运行 Ollama 中文向量模型
+
+根 `compose.yml` 默认启动 Ollama，只在项目内网监听。首次启动从 Ollama 模型仓库拉取 `quentinz/bge-small-zh-v1.5:q8_0`，以后从 `ollama-data` 卷复用。
+
+`ollama-init` 核对固定模型摘要并通过平台使用的 `/v1/embeddings` 接口验证 512 维向量，成功退出后平台启动。可用 `docker compose logs ollama-init` 和 `docker compose exec ollama ollama list` 检查。首次使用此部署默认值时，知识库会在检索时建立对应索引。已有管理员保存的检索设置优先；切换这些实例时，在知识检索设置中保存 Compose 配置列出的地址、模型名、摘要和维度，平台会重建索引。
 
 ## MinIO 与文件存储升级
 
@@ -30,14 +36,14 @@ corepack.cmd yarn server:files --apply --target=storage_ID
 
 ## 服务器首次部署
 
-服务器准备 **Git、Docker Engine 与 Docker Compose v2**，Docker 使用 Linux 容器。先确认 `docker info` 和 `docker compose version` 正常；服务器需能访问依赖、镜像仓库及模型下载源。构建在容器内完成，包含固定的 Node 24、Yarn 4.18、Harness 和 Next 生产产物，以及 Office 预览组件、中文字体与本地 Embedding 模型。
+服务器准备 **Git、Docker Engine 与 Docker Compose v2**，Docker 使用 Linux 容器。先确认 `docker info` 和 `docker compose version` 正常；服务器需能访问依赖、镜像仓库及模型下载源。构建在容器内完成，包含固定的 Node 24、Yarn 4.18、Harness 和 Next 生产产物，以及 Office 预览组件和中文字体。Ollama 在容器启动后准备向量模型。
 
 **2 GB 或更少内存的服务器先检查 swap**，按[小内存服务器](#小内存服务器与-exit-code-137)准备构建所需余量后再执行下面的启动命令。
 
 ```bash
 git clone --branch main https://github.com/zhongxinqiao06-spec/SuperDsh.git
 cd SuperDsh
-docker compose up -d --build
+docker compose up -d
 ```
 
 不需要在宿主机执行 `yarn install`、`server:sync` 或初始化上游子模块；镜像使用仓库固定的运行依赖归档。首次构建需要下载依赖；后续构建可复用 Docker 缓存。构建失败时先解决日志中的错误，不删除数据卷，也不更换锁文件或上游版本。
@@ -50,7 +56,7 @@ docker compose logs --tail=100 platform
 curl --fail --silent --show-error http://127.0.0.1:5174/api/v2/health/ready
 ```
 
-`config-init` 成功退出是正常状态，它负责一次性初始化持久配置。其余服务应正常运行，`platform` 就绪后 readiness 返回 HTTP 200。打开 **`http://服务器IP:5174`**，默认是星桥官网，点击「进入工作台」登录。服务器防火墙 / 云安全组需允许实际访问端口；本机浏览器使用 [http://127.0.0.1:5174](http://127.0.0.1:5174)。
+`config-init`、`minio-init` 和 `ollama-init` 分别初始化持久配置、对象存储和向量模型，成功时退出码均为 0。其余 6 个服务应持续运行，`platform` 就绪后 readiness 返回 HTTP 200。打开 **`http://服务器IP:5174`**，默认是星桥官网，点击「进入工作台」登录。服务器防火墙 / 云安全组需允许实际访问端口；本机浏览器使用 [http://127.0.0.1:5174](http://127.0.0.1:5174)。
 
 ### 首次管理员与模型
 
@@ -76,7 +82,7 @@ git pull --ff-only origin main && docker compose up -d --build
 
 ### 知识检索与办公助手准备
 
-镜像构建会下载并逐文件校验固定的 `Xenova/bge-small-zh-v1.5` q8 ONNX（512 维，revision `75c43b069aac4d136ba6bc1122f995fedcfd2781`），存放在 `/app/models/bge-small-zh-v1.5`。构建需能访问 Hugging Face；下载或校验失败应先处理明确报错，不跳过校验、不在用户首次提问时下载。原生开发对应根命令为 `corepack yarn server:knowledge:prepare`。
+原生开发如需使用 ONNX 模型，运行 `corepack yarn server:knowledge:prepare` 可提前下载并校验固定的 `Xenova/bge-small-zh-v1.5` 权重。Compose 部署的模型由 `ollama-init` 在启动时校验。
 
 进入「智能体管理 → 知识库 → 检索设置」可配置本地或外部 OpenAI 兼容 Embedding，保存及全局索引同时要求 `models.manage` 和 `agents.manage`，独立于聊天模型。默认本地模式不需要外发配置。外部 Key 加密保存，不自动切换供应商。更换模型时建立独立索引，验证成功再切换；失败保留原索引。「索引与检索」显示每份资料状态和重试入口。Qdrant 卷仍需保留；索引可重建，但原文在文件存储（旧原文仍在 PostgreSQL），元数据与权限在 PostgreSQL，不能只备份 Qdrant。
 
@@ -321,7 +327,7 @@ docker run --rm --user 0:0 --entrypoint tar \
 tar -tzf "$backup_dir/volumes.tar.gz" > "$backup_dir/contents.txt"
 ```
 
-这些命令沿用上节的 `backup_dir`、`previous_image`，使用默认卷定义；若自行改过 Compose 的卷名或改用外部数据库，须同步采用真实挂载和对应数据库备份方案。已启用 MinIO 的部署备份七个卷；尚未升级的旧环境仍备份原六个卷，不创建空 MinIO 卷冒充备份。数据库、配套密钥、上传文件、Agent Home 和索引必须一致保留。可选 `.env`、反向代理配置及证书也应另存到同一受限备份位置；不要把含密钥的备份提交 Git。归档可列出不等同于恢复成功，应在独立环境演练恢复。
+这些命令沿用上节的 `backup_dir`、`previous_image`，使用默认卷定义；若自行改过 Compose 的卷名或改用外部数据库，须同步采用真实挂载和对应数据库备份方案。Ollama 模型缓存可由初始化服务按固定摘要重新下载，离线恢复需另存 `ollama-data`。已启用 MinIO 的部署备份七个业务数据卷；尚未升级的旧环境仍备份原六个卷，不创建空 MinIO 卷冒充备份。数据库、配套密钥、上传文件、Agent Home 和索引必须一致保留。可选 `.env`、反向代理配置及证书也应另存到同一受限备份位置；不要把含密钥的备份提交 Git。归档可列出不等同于恢复成功，应在独立环境演练恢复。
 
 备份失败就停止更新，原容器及卷仍保留；用 `docker compose start postgres redis qdrant platform` 恢复原容器，不要执行 `up` 启动尚未验证的新镜像。备份成功后启动新版本：
 
