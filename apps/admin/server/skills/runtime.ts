@@ -235,7 +235,10 @@ export class SkillRuntime {
     const stageSummary = ({
       output: _output,
       ...stage
-    }: SkillRun['stages'][number]) => stage
+    }: SkillRun['stages'][number]) => ({
+      ...stage,
+      calls: stage.calls.map(({ output: _result, ...call }) => call),
+    })
     const { program: _program, stages, history, ...summary } = run
     return {
       run: {
@@ -244,6 +247,11 @@ export class SkillRuntime {
         history: history.map(stageSummary),
       },
       previousOutput: stages[Math.max(0, run.stageIndex - 1)]?.output ?? null,
+      auxiliaryResults:
+        stages[run.stageIndex]?.calls
+          .filter((call) => call.auxiliary && call.state === 'completed')
+          .slice(-10)
+          .map(({ tool, phase, output }) => ({ tool, phase, output })) ?? [],
       currentStage: definition
         ? {
             ...definition,
@@ -252,7 +260,7 @@ export class SkillRuntime {
               .join('\n\n'),
           }
         : null,
-      note: '仅执行 currentStage。submit/review 阶段用 action=submit，工具阶段调用列出的工具。生成阶段的用户确认由 Host 管理。不要跳阶段或自行声称校验通过。',
+      note: '仅执行 currentStage。submit 阶段可按需调用 toolIds 中的辅助工具；inspectToolIds 只允许 inspect。辅助调用不推进阶段，完成后提交结构化结果。所有 plan 仍由 Host 确认后执行；不能跳阶段或虚报校验通过。',
     }
   }
 
@@ -446,6 +454,26 @@ export class SkillRuntime {
           409,
           '此阶段必须由真实工具执行，不能通过文字提交完成',
         )
+      if (
+        stage.calls.some(
+          (call) =>
+            call.auxiliary &&
+            call.phase === 'prepare' &&
+            call.state === 'completed' &&
+            !stage.calls.some(
+              (done) =>
+                done.auxiliary &&
+                done.phase === 'execute' &&
+                done.callId === call.callId &&
+                done.tool === call.tool &&
+                done.state === 'completed',
+            ),
+        )
+      )
+        throw new ApiError(
+          409,
+          '辅助方案尚未完成确认和执行；用户拒绝时请修订当前阶段',
+        )
       const output = object(args.output)
       const checks = await this.checks(run, output, db)
       stage.output = output
@@ -519,9 +547,15 @@ export class SkillRuntime {
           '方案已通过工具预检并固定版本',
         )
       if (check === 'artifact' || check === 'rendered-quality') {
-        const ids = run.stages.flatMap((stage) =>
-          stage.calls.flatMap((call) => call.artifactIds ?? []),
-        )
+        const ids = [
+          ...new Set(
+            run.stages.flatMap((stage) =>
+              stage.calls
+                .filter((call) => !call.auxiliary)
+                .flatMap((call) => call.artifactIds ?? []),
+            ),
+          ),
+        ]
         const rows = ids.length
           ? await db.query(
               'SELECT metadata_json FROM business_agent_artifacts WHERE session_id=$1 AND id=ANY($2::text[])',
@@ -529,13 +563,31 @@ export class SkillRuntime {
             )
           : []
         const artifacts = rows.map((row) => json<Row>(row.metadata_json, {}))
+        // Images are materials, not Office documents. Legacy metadata may lack MIME/name.
+        const documents = artifacts.filter(
+          (item) =>
+            /\.(pptx|docx)$/i.test(String(item.name ?? item.filename ?? '')) ||
+            [
+              'application/vnd.openxmlformats-officedocument.presentationml.presentation',
+              'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+            ].includes(String(item.mediaType)) ||
+            (!item.mediaType &&
+              !item.name &&
+              !item.filename &&
+              item.quality !== undefined),
+        )
         add(
           check,
           artifacts.length > 0 &&
             (check === 'artifact' ||
-              artifacts.every(
-                (item) => object(item.quality).status === 'passed',
-              )),
+              (documents.length > 0 &&
+                documents.every(
+                  (item) =>
+                    !!item.quality &&
+                    typeof item.quality === 'object' &&
+                    !Array.isArray(item.quality) &&
+                    object(item.quality).status === 'passed',
+                ))),
           artifacts.length
             ? check === 'artifact'
               ? '成果已保存为当前会话文件'
@@ -565,25 +617,41 @@ export class SkillRuntime {
         definition = run.program.stages[run.stageIndex]
       if (!activeStates.includes(run.state) || !stage || !definition)
         throw new ApiError(409, '技能未处于可执行阶段')
-      if (
-        !definition.toolIds.includes(tool) ||
-        definition.operation !== context.phase
-      )
+      const auxiliary = definition.operation === 'submit'
+      const allowed = auxiliary
+        ? (definition.toolIds.includes(tool) &&
+            ['inspect', 'prepare', 'execute'].includes(context.phase ?? '')) ||
+          (context.phase === 'inspect' &&
+            (definition.inspectToolIds ?? []).includes(tool))
+        : definition.toolIds.includes(tool) &&
+          definition.operation === context.phase
+      if (!allowed)
         throw new ApiError(
           403,
           `当前阶段“${stage.name}”仅允许 ${definition.operation}：${definition.toolIds.join('、')}`,
         )
       if (row.claimed_call)
         throw new ApiError(409, '当前阶段已有工具调用，请等待完成')
-      if (stage.calls.some((call) => call.state === 'completed'))
+      if (
+        auxiliary &&
+        stage.calls.some(
+          (call) =>
+            call.callId === context.callId && call.phase === context.phase,
+        )
+      )
+        throw new ApiError(409, '此辅助调用已有记录，不能重复执行')
+      if (!auxiliary && stage.calls.some((call) => call.state === 'completed'))
         throw new ApiError(409, '此阶段已有执行结果，请明确修订，不能重复调用')
       if (context.phase === 'execute') {
-        const previous = run.stages[run.stageIndex - 1]
+        const previous = auxiliary ? stage : run.stages[run.stageIndex - 1]
         if (
           !context.confirmation ||
           !previous?.calls.some(
             (call) =>
               call.planId === context.confirmation!.planId &&
+              call.phase === 'prepare' &&
+              call.state === 'completed' &&
+              call.tool === tool &&
               call.callId === context.callId,
           )
         )
@@ -607,6 +675,7 @@ export class SkillRuntime {
         tool,
         phase: context.phase || '',
         state: 'running',
+        ...(auxiliary ? { auxiliary: true } : {}),
       })
       await this.store(db, owner, run, 'tool-started')
       return {
@@ -614,6 +683,7 @@ export class SkillRuntime {
         revision: run.revision,
         claim,
         stageIndex: run.stageIndex,
+        auxiliary,
         timeoutSeconds: run.program.timeoutSeconds,
       }
     })
@@ -655,7 +725,8 @@ export class SkillRuntime {
       } else {
         const output = { ...result }
         delete output.confirmation
-        stage.output = output
+        if (ticket.auxiliary) call.output = output
+        else stage.output = output
         call.state = 'completed'
         if (output.plan) call.planId = text(object(output.plan).id)
         const artifacts = Array.isArray(output.artifacts)
@@ -666,11 +737,16 @@ export class SkillRuntime {
         call.artifactIds = artifacts
           .map((item) => text(object(item).fileId))
           .filter(Boolean)
-        stage.checks = await this.checks(run, output, db)
-        if (stage.checks.some((check) => !check.passed)) {
-          stage.state = 'needs-revision'
-          run.state = 'needs-revision'
-        } else this.advance(run)
+        if (ticket.auxiliary) {
+          run.state = call.phase === 'prepare' ? 'waiting-user' : 'running'
+          stage.state = run.state
+        } else {
+          stage.checks = await this.checks(run, output, db)
+          if (stage.checks.some((check) => !check.passed)) {
+            stage.state = 'needs-revision'
+            run.state = 'needs-revision'
+          } else this.advance(run)
+        }
       }
       await this.store(db, owner, run, error ? 'tool-failed' : 'tool-completed')
     })

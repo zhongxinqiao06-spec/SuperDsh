@@ -474,6 +474,8 @@ test('skill flow editor saves editable stages as a draft with required tool depe
     .find((item) => item.textContent.includes('阶段名称'))
     .querySelector('input')
   await change(stageName, '公司资料与权限检查')
+  await click('补齐多模态工具', dialog)
+  await click('补齐多模态工具', dialog)
   await click('保存', dialog)
   assert.equal(
     saved.body.program,
@@ -488,6 +490,15 @@ test('skill flow editor saves editable stages as a draft with required tool depe
     '',
   ])
   assert.ok(saved.body.requiredToolIds.includes('presentation_report'))
+  for (const id of ['illustration_render', 'image_generate', 'vision_analyze'])
+    assert.ok(saved.body.requiredToolIds.includes(id))
+  assert.deepEqual(saved.body.programDraft.stages[2].inspectToolIds, [
+    'presentation_report',
+  ])
+  assert.equal(
+    new Set(saved.body.programDraft.stages[2].toolIds).size,
+    saved.body.programDraft.stages[2].toolIds.length,
+  )
   assert.deepEqual(saved.body.programDraft.stages.at(-1).checks, [
     'schema',
     'artifact',

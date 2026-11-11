@@ -5,7 +5,10 @@ import type {
   SkillProgram,
   SkillStageDefinition,
 } from '@superdsh/core/contracts/skills'
-import { documentSkillProgram } from '@superdsh/core/client/skill-presets'
+import {
+  documentSkillProgram,
+  withMultimodalTools,
+} from '@superdsh/core/client/skill-presets'
 import type { AgentSkill, AgentTool } from '@/features/agents/resources-api'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -53,6 +56,18 @@ export function SkillProgramEditor({
         >
           使用 Word 流程起点
         </Button>
+        {value && (
+          <Button
+            type="button"
+            variant="outline"
+            disabled={
+              !value.stages.some((stage) => stage.operation === 'submit')
+            }
+            onClick={() => onChange(withMultimodalTools(value))}
+          >
+            补齐多模态工具
+          </Button>
+        )}
         {value && (
           <Button
             type="button"
@@ -154,6 +169,9 @@ export function SkillProgramEditor({
                       updateStage(index, {
                         operation: e.target
                           .value as SkillStageDefinition['operation'],
+                        ...(e.target.value === 'submit'
+                          ? {}
+                          : { inspectToolIds: undefined }),
                       })
                     }
                   >
@@ -200,7 +218,11 @@ export function SkillProgramEditor({
                   />
                 </FieldLabel>
                 <fieldset>
-                  <legend className="text-sm">允许工具</legend>
+                  <legend className="text-sm">
+                    {stage.operation === 'submit'
+                      ? '允许辅助工具（仍需原有确认）'
+                      : '允许工具'}
+                  </legend>
                   {tools.map((tool) => (
                     <label
                       key={tool.id}
@@ -221,6 +243,40 @@ export function SkillProgramEditor({
                     </label>
                   ))}
                 </fieldset>
+                {stage.operation === 'submit' && (
+                  <fieldset>
+                    <legend className="text-sm">
+                      额外允许检查输入（只允许 inspect）
+                    </legend>
+                    <p className="text-xs text-muted-foreground">
+                      用于配图后让文档工具读取素材并返回
+                      imageId，不允许在这里提前生成文档。辅助调用不推进阶段。
+                    </p>
+                    {tools.map((tool) => (
+                      <label
+                        key={tool.id}
+                        className="mr-3 inline-flex items-center gap-1 text-sm"
+                      >
+                        <input
+                          type="checkbox"
+                          checked={(stage.inspectToolIds ?? []).includes(
+                            tool.id,
+                          )}
+                          onChange={(e) =>
+                            updateStage(index, {
+                              inspectToolIds: e.target.checked
+                                ? [...(stage.inspectToolIds ?? []), tool.id]
+                                : (stage.inspectToolIds ?? []).filter(
+                                    (id) => id !== tool.id,
+                                  ),
+                            })
+                          }
+                        />
+                        {tool.name}
+                      </label>
+                    ))}
+                  </fieldset>
+                )}
                 <fieldset>
                   <legend className="text-sm">校验依据</legend>
                   {(

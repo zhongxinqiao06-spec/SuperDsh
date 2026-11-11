@@ -104,7 +104,13 @@ export class AgentResourceService {
         'SELECT key FROM instance_settings WHERE key=$1',
         [flowKey],
       )
-      if (marker && upgraded && graphic && presentation && flows) return
+      const multimodalKey = `${key}:multimodal-tools-v1`
+      const [multimodal] = await db.query(
+        'SELECT key FROM instance_settings WHERE key=$1',
+        [multimodalKey],
+      )
+      if (marker && upgraded && graphic && presentation && flows && multimodal)
+        return
       const now = utcNow()
       for (const [kind, entries] of [
         ['tools', agentTools.map((entry) => ({ ...entry, settings: {} }))],
@@ -124,6 +130,10 @@ export class AgentResourceService {
               ['document_report', 'business-document'].includes(entry.id)
             ) &&
             !(!graphic && entry.id === 'illustration_render') &&
+            !(
+              !multimodal &&
+              ['image_generate', 'vision_analyze'].includes(entry.id)
+            ) &&
             !(
               !flows &&
               ['presentation-flow', 'document-flow'].includes(entry.id)
@@ -167,6 +177,10 @@ export class AgentResourceService {
       await db.query(
         'INSERT INTO instance_settings(key,value,updated_at) VALUES($1,$2,$3) ON CONFLICT DO NOTHING',
         [flowKey, '1', now],
+      )
+      await db.query(
+        'INSERT INTO instance_settings(key,value,updated_at) VALUES($1,$2,$3) ON CONFLICT DO NOTHING',
+        [multimodalKey, '1', now],
       )
     })
   }
@@ -311,7 +325,9 @@ export class AgentResourceService {
         if (!program) continue
         for (const stage of program.stages) {
           if (
-            stage.toolIds.some((tool) => !input.requiredToolIds.includes(tool))
+            [...stage.toolIds, ...(stage.inspectToolIds ?? [])].some(
+              (tool) => !input.requiredToolIds.includes(tool),
+            )
           )
             throw new ApiError(422, `阶段“${stage.name}”的工具必须加入技能依赖`)
           if (!stage.skillId) continue

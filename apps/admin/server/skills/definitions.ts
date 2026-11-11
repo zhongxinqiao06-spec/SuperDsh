@@ -65,6 +65,9 @@ export function validateSkillProgram(value: unknown): SkillProgram {
     )
       throw new ApiError(422, '资料和方案证据必须来自对应的真实工具阶段')
     const toolIds = strings(stage.toolIds ?? [], '阶段工具')
+    const inspectToolIds = strings(stage.inspectToolIds ?? [], '辅助检查工具')
+    if (inspectToolIds.length && operation !== 'submit')
+      throw new ApiError(422, '辅助检查工具只能配置在提交阶段')
     if (
       ['inspect', 'prepare', 'execute'].includes(operation) &&
       !toolIds.length
@@ -79,6 +82,7 @@ export function validateSkillProgram(value: unknown): SkillProgram {
         : {}),
       operation,
       toolIds,
+      ...(inspectToolIds.length ? { inspectToolIds } : {}),
       outputSchema: validateSchema(stage.outputSchema, '阶段输出'),
       checks: checks as SkillProgram['stages'][number]['checks'],
     }

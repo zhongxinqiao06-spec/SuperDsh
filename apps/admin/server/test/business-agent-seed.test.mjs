@@ -104,7 +104,7 @@ const seededState = {
   assets: 4,
   libraries: 3,
   skills: 9,
-  tools: 5,
+  tools: 7,
   markers: 2,
   audits: 11,
 }
@@ -312,7 +312,7 @@ test('initial page preparation persists four editable examples and never recreat
       6,
     )
   }
-  assert.equal(catalog.tools.length, 5)
+  assert.equal(catalog.tools.length, 7)
   assert.deepEqual(
     initial.agents.map((agent) => agent.knowledgeBaseIds.length),
     [2, 2, 1, 1],

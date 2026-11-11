@@ -330,8 +330,15 @@ async function createAgents(
 /** New/copied examples opt in. Existing definitions and session snapshots stay unchanged. */
 function newExampleFlow(index: number) {
   if (index !== 1 && index !== 3) return {}
+  const skillId = index === 1 ? 'presentation-flow' : 'document-flow'
   return {
-    skillIds: [index === 1 ? 'presentation-flow' : 'document-flow'],
+    skillIds: [skillId],
+    toolIds: [
+      ...new Set([
+        ...officeAgentExamples[index]!.toolIds,
+        ...defaultSkillTools[skillId]!,
+      ]),
+    ],
     skillPolicy: { mode: 'auto' as const },
   }
 }
@@ -406,7 +413,7 @@ async function copyLatestExamples(
   account: Account,
   marker: DemoMarker,
 ) {
-  if (marker.copiedVersion === 7) return
+  if (marker.copiedVersion === 8) return
   const resources = new AgentResourceService(service.options)
   const catalog = await resources.catalog(account)
   const skillIds = new Map<string, string>()
@@ -474,7 +481,7 @@ async function copyLatestExamples(
       }),
     )
   }
-  marker.copiedVersion = 7
+  marker.copiedVersion = 8
   marker.copiedAgentIds = copies.map((item) => item.id)
   await saveMarker(service, account, marker)
 }

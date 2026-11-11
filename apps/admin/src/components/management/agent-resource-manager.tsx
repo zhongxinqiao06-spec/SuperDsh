@@ -743,6 +743,7 @@ function ScopedResourceManager({ kind }: { kind: Kind }) {
                           ...draft.requiredToolIds,
                           ...(programDraft?.stages.flatMap((stage) => [
                             ...stage.toolIds,
+                            ...(stage.inspectToolIds ?? []),
                             ...(catalog.data?.skills.find(
                               (skill) => skill.id === stage.skillId,
                             )?.requiredToolIds ?? []),

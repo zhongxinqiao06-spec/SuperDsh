@@ -108,6 +108,17 @@ export interface BusinessAgentPort {
 
 export const agentTools = [
   {
+    id: 'image_generate',
+    name: '生成与编辑图片',
+    description:
+      '通过已配置的多模态模型生成图片，或使用授权参考图编辑；保留确认和费用来源。',
+  },
+  {
+    id: 'vision_analyze',
+    name: '理解图片',
+    description: '通过已配置的视觉模型分析授权图片，返回真实分析结果。',
+  },
+  {
     id: 'illustration_render',
     name: 'JSON 可靠配图',
     description:
@@ -175,8 +186,19 @@ export const agentSkills = [
 
 /** Seed relationships only; runtime dispatch is driven by registered descriptors. */
 export const defaultSkillTools: Record<string, string[]> = {
-  'presentation-flow': ['presentation_report'],
-  'document-flow': ['document_report'],
+  ...Object.fromEntries(
+    documentFlowSkills.map((skill) => [
+      skill.id,
+      [
+        ...new Set(
+          skill.program.stages.flatMap((stage) => [
+            ...stage.toolIds,
+            ...(stage.inspectToolIds ?? []),
+          ]),
+        ),
+      ],
+    ]),
+  ),
   ...Object.fromEntries(
     presentationSkills.map((skill) => [skill.id, ['presentation_report']]),
   ),

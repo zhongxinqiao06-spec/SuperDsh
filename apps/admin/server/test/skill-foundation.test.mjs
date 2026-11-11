@@ -5,12 +5,16 @@ import {
   validateSkillPolicy,
 } from '../skills/definitions.ts'
 import { matchSkills } from '../skills/matching.ts'
-import { documentSkillProgram } from '../../../desktop/core/src/client/skill-presets.ts'
+import {
+  documentSkillProgram,
+  withMultimodalTools,
+} from '../../../desktop/core/src/client/skill-presets.ts'
 import { skillPrompt } from '../agents/skill-prompt.ts'
 import { skillControlParameters } from '../skills/host-parameters.mjs'
 import { createRequire } from 'node:module'
 import { officeJson } from '../agents/office-sources.ts'
 import { pathToFileURL } from 'node:url'
+import { SkillRuntime } from '../skills/runtime.ts'
 
 const make = (id, kind) => ({
   id,
@@ -78,7 +82,80 @@ test('definitions reject fabricated validators, arbitrary schemas and missing ap
   attempt((p) => p.stages.splice(3, 1))
   attempt((p) => (p.stages[2].id = p.stages[1].id))
   attempt((p) => (p.maxRevisions = 999))
+  attempt((p) => (p.stages[0].inspectToolIds = ['image_generate']))
   assert.throws(() => validateSkillPolicy({ mode: 'fixed' }))
+})
+
+test('multimodal configuration is additive and repeatable for PPT and Word', () => {
+  for (const kind of ['ppt', 'word']) {
+    const program = documentSkillProgram(kind)
+    program.stages[1].name = '企业定制策划'
+    program.stages[1].instructions = '保留客户自己的工作方法'
+    const updated = withMultimodalTools(program)
+    assert.equal(updated.stages.length, program.stages.length)
+    assert.equal(updated.stages[1].name, '企业定制策划')
+    assert.match(updated.stages[1].instructions, /保留客户自己的工作方法/)
+    assert.deepEqual(withMultimodalTools(updated), updated)
+    assert.deepEqual(updated.stages[2].toolIds, [
+      'illustration_render',
+      'image_generate',
+      'vision_analyze',
+    ])
+    assert.deepEqual(updated.stages[2].inspectToolIds, [
+      kind === 'ppt' ? 'presentation_report' : 'document_report',
+    ])
+    assert.deepEqual(updated.stages[3], program.stages[3])
+    validateSkillProgram(updated)
+  }
+})
+
+test('final rendering evidence accepts mixed materials but never an image instead of a checked document', async () => {
+  const runtime = new SkillRuntime({})
+  const program = documentSkillProgram('ppt')
+  const run = {
+    program,
+    stageIndex: 5,
+    sessionId: 'synthetic',
+    stages: [
+      {
+        calls: [
+          { artifactIds: ['doc', 'image'] },
+          { auxiliary: true, artifactIds: ['unused-image'] },
+        ],
+      },
+    ],
+  }
+  const doc = {
+    fileId: 'doc',
+    name: '成果.pptx',
+    quality: { status: 'passed' },
+  }
+  const image = { fileId: 'image', mediaType: 'image/png' }
+  const check = async (artifacts) => {
+    const checks = await runtime.checks(
+      run,
+      {
+        summary:
+          '检查真实保存的成果及渲染报告，不把素材文件冒充已通过校验的文档。',
+      },
+      {
+        query: async (_sql, [, ids]) => {
+          assert.deepEqual(ids, ['doc', 'image'])
+          return artifacts.map((item) => ({
+            metadata_json: JSON.stringify(item),
+          }))
+        },
+      },
+    )
+    return checks.find((item) => item.validator === 'rendered-quality').passed
+  }
+  assert.equal(await check([doc, image]), true)
+  assert.equal(await check([image]), false)
+  assert.equal(await check([{ ...doc, quality: undefined }, image]), false)
+  assert.equal(
+    await check([{ ...doc, quality: { status: 'draft' } }, image]),
+    false,
+  )
 })
 test('auto mode loads candidate summaries instead of eagerly expanding every skill instruction', () => {
   const prompt = skillPrompt({

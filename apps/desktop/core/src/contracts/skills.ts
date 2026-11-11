@@ -10,6 +10,8 @@ export interface SkillStageDefinition {
   skillId?: string
   operation: SkillOperation
   toolIds: string[]
+  /** Additional read-only inspections while composing a submit-stage result. */
+  inspectToolIds?: string[]
   outputSchema: JsonSchema
   checks: ('schema' | 'sources' | 'plan' | 'artifact' | 'rendered-quality')[]
 }
@@ -63,6 +65,8 @@ export interface SkillStageRun {
     state: string
     planId?: string
     artifactIds?: string[]
+    auxiliary?: boolean
+    output?: Record<string, unknown>
   }[]
   startedAt?: string
   endedAt?: string

@@ -1,5 +1,41 @@
 import type { SkillProgram, SkillStageDefinition } from '../contracts/skills.js'
 
+/** Explicit configuration edit, preserving the existing stages and instructions. */
+export function withMultimodalTools(program: SkillProgram): SkillProgram {
+  const submissions = program.stages.filter(
+    (stage) => stage.operation === 'submit',
+  )
+  const last = submissions.at(-1)?.id
+  const inspections = program.stages
+    .filter((stage) => stage.operation === 'inspect')
+    .flatMap((stage) => stage.toolIds)
+  return {
+    ...program,
+    stages: program.stages.map((stage) => {
+      if (stage.operation !== 'submit') return stage
+      const guidance =
+        '按需调用已授权的辅助工具：vision_analyze 理解参考图片；illustration_render 用 JSON 制作流程等可靠配图；image_generate 使用已绑定模型生图或编辑参考图。每次 plan 仍需用户确认，失败不得自动换模型或改为无图。配图完成后，用 artifactId 以 role:image 传给文档工具 inspect 获取 imageId，再写入最终文档方案；不把正文和精确数字交给生图模型。辅助调用不推进阶段，处理完后再提交 summary；没有配图需求可直接提交。用户拒绝辅助方案时 revise 当前阶段，不能复用旧确认。'
+      return {
+        ...stage,
+        toolIds: [
+          ...new Set([
+            ...stage.toolIds,
+            ...(stage.id === last
+              ? ['illustration_render', 'image_generate', 'vision_analyze']
+              : ['vision_analyze']),
+          ]),
+        ],
+        inspectToolIds: [
+          ...new Set([...(stage.inspectToolIds ?? []), ...inspections]),
+        ],
+        instructions: stage.instructions.includes(guidance)
+          ? stage.instructions
+          : `${stage.instructions}\n${guidance}`,
+      }
+    }),
+  }
+}
+
 /** Optional editable starting points; runtime dispatch never branches on these names. */
 export function documentSkillProgram(kind: 'ppt' | 'word'): SkillProgram {
   const tool = kind === 'ppt' ? 'presentation_report' : 'document_report'
@@ -77,7 +113,7 @@ export function documentSkillProgram(kind: 'ppt' | 'word'): SkillProgram {
       checks: ['schema', 'artifact', 'rendered-quality'],
     },
   ]
-  return {
+  return withMultimodalTools({
     schemaVersion: 1,
     match: {
       phrases:
@@ -95,5 +131,5 @@ export function documentSkillProgram(kind: 'ppt' | 'word'): SkillProgram {
     stages,
     maxRevisions: 2,
     timeoutSeconds: 600,
-  }
+  })
 }
