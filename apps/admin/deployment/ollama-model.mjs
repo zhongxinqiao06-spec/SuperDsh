@@ -3,28 +3,20 @@ const { model, revision, dimensions, baseUrl } = JSON.parse(
 )
 const origin = new URL(baseUrl).origin
 
-async function request(path, body, timeout = 30_000) {
+async function request(path, body) {
   const response = await fetch(new URL(path, origin), {
     method: body ? 'POST' : 'GET',
     headers: { 'content-type': 'application/json' },
     body: body && JSON.stringify(body),
-    signal: AbortSignal.timeout(timeout),
+    signal: AbortSignal.timeout(30_000),
   })
   if (!response.ok) throw new Error(`Ollama ${path} 返回 ${response.status}`)
   return response.json()
 }
 
-async function installedModel() {
-  const { models } = await request('/api/tags')
-  return models.find((entry) => entry.name === model)
-}
-
-// 复用持久卷中的固定版本。远端标签发生漂移时终止启动，避免现有索引混入不同权重。
-let installed = await installedModel()
-if (!installed) {
-  await request('/api/pull', { model, stream: false }, 15 * 60_000)
-  installed = await installedModel()
-}
+// 通过运行中的服务核对实际加载的清单，确保知识库使用固定版本。
+const { models } = await request('/api/tags')
+const installed = models.find((entry) => entry.name === model)
 if (installed?.digest !== revision) throw new Error(`模型摘要不符：${model}`)
 
 const { data } = await request('/v1/embeddings', {

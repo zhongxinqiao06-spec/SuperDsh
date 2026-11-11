@@ -6,7 +6,7 @@
 
 ## 在项目服务器上运行 Ollama 中文向量模型
 
-根 `compose.yml` 默认启动 Ollama，只在项目内网监听。首次启动从 Ollama 模型仓库拉取 `quentinz/bge-small-zh-v1.5:q8_0`，以后从 `ollama-data` 卷复用。
+根 `compose.yml` 默认启动 Ollama，只在项目内网监听。首次构建从 Ollama 模型仓库下载 `quentinz/bge-small-zh-v1.5:q8_0` 的清单和四个数据块，逐个校验 SHA-256。镜像包含模型和上游许可证。启动时会从镜像将权重装入 `ollama-data`，已有正确数据直接复用，运行期间无需访问模型仓库。[模型来源](https://ollama.com/quentinz/bge-small-zh-v1.5/tags) · [原始模型](https://huggingface.co/BAAI/bge-small-zh-v1.5)
 
 `ollama-init` 核对固定模型摘要并通过平台使用的 `/v1/embeddings` 接口验证 512 维向量，成功退出后平台启动。可用 `docker compose logs ollama-init` 和 `docker compose exec ollama ollama list` 检查。首次使用此部署默认值时，知识库会在检索时建立对应索引。已有管理员保存的检索设置优先；切换这些实例时，在知识检索设置中保存 Compose 配置列出的地址、模型名、摘要和维度，平台会重建索引。
 
@@ -327,7 +327,7 @@ docker run --rm --user 0:0 --entrypoint tar \
 tar -tzf "$backup_dir/volumes.tar.gz" > "$backup_dir/contents.txt"
 ```
 
-这些命令沿用上节的 `backup_dir`、`previous_image`，使用默认卷定义；若自行改过 Compose 的卷名或改用外部数据库，须同步采用真实挂载和对应数据库备份方案。Ollama 模型缓存可由初始化服务按固定摘要重新下载，离线恢复需另存 `ollama-data`。已启用 MinIO 的部署备份七个业务数据卷；尚未升级的旧环境仍备份原六个卷，不创建空 MinIO 卷冒充备份。数据库、配套密钥、上传文件、Agent Home 和索引必须一致保留。可选 `.env`、反向代理配置及证书也应另存到同一受限备份位置；不要把含密钥的备份提交 Git。归档可列出不等同于恢复成功，应在独立环境演练恢复。
+这些命令沿用上节的 `backup_dir`、`previous_image`，使用默认卷定义；若自行改过 Compose 的卷名或改用外部数据库，须同步采用真实挂载和对应数据库备份方案。内置 Ollama 模型可以从已构建的镜像恢复；另行安装的模型需备份 `ollama-data`。已启用 MinIO 的部署备份七个业务数据卷；尚未升级的旧环境仍备份原六个卷，不创建空 MinIO 卷冒充备份。数据库、配套密钥、上传文件、Agent Home 和索引必须一致保留。可选 `.env`、反向代理配置及证书也应另存到同一受限备份位置；不要把含密钥的备份提交 Git。归档可列出不等同于恢复成功，应在独立环境演练恢复。
 
 备份失败就停止更新，原容器及卷仍保留；用 `docker compose start postgres redis qdrant platform` 恢复原容器，不要执行 `up` 启动尚未验证的新镜像。备份成功后启动新版本：
 

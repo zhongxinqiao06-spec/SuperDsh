@@ -109,7 +109,7 @@ corepack.cmd yarn server:dev
 
 `server:deps:up` **只启动 PostgreSQL / Redis / Qdrant / MinIO 容器**；`server:dev` 在本机启动 Next.js、Node API 和 Agent 生命周期管理。用户需要服务端 Agent 时自动启动完整 Harness 子进程，无需 Supervisor、Python API 或额外 Agent 命令。`admin:dev` 是同一入口的别名，不要同时启动。
 
-`server:knowledge:prepare` 提前下载并校验固定版 `bge-small-zh-v1.5` ONNX，已有正确文件直接复用；只使用聊天可暂不准备。模型保存在 Agent 数据目录的 `models` 下，可用 `SUPERDSH_EMBEDDING_MODEL_DIR` 指定目录。原生开发按需使用此命令。根 Compose 在启动时通过 Ollama 拉取并校验中文向量模型，模型保存在 `ollama-data` 卷。
+`server:knowledge:prepare` 提前下载并校验固定版 `bge-small-zh-v1.5` ONNX，已有正确文件直接复用；只使用聊天可暂不准备。模型保存在 Agent 数据目录的 `models` 下，可用 `SUPERDSH_EMBEDDING_MODEL_DIR` 指定目录。原生开发按需使用此命令。根 Compose 构建 Ollama 镜像时下载并校验中文向量模型，启动时自动装入 `ollama-data` 卷。
 
 | 服务                                  | 默认地址                                                  |
 | ------------------------------------- | --------------------------------------------------------- |

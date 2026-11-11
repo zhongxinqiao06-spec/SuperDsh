@@ -109,7 +109,7 @@ corepack.cmd yarn server:dev
 
 `server:deps:up` **starts only PostgreSQL / Redis / Qdrant / MinIO containers**. `server:dev` runs Next.js, Node API and Agent lifecycle management on the host. Full Harness children start when a user needs a server Agent; no Supervisor, Python API or extra Agent command is required. `admin:dev` is an alias for the same entry; do not run both.
 
-`server:knowledge:prepare` downloads and verifies the pinned `bge-small-zh-v1.5` ONNX model in advance, reusing valid files. Chat-only use can skip this preparation. Models live under the Agent data directory's `models` folder; `SUPERDSH_EMBEDDING_MODEL_DIR` overrides it. Native development can use this command as needed. The root Compose stack pulls and verifies the Chinese embedding model through Ollama at startup and stores it in the `ollama-data` volume.
+`server:knowledge:prepare` downloads and verifies the pinned `bge-small-zh-v1.5` ONNX model in advance, reusing valid files. Chat-only use can skip this preparation. Models live under the Agent data directory's `models` folder; `SUPERDSH_EMBEDDING_MODEL_DIR` overrides it. Native development can use this command as needed. The root Compose stack downloads and verifies the Chinese embedding model when building the Ollama image, then installs it in the `ollama-data` volume at startup.
 
 | Service                                               | Default address                                           |
 | ----------------------------------------------------- | --------------------------------------------------------- |
