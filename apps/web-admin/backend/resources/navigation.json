@@ -1,0 +1,493 @@
+{
+  "source": "apps/admin/server/management/navigation.ts",
+  "modules": [
+    {
+      "id": "overview",
+      "route": "#/overview",
+      "title": "总览",
+      "icon": "gauge",
+      "permissions": []
+    },
+    {
+      "id": "access.users",
+      "route": "#/access/users",
+      "title": "用户管理",
+      "icon": "users",
+      "permissions": [
+        "users.read"
+      ]
+    },
+    {
+      "id": "access.roles",
+      "route": "#/access/roles",
+      "title": "角色与权限",
+      "icon": "shield",
+      "permissions": [
+        "roles.manage"
+      ]
+    },
+    {
+      "id": "access.menus",
+      "route": "#/access/menus",
+      "title": "菜单管理",
+      "icon": "menu",
+      "permissions": [
+        "menus.read",
+        "menus.manage"
+      ]
+    },
+    {
+      "id": "models",
+      "route": "#/models",
+      "title": "聊天模型",
+      "icon": "key",
+      "permissions": [
+        "models.manage"
+      ]
+    },
+    {
+      "id": "models.multimodal",
+      "route": "#/models/multimodal",
+      "title": "多模态模型",
+      "icon": "sparkles",
+      "permissions": [
+        "models.manage"
+      ]
+    },
+    {
+      "id": "system.storage",
+      "route": "#/system/storage",
+      "title": "文件存储",
+      "icon": "folder",
+      "permissions": [
+        "storage.manage"
+      ]
+    },
+    {
+      "id": "account.files",
+      "route": "#/account/files",
+      "title": "我的文件",
+      "icon": "folder",
+      "permissions": [
+        "files.read"
+      ]
+    },
+    {
+      "id": "agents",
+      "route": "#/agents",
+      "title": "智能体列表",
+      "icon": "bot",
+      "permissions": [
+        "agents.manage"
+      ]
+    },
+    {
+      "id": "knowledge",
+      "route": "#/knowledge",
+      "title": "知识库",
+      "icon": "book-open",
+      "permissions": [
+        "agents.manage"
+      ]
+    },
+    {
+      "id": "skills",
+      "route": "#/skills",
+      "title": "技能管理",
+      "icon": "sparkles",
+      "permissions": [
+        "agents.manage"
+      ]
+    },
+    {
+      "id": "tools",
+      "route": "#/tools",
+      "title": "工具管理",
+      "icon": "wrench",
+      "permissions": [
+        "agents.manage"
+      ]
+    },
+    {
+      "id": "devices",
+      "route": "#/operations/devices",
+      "title": "设备运维",
+      "icon": "monitor",
+      "permissions": [
+        "devices.inventory.read"
+      ]
+    },
+    {
+      "id": "workbench",
+      "route": "#/workspace",
+      "title": "Agent 工作台",
+      "icon": "bot",
+      "permissions": [
+        "sessions.read",
+        "sessions.run",
+        "devices.read"
+      ]
+    },
+    {
+      "id": "system.service",
+      "route": "#/system/service",
+      "title": "服务设置",
+      "icon": "settings",
+      "permissions": [
+        "settings.manage"
+      ]
+    },
+    {
+      "id": "system.audit",
+      "route": "#/system/audit",
+      "title": "审计",
+      "icon": "history",
+      "permissions": [
+        "audit.read"
+      ]
+    },
+    {
+      "id": "account.profile",
+      "route": "#/account/profile",
+      "title": "账号资料",
+      "icon": "user",
+      "permissions": []
+    },
+    {
+      "id": "account.security",
+      "route": "#/account/security",
+      "title": "账号安全与登录记录",
+      "icon": "shield",
+      "permissions": []
+    },
+    {
+      "id": "account.models",
+      "route": "#/account/models",
+      "title": "个人模型",
+      "icon": "key",
+      "permissions": [
+        "models.personal.manage"
+      ]
+    },
+    {
+      "id": "account.appearance",
+      "route": "#/account/appearance",
+      "title": "外观设置",
+      "icon": "paintbrush",
+      "permissions": []
+    },
+    {
+      "id": "account.mobile",
+      "route": "#/account/mobile",
+      "title": "手机登录记录",
+      "icon": "smartphone",
+      "permissions": []
+    }
+  ],
+  "icons": [
+    "gauge",
+    "users",
+    "shield",
+    "menu",
+    "bot",
+    "key",
+    "monitor",
+    "settings",
+    "user",
+    "history",
+    "paintbrush",
+    "smartphone",
+    "folder",
+    "book-open",
+    "sparkles",
+    "wrench"
+  ],
+  "items": [
+    {
+      "id": "access",
+      "kind": "group",
+      "moduleId": null,
+      "parentId": null,
+      "title": "用户与权限",
+      "icon": "users",
+      "order": 1,
+      "visible": true,
+      "roleIds": []
+    },
+    {
+      "id": "agent-management",
+      "kind": "group",
+      "moduleId": null,
+      "parentId": null,
+      "title": "智能体管理",
+      "icon": "bot",
+      "order": 2,
+      "visible": true,
+      "roleIds": []
+    },
+    {
+      "id": "model-management",
+      "kind": "group",
+      "moduleId": null,
+      "parentId": null,
+      "title": "模型管理",
+      "icon": "key",
+      "order": 3,
+      "visible": true,
+      "roleIds": []
+    },
+    {
+      "id": "system",
+      "kind": "group",
+      "moduleId": null,
+      "parentId": null,
+      "title": "系统管理",
+      "icon": "settings",
+      "order": 6,
+      "visible": true,
+      "roleIds": []
+    },
+    {
+      "id": "account",
+      "kind": "group",
+      "moduleId": null,
+      "parentId": null,
+      "title": "个人中心",
+      "icon": "user",
+      "order": 7,
+      "visible": true,
+      "roleIds": []
+    },
+    {
+      "id": "overview",
+      "kind": "page",
+      "moduleId": "overview",
+      "parentId": null,
+      "title": "总览",
+      "icon": "gauge",
+      "order": 0,
+      "visible": true,
+      "roleIds": []
+    },
+    {
+      "id": "access.users",
+      "kind": "page",
+      "moduleId": "access.users",
+      "parentId": "access",
+      "title": "用户管理",
+      "icon": "users",
+      "order": 0,
+      "visible": true,
+      "roleIds": []
+    },
+    {
+      "id": "access.roles",
+      "kind": "page",
+      "moduleId": "access.roles",
+      "parentId": "access",
+      "title": "角色与权限",
+      "icon": "shield",
+      "order": 1,
+      "visible": true,
+      "roleIds": []
+    },
+    {
+      "id": "access.menus",
+      "kind": "page",
+      "moduleId": "access.menus",
+      "parentId": "access",
+      "title": "菜单管理",
+      "icon": "menu",
+      "order": 2,
+      "visible": true,
+      "roleIds": []
+    },
+    {
+      "id": "models",
+      "kind": "page",
+      "moduleId": "models",
+      "parentId": "model-management",
+      "title": "聊天模型",
+      "icon": "key",
+      "order": 0,
+      "visible": true,
+      "roleIds": []
+    },
+    {
+      "id": "models.multimodal",
+      "kind": "page",
+      "moduleId": "models.multimodal",
+      "parentId": "model-management",
+      "title": "多模态模型",
+      "icon": "sparkles",
+      "order": 1,
+      "visible": true,
+      "roleIds": []
+    },
+    {
+      "id": "system.storage",
+      "kind": "page",
+      "moduleId": "system.storage",
+      "parentId": "system",
+      "title": "文件存储",
+      "icon": "folder",
+      "order": 0,
+      "visible": true,
+      "roleIds": []
+    },
+    {
+      "id": "account.files",
+      "kind": "page",
+      "moduleId": "account.files",
+      "parentId": "account",
+      "title": "我的文件",
+      "icon": "folder",
+      "order": 0,
+      "visible": true,
+      "roleIds": []
+    },
+    {
+      "id": "agents",
+      "kind": "page",
+      "moduleId": "agents",
+      "parentId": "agent-management",
+      "title": "智能体列表",
+      "icon": "bot",
+      "order": 0,
+      "visible": true,
+      "roleIds": []
+    },
+    {
+      "id": "knowledge",
+      "kind": "page",
+      "moduleId": "knowledge",
+      "parentId": "agent-management",
+      "title": "知识库",
+      "icon": "book-open",
+      "order": 1,
+      "visible": true,
+      "roleIds": []
+    },
+    {
+      "id": "skills",
+      "kind": "page",
+      "moduleId": "skills",
+      "parentId": "agent-management",
+      "title": "技能管理",
+      "icon": "sparkles",
+      "order": 2,
+      "visible": true,
+      "roleIds": []
+    },
+    {
+      "id": "tools",
+      "kind": "page",
+      "moduleId": "tools",
+      "parentId": "agent-management",
+      "title": "工具管理",
+      "icon": "wrench",
+      "order": 3,
+      "visible": true,
+      "roleIds": []
+    },
+    {
+      "id": "devices",
+      "kind": "page",
+      "moduleId": "devices",
+      "parentId": null,
+      "title": "设备运维",
+      "icon": "monitor",
+      "order": 4,
+      "visible": true,
+      "roleIds": []
+    },
+    {
+      "id": "workbench",
+      "kind": "page",
+      "moduleId": "workbench",
+      "parentId": null,
+      "title": "Agent 工作台",
+      "icon": "bot",
+      "order": 5,
+      "visible": true,
+      "roleIds": []
+    },
+    {
+      "id": "system.service",
+      "kind": "page",
+      "moduleId": "system.service",
+      "parentId": "system",
+      "title": "服务设置",
+      "icon": "settings",
+      "order": 1,
+      "visible": true,
+      "roleIds": []
+    },
+    {
+      "id": "system.audit",
+      "kind": "page",
+      "moduleId": "system.audit",
+      "parentId": "system",
+      "title": "审计",
+      "icon": "history",
+      "order": 2,
+      "visible": true,
+      "roleIds": []
+    },
+    {
+      "id": "account.profile",
+      "kind": "page",
+      "moduleId": "account.profile",
+      "parentId": "account",
+      "title": "账号资料",
+      "icon": "user",
+      "order": 1,
+      "visible": true,
+      "roleIds": []
+    },
+    {
+      "id": "account.security",
+      "kind": "page",
+      "moduleId": "account.security",
+      "parentId": "account",
+      "title": "账号安全与登录记录",
+      "icon": "shield",
+      "order": 2,
+      "visible": true,
+      "roleIds": []
+    },
+    {
+      "id": "account.models",
+      "kind": "page",
+      "moduleId": "account.models",
+      "parentId": "account",
+      "title": "个人模型",
+      "icon": "key",
+      "order": 3,
+      "visible": true,
+      "roleIds": []
+    },
+    {
+      "id": "account.appearance",
+      "kind": "page",
+      "moduleId": "account.appearance",
+      "parentId": "account",
+      "title": "外观设置",
+      "icon": "paintbrush",
+      "order": 4,
+      "visible": true,
+      "roleIds": []
+    },
+    {
+      "id": "account.mobile",
+      "kind": "page",
+      "moduleId": "account.mobile",
+      "parentId": "account",
+      "title": "手机登录记录",
+      "icon": "smartphone",
+      "order": 5,
+      "visible": true,
+      "roleIds": []
+    }
+  ]
+}

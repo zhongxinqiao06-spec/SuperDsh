@@ -1,0 +1,1018 @@
+/* 工作台沿用旧管理端的中性侧栏、居中消息列与一体输入卡，样式不介入会话状态。 */
+.workbench-page {
+  display: flex;
+  width: 100%;
+  height: 100%;
+  min-height: 0;
+  overflow: hidden;
+  background: var(--background);
+}
+.workspace-sidebar {
+  display: flex;
+  flex-shrink: 0;
+  flex-direction: column;
+  gap: 8px;
+  width: 240px;
+  min-width: 180px;
+  max-width: 40%;
+  padding: 14px 12px;
+  overflow: auto;
+  resize: horizontal;
+  border-right: 1px solid var(--border);
+  background: var(--sidebar);
+}
+.workspace-new-session.el-button {
+  justify-content: flex-start;
+  height: 40px;
+  margin-bottom: 4px;
+  border-color: transparent;
+  background: var(--muted);
+  font-weight: 500;
+}
+.workspace-sidebar .el-button > span,
+.workbench-toolbar .el-button > span,
+.workspace-files .el-button > span,
+.terminal-pane .el-button > span,
+.composer-stop > span {
+  gap: 7px;
+}
+.workspace-sidebar .el-input__wrapper {
+  background: transparent;
+}
+.workspace-section-heading {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 4px;
+  padding: 8px 8px 2px;
+  color: var(--muted-foreground);
+  font-size: 12px;
+  font-weight: 500;
+}
+.workspace-sidebar-title {
+  font-size: 16px;
+  font-weight: 600;
+  padding: 6px 4px 8px;
+}
+.sidebar-group {
+  margin-bottom: 12px;
+}
+.sidebar-devices-group {
+  order: 1;
+}
+.sidebar-pinned-group {
+  order: 2;
+}
+.sidebar-server-group,
+.sidebar-all-group {
+  order: 3;
+}
+.sidebar-projects-group {
+  order: 4;
+}
+.sidebar-unassigned-group {
+  order: 5;
+}
+.sidebar-filter-toggle,
+.sidebar-filter-panel {
+  order: 6;
+}
+.sidebar-more {
+  order: 7;
+}
+.workspace-section-heading > button,
+.sidebar-project-heading > button,
+.sidebar-device {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  border: 0;
+  background: transparent;
+  color: inherit;
+  font: inherit;
+  text-align: left;
+}
+.workspace-section-heading .app-icon {
+  width: 12px;
+  height: 12px;
+}
+.workspace-section-heading .collapsed {
+  transform: rotate(-90deg);
+}
+.workspace-section-heading .el-button {
+  padding: 3px;
+  height: 24px;
+  width: 24px;
+}
+.sidebar-device {
+  width: 100%;
+  padding: 9px 16px;
+  border-radius: 6px;
+  font-size: 14px;
+  color: var(--foreground);
+}
+.sidebar-device:hover,
+.sidebar-project-heading:hover {
+  background: var(--muted);
+}
+.session-status-dot[data-status='online'] {
+  background: var(--el-color-success);
+}
+.sidebar-project-heading {
+  display: flex;
+  align-items: center;
+  min-width: 0;
+  border-radius: 6px;
+}
+.sidebar-project-heading > button {
+  flex: 1;
+  min-width: 0;
+  padding: 9px 8px;
+}
+.sidebar-project-heading > button > span {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.sidebar-project-heading > .el-button {
+  padding: 3px;
+  width: 25px;
+  margin: 0;
+}
+.sidebar-project-sessions {
+  padding-left: 12px;
+}
+.sidebar-filter-toggle {
+  align-self: flex-start;
+  color: var(--muted-foreground);
+  font-size: 12px;
+}
+.sidebar-filter-panel {
+  display: grid;
+  gap: 8px;
+}
+.workbench-page.is-empty .workbench-toolbar > .workbench-sidebar-toggle {
+  margin-right: auto;
+}
+.project-filter {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  min-width: 0;
+}
+.project-filter .el-select {
+  flex: 1;
+  min-width: 0;
+}
+.project-filter .el-button {
+  width: 28px;
+  padding: 0;
+}
+.workspace-sidebar .el-switch {
+  align-self: flex-start;
+  padding: 0 8px;
+}
+.workspace-sidebar .el-switch__label {
+  color: var(--muted-foreground);
+  font-weight: 400;
+}
+.workspace-sidebar .el-switch__label.is-active {
+  color: var(--foreground);
+}
+.workspace-empty {
+  margin: 0;
+  padding: 8px;
+  color: var(--muted-foreground);
+  font-size: 12px;
+}
+.sidebar-session {
+  display: flex;
+  align-items: center;
+  min-width: 0;
+  border-radius: 6px;
+  color: var(--muted-foreground);
+}
+.session-menu {
+  flex: none;
+  margin-inline-end: 4px;
+}
+.session-menu-trigger {
+  display: grid;
+  place-items: center;
+  width: 28px;
+  height: 28px;
+  padding: 0;
+  border: 0;
+  border-radius: 6px;
+  background: transparent;
+  color: var(--muted-foreground);
+  cursor: pointer;
+}
+.session-menu-trigger:is(:hover, :focus-visible, [aria-expanded='true']) {
+  background: var(--background);
+  color: var(--foreground);
+}
+/* 鼠标悬停或键盘聚焦时显示菜单入口，触屏始终可以直接点按。 */
+@media (hover: hover) and (pointer: fine) {
+  .sidebar-session:not(:hover, :focus-within, .selected)
+    .session-menu-trigger:not([aria-expanded='true']) {
+    opacity: 0;
+  }
+}
+@media (pointer: coarse) {
+  .session-menu-trigger {
+    width: 40px;
+    height: 40px;
+  }
+}
+.sidebar-session:hover,
+.sidebar-session.selected {
+  background: var(--muted);
+  color: var(--foreground);
+}
+.session-main {
+  display: flex;
+  flex: 1;
+  align-items: flex-start;
+  gap: 9px;
+  min-width: 0;
+  padding: 9px 8px;
+  border: 0;
+  background: transparent;
+  color: inherit;
+  text-align: left;
+}
+.session-main > svg {
+  flex-shrink: 0;
+  margin-top: 2px;
+}
+.session-text {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  gap: 4px;
+  min-width: 0;
+}
+.session-text > span {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.session-text small {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  color: var(--muted-foreground);
+  font-size: 11px;
+}
+.session-status-dot {
+  width: 5px;
+  height: 5px;
+  border-radius: 50%;
+  background: currentColor;
+}
+.session-status-dot[data-status='running'] {
+  background: var(--el-color-success);
+}
+.session-status-dot[data-status='waiting_approval'],
+.session-status-dot[data-status='waiting_input'] {
+  background: var(--el-color-warning);
+}
+.workbench-main {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  min-width: 0;
+  min-height: 0;
+}
+.workbench-toolbar {
+  display: flex;
+  flex-shrink: 0;
+  align-items: center;
+  gap: 4px;
+  min-height: 52px;
+  padding: 8px 16px;
+}
+.workbench-toolbar .el-button {
+  margin-left: 0;
+  padding: 6px 8px;
+  color: var(--muted-foreground);
+}
+.workbench-toolbar .workbench-sidebar-toggle {
+  color: var(--foreground);
+}
+.workbench-heading {
+  flex: 1;
+  min-width: 0;
+  padding: 0 6px;
+}
+.workbench-heading h1 {
+  margin: 0;
+  overflow: hidden;
+  font-size: 14px;
+  font-weight: 500;
+  line-height: 20px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.workbench-heading small {
+  color: var(--muted-foreground);
+  font-size: 11px;
+}
+.workbench-main > .el-alert {
+  flex-shrink: 0;
+  width: calc(100% - 32px);
+  margin: 4px 16px;
+}
+.workbench-conversation {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  min-height: 0;
+}
+.workbench-conversation > .el-alert {
+  align-self: center;
+  width: min(768px, calc(100% - 32px));
+  margin-bottom: 8px;
+}
+.workbench-timeline {
+  flex: 1;
+  min-height: 0;
+  overflow: auto;
+  overscroll-behavior: contain;
+}
+.workbench-timeline-content {
+  width: min(800px, 100%);
+  margin: 0 auto;
+  padding: 20px 16px;
+}
+.workbench-welcome {
+  width: min(768px, calc(100% - 48px));
+  margin: 0 auto 26px;
+  text-align: center;
+}
+.workbench-welcome h2 {
+  margin: 0 0 12px;
+  font-size: clamp(26px, 3vw, 36px);
+  font-weight: 600;
+  line-height: 1.25;
+  letter-spacing: -0.035em;
+}
+.workbench-welcome p {
+  margin: 0;
+  color: var(--muted-foreground);
+  font-size: 14px;
+}
+.workbench-page.is-empty .workbench-conversation {
+  justify-content: safe center;
+  padding-bottom: 48px;
+  overflow: auto;
+}
+.composer-config-heading {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 12px;
+  font-size: 12px;
+}
+.composer-config-heading strong {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-weight: 500;
+}
+.composer-config-heading > span,
+.composer-config-menu p {
+  color: var(--muted-foreground);
+}
+/* 弹层挂到 body，尺寸和主题独立限定；窄屏不能因说明文案撑宽输入栏。 */
+.composer-config-menu .el-select-dropdown {
+  width: 280px;
+  max-width: calc(100vw - 24px);
+}
+.composer-config-menu p {
+  margin: 8px 0;
+  font-size: 12px;
+  line-height: 1.6;
+}
+.composer-config-menu .el-button {
+  width: 100%;
+  margin: 4px 0 0;
+}
+.composer-config-menu .el-button > span {
+  gap: 6px;
+}
+.composer-runtime-status {
+  width: 6px;
+  height: 6px;
+  flex-shrink: 0;
+  border-radius: 50%;
+  background: var(--muted-foreground);
+}
+.composer-runtime-status[data-status='running'] {
+  background: var(--el-color-success);
+}
+.composer-runtime-status[data-status='starting'],
+.composer-runtime-status[data-status='unknown'] {
+  background: var(--el-color-warning);
+}
+.composer-runtime-status[data-status='error'] {
+  background: var(--destructive);
+}
+.composer {
+  container-type: inline-size;
+  display: flex;
+  flex-shrink: 0;
+  flex-direction: column;
+  align-self: center;
+  width: min(768px, calc(100% - 32px));
+  padding: 16px 16px 8px;
+  overflow: hidden;
+  border: 1px solid var(--border);
+  border-radius: 16px;
+  background: var(--card);
+  box-shadow: 0 1px 3px rgb(0 0 0 / 5%);
+  transition:
+    border-color 150ms,
+    box-shadow 150ms;
+}
+.composer:focus-within {
+  border-color: var(--ring, var(--muted-foreground));
+  box-shadow: 0 0 0 2px
+    color-mix(in srgb, var(--muted-foreground) 12%, transparent);
+}
+.composer .el-textarea__inner {
+  padding: 0 4px;
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+  font-size: 16px;
+  line-height: 1.65;
+  box-shadow: none;
+}
+.composer .el-textarea__inner:focus,
+.composer .el-textarea__inner:hover {
+  box-shadow: none;
+}
+.composer .el-textarea.is-disabled .el-textarea__inner {
+  border: 0;
+  background: transparent;
+  box-shadow: none;
+}
+.draft-files {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+.draft-files:not(:empty) {
+  padding: 8px 0;
+}
+.composer-actions {
+  display: flex;
+  flex-wrap: nowrap;
+  align-items: center;
+  gap: 6px;
+  margin-top: 10px;
+  padding-top: 8px;
+  border-top: 1px solid var(--border);
+}
+.composer-options {
+  /* 子组件通过显式变量融入同一行，避免 scoped 样式加载顺序恢复成整组换行。 */
+  --runtime-selectors-display: contents;
+  --runtime-selector-width: auto;
+  display: flex;
+  flex: 1;
+  flex-wrap: nowrap;
+  align-items: center;
+  gap: 4px;
+  min-width: 0;
+  overflow-x: auto;
+  scrollbar-width: thin;
+}
+.composer-options .el-select,
+.composer-options .runtime-selectors .el-select {
+  flex: 1 1 112px;
+  width: auto;
+  min-width: 88px;
+}
+.composer-options .composer-device-select {
+  flex-basis: 128px;
+  min-width: 112px;
+}
+.composer-options .runtime-selectors .runtime-model-select {
+  flex-basis: 148px;
+  min-width: 104px;
+}
+.composer-options .runtime-selectors .runtime-reasoning-select {
+  flex: 0 1 76px;
+  min-width: 60px;
+}
+.composer-options .runtime-selectors .runtime-permission-select {
+  flex-basis: 112px;
+  min-width: 96px;
+}
+.composer-actions > .el-switch,
+.composer-options .runtime-settings-trigger {
+  flex-shrink: 0;
+}
+.composer-options .el-select__wrapper {
+  padding: 4px 8px;
+  background: transparent;
+  box-shadow: none;
+}
+.composer-options .el-select__wrapper:hover {
+  background: var(--muted);
+  box-shadow: none;
+}
+.upload-label {
+  position: relative;
+  display: grid;
+  flex-shrink: 0;
+  width: 32px;
+  height: 32px;
+  place-items: center;
+  overflow: hidden;
+  border-radius: 6px;
+  color: var(--muted-foreground);
+  cursor: pointer;
+}
+.upload-label:hover {
+  background: var(--muted);
+}
+.upload-label:focus-within {
+  outline: 2px solid var(--ring, var(--muted-foreground));
+  outline-offset: 2px;
+}
+.upload-label input {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  opacity: 0;
+  cursor: pointer;
+}
+.composer-send.el-button {
+  flex-shrink: 0;
+  width: 34px;
+  height: 34px;
+  margin: 0;
+  padding: 0;
+  border-radius: 50%;
+}
+.composer-send.el-button.is-loading .app-icon {
+  display: none;
+}
+.composer-send .el-icon {
+  margin: 0;
+}
+.composer-stop.el-button {
+  flex-shrink: 0;
+  margin: 0;
+  padding: 6px 9px;
+}
+/* 所有操作保持单行；窄卡片压缩辅助按钮，选项不足时仅在选项区横向滚动。 */
+@container (max-width: 520px) {
+  .composer-actions .el-switch__label,
+  .composer-stop span > span {
+    display: none;
+  }
+  .composer-options .el-select {
+    min-width: 80px;
+  }
+  .composer-options .composer-device-select {
+    min-width: 96px;
+  }
+  .composer-options .runtime-settings-trigger {
+    width: 32px;
+    padding: 6px;
+    font-size: 0;
+  }
+  .composer-options .runtime-settings-trigger .app-icon {
+    margin-right: 0;
+  }
+}
+.composer-note {
+  align-self: center;
+  margin: 8px 16px 12px;
+  color: var(--muted-foreground);
+  font-size: 11px;
+  text-align: center;
+}
+.workbench-page.is-empty .composer-note {
+  margin-top: 12px;
+}
+.timeline-list {
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+  min-width: 0;
+}
+.timeline-empty {
+  padding: 40px 0;
+  color: var(--muted-foreground);
+  text-align: center;
+}
+.timeline-item {
+  min-width: 0;
+  padding: 4px 0;
+  overflow-wrap: anywhere;
+}
+.timeline-item[data-kind='你'] {
+  align-self: flex-end;
+  width: fit-content;
+  max-width: 90%;
+  padding: 12px 16px;
+  border-radius: 18px;
+  background: var(--muted);
+}
+.timeline-item > header {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-bottom: 8px;
+  color: var(--muted-foreground);
+  font-size: 12px;
+}
+.timeline-item > header strong {
+  flex: 1;
+  font-weight: 500;
+}
+.timeline-item > header small {
+  font-size: 10px;
+}
+.timeline-item > .markdown-content > :first-child {
+  margin-top: 0;
+}
+.timeline-item > .markdown-content > :last-child {
+  margin-bottom: 0;
+}
+.timeline-item > details,
+.session-results details {
+  margin: 8px 0;
+  overflow: hidden;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--card);
+}
+.timeline-item > details > summary,
+.session-results summary {
+  padding: 10px 12px;
+  color: var(--muted-foreground);
+  font-size: 13px;
+  cursor: pointer;
+}
+.timeline-item > details > summary svg {
+  display: inline-block;
+  margin: 0 5px -3px 0;
+}
+.timeline-item > details > pre,
+.session-results pre {
+  max-height: 360px;
+  margin: 0;
+  padding: 12px;
+  overflow: auto;
+  border-top: 1px solid var(--border);
+  background: var(--muted);
+  font-size: 12px;
+  line-height: 1.65;
+  white-space: pre-wrap;
+}
+.attachment-list {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-top: 10px;
+}
+.attachment-list .el-button {
+  max-width: 100%;
+  margin: 0;
+  border: 1px solid var(--border);
+  background: var(--background);
+}
+.interaction-card {
+  margin-top: 18px;
+  padding: 16px;
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  background: var(--card);
+  box-shadow: 0 2px 8px rgb(0 0 0 / 4%);
+}
+.interaction-card h3 {
+  margin: 0 0 12px;
+  font-size: 15px;
+  font-weight: 600;
+}
+.interaction-card fieldset {
+  margin: 16px 0;
+  padding: 12px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+}
+.interaction-card legend {
+  padding: 0 6px;
+  font-size: 13px;
+  font-weight: 500;
+}
+.interaction-card .actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+.interaction-card .el-radio-group,
+.interaction-card .el-checkbox-group {
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+  gap: 8px;
+}
+.interaction-card .el-radio,
+.interaction-card .el-checkbox {
+  height: auto;
+  min-height: 28px;
+  margin-right: 0;
+}
+.interaction-card .el-radio__label,
+.interaction-card .el-checkbox__label {
+  white-space: normal;
+  line-height: 1.5;
+}
+.interaction-card small {
+  display: block;
+  color: var(--muted-foreground);
+  font-size: 12px;
+}
+.interaction-card .el-button {
+  margin-top: 12px;
+}
+.session-results {
+  margin-top: 16px;
+}
+.session-results .markdown-content,
+.session-results ol,
+.session-records > details > p {
+  margin: 12px;
+}
+.session-results details details {
+  margin: 8px 12px 12px;
+}
+.session-records > details > .el-button {
+  margin: 8px 12px 12px;
+}
+.session-artifact {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin: 8px 0;
+  padding: 12px;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+}
+.session-artifact-name {
+  flex: 1;
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+.session-preview-dialog .preview {
+  width: 100%;
+  height: 70vh;
+  border: 0;
+}
+.session-preview-dialog .preview-image {
+  max-width: 100%;
+  max-height: 70vh;
+}
+.session-record-dialog pre {
+  max-height: 400px;
+  padding: 12px;
+  overflow: auto;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--muted);
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+.workbench-drawer .el-drawer__header {
+  margin-bottom: 0;
+  padding: 16px 20px;
+  border-bottom: 1px solid var(--border);
+}
+.workbench-drawer .el-drawer__body {
+  padding: 16px 20px;
+}
+.workspace-files {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+.file-toolbar {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.file-toolbar > .el-input {
+  flex: 1;
+  min-width: 100px;
+}
+.file-toolbar strong {
+  flex: 1;
+  overflow-wrap: anywhere;
+  font-size: 13px;
+  font-weight: 500;
+}
+.workspace-files .el-table {
+  border: 1px solid var(--border);
+  border-radius: 8px;
+}
+.workspace-files > .el-textarea .el-textarea__inner {
+  font-family: var(--font-mono, ui-monospace, monospace);
+  font-size: 13px;
+  line-height: 1.7;
+}
+.workspace-files > p,
+.terminal-pane > p,
+.session-share-description {
+  margin: 0;
+  color: var(--muted-foreground);
+  font-size: 12px;
+  line-height: 1.6;
+}
+.terminal-pane {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  height: 100%;
+  min-height: 360px;
+}
+.terminal-toolbar,
+.terminal-tabs,
+.terminal-tab {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+.terminal-tabs {
+  flex-shrink: 0;
+  overflow-x: auto;
+  border-bottom: 1px solid var(--border);
+}
+.terminal-tab {
+  flex-shrink: 0;
+  gap: 0;
+  border-bottom: 2px solid transparent;
+  color: var(--muted-foreground);
+}
+.terminal-tab.active {
+  border-bottom-color: var(--foreground);
+  color: var(--foreground);
+}
+.terminal-tab .el-button {
+  color: inherit;
+}
+.terminal-host {
+  flex: 1;
+  min-height: 300px;
+  padding: 12px;
+  overflow: hidden;
+  border-radius: 8px;
+  background: #000;
+}
+.session-share-description {
+  margin-bottom: 16px;
+}
+.share-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 10px;
+  margin-top: 16px;
+  padding-top: 16px;
+  border-top: 1px solid var(--border);
+}
+.share-row > span {
+  width: 100%;
+  color: var(--muted-foreground);
+  font-size: 12px;
+}
+.share-row .el-input {
+  flex: 1;
+  min-width: 180px;
+}
+.share-page {
+  width: min(816px, 100%);
+  margin: 0 auto;
+  padding: 40px 24px;
+}
+.share-page-heading {
+  margin-bottom: 32px;
+  padding-bottom: 24px;
+  border-bottom: 1px solid var(--border);
+}
+.share-page-label,
+.share-page-heading p {
+  color: var(--muted-foreground);
+  font-size: 12px;
+}
+.share-page-heading h1 {
+  margin: 12px 0;
+  font-size: 26px;
+  font-weight: 600;
+  line-height: 1.4;
+}
+.workbench-sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border: 0;
+}
+@media (max-width: 1100px) {
+  .workbench-action-label {
+    display: none;
+  }
+  .workspace-sidebar {
+    width: 210px;
+  }
+}
+@media (max-width: 800px) {
+  .workbench-page {
+    position: relative;
+  }
+  .workspace-sidebar {
+    position: absolute;
+    inset: 52px auto 0 0;
+    z-index: 20;
+    width: min(280px, 85%);
+    max-width: none;
+    resize: none;
+    box-shadow: 8px 0 24px rgb(0 0 0 / 8%);
+  }
+  .workbench-toolbar {
+    gap: 0;
+    padding: 8px;
+  }
+  .workbench-toolbar .el-button {
+    padding: 6px;
+  }
+  .workbench-page.is-empty .workbench-conversation {
+    justify-content: flex-start;
+    padding-top: 48px;
+    padding-bottom: 16px;
+  }
+  .workbench-welcome {
+    margin-bottom: 22px;
+  }
+  .composer {
+    width: calc(100% - 24px);
+    padding: 12px 10px 8px;
+  }
+  .composer-actions {
+    gap: 4px;
+  }
+  .composer-options .el-select__wrapper {
+    padding: 4px;
+    font-size: 12px;
+  }
+  .composer-stop span > span {
+    display: none;
+  }
+  .workbench-drawer.el-drawer {
+    width: 100% !important;
+  }
+  .file-toolbar {
+    flex-wrap: wrap;
+  }
+  .session-artifact {
+    flex-wrap: wrap;
+  }
+  .share-page {
+    padding: 24px 16px;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .composer {
+    transition: none;
+  }
+}
+
+/* 项目操作显示在项目名下方，长标题和操作按钮各自拥有点击区域。 */
+.workspace-sidebar .sidebar-record-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 2px 8px;
+  padding: 0 8px 6px 26px;
+}
+.sidebar-record-actions .el-button {
+  min-height: 26px;
+  height: auto;
+  padding: 2px 0;
+  font-size: 12px;
+}
+.terminal-tab {
+  flex-wrap: wrap;
+  max-width: 100%;
+}
+.terminal-tab .row-actions {
+  flex-wrap: wrap;
+}

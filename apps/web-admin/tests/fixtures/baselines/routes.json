@@ -1,0 +1,1407 @@
+[
+  {
+    "method": "GET",
+    "path": "/api/v2/auth/config",
+    "transport": "http"
+  },
+  {
+    "method": "POST",
+    "path": "/api/v2/auth/password-salt",
+    "transport": "http"
+  },
+  {
+    "method": "POST",
+    "path": "/api/v2/auth/login",
+    "transport": "http"
+  },
+  {
+    "method": "POST",
+    "path": "/api/v2/auth/register",
+    "transport": "http"
+  },
+  {
+    "method": "POST",
+    "path": "/api/v2/auth/refresh",
+    "transport": "http"
+  },
+  {
+    "method": "POST",
+    "path": "/api/v2/auth/logout",
+    "transport": "http"
+  },
+  {
+    "method": "POST",
+    "path": "/api/v2/auth/logout-all",
+    "transport": "http"
+  },
+  {
+    "method": "GET",
+    "path": "/api/v2/auth/me",
+    "transport": "http"
+  },
+  {
+    "method": "PUT",
+    "path": "/api/v2/auth/me/profile",
+    "transport": "http"
+  },
+  {
+    "method": "PUT",
+    "path": "/api/v2/auth/me/username",
+    "transport": "http"
+  },
+  {
+    "method": "PUT",
+    "path": "/api/v2/auth/me/avatar",
+    "transport": "http"
+  },
+  {
+    "method": "DELETE",
+    "path": "/api/v2/auth/me/avatar",
+    "transport": "http"
+  },
+  {
+    "method": "POST",
+    "path": "/api/v2/auth/change-password",
+    "transport": "http"
+  },
+  {
+    "method": "GET",
+    "path": "/api/v2/auth/sessions",
+    "transport": "http"
+  },
+  {
+    "method": "POST",
+    "path": "/api/v2/auth/recovery-codes",
+    "transport": "http"
+  },
+  {
+    "method": "POST",
+    "path": "/api/v2/auth/recovery/reset",
+    "transport": "http"
+  },
+  {
+    "method": "POST",
+    "path": "/api/v2/auth/email-code",
+    "transport": "http"
+  },
+  {
+    "method": "PUT",
+    "path": "/api/v2/auth/me/email",
+    "transport": "http"
+  },
+  {
+    "method": "POST",
+    "path": "/api/v2/auth/recovery/reset-email",
+    "transport": "http"
+  },
+  {
+    "method": "GET",
+    "path": "/api/v2/.well-known/oauth-authorization-server",
+    "transport": "http"
+  },
+  {
+    "method": "GET",
+    "path": "/api/v2/oauth/authorize",
+    "transport": "http"
+  },
+  {
+    "method": "POST",
+    "path": "/api/v2/oauth/authorize",
+    "transport": "http"
+  },
+  {
+    "method": "POST",
+    "path": "/api/v2/oauth/token",
+    "transport": "http"
+  },
+  {
+    "method": "GET",
+    "path": "/api/v2/auth/oauth/start",
+    "transport": "http"
+  },
+  {
+    "method": "GET",
+    "path": "/api/v2/auth/oauth/callback",
+    "transport": "http"
+  },
+  {
+    "method": "POST",
+    "path": "/api/v2/auth/oauth/finalize",
+    "transport": "http"
+  },
+  {
+    "method": "POST",
+    "path": "/api/v2/auth/mobile-login/qr",
+    "transport": "http"
+  },
+  {
+    "method": "POST",
+    "path": "/api/v2/auth/mobile-login/request",
+    "transport": "http"
+  },
+  {
+    "method": "POST",
+    "path": "/api/v2/auth/mobile-login/status",
+    "transport": "http"
+  },
+  {
+    "method": "POST",
+    "path": "/api/v2/auth/mobile-login/confirm",
+    "transport": "http"
+  },
+  {
+    "method": "POST",
+    "path": "/api/v2/auth/mobile-login/exchange",
+    "transport": "http"
+  },
+  {
+    "method": "GET",
+    "path": "/api/v2/admin/users",
+    "transport": "http"
+  },
+  {
+    "method": "POST",
+    "path": "/api/v2/admin/users",
+    "transport": "http"
+  },
+  {
+    "method": "GET",
+    "path": "/api/v2/admin/roles",
+    "transport": "http"
+  },
+  {
+    "method": "POST",
+    "path": "/api/v2/admin/roles",
+    "transport": "http"
+  },
+  {
+    "method": "GET",
+    "path": "/api/v2/admin/audit",
+    "transport": "http"
+  },
+  {
+    "method": "GET",
+    "path": "/api/v2/navigation",
+    "transport": "http"
+  },
+  {
+    "method": "GET",
+    "path": "/api/v2/admin/menus",
+    "transport": "http"
+  },
+  {
+    "method": "PUT",
+    "path": "/api/v2/admin/menus",
+    "transport": "http"
+  },
+  {
+    "method": "POST",
+    "path": "/api/v2/admin/menus/reset",
+    "transport": "http"
+  },
+  {
+    "method": "GET",
+    "path": "/api/v2/admin/dashboard/settings",
+    "transport": "http"
+  },
+  {
+    "method": "PATCH",
+    "path": "/api/v2/admin/dashboard/settings",
+    "transport": "http"
+  },
+  {
+    "method": "GET",
+    "path": "/api/v2/admin/dashboard/overview",
+    "transport": "http"
+  },
+  {
+    "method": "POST",
+    "path": "/api/v2/admin/dashboard/snapshots/today",
+    "transport": "http"
+  },
+  {
+    "method": "GET",
+    "path": "/api/v2/admin/settings",
+    "transport": "http"
+  },
+  {
+    "method": "PATCH",
+    "path": "/api/v2/admin/settings",
+    "transport": "http"
+  },
+  {
+    "method": "GET",
+    "path": "/api/v2/admin/devices",
+    "transport": "http"
+  },
+  {
+    "method": "GET",
+    "path": "/api/v2/admin/service",
+    "transport": "http"
+  },
+  {
+    "method": "GET",
+    "path": "/api/v2/announcement",
+    "transport": "http"
+  },
+  {
+    "method": "GET",
+    "path": "/api/v2/admin/announcement",
+    "transport": "http"
+  },
+  {
+    "method": "PUT",
+    "path": "/api/v2/admin/announcement",
+    "transport": "http"
+  },
+  {
+    "method": "GET",
+    "path": "/api/v2/connectors",
+    "transport": "http"
+  },
+  {
+    "method": "POST",
+    "path": "/api/v2/connectors",
+    "transport": "http"
+  },
+  {
+    "method": "POST",
+    "path": "/api/v2/connector/auth",
+    "transport": "http"
+  },
+  {
+    "method": "POST",
+    "path": "/api/v2/connector/ingest",
+    "transport": "http"
+  },
+  {
+    "method": "POST",
+    "path": "/api/v2/ws-ticket",
+    "transport": "http"
+  },
+  {
+    "method": "POST",
+    "path": "/api/v2/pairing/start",
+    "transport": "http"
+  },
+  {
+    "method": "POST",
+    "path": "/api/v2/pairing/claim",
+    "transport": "http"
+  },
+  {
+    "method": "POST",
+    "path": "/api/v2/pairing/poll",
+    "transport": "http"
+  },
+  {
+    "method": "GET",
+    "path": "/api/v2/projects",
+    "transport": "http"
+  },
+  {
+    "method": "POST",
+    "path": "/api/v2/projects",
+    "transport": "http"
+  },
+  {
+    "method": "GET",
+    "path": "/api/v2/sessions",
+    "transport": "http"
+  },
+  {
+    "method": "GET",
+    "path": "/api/v2/sessions/list",
+    "transport": "http"
+  },
+  {
+    "method": "POST",
+    "path": "/api/v2/sessions",
+    "transport": "http"
+  },
+  {
+    "method": "POST",
+    "path": "/api/v2/sessions/create-and-start",
+    "transport": "http"
+  },
+  {
+    "method": "POST",
+    "path": "/api/v2/sessions/archive",
+    "transport": "http"
+  },
+  {
+    "method": "POST",
+    "path": "/api/v2/sessions/unarchive",
+    "transport": "http"
+  },
+  {
+    "method": "POST",
+    "path": "/api/v2/sessions/read",
+    "transport": "http"
+  },
+  {
+    "method": "GET",
+    "path": "/api/v2/agents",
+    "transport": "http"
+  },
+  {
+    "method": "GET",
+    "path": "/api/v2/admin/agents",
+    "transport": "http"
+  },
+  {
+    "method": "GET",
+    "path": "/api/v2/admin/agents/catalog",
+    "transport": "http"
+  },
+  {
+    "method": "POST",
+    "path": "/api/v2/admin/agents",
+    "transport": "http"
+  },
+  {
+    "method": "POST",
+    "path": "/api/v2/admin/agents/assets",
+    "transport": "http"
+  },
+  {
+    "method": "POST",
+    "path": "/api/v2/admin/agents/demo",
+    "transport": "http"
+  },
+  {
+    "method": "POST",
+    "path": "/api/v2/admin/agents/initialize",
+    "transport": "http"
+  },
+  {
+    "method": "GET",
+    "path": "/api/v2/admin/extensions",
+    "transport": "http"
+  },
+  {
+    "method": "POST",
+    "path": "/api/v2/admin/extensions/install",
+    "transport": "http"
+  },
+  {
+    "method": "POST",
+    "path": "/api/v2/admin/extensions/mcp/discover",
+    "transport": "http"
+  },
+  {
+    "method": "POST",
+    "path": "/api/v2/admin/extensions/mcp",
+    "transport": "http"
+  },
+  {
+    "method": "POST",
+    "path": "/api/v2/admin/skills/match-preview",
+    "transport": "http"
+  },
+  {
+    "method": "POST",
+    "path": "/api/v2/admin/skills/import-extension",
+    "transport": "http"
+  },
+  {
+    "method": "POST",
+    "path": "/api/v2/admin/skills/import",
+    "transport": "http"
+  },
+  {
+    "method": "GET",
+    "path": "/api/v2/admin/knowledge-bases",
+    "transport": "http"
+  },
+  {
+    "method": "GET",
+    "path": "/api/v2/admin/skills",
+    "transport": "http"
+  },
+  {
+    "method": "GET",
+    "path": "/api/v2/admin/tools",
+    "transport": "http"
+  },
+  {
+    "method": "POST",
+    "path": "/api/v2/admin/knowledge-bases",
+    "transport": "http"
+  },
+  {
+    "method": "POST",
+    "path": "/api/v2/admin/skills",
+    "transport": "http"
+  },
+  {
+    "method": "POST",
+    "path": "/api/v2/admin/tools",
+    "transport": "http"
+  },
+  {
+    "method": "GET",
+    "path": "/api/v2/admin/knowledge-bases/search-status",
+    "transport": "http"
+  },
+  {
+    "method": "GET",
+    "path": "/api/v2/admin/knowledge-embedding",
+    "transport": "http"
+  },
+  {
+    "method": "PUT",
+    "path": "/api/v2/admin/knowledge-embedding",
+    "transport": "http"
+  },
+  {
+    "method": "POST",
+    "path": "/api/v2/admin/knowledge-embedding/prepare-local",
+    "transport": "http"
+  },
+  {
+    "method": "POST",
+    "path": "/api/v2/connectors/fs/preview-session",
+    "transport": "http"
+  },
+  {
+    "method": "POST",
+    "path": "/api/v2/connectors/fs/preview/read",
+    "transport": "http"
+  },
+  {
+    "method": "POST",
+    "path": "/api/v2/connectors/fs/preview/readText",
+    "transport": "http"
+  },
+  {
+    "method": "GET",
+    "path": "/api/v2/files",
+    "transport": "http"
+  },
+  {
+    "method": "POST",
+    "path": "/api/v2/files/uploads",
+    "transport": "http"
+  },
+  {
+    "method": "GET",
+    "path": "/api/v2/admin/storage",
+    "transport": "http"
+  },
+  {
+    "method": "POST",
+    "path": "/api/v2/admin/storage/connections",
+    "transport": "http"
+  },
+  {
+    "method": "PUT",
+    "path": "/api/v2/admin/storage",
+    "transport": "http"
+  },
+  {
+    "method": "GET",
+    "path": "/api/v2/admin/storage/usage",
+    "transport": "http"
+  },
+  {
+    "method": "GET",
+    "path": "/api/v2/admin/storage/migrations",
+    "transport": "http"
+  },
+  {
+    "method": "GET",
+    "path": "/api/v2/admin/models/providers",
+    "transport": "http"
+  },
+  {
+    "method": "POST",
+    "path": "/api/v2/admin/models/providers",
+    "transport": "http"
+  },
+  {
+    "method": "GET",
+    "path": "/api/v2/admin/models/default",
+    "transport": "http"
+  },
+  {
+    "method": "PUT",
+    "path": "/api/v2/admin/models/default",
+    "transport": "http"
+  },
+  {
+    "method": "GET",
+    "path": "/api/v2/models/personal/providers",
+    "transport": "http"
+  },
+  {
+    "method": "POST",
+    "path": "/api/v2/models/personal/providers",
+    "transport": "http"
+  },
+  {
+    "method": "GET",
+    "path": "/api/v2/models/personal/default",
+    "transport": "http"
+  },
+  {
+    "method": "PUT",
+    "path": "/api/v2/models/personal/default",
+    "transport": "http"
+  },
+  {
+    "method": "GET",
+    "path": "/api/v2/models/catalog",
+    "transport": "http"
+  },
+  {
+    "method": "GET",
+    "path": "/api/v2/connector/models/catalog",
+    "transport": "http"
+  },
+  {
+    "method": "GET",
+    "path": "/api/v2/admin/models/configurations",
+    "transport": "http"
+  },
+  {
+    "method": "POST",
+    "path": "/api/v2/admin/models/connections",
+    "transport": "http"
+  },
+  {
+    "method": "POST",
+    "path": "/api/v2/admin/models/configurations",
+    "transport": "http"
+  },
+  {
+    "method": "GET",
+    "path": "/api/v2/models/capabilities",
+    "transport": "http"
+  },
+  {
+    "method": "GET",
+    "path": "/api/v2/server-agent",
+    "transport": "http"
+  },
+  {
+    "method": "POST",
+    "path": "/api/v2/server-agent",
+    "transport": "http"
+  },
+  {
+    "method": "GET",
+    "path": "/api/v2/health",
+    "transport": "http"
+  },
+  {
+    "method": "GET",
+    "path": "/api/v2/health/live",
+    "transport": "http"
+  },
+  {
+    "method": "GET",
+    "path": "/api/v2/health/ready",
+    "transport": "http"
+  },
+  {
+    "method": "DELETE",
+    "path": "/api/v2/auth/sessions/{session_id}",
+    "transport": "http"
+  },
+  {
+    "method": "PATCH",
+    "path": "/api/v2/admin/users/{user_id}",
+    "transport": "http"
+  },
+  {
+    "method": "DELETE",
+    "path": "/api/v2/admin/users/{user_id}",
+    "transport": "http"
+  },
+  {
+    "method": "POST",
+    "path": "/api/v2/admin/users/{user_id}/restore",
+    "transport": "http"
+  },
+  {
+    "method": "POST",
+    "path": "/api/v2/admin/users/{user_id}/password-reset",
+    "transport": "http"
+  },
+  {
+    "method": "PATCH",
+    "path": "/api/v2/admin/roles/{role_id}",
+    "transport": "http"
+  },
+  {
+    "method": "DELETE",
+    "path": "/api/v2/admin/roles/{role_id}",
+    "transport": "http"
+  },
+  {
+    "method": "POST",
+    "path": "/api/v2/admin/dashboard/snapshots/{target_date}",
+    "transport": "http"
+  },
+  {
+    "method": "POST",
+    "path": "/api/v2/admin/devices/{connector_id}/block",
+    "transport": "http"
+  },
+  {
+    "method": "POST",
+    "path": "/api/v2/admin/devices/{connector_id}/resume",
+    "transport": "http"
+  },
+  {
+    "method": "GET",
+    "path": "/api/v2/connectors/{connector_id}",
+    "transport": "http"
+  },
+  {
+    "method": "PATCH",
+    "path": "/api/v2/connectors/{connector_id}",
+    "transport": "http"
+  },
+  {
+    "method": "DELETE",
+    "path": "/api/v2/connectors/{connector_id}",
+    "transport": "http"
+  },
+  {
+    "method": "POST",
+    "path": "/api/v2/connectors/{connector_id}/revoke",
+    "transport": "http"
+  },
+  {
+    "method": "GET",
+    "path": "/api/v2/connectors/{connector_id}/preferences",
+    "transport": "http"
+  },
+  {
+    "method": "GET",
+    "path": "/api/v2/connectors/{connector_id}/protocol/capabilities",
+    "transport": "http"
+  },
+  {
+    "method": "GET",
+    "path": "/api/v2/connectors/{connector_id}/runtimes",
+    "transport": "http"
+  },
+  {
+    "method": "GET",
+    "path": "/api/v2/connectors/{connector_id}/runtime-types",
+    "transport": "http"
+  },
+  {
+    "method": "POST",
+    "path": "/api/v2/connectors/{connector_id}/runtimes/discover",
+    "transport": "http"
+  },
+  {
+    "method": "POST",
+    "path": "/api/v2/connectors/{connector_id}/runtime-types/discover",
+    "transport": "http"
+  },
+  {
+    "method": "POST",
+    "path": "/api/v2/connectors/{connector_id}/runtimes",
+    "transport": "http"
+  },
+  {
+    "method": "PATCH",
+    "path": "/api/v2/projects/{project_id}",
+    "transport": "http"
+  },
+  {
+    "method": "DELETE",
+    "path": "/api/v2/projects/{project_id}",
+    "transport": "http"
+  },
+  {
+    "method": "GET",
+    "path": "/api/v2/projects/{project_id}/sessions",
+    "transport": "http"
+  },
+  {
+    "method": "POST",
+    "path": "/api/v2/projects/{target_id}/sessions/archive-all",
+    "transport": "http"
+  },
+  {
+    "method": "POST",
+    "path": "/api/v2/connectors/{target_id}/sessions/archive-all",
+    "transport": "http"
+  },
+  {
+    "method": "GET",
+    "path": "/api/v2/sessions/{session_id}/meta",
+    "transport": "http"
+  },
+  {
+    "method": "GET",
+    "path": "/api/v2/sessions/{session_id}/agent-binding",
+    "transport": "http"
+  },
+  {
+    "method": "PUT",
+    "path": "/api/v2/sessions/{session_id}/agent-binding",
+    "transport": "http"
+  },
+  {
+    "method": "PATCH",
+    "path": "/api/v2/sessions/{session_id}/meta",
+    "transport": "http"
+  },
+  {
+    "method": "GET",
+    "path": "/api/v2/sessions/{session_id}/timeline",
+    "transport": "http"
+  },
+  {
+    "method": "GET",
+    "path": "/api/v2/sessions/{session_id}/snapshot",
+    "transport": "http"
+  },
+  {
+    "method": "GET",
+    "path": "/api/v2/sessions/{session_id}/events",
+    "transport": "http"
+  },
+  {
+    "method": "GET",
+    "path": "/api/v2/sessions/{session_id}/runtime/state",
+    "transport": "http"
+  },
+  {
+    "method": "GET",
+    "path": "/api/v2/sessions/{session_id}/runtime/capabilities",
+    "transport": "http"
+  },
+  {
+    "method": "GET",
+    "path": "/api/v2/sessions/{session_id}/runtime/catalogs/model",
+    "transport": "http"
+  },
+  {
+    "method": "GET",
+    "path": "/api/v2/sessions/{session_id}/runtime/catalogs/permission",
+    "transport": "http"
+  },
+  {
+    "method": "GET",
+    "path": "/api/v2/sessions/{session_id}/runtime/commands",
+    "transport": "http"
+  },
+  {
+    "method": "GET",
+    "path": "/api/v2/sessions/{session_id}/runtime/notices",
+    "transport": "http"
+  },
+  {
+    "method": "PATCH",
+    "path": "/api/v2/sessions/{session_id}/runtime/selections",
+    "transport": "http"
+  },
+  {
+    "method": "POST",
+    "path": "/api/v2/sessions/{session_id}/runtime/messages",
+    "transport": "http"
+  },
+  {
+    "method": "POST",
+    "path": "/api/v2/sessions/{session_id}/runtime/interrupt",
+    "transport": "http"
+  },
+  {
+    "method": "POST",
+    "path": "/api/v2/sessions/{session_id}/runtime/steer",
+    "transport": "http"
+  },
+  {
+    "method": "POST",
+    "path": "/api/v2/sessions/{session_id}/runtime/commands",
+    "transport": "http"
+  },
+  {
+    "method": "POST",
+    "path": "/api/v2/sessions/{session_id}/sync",
+    "transport": "http"
+  },
+  {
+    "method": "POST",
+    "path": "/api/v2/sessions/{session_id}/takeover",
+    "transport": "http"
+  },
+  {
+    "method": "DELETE",
+    "path": "/api/v2/sessions/{session_id}/takeover",
+    "transport": "http"
+  },
+  {
+    "method": "POST",
+    "path": "/api/v2/sessions/{session_id}/shares",
+    "transport": "http"
+  },
+  {
+    "method": "GET",
+    "path": "/api/v2/public/shares/{share_id}",
+    "transport": "http"
+  },
+  {
+    "method": "GET",
+    "path": "/api/v2/sessions/{session_id}/skill-runs",
+    "transport": "http"
+  },
+  {
+    "method": "GET",
+    "path": "/api/v2/sessions/{session_id}/office-plans",
+    "transport": "http"
+  },
+  {
+    "method": "GET",
+    "path": "/api/v2/sessions/{session_id}/agent-evidence",
+    "transport": "http"
+  },
+  {
+    "method": "GET",
+    "path": "/api/v2/admin/agents/{agent_id}/readiness",
+    "transport": "http"
+  },
+  {
+    "method": "PUT",
+    "path": "/api/v2/admin/agents/{agent_id}",
+    "transport": "http"
+  },
+  {
+    "method": "DELETE",
+    "path": "/api/v2/admin/agents/{agent_id}",
+    "transport": "http"
+  },
+  {
+    "method": "GET",
+    "path": "/api/v2/admin/agents/assets/{asset_id}/preview",
+    "transport": "http"
+  },
+  {
+    "method": "GET",
+    "path": "/api/v2/admin/agents/assets/{asset_id}/download",
+    "transport": "http"
+  },
+  {
+    "method": "GET",
+    "path": "/api/v2/sessions/{session_id}/agent-artifacts",
+    "transport": "http"
+  },
+  {
+    "method": "PUT",
+    "path": "/api/v2/admin/extensions/{source_id}",
+    "transport": "http"
+  },
+  {
+    "method": "POST",
+    "path": "/api/v2/admin/extensions/{source_id}/check",
+    "transport": "http"
+  },
+  {
+    "method": "POST",
+    "path": "/api/v2/admin/skills/{resource_id}/publish",
+    "transport": "http"
+  },
+  {
+    "method": "GET",
+    "path": "/api/v2/admin/knowledge-bases/{resource_id}/versions",
+    "transport": "http"
+  },
+  {
+    "method": "POST",
+    "path": "/api/v2/admin/knowledge-bases/{resource_id}/restore",
+    "transport": "http"
+  },
+  {
+    "method": "GET",
+    "path": "/api/v2/admin/skills/{resource_id}/versions",
+    "transport": "http"
+  },
+  {
+    "method": "POST",
+    "path": "/api/v2/admin/skills/{resource_id}/restore",
+    "transport": "http"
+  },
+  {
+    "method": "GET",
+    "path": "/api/v2/admin/tools/{resource_id}/versions",
+    "transport": "http"
+  },
+  {
+    "method": "POST",
+    "path": "/api/v2/admin/tools/{resource_id}/restore",
+    "transport": "http"
+  },
+  {
+    "method": "PUT",
+    "path": "/api/v2/admin/knowledge-bases/{resource_id}",
+    "transport": "http"
+  },
+  {
+    "method": "PUT",
+    "path": "/api/v2/admin/skills/{resource_id}",
+    "transport": "http"
+  },
+  {
+    "method": "PUT",
+    "path": "/api/v2/admin/tools/{resource_id}",
+    "transport": "http"
+  },
+  {
+    "method": "DELETE",
+    "path": "/api/v2/admin/knowledge-bases/{resource_id}",
+    "transport": "http"
+  },
+  {
+    "method": "DELETE",
+    "path": "/api/v2/admin/skills/{resource_id}",
+    "transport": "http"
+  },
+  {
+    "method": "DELETE",
+    "path": "/api/v2/admin/tools/{resource_id}",
+    "transport": "http"
+  },
+  {
+    "method": "POST",
+    "path": "/api/v2/admin/knowledge-bases/{resource_id}/index",
+    "transport": "http"
+  },
+  {
+    "method": "GET",
+    "path": "/api/v2/admin/knowledge-bases/{resource_id}/index",
+    "transport": "http"
+  },
+  {
+    "method": "POST",
+    "path": "/api/v2/admin/knowledge-bases/{resource_id}/search",
+    "transport": "http"
+  },
+  {
+    "method": "POST",
+    "path": "/api/v2/sessions/{session_id}/attachments",
+    "transport": "http"
+  },
+  {
+    "method": "POST",
+    "path": "/api/v2/sessions/{session_id}/attachments/from-file",
+    "transport": "http"
+  },
+  {
+    "method": "POST",
+    "path": "/api/v2/connectors/{connector_id}/fs/list",
+    "transport": "http"
+  },
+  {
+    "method": "POST",
+    "path": "/api/v2/connectors/{connector_id}/fs/readText",
+    "transport": "http"
+  },
+  {
+    "method": "POST",
+    "path": "/api/v2/connectors/{connector_id}/fs/write",
+    "transport": "http"
+  },
+  {
+    "method": "POST",
+    "path": "/api/v2/connectors/{connector_id}/fs/read",
+    "transport": "http"
+  },
+  {
+    "method": "POST",
+    "path": "/api/v2/connectors/{connector_id}/fs/preview-token",
+    "transport": "http"
+  },
+  {
+    "method": "PUT",
+    "path": "/api/v2/connector/fs/transfers/{transfer_id}",
+    "transport": "http"
+  },
+  {
+    "method": "GET",
+    "path": "/api/v2/connectors/{target_id}/terminals",
+    "transport": "http"
+  },
+  {
+    "method": "POST",
+    "path": "/api/v2/connectors/{target_id}/terminals",
+    "transport": "http"
+  },
+  {
+    "method": "GET",
+    "path": "/api/v2/connectors/{target_id}/terminals-v2",
+    "transport": "http"
+  },
+  {
+    "method": "POST",
+    "path": "/api/v2/connectors/{target_id}/terminals-v2",
+    "transport": "http"
+  },
+  {
+    "method": "GET",
+    "path": "/api/v2/sessions/{target_id}/terminals",
+    "transport": "http"
+  },
+  {
+    "method": "POST",
+    "path": "/api/v2/sessions/{target_id}/terminals",
+    "transport": "http"
+  },
+  {
+    "method": "POST",
+    "path": "/api/v2/connectors/{connector_id}/shell/exec",
+    "transport": "http"
+  },
+  {
+    "method": "POST",
+    "path": "/api/v2/connectors/{connector_id}/shell/tasks",
+    "transport": "http"
+  },
+  {
+    "method": "GET",
+    "path": "/api/v2/files/uploads/{upload_id}",
+    "transport": "http"
+  },
+  {
+    "method": "POST",
+    "path": "/api/v2/files/uploads/{upload_id}/complete",
+    "transport": "http"
+  },
+  {
+    "method": "POST",
+    "path": "/api/v2/files/uploads/{upload_id}/cancel",
+    "transport": "http"
+  },
+  {
+    "method": "GET",
+    "path": "/api/v2/files/{file_id}",
+    "transport": "http"
+  },
+  {
+    "method": "GET",
+    "path": "/api/v2/files/{file_id}/content",
+    "transport": "http"
+  },
+  {
+    "method": "GET",
+    "path": "/api/v2/files/{file_id}/versions",
+    "transport": "http"
+  },
+  {
+    "method": "POST",
+    "path": "/api/v2/files/{file_id}/trash",
+    "transport": "http"
+  },
+  {
+    "method": "POST",
+    "path": "/api/v2/files/{file_id}/restore",
+    "transport": "http"
+  },
+  {
+    "method": "PATCH",
+    "path": "/api/v2/admin/storage/connections/{connection_id}",
+    "transport": "http"
+  },
+  {
+    "method": "POST",
+    "path": "/api/v2/admin/storage/connections/{connection_id}/check",
+    "transport": "http"
+  },
+  {
+    "method": "POST",
+    "path": "/api/v2/files/{file_id}/migrate",
+    "transport": "http"
+  },
+  {
+    "method": "PATCH",
+    "path": "/api/v2/admin/models/providers/{provider_id}",
+    "transport": "http"
+  },
+  {
+    "method": "DELETE",
+    "path": "/api/v2/admin/models/providers/{provider_id}",
+    "transport": "http"
+  },
+  {
+    "method": "PATCH",
+    "path": "/api/v2/models/personal/providers/{provider_id}",
+    "transport": "http"
+  },
+  {
+    "method": "DELETE",
+    "path": "/api/v2/models/personal/providers/{provider_id}",
+    "transport": "http"
+  },
+  {
+    "method": "POST",
+    "path": "/api/v2/models/personal/providers/{provider_id}/verify",
+    "transport": "http"
+  },
+  {
+    "method": "POST",
+    "path": "/api/v2/models/personal/providers/{provider_id}/validate",
+    "transport": "http"
+  },
+  {
+    "method": "GET",
+    "path": "/api/v2/agents/{runtime}/model-catalog",
+    "transport": "http"
+  },
+  {
+    "method": "GET",
+    "path": "/api/v2/agents/{runtime}/permission-catalog",
+    "transport": "http"
+  },
+  {
+    "method": "PATCH",
+    "path": "/api/v2/admin/models/connections/{id}",
+    "transport": "http"
+  },
+  {
+    "method": "PATCH",
+    "path": "/api/v2/admin/models/configurations/{id}",
+    "transport": "http"
+  },
+  {
+    "method": "PUT",
+    "path": "/api/v2/admin/models/defaults/{capability}",
+    "transport": "http"
+  },
+  {
+    "method": "POST",
+    "path": "/api/v2/admin/models/configurations/{id}/verify",
+    "transport": "http"
+  },
+  {
+    "method": "GET",
+    "path": "/api/v2/models/operations/{id}",
+    "transport": "http"
+  },
+  {
+    "method": "GET",
+    "path": "/api/v2/connectors/{connector_id}/runtimes/{runtime_id}",
+    "transport": "http"
+  },
+  {
+    "method": "PATCH",
+    "path": "/api/v2/connectors/{connector_id}/runtimes/{runtime_id}",
+    "transport": "http"
+  },
+  {
+    "method": "PUT",
+    "path": "/api/v2/connectors/{connector_id}/runtimes/{runtime_id}/config",
+    "transport": "http"
+  },
+  {
+    "method": "PUT",
+    "path": "/api/v2/connectors/{connector_id}/runtimes/{runtime_id}/active",
+    "transport": "http"
+  },
+  {
+    "method": "DELETE",
+    "path": "/api/v2/connectors/{connector_id}/runtimes/{runtime_id}/config",
+    "transport": "http"
+  },
+  {
+    "method": "GET",
+    "path": "/api/v2/connectors/{connector_id}/runtimes/{runtime_id}/capabilities",
+    "transport": "http"
+  },
+  {
+    "method": "GET",
+    "path": "/api/v2/connectors/{connector_id}/runtimes/{runtime_id}/catalogs/model",
+    "transport": "http"
+  },
+  {
+    "method": "GET",
+    "path": "/api/v2/connectors/{connector_id}/runtimes/{runtime_id}/catalogs/permission",
+    "transport": "http"
+  },
+  {
+    "method": "GET",
+    "path": "/api/v2/connectors/{connector_id}/runtimes/{runtime_id}/commands",
+    "transport": "http"
+  },
+  {
+    "method": "POST",
+    "path": "/api/v2/sessions/{session_id}/runtime/notices/{notice_id}/respond",
+    "transport": "http"
+  },
+  {
+    "method": "GET",
+    "path": "/api/v2/sessions/{session_id}/skill-runs/{run_id}",
+    "transport": "http"
+  },
+  {
+    "method": "GET",
+    "path": "/api/v2/sessions/{session_id}/office-plans/{plan_id}",
+    "transport": "http"
+  },
+  {
+    "method": "PUT",
+    "path": "/api/v2/sessions/{session_id}/office-plans/{plan_id}",
+    "transport": "http"
+  },
+  {
+    "method": "GET",
+    "path": "/api/v2/sessions/{session_id}/agent-artifacts/{artifact_id}/preview",
+    "transport": "http"
+  },
+  {
+    "method": "GET",
+    "path": "/api/v2/sessions/{session_id}/agent-evidence/{evidence_id}",
+    "transport": "http"
+  },
+  {
+    "method": "GET",
+    "path": "/api/v2/sessions/{session_id}/attachments/{file_id}",
+    "transport": "http"
+  },
+  {
+    "method": "GET",
+    "path": "/api/v2/sessions/{session_id}/attachments/{file_id}/open",
+    "transport": "http"
+  },
+  {
+    "method": "GET",
+    "path": "/api/v2/sessions/local/{session_id}/{file_id}",
+    "transport": "http"
+  },
+  {
+    "method": "GET",
+    "path": "/api/v2/connector/sessions/{session_id}/attachments/{file_id}/content",
+    "transport": "http"
+  },
+  {
+    "method": "GET",
+    "path": "/api/v2/public/shares/{share_id}/attachments/{file_id}",
+    "transport": "http"
+  },
+  {
+    "method": "GET",
+    "path": "/api/v2/connectors/{connector_id}/fs/transfers/{transfer_id}",
+    "transport": "http"
+  },
+  {
+    "method": "PATCH",
+    "path": "/api/v2/connectors/{target_id}/terminals/{terminal_id}",
+    "transport": "http"
+  },
+  {
+    "method": "DELETE",
+    "path": "/api/v2/connectors/{target_id}/terminals/{terminal_id}",
+    "transport": "http"
+  },
+  {
+    "method": "POST",
+    "path": "/api/v2/connectors/{target_id}/terminals/{terminal_id}/resize",
+    "transport": "http"
+  },
+  {
+    "method": "PATCH",
+    "path": "/api/v2/connectors/{target_id}/terminals-v2/{terminal_id}",
+    "transport": "http"
+  },
+  {
+    "method": "DELETE",
+    "path": "/api/v2/connectors/{target_id}/terminals-v2/{terminal_id}",
+    "transport": "http"
+  },
+  {
+    "method": "POST",
+    "path": "/api/v2/connectors/{target_id}/terminals-v2/{terminal_id}/resize",
+    "transport": "http"
+  },
+  {
+    "method": "PATCH",
+    "path": "/api/v2/connectors/{target_id}/terminals-v2/{terminal_id}/persistence",
+    "transport": "http"
+  },
+  {
+    "method": "POST",
+    "path": "/api/v2/connectors/{target_id}/terminals-v2/{terminal_id}/write",
+    "transport": "http"
+  },
+  {
+    "method": "GET",
+    "path": "/api/v2/connectors/{target_id}/terminals-v2/{terminal_id}/snapshot",
+    "transport": "http"
+  },
+  {
+    "method": "PATCH",
+    "path": "/api/v2/sessions/{target_id}/terminals/{terminal_id}",
+    "transport": "http"
+  },
+  {
+    "method": "DELETE",
+    "path": "/api/v2/sessions/{target_id}/terminals/{terminal_id}",
+    "transport": "http"
+  },
+  {
+    "method": "POST",
+    "path": "/api/v2/sessions/{target_id}/terminals/{terminal_id}/resize",
+    "transport": "http"
+  },
+  {
+    "method": "GET",
+    "path": "/api/v2/connectors/{connector_id}/shell/tasks/{task_id}/wait",
+    "transport": "http"
+  },
+  {
+    "method": "PUT",
+    "path": "/api/v2/files/uploads/{upload_id}/parts/{part}",
+    "transport": "http"
+  },
+  {
+    "method": "POST",
+    "path": "/api/v2/models/{provider_id}/{protocol}/{operation:path}",
+    "transport": "http"
+  },
+  {
+    "method": "POST",
+    "path": "/api/v2/connector/models/{provider_id}/{protocol}/{operation:path}",
+    "transport": "http"
+  },
+  {
+    "method": "GET",
+    "path": "/api/v2/connector/ws",
+    "transport": "websocket"
+  },
+  {
+    "method": "GET",
+    "path": "/api/v2/dashboard/ws",
+    "transport": "websocket"
+  },
+  {
+    "method": "GET",
+    "path": "/api/v2/sessions/{session_id}/ws",
+    "transport": "websocket"
+  },
+  {
+    "method": "GET",
+    "path": "/api/v2/connector/terminals/{terminal_id}/relay",
+    "transport": "websocket"
+  },
+  {
+    "method": "GET",
+    "path": "/api/v2/connectors/{connector_id}/terminals/{terminal_id}/stream",
+    "transport": "websocket"
+  },
+  {
+    "method": "GET",
+    "path": "/api/v2/connectors/{connector_id}/terminals-v2/{terminal_id}/stream",
+    "transport": "websocket"
+  },
+  {
+    "method": "GET",
+    "path": "/api/v2/sessions/{session_id}/terminals/{terminal_id}/stream",
+    "transport": "websocket"
+  }
+]

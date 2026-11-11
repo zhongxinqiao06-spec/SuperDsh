@@ -1,0 +1,121 @@
+{
+  "additionalProperties": false,
+  "description": "首个管理员初始化 DTO，角色由用例固定而非客户端控制。",
+  "properties": {
+    "username": {
+      "default": "",
+      "title": "Username",
+      "type": "string"
+    },
+    "email": {
+      "anyOf": [
+        {
+          "maxLength": 254,
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Email"
+    },
+    "displayName": {
+      "anyOf": [
+        {
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Displayname"
+    },
+    "password": {
+      "anyOf": [
+        {
+          "maxLength": 1024,
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Password"
+    },
+    "passwordVerifier": {
+      "anyOf": [
+        {
+          "maxLength": 100,
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Passwordverifier"
+    },
+    "passwordSalt": {
+      "anyOf": [
+        {
+          "maxLength": 128,
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Passwordsalt"
+    },
+    "roles": {
+      "items": {
+        "type": "string"
+      },
+      "maxItems": 30,
+      "title": "Roles",
+      "type": "array"
+    },
+    "role": {
+      "anyOf": [
+        {
+          "maxLength": 100,
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Role"
+    },
+    "setupToken": {
+      "default": "",
+      "maxLength": 200,
+      "title": "Setuptoken",
+      "type": "string"
+    },
+    "code": {
+      "default": "",
+      "maxLength": 20,
+      "title": "Code",
+      "type": "string"
+    },
+    "clientType": {
+      "default": "browser",
+      "title": "Clienttype",
+      "type": "string"
+    },
+    "clientName": {
+      "default": "Browser",
+      "maxLength": 200,
+      "title": "Clientname",
+      "type": "string"
+    }
+  },
+  "title": "RegisterInput",
+  "type": "object"
+}

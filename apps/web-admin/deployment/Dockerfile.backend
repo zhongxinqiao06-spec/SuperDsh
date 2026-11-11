@@ -1,0 +1,77 @@
+# syntax=docker/dockerfile:1
+ARG NODE_IMAGE
+ARG PYTHON_IMAGE
+FROM ${NODE_IMAGE} AS engine-build
+WORKDIR /app
+ENV ELECTRON_SKIP_BINARY_DOWNLOAD=1 YARN_NETWORK_CONCURRENCY=2 npm_config_jobs=1
+RUN apt-get update && apt-get install -y --no-install-recommends ca-certificates git python3 make g++ pkg-config && rm -rf /var/lib/apt/lists/* && corepack enable
+COPY package.json yarn.lock .yarnrc.yml ./
+COPY .yarn/patches/ ./.yarn/patches/
+COPY patches/ ./patches/
+COPY vendor/ ./vendor/
+COPY apps/admin/package.json ./apps/admin/package.json
+COPY apps/desktop/package.json ./apps/desktop/package.json
+COPY apps/desktop/ui/package.json ./apps/desktop/ui/package.json
+COPY apps/desktop/core/package.json ./apps/desktop/core/package.json
+COPY apps/desktop/plugins/harness/package.json ./apps/desktop/plugins/harness/package.json
+COPY dsh-community-market/package.json ./dsh-community-market/package.json
+COPY dsh-community-fabric/package.json ./dsh-community-fabric/package.json
+RUN --mount=type=cache,target=/root/.yarn/berry/cache corepack yarn install --immutable
+COPY apps/desktop/core/src/contracts/ ./apps/desktop/core/src/contracts/
+COPY apps/desktop/plugins/harness/src/ ./apps/desktop/plugins/harness/src/
+COPY apps/desktop/plugins/harness/tsdown.config.ts ./apps/desktop/plugins/harness/tsdown.config.ts
+COPY apps/desktop/plugins/harness/tsconfig.json ./apps/desktop/plugins/harness/tsconfig.json
+COPY tsconfig.base.json tsconfig.node.json ./
+COPY apps/web-admin/scripts/ ./apps/web-admin/scripts/
+RUN node node_modules/tsdown/dist/run.mjs --config apps/web-admin/scripts/engine-contracts.config.ts && corepack yarn workspace @superdsh/harness build
+COPY upstream.json ./
+COPY apps/web-admin/engine-adapter/ ./apps/web-admin/engine-adapter/
+ARG SOURCE_COMMIT
+ENV WEB_ADMIN_SOURCE_COMMIT=${SOURCE_COMMIT}
+RUN node apps/web-admin/scripts/build-info.ts && node node_modules/tsdown/dist/run.mjs --config apps/web-admin/engine-adapter/tsdown.config.ts
+
+FROM ${PYTHON_IMAGE} AS python-build
+ARG UV_VERSION
+ENV PYTHONPYCACHEPREFIX=/app/.superdsh-work/web-admin-tools/pycache UV_CACHE_DIR=/app/.superdsh-work/web-admin-tools/uv-cache
+RUN pip install --no-cache-dir uv==${UV_VERSION}
+WORKDIR /app/apps/web-admin/backend
+COPY apps/web-admin/backend/pyproject.toml apps/web-admin/backend/uv.lock ./
+ENV UV_PROJECT_ENVIRONMENT=/opt/venv UV_LINK_MODE=copy
+RUN uv sync --frozen --no-dev --no-install-project
+
+FROM ${PYTHON_IMAGE} AS office-fonts
+RUN apt-get update && apt-get install -y --no-install-recommends fonts-noto-cjk python3-fonttools && rm -rf /var/lib/apt/lists/*
+COPY apps/web-admin/deployment/prepare-fonts.py /tmp/prepare-fonts.py
+RUN /usr/bin/python3 /tmp/prepare-fonts.py /usr/share/fonts/opentype/noto /opt/office-fonts && cp /usr/share/doc/fonts-noto-cjk/copyright /opt/office-fonts/LICENSE
+
+FROM ${PYTHON_IMAGE} AS runtime
+RUN apt-get update && apt-get install -y --no-install-recommends ca-certificates git curl openssh-client procps fontconfig fonts-dejavu-core fonts-liberation libreoffice-writer libreoffice-calc libreoffice-impress && rm -rf /var/lib/apt/lists/* && useradd --create-home --uid 1000 webadmin
+COPY --from=office-fonts /opt/office-fonts /usr/local/share/fonts/superdsh-cjk
+RUN fc-cache -f
+WORKDIR /app
+COPY --from=engine-build /usr/local/bin/node /usr/local/bin/node
+COPY --from=engine-build /usr/local/lib/node_modules/npm /usr/local/lib/node_modules/npm
+RUN ln -s /usr/local/lib/node_modules/npm/bin/npm-cli.js /usr/local/bin/npm
+COPY --from=python-build /usr/local/bin/uv /usr/local/bin/uv
+COPY --from=engine-build /app/apps/desktop/plugins/harness/package.json ./apps/desktop/plugins/harness/package.json
+COPY --from=engine-build /app/apps/desktop/plugins/harness/lib/ ./apps/desktop/plugins/harness/lib/
+COPY --from=engine-build /app/apps/desktop/plugins/harness/node_modules/ ./apps/desktop/plugins/harness/node_modules/
+COPY apps/desktop/plugins/harness/cordis.patch.yml apps/desktop/plugins/harness/host.cordis.patch.yml ./apps/desktop/plugins/harness/
+COPY --from=engine-build /app/apps/desktop/package.json ./apps/desktop/package.json
+COPY --from=engine-build /app/package.json /app/upstream.json ./
+COPY --from=engine-build /app/vendor/ ./vendor/
+COPY --from=engine-build /app/patches/ ./patches/
+COPY LICENSE ./LICENSE
+COPY --from=engine-build /app/apps/web-admin/engine-adapter/dist/ ./apps/web-admin/engine-adapter/dist/
+COPY --from=python-build /opt/venv /opt/venv
+COPY apps/web-admin/backend/ ./apps/web-admin/backend/
+COPY apps/web-admin/contracts/ ./apps/web-admin/contracts/
+COPY apps/web-admin/deployment/compatibility-routes.json ./apps/web-admin/deployment/compatibility-routes.json
+COPY --from=engine-build /app/apps/web-admin/backend/resources/build-info.json ./apps/web-admin/backend/resources/build-info.json
+COPY apps/web-admin/deployment/bootstrap.py ./apps/web-admin/deployment/bootstrap.py
+RUN mkdir -p /data/runtime/.superdsh-work/pycache /data/files /data/config && chown -R webadmin:webadmin /data
+ENV PATH=/opt/venv/bin:$PATH PYTHONPATH=/app/apps/web-admin/backend PYTHONPYCACHEPREFIX=/data/runtime/.superdsh-work/pycache UV_CACHE_DIR=/data/runtime/.superdsh-work/uv-cache XDG_CACHE_HOME=/data/runtime/.superdsh-work/cache npm_config_cache=/data/runtime/.superdsh-work/npm-cache WEB_ADMIN_DATA_DIR=/data/runtime WEB_ADMIN_REPOSITORY_ROOT=/app WEB_ADMIN_OFFICE_EXECUTABLE=/usr/bin/libreoffice NODE_ENV=production
+USER webadmin
+EXPOSE 8001
+HEALTHCHECK --interval=15s --timeout=3s --retries=10 CMD curl --fail http://127.0.0.1:8001/api/health/ready || exit 1
+CMD ["python", "apps/web-admin/deployment/bootstrap.py"]

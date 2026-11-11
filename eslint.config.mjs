@@ -2,6 +2,7 @@ import js from '@eslint/js'
 import globals from 'globals'
 import tseslint from 'typescript-eslint'
 import reactHooks from 'eslint-plugin-react-hooks'
+import vue from 'eslint-plugin-vue'
 import { adminBrowserBoundary } from './scripts/eslint-admin-boundaries.mjs'
 
 export default tseslint.config(
@@ -32,6 +33,22 @@ export default tseslint.config(
   },
   js.configs.recommended,
   ...tseslint.configs.recommended,
+  ...vue.configs['flat/recommended'],
+  {
+    files: ['apps/web-admin/fronted/**/*.vue'],
+    languageOptions: {
+      parserOptions: { parser: tseslint.parser, extraFileExtensions: ['.vue'] },
+    },
+    rules: {
+      'vue/html-self-closing': 'off',
+      'vue/max-attributes-per-line': 'off',
+      'vue/singleline-html-element-content-newline': 'off',
+      'vue/multiline-html-element-content-newline': 'off',
+      'vue/html-indent': 'off',
+      'vue/html-closing-bracket-newline': 'off',
+      'vue/first-attribute-linebreak': 'off',
+    },
+  },
   {
     languageOptions: { globals: { ...globals.node, ...globals.browser } },
     rules: {
@@ -60,6 +77,20 @@ export default tseslint.config(
   {
     files: ['**/*.{ts,tsx}'],
     rules: { 'no-undef': 'off' },
+  },
+  {
+    files: ['apps/web-admin/**/*.{ts,vue}', 'scripts/web-admin.ts'],
+    rules: {
+      '@typescript-eslint/no-explicit-any': 'error',
+      '@typescript-eslint/no-unused-vars': [
+        'error',
+        {
+          argsIgnorePattern: '^_',
+          varsIgnorePattern: '^_',
+          caughtErrors: 'none',
+        },
+      ],
+    },
   },
   {
     files: ['apps/admin/src/**/*.{ts,tsx}'],

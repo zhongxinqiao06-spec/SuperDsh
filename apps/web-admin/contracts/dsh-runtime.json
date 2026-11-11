@@ -1,0 +1,9 @@
+{
+  "runtime": "dsh",
+  "jsonrpc": "2.0",
+  "protocolVersion": "1.0",
+  "endpointVersion": 1,
+  "projectionVersion": 2,
+  "checkpointVersion": 1,
+  "inputRequestSchemaVersion": 1
+}

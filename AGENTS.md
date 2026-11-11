@@ -14,6 +14,12 @@
 - The migrated AA apps are owned source; the former server app is now the Node port under `apps/admin/server`. `yarn sources:prepare` applies the pinned AA sparse checkout that physically excludes `web-next`, `server`, and `android`; do not restore old paths or create forwarding links. Import provenance is in `vendor/agents-anywhere/apps-source.json`. Shared AA protocol fixtures remain read-only under its `contracts` directory.
 - Retired desktop source is not an active workspace or fallback command. The pre-refactor source snapshot is under `.superdsh-work`; never depend on retired files.
 
+## New Web Admin implementation
+
+- `apps/web-admin/fronted` and `apps/web-admin/backend` are the planned Vue3/TypeScript and Python/FastAPI implementation. Follow [Web Admin development rules](apps/web-admin/AGENTS.md) and the three plans under `docs/plans/web-admin-*`. Keep `apps/admin`, its existing worktree changes, old commands and default deployment intact.
+- New business routes are unversioned. Preserve existing clients through one declarative ingress compatibility mapping, not versioned business handlers. Read release and runtime versions from authoritative metadata; preserve locked dependencies and required protocol identifiers.
+- Separate folders by domain and responsibility, add meaningful Chinese comments to owned public contracts and complex logic, and enforce robustness requirements. Keep all new tests in `apps/web-admin/tests` and generated validation artifacts under `.superdsh-work/web-admin-validation`, outside production code and runtime images.
+
 ## Runtime boundaries
 
 - Preserve Electron main, sandboxed preload, product renderer, compatibility renderer and backend process isolation. A failed required engine exposes diagnostics/retry/recovery, not business UI.

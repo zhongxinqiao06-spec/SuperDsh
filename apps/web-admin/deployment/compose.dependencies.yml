@@ -1,0 +1,81 @@
+name: superdsh-web-admin-dev
+services:
+  postgres:
+    image: ${WEB_ADMIN_IMAGE_POSTGRES:?Use web-admin command}
+    # Docker 重启后恢复已启用的开发数据库，手动停止的容器保持停止。
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: web_admin
+      POSTGRES_USER: web_admin
+      POSTGRES_PASSWORD: ${WEB_ADMIN_POSTGRES_PASSWORD:?Missing generated configuration}
+    ports: ['127.0.0.1:${WEB_ADMIN_POSTGRES_PORT}:5432']
+    volumes: [postgres-data:/var/lib/postgresql/data]
+    healthcheck:
+      test: [CMD-SHELL, 'pg_isready -U web_admin -d web_admin']
+      interval: 3s
+      timeout: 3s
+      retries: 20
+  redis:
+    image: ${WEB_ADMIN_IMAGE_REDIS:?Use web-admin command}
+    # 缓存与数据库采用相同恢复策略，不自动启动可选中间件。
+    restart: unless-stopped
+    command:
+      [
+        redis-server,
+        --appendonly,
+        'yes',
+        --requirepass,
+        '${WEB_ADMIN_REDIS_PASSWORD}',
+      ]
+    ports: ['127.0.0.1:${WEB_ADMIN_REDIS_PORT}:6379']
+    volumes: [redis-data:/data]
+    healthcheck:
+      test: [CMD, redis-cli, -a, '${WEB_ADMIN_REDIS_PASSWORD}', ping]
+      interval: 3s
+      timeout: 3s
+      retries: 20
+  qdrant:
+    image: ${WEB_ADMIN_IMAGE_QDRANT:?Use web-admin command}
+    environment:
+      QDRANT__SERVICE__API_KEY: ${WEB_ADMIN_QDRANT_API_KEY}
+    ports: ['127.0.0.1:${WEB_ADMIN_QDRANT_PORT}:6333']
+    volumes: [qdrant-data:/qdrant/storage]
+  minio:
+    image: ${WEB_ADMIN_IMAGE_MINIO:?Use web-admin command}
+    build:
+      context: ./minio
+      args:
+        GO_IMAGE: ${WEB_ADMIN_IMAGE_GO}
+        ALPINE_IMAGE: ${WEB_ADMIN_IMAGE_ALPINE}
+        MINIO_SOURCE: ${WEB_ADMIN_MINIO_SOURCE}
+        MINIO_SHA256: ${WEB_ADMIN_MINIO_SHA256}
+        MC_SOURCE: ${WEB_ADMIN_MC_SOURCE}
+        MC_SHA256: ${WEB_ADMIN_MC_SHA256}
+    command: [server, /data]
+    environment:
+      MINIO_ROOT_USER: web-admin
+      MINIO_ROOT_PASSWORD: ${WEB_ADMIN_MINIO_PASSWORD}
+    ports: ['127.0.0.1:${WEB_ADMIN_MINIO_PORT}:9000']
+    volumes: [minio-data:/data]
+    healthcheck:
+      test:
+        [CMD, wget, -q, --spider, 'http://127.0.0.1:9000/minio/health/ready']
+      interval: 3s
+      timeout: 3s
+      retries: 30
+  minio-init:
+    image: ${WEB_ADMIN_IMAGE_MINIO:?Use web-admin command}
+    pull_policy: never
+    entrypoint: ['/usr/local/bin/web-admin-minio-init']
+    environment:
+      MINIO_ROOT_USER: web-admin
+      MINIO_ROOT_PASSWORD: ${WEB_ADMIN_MINIO_PASSWORD}
+      WEB_ADMIN_STORAGE_BUCKET: ${WEB_ADMIN_STORAGE_BUCKET}
+    depends_on:
+      minio: { condition: service_healthy }
+    restart: 'no'
+volumes:
+  postgres-data:
+  redis-data:
+  qdrant-data:
+  minio-data:

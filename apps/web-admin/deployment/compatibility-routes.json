@@ -1,0 +1,2027 @@
+{
+  "schemaVersion": 1,
+  "cookies": {
+    "refresh": {
+      "name": "superdsh_refresh",
+      "canonicalPath": "/api/auth",
+      "legacyPath": "/api/v2/auth"
+    },
+    "oauthState": {
+      "name": "superdsh_oauth_state",
+      "canonicalPath": "/api/auth/oauth",
+      "legacyPath": "/api/v2/auth/oauth"
+    }
+  },
+  "routes": [
+    {
+      "method": "GET",
+      "transport": "http",
+      "legacy": "/api/v2/.well-known/oauth-authorization-server",
+      "canonical": "/api/.well-known/oauth-authorization-server"
+    },
+    {
+      "method": "GET",
+      "transport": "http",
+      "legacy": "/api/v2/admin/agents",
+      "canonical": "/api/admin/agents"
+    },
+    {
+      "method": "POST",
+      "transport": "http",
+      "legacy": "/api/v2/admin/agents",
+      "canonical": "/api/admin/agents"
+    },
+    {
+      "method": "POST",
+      "transport": "http",
+      "legacy": "/api/v2/admin/agents/assets",
+      "canonical": "/api/admin/agents/assets"
+    },
+    {
+      "method": "GET",
+      "transport": "http",
+      "legacy": "/api/v2/admin/agents/assets/{asset_id}/download",
+      "canonical": "/api/admin/agents/assets/{asset_id}/download"
+    },
+    {
+      "method": "GET",
+      "transport": "http",
+      "legacy": "/api/v2/admin/agents/assets/{asset_id}/preview",
+      "canonical": "/api/admin/agents/assets/{asset_id}/preview"
+    },
+    {
+      "method": "GET",
+      "transport": "http",
+      "legacy": "/api/v2/admin/agents/catalog",
+      "canonical": "/api/admin/agents/catalog"
+    },
+    {
+      "method": "POST",
+      "transport": "http",
+      "legacy": "/api/v2/admin/agents/initialize",
+      "canonical": "/api/admin/agents/initialize"
+    },
+    {
+      "method": "DELETE",
+      "transport": "http",
+      "legacy": "/api/v2/admin/agents/{agent_id}",
+      "canonical": "/api/admin/agents/{agent_id}"
+    },
+    {
+      "method": "PUT",
+      "transport": "http",
+      "legacy": "/api/v2/admin/agents/{agent_id}",
+      "canonical": "/api/admin/agents/{agent_id}"
+    },
+    {
+      "method": "GET",
+      "transport": "http",
+      "legacy": "/api/v2/admin/agents/{agent_id}/readiness",
+      "canonical": "/api/admin/agents/{agent_id}/readiness"
+    },
+    {
+      "method": "GET",
+      "transport": "http",
+      "legacy": "/api/v2/admin/announcement",
+      "canonical": "/api/admin/announcement"
+    },
+    {
+      "method": "PUT",
+      "transport": "http",
+      "legacy": "/api/v2/admin/announcement",
+      "canonical": "/api/admin/announcement"
+    },
+    {
+      "method": "GET",
+      "transport": "http",
+      "legacy": "/api/v2/admin/audit",
+      "canonical": "/api/admin/audit"
+    },
+    {
+      "method": "GET",
+      "transport": "http",
+      "legacy": "/api/v2/admin/dashboard/overview",
+      "canonical": "/api/admin/dashboard/overview"
+    },
+    {
+      "method": "GET",
+      "transport": "http",
+      "legacy": "/api/v2/admin/dashboard/settings",
+      "canonical": "/api/admin/dashboard/settings"
+    },
+    {
+      "method": "PATCH",
+      "transport": "http",
+      "legacy": "/api/v2/admin/dashboard/settings",
+      "canonical": "/api/admin/dashboard/settings"
+    },
+    {
+      "method": "POST",
+      "transport": "http",
+      "legacy": "/api/v2/admin/dashboard/snapshots/today",
+      "canonical": "/api/admin/dashboard/snapshots/today"
+    },
+    {
+      "method": "POST",
+      "transport": "http",
+      "legacy": "/api/v2/admin/dashboard/snapshots/{target_date}",
+      "canonical": "/api/admin/dashboard/snapshots/{target_date}"
+    },
+    {
+      "method": "GET",
+      "transport": "http",
+      "legacy": "/api/v2/admin/devices",
+      "canonical": "/api/admin/devices"
+    },
+    {
+      "method": "POST",
+      "transport": "http",
+      "legacy": "/api/v2/admin/devices/{connector_id}/block",
+      "canonical": "/api/admin/devices/{connector_id}/block"
+    },
+    {
+      "method": "POST",
+      "transport": "http",
+      "legacy": "/api/v2/admin/devices/{connector_id}/resume",
+      "canonical": "/api/admin/devices/{connector_id}/resume"
+    },
+    {
+      "method": "GET",
+      "transport": "http",
+      "legacy": "/api/v2/admin/extensions",
+      "canonical": "/api/admin/extensions"
+    },
+    {
+      "method": "POST",
+      "transport": "http",
+      "legacy": "/api/v2/admin/extensions/install",
+      "canonical": "/api/admin/extensions/install"
+    },
+    {
+      "method": "POST",
+      "transport": "http",
+      "legacy": "/api/v2/admin/extensions/mcp",
+      "canonical": "/api/admin/extensions/mcp"
+    },
+    {
+      "method": "POST",
+      "transport": "http",
+      "legacy": "/api/v2/admin/extensions/mcp/discover",
+      "canonical": "/api/admin/extensions/mcp/discover"
+    },
+    {
+      "method": "PUT",
+      "transport": "http",
+      "legacy": "/api/v2/admin/extensions/{identifier}",
+      "canonical": "/api/admin/extensions/{identifier}"
+    },
+    {
+      "method": "POST",
+      "transport": "http",
+      "legacy": "/api/v2/admin/extensions/{identifier}/check",
+      "canonical": "/api/admin/extensions/{identifier}/check"
+    },
+    {
+      "method": "GET",
+      "transport": "http",
+      "legacy": "/api/v2/admin/knowledge-bases",
+      "canonical": "/api/admin/knowledge-bases"
+    },
+    {
+      "method": "POST",
+      "transport": "http",
+      "legacy": "/api/v2/admin/knowledge-bases",
+      "canonical": "/api/admin/knowledge-bases"
+    },
+    {
+      "method": "GET",
+      "transport": "http",
+      "legacy": "/api/v2/admin/knowledge-bases/search-status",
+      "canonical": "/api/admin/knowledge-bases/search-status"
+    },
+    {
+      "method": "DELETE",
+      "transport": "http",
+      "legacy": "/api/v2/admin/knowledge-bases/{identifier}",
+      "canonical": "/api/admin/knowledge-bases/{identifier}"
+    },
+    {
+      "method": "PUT",
+      "transport": "http",
+      "legacy": "/api/v2/admin/knowledge-bases/{identifier}",
+      "canonical": "/api/admin/knowledge-bases/{identifier}"
+    },
+    {
+      "method": "GET",
+      "transport": "http",
+      "legacy": "/api/v2/admin/knowledge-bases/{identifier}/index",
+      "canonical": "/api/admin/knowledge-bases/{identifier}/index"
+    },
+    {
+      "method": "POST",
+      "transport": "http",
+      "legacy": "/api/v2/admin/knowledge-bases/{identifier}/index",
+      "canonical": "/api/admin/knowledge-bases/{identifier}/index"
+    },
+    {
+      "method": "POST",
+      "transport": "http",
+      "legacy": "/api/v2/admin/knowledge-bases/{identifier}/restore",
+      "canonical": "/api/admin/knowledge-bases/{identifier}/restore"
+    },
+    {
+      "method": "POST",
+      "transport": "http",
+      "legacy": "/api/v2/admin/knowledge-bases/{identifier}/search",
+      "canonical": "/api/admin/knowledge-bases/{identifier}/search"
+    },
+    {
+      "method": "GET",
+      "transport": "http",
+      "legacy": "/api/v2/admin/knowledge-bases/{identifier}/versions",
+      "canonical": "/api/admin/knowledge-bases/{identifier}/versions"
+    },
+    {
+      "method": "GET",
+      "transport": "http",
+      "legacy": "/api/v2/admin/knowledge-embedding",
+      "canonical": "/api/admin/knowledge-embedding"
+    },
+    {
+      "method": "PUT",
+      "transport": "http",
+      "legacy": "/api/v2/admin/knowledge-embedding",
+      "canonical": "/api/admin/knowledge-embedding"
+    },
+    {
+      "method": "POST",
+      "transport": "http",
+      "legacy": "/api/v2/admin/knowledge-embedding/prepare-local",
+      "canonical": "/api/admin/knowledge-embedding/prepare-local"
+    },
+    {
+      "method": "GET",
+      "transport": "http",
+      "legacy": "/api/v2/admin/menus",
+      "canonical": "/api/admin/menus"
+    },
+    {
+      "method": "PUT",
+      "transport": "http",
+      "legacy": "/api/v2/admin/menus",
+      "canonical": "/api/admin/menus"
+    },
+    {
+      "method": "POST",
+      "transport": "http",
+      "legacy": "/api/v2/admin/menus/reset",
+      "canonical": "/api/admin/menus/reset"
+    },
+    {
+      "method": "GET",
+      "transport": "http",
+      "legacy": "/api/v2/admin/models/configurations",
+      "canonical": "/api/admin/models/configurations"
+    },
+    {
+      "method": "POST",
+      "transport": "http",
+      "legacy": "/api/v2/admin/models/configurations",
+      "canonical": "/api/admin/models/configurations"
+    },
+    {
+      "method": "PATCH",
+      "transport": "http",
+      "legacy": "/api/v2/admin/models/configurations/{identifier}",
+      "canonical": "/api/admin/models/configurations/{identifier}"
+    },
+    {
+      "method": "POST",
+      "transport": "http",
+      "legacy": "/api/v2/admin/models/configurations/{identifier}/verify",
+      "canonical": "/api/admin/models/configurations/{identifier}/verify"
+    },
+    {
+      "method": "POST",
+      "transport": "http",
+      "legacy": "/api/v2/admin/models/connections",
+      "canonical": "/api/admin/models/connections"
+    },
+    {
+      "method": "PATCH",
+      "transport": "http",
+      "legacy": "/api/v2/admin/models/connections/{identifier}",
+      "canonical": "/api/admin/models/connections/{identifier}"
+    },
+    {
+      "method": "GET",
+      "transport": "http",
+      "legacy": "/api/v2/admin/models/default",
+      "canonical": "/api/admin/models/default"
+    },
+    {
+      "method": "PUT",
+      "transport": "http",
+      "legacy": "/api/v2/admin/models/default",
+      "canonical": "/api/admin/models/default"
+    },
+    {
+      "method": "PUT",
+      "transport": "http",
+      "legacy": "/api/v2/admin/models/defaults/{capability}",
+      "canonical": "/api/admin/models/defaults/{capability}"
+    },
+    {
+      "method": "GET",
+      "transport": "http",
+      "legacy": "/api/v2/admin/models/providers",
+      "canonical": "/api/admin/models/providers"
+    },
+    {
+      "method": "POST",
+      "transport": "http",
+      "legacy": "/api/v2/admin/models/providers",
+      "canonical": "/api/admin/models/providers"
+    },
+    {
+      "method": "DELETE",
+      "transport": "http",
+      "legacy": "/api/v2/admin/models/providers/{provider_id}",
+      "canonical": "/api/admin/models/providers/{provider_id}"
+    },
+    {
+      "method": "PATCH",
+      "transport": "http",
+      "legacy": "/api/v2/admin/models/providers/{provider_id}",
+      "canonical": "/api/admin/models/providers/{provider_id}"
+    },
+    {
+      "method": "POST",
+      "transport": "http",
+      "legacy": "/api/v2/admin/models/providers/{provider_id}/validate",
+      "canonical": "/api/admin/models/providers/{provider_id}/validate"
+    },
+    {
+      "method": "POST",
+      "transport": "http",
+      "legacy": "/api/v2/admin/models/providers/{provider_id}/verify",
+      "canonical": "/api/admin/models/providers/{provider_id}/verify"
+    },
+    {
+      "method": "GET",
+      "transport": "http",
+      "legacy": "/api/v2/admin/roles",
+      "canonical": "/api/admin/roles"
+    },
+    {
+      "method": "POST",
+      "transport": "http",
+      "legacy": "/api/v2/admin/roles",
+      "canonical": "/api/admin/roles"
+    },
+    {
+      "method": "DELETE",
+      "transport": "http",
+      "legacy": "/api/v2/admin/roles/{role_id}",
+      "canonical": "/api/admin/roles/{role_id}"
+    },
+    {
+      "method": "PATCH",
+      "transport": "http",
+      "legacy": "/api/v2/admin/roles/{role_id}",
+      "canonical": "/api/admin/roles/{role_id}"
+    },
+    {
+      "method": "GET",
+      "transport": "http",
+      "legacy": "/api/v2/admin/service",
+      "canonical": "/api/admin/service"
+    },
+    {
+      "method": "GET",
+      "transport": "http",
+      "legacy": "/api/v2/admin/settings",
+      "canonical": "/api/admin/settings"
+    },
+    {
+      "method": "PATCH",
+      "transport": "http",
+      "legacy": "/api/v2/admin/settings",
+      "canonical": "/api/admin/settings"
+    },
+    {
+      "method": "GET",
+      "transport": "http",
+      "legacy": "/api/v2/admin/skills",
+      "canonical": "/api/admin/skills"
+    },
+    {
+      "method": "POST",
+      "transport": "http",
+      "legacy": "/api/v2/admin/skills",
+      "canonical": "/api/admin/skills"
+    },
+    {
+      "method": "POST",
+      "transport": "http",
+      "legacy": "/api/v2/admin/skills/import",
+      "canonical": "/api/admin/skills/import"
+    },
+    {
+      "method": "POST",
+      "transport": "http",
+      "legacy": "/api/v2/admin/skills/import-extension",
+      "canonical": "/api/admin/skills/import-extension"
+    },
+    {
+      "method": "POST",
+      "transport": "http",
+      "legacy": "/api/v2/admin/skills/match-preview",
+      "canonical": "/api/admin/skills/match-preview"
+    },
+    {
+      "method": "DELETE",
+      "transport": "http",
+      "legacy": "/api/v2/admin/skills/{identifier}",
+      "canonical": "/api/admin/skills/{identifier}"
+    },
+    {
+      "method": "PUT",
+      "transport": "http",
+      "legacy": "/api/v2/admin/skills/{identifier}",
+      "canonical": "/api/admin/skills/{identifier}"
+    },
+    {
+      "method": "POST",
+      "transport": "http",
+      "legacy": "/api/v2/admin/skills/{identifier}/publish",
+      "canonical": "/api/admin/skills/{identifier}/publish"
+    },
+    {
+      "method": "POST",
+      "transport": "http",
+      "legacy": "/api/v2/admin/skills/{identifier}/restore",
+      "canonical": "/api/admin/skills/{identifier}/restore"
+    },
+    {
+      "method": "GET",
+      "transport": "http",
+      "legacy": "/api/v2/admin/skills/{identifier}/versions",
+      "canonical": "/api/admin/skills/{identifier}/versions"
+    },
+    {
+      "method": "GET",
+      "transport": "http",
+      "legacy": "/api/v2/admin/storage",
+      "canonical": "/api/admin/storage"
+    },
+    {
+      "method": "PUT",
+      "transport": "http",
+      "legacy": "/api/v2/admin/storage",
+      "canonical": "/api/admin/storage"
+    },
+    {
+      "method": "POST",
+      "transport": "http",
+      "legacy": "/api/v2/admin/storage/cleanup",
+      "canonical": "/api/admin/storage/cleanup"
+    },
+    {
+      "method": "POST",
+      "transport": "http",
+      "legacy": "/api/v2/admin/storage/connections",
+      "canonical": "/api/admin/storage/connections"
+    },
+    {
+      "method": "PATCH",
+      "transport": "http",
+      "legacy": "/api/v2/admin/storage/connections/{connection_id}",
+      "canonical": "/api/admin/storage/connections/{connection_id}"
+    },
+    {
+      "method": "POST",
+      "transport": "http",
+      "legacy": "/api/v2/admin/storage/connections/{connection_id}/check",
+      "canonical": "/api/admin/storage/connections/{connection_id}/check"
+    },
+    {
+      "method": "GET",
+      "transport": "http",
+      "legacy": "/api/v2/admin/storage/migrations",
+      "canonical": "/api/admin/storage/migrations"
+    },
+    {
+      "method": "GET",
+      "transport": "http",
+      "legacy": "/api/v2/admin/storage/usage",
+      "canonical": "/api/admin/storage/usage"
+    },
+    {
+      "method": "GET",
+      "transport": "http",
+      "legacy": "/api/v2/admin/tools",
+      "canonical": "/api/admin/tools"
+    },
+    {
+      "method": "POST",
+      "transport": "http",
+      "legacy": "/api/v2/admin/tools",
+      "canonical": "/api/admin/tools"
+    },
+    {
+      "method": "DELETE",
+      "transport": "http",
+      "legacy": "/api/v2/admin/tools/{identifier}",
+      "canonical": "/api/admin/tools/{identifier}"
+    },
+    {
+      "method": "PUT",
+      "transport": "http",
+      "legacy": "/api/v2/admin/tools/{identifier}",
+      "canonical": "/api/admin/tools/{identifier}"
+    },
+    {
+      "method": "POST",
+      "transport": "http",
+      "legacy": "/api/v2/admin/tools/{identifier}/restore",
+      "canonical": "/api/admin/tools/{identifier}/restore"
+    },
+    {
+      "method": "GET",
+      "transport": "http",
+      "legacy": "/api/v2/admin/tools/{identifier}/versions",
+      "canonical": "/api/admin/tools/{identifier}/versions"
+    },
+    {
+      "method": "GET",
+      "transport": "http",
+      "legacy": "/api/v2/admin/users",
+      "canonical": "/api/admin/users"
+    },
+    {
+      "method": "POST",
+      "transport": "http",
+      "legacy": "/api/v2/admin/users",
+      "canonical": "/api/admin/users"
+    },
+    {
+      "method": "DELETE",
+      "transport": "http",
+      "legacy": "/api/v2/admin/users/{user_id}",
+      "canonical": "/api/admin/users/{user_id}"
+    },
+    {
+      "method": "PATCH",
+      "transport": "http",
+      "legacy": "/api/v2/admin/users/{user_id}",
+      "canonical": "/api/admin/users/{user_id}"
+    },
+    {
+      "method": "POST",
+      "transport": "http",
+      "legacy": "/api/v2/admin/users/{user_id}/password-reset",
+      "canonical": "/api/admin/users/{user_id}/password-reset"
+    },
+    {
+      "method": "POST",
+      "transport": "http",
+      "legacy": "/api/v2/admin/users/{user_id}/restore",
+      "canonical": "/api/admin/users/{user_id}/restore"
+    },
+    {
+      "method": "GET",
+      "transport": "http",
+      "legacy": "/api/v2/agents",
+      "canonical": "/api/agents"
+    },
+    {
+      "method": "GET",
+      "transport": "http",
+      "legacy": "/api/v2/agents/{runtime}/model-catalog",
+      "canonical": "/api/agents/{runtime}/model-catalog"
+    },
+    {
+      "method": "GET",
+      "transport": "http",
+      "legacy": "/api/v2/agents/{runtime}/permission-catalog",
+      "canonical": "/api/agents/{runtime}/permission-catalog"
+    },
+    {
+      "method": "GET",
+      "transport": "http",
+      "legacy": "/api/v2/announcement",
+      "canonical": "/api/announcement"
+    },
+    {
+      "method": "POST",
+      "transport": "http",
+      "legacy": "/api/v2/auth/change-password",
+      "canonical": "/api/auth/change-password"
+    },
+    {
+      "method": "GET",
+      "transport": "http",
+      "legacy": "/api/v2/auth/config",
+      "canonical": "/api/auth/config"
+    },
+    {
+      "method": "POST",
+      "transport": "http",
+      "legacy": "/api/v2/auth/email-code",
+      "canonical": "/api/auth/email-code"
+    },
+    {
+      "method": "POST",
+      "transport": "http",
+      "legacy": "/api/v2/auth/login",
+      "canonical": "/api/auth/login"
+    },
+    {
+      "method": "POST",
+      "transport": "http",
+      "legacy": "/api/v2/auth/logout",
+      "canonical": "/api/auth/logout"
+    },
+    {
+      "method": "POST",
+      "transport": "http",
+      "legacy": "/api/v2/auth/logout-all",
+      "canonical": "/api/auth/logout-all"
+    },
+    {
+      "method": "GET",
+      "transport": "http",
+      "legacy": "/api/v2/auth/me",
+      "canonical": "/api/auth/me"
+    },
+    {
+      "method": "DELETE",
+      "transport": "http",
+      "legacy": "/api/v2/auth/me/avatar",
+      "canonical": "/api/auth/me/avatar"
+    },
+    {
+      "method": "PUT",
+      "transport": "http",
+      "legacy": "/api/v2/auth/me/avatar",
+      "canonical": "/api/auth/me/avatar"
+    },
+    {
+      "method": "PUT",
+      "transport": "http",
+      "legacy": "/api/v2/auth/me/email",
+      "canonical": "/api/auth/me/email"
+    },
+    {
+      "method": "PUT",
+      "transport": "http",
+      "legacy": "/api/v2/auth/me/profile",
+      "canonical": "/api/auth/me/profile"
+    },
+    {
+      "method": "PUT",
+      "transport": "http",
+      "legacy": "/api/v2/auth/me/username",
+      "canonical": "/api/auth/me/username"
+    },
+    {
+      "method": "POST",
+      "transport": "http",
+      "legacy": "/api/v2/auth/mobile-login/confirm",
+      "canonical": "/api/auth/mobile-login/confirm"
+    },
+    {
+      "method": "POST",
+      "transport": "http",
+      "legacy": "/api/v2/auth/mobile-login/exchange",
+      "canonical": "/api/auth/mobile-login/exchange"
+    },
+    {
+      "method": "POST",
+      "transport": "http",
+      "legacy": "/api/v2/auth/mobile-login/qr",
+      "canonical": "/api/auth/mobile-login/qr"
+    },
+    {
+      "method": "POST",
+      "transport": "http",
+      "legacy": "/api/v2/auth/mobile-login/request",
+      "canonical": "/api/auth/mobile-login/request"
+    },
+    {
+      "method": "POST",
+      "transport": "http",
+      "legacy": "/api/v2/auth/mobile-login/status",
+      "canonical": "/api/auth/mobile-login/status"
+    },
+    {
+      "method": "POST",
+      "transport": "http",
+      "legacy": "/api/v2/auth/mobile-login/{operation}",
+      "canonical": "/api/auth/mobile-login/{operation}"
+    },
+    {
+      "method": "GET",
+      "transport": "http",
+      "legacy": "/api/v2/auth/oauth/callback",
+      "canonical": "/api/auth/oauth/callback"
+    },
+    {
+      "method": "POST",
+      "transport": "http",
+      "legacy": "/api/v2/auth/oauth/finalize",
+      "canonical": "/api/auth/oauth/finalize"
+    },
+    {
+      "method": "GET",
+      "transport": "http",
+      "legacy": "/api/v2/auth/oauth/start",
+      "canonical": "/api/auth/oauth/start"
+    },
+    {
+      "method": "POST",
+      "transport": "http",
+      "legacy": "/api/v2/auth/password-salt",
+      "canonical": "/api/auth/password-salt"
+    },
+    {
+      "method": "POST",
+      "transport": "http",
+      "legacy": "/api/v2/auth/recovery-codes",
+      "canonical": "/api/auth/recovery-codes"
+    },
+    {
+      "method": "POST",
+      "transport": "http",
+      "legacy": "/api/v2/auth/recovery/reset",
+      "canonical": "/api/auth/recovery/reset"
+    },
+    {
+      "method": "POST",
+      "transport": "http",
+      "legacy": "/api/v2/auth/recovery/reset-email",
+      "canonical": "/api/auth/recovery/reset-email"
+    },
+    {
+      "method": "POST",
+      "transport": "http",
+      "legacy": "/api/v2/auth/refresh",
+      "canonical": "/api/auth/refresh"
+    },
+    {
+      "method": "POST",
+      "transport": "http",
+      "legacy": "/api/v2/auth/register",
+      "canonical": "/api/auth/register"
+    },
+    {
+      "method": "GET",
+      "transport": "http",
+      "legacy": "/api/v2/auth/sessions",
+      "canonical": "/api/auth/sessions"
+    },
+    {
+      "method": "DELETE",
+      "transport": "http",
+      "legacy": "/api/v2/auth/sessions/{session_id}",
+      "canonical": "/api/auth/sessions/{session_id}"
+    },
+    {
+      "method": "POST",
+      "transport": "http",
+      "legacy": "/api/v2/connector/auth",
+      "canonical": "/api/connector/auth"
+    },
+    {
+      "method": "PUT",
+      "transport": "http",
+      "legacy": "/api/v2/connector/fs/transfers/{transfer_id}",
+      "canonical": "/api/connector/fs/transfers/{transfer_id}"
+    },
+    {
+      "method": "POST",
+      "transport": "http",
+      "legacy": "/api/v2/connector/ingest",
+      "canonical": "/api/connector/ingest"
+    },
+    {
+      "method": "GET",
+      "transport": "http",
+      "legacy": "/api/v2/connector/models/catalog",
+      "canonical": "/api/connector/models/catalog"
+    },
+    {
+      "method": "POST",
+      "transport": "http",
+      "legacy": "/api/v2/connector/models/{provider_id}/{protocol}/{operation:path}",
+      "canonical": "/api/connector/models/{provider_id}/{protocol}/{operation:path}"
+    },
+    {
+      "method": "GET",
+      "transport": "http",
+      "legacy": "/api/v2/connector/sessions/{session_id}/attachments/{file_id}/content",
+      "canonical": "/api/connector/sessions/{session_id}/attachments/{file_id}/content"
+    },
+    {
+      "method": "WEBSOCKET",
+      "transport": "websocket",
+      "legacy": "/api/v2/connector/terminals/{terminal_id}/relay",
+      "canonical": "/api/connector/terminals/{terminal_id}/relay"
+    },
+    {
+      "method": "WEBSOCKET",
+      "transport": "websocket",
+      "legacy": "/api/v2/connector/ws",
+      "canonical": "/api/connector/ws"
+    },
+    {
+      "method": "GET",
+      "transport": "http",
+      "legacy": "/api/v2/connectors",
+      "canonical": "/api/connectors"
+    },
+    {
+      "method": "POST",
+      "transport": "http",
+      "legacy": "/api/v2/connectors",
+      "canonical": "/api/connectors"
+    },
+    {
+      "method": "POST",
+      "transport": "http",
+      "legacy": "/api/v2/connectors/fs/preview-session",
+      "canonical": "/api/connectors/fs/preview-session"
+    },
+    {
+      "method": "POST",
+      "transport": "http",
+      "legacy": "/api/v2/connectors/fs/preview/read",
+      "canonical": "/api/connectors/fs/preview/read"
+    },
+    {
+      "method": "POST",
+      "transport": "http",
+      "legacy": "/api/v2/connectors/fs/preview/readText",
+      "canonical": "/api/connectors/fs/preview/readText"
+    },
+    {
+      "method": "DELETE",
+      "transport": "http",
+      "legacy": "/api/v2/connectors/{connector_id}",
+      "canonical": "/api/connectors/{connector_id}"
+    },
+    {
+      "method": "GET",
+      "transport": "http",
+      "legacy": "/api/v2/connectors/{connector_id}",
+      "canonical": "/api/connectors/{connector_id}"
+    },
+    {
+      "method": "PATCH",
+      "transport": "http",
+      "legacy": "/api/v2/connectors/{connector_id}",
+      "canonical": "/api/connectors/{connector_id}"
+    },
+    {
+      "method": "POST",
+      "transport": "http",
+      "legacy": "/api/v2/connectors/{connector_id}/fs/list",
+      "canonical": "/api/connectors/{connector_id}/fs/list"
+    },
+    {
+      "method": "POST",
+      "transport": "http",
+      "legacy": "/api/v2/connectors/{connector_id}/fs/preview-token",
+      "canonical": "/api/connectors/{connector_id}/fs/preview-token"
+    },
+    {
+      "method": "POST",
+      "transport": "http",
+      "legacy": "/api/v2/connectors/{connector_id}/fs/read",
+      "canonical": "/api/connectors/{connector_id}/fs/read"
+    },
+    {
+      "method": "POST",
+      "transport": "http",
+      "legacy": "/api/v2/connectors/{connector_id}/fs/readText",
+      "canonical": "/api/connectors/{connector_id}/fs/readText"
+    },
+    {
+      "method": "GET",
+      "transport": "http",
+      "legacy": "/api/v2/connectors/{connector_id}/fs/transfers/{transfer_id}",
+      "canonical": "/api/connectors/{connector_id}/fs/transfers/{transfer_id}"
+    },
+    {
+      "method": "POST",
+      "transport": "http",
+      "legacy": "/api/v2/connectors/{connector_id}/fs/write",
+      "canonical": "/api/connectors/{connector_id}/fs/write"
+    },
+    {
+      "method": "GET",
+      "transport": "http",
+      "legacy": "/api/v2/connectors/{connector_id}/preferences",
+      "canonical": "/api/connectors/{connector_id}/preferences"
+    },
+    {
+      "method": "GET",
+      "transport": "http",
+      "legacy": "/api/v2/connectors/{connector_id}/protocol/capabilities",
+      "canonical": "/api/connectors/{connector_id}/protocol/capabilities"
+    },
+    {
+      "method": "POST",
+      "transport": "http",
+      "legacy": "/api/v2/connectors/{connector_id}/revoke",
+      "canonical": "/api/connectors/{connector_id}/revoke"
+    },
+    {
+      "method": "GET",
+      "transport": "http",
+      "legacy": "/api/v2/connectors/{connector_id}/runtime-types",
+      "canonical": "/api/connectors/{connector_id}/runtime-types"
+    },
+    {
+      "method": "POST",
+      "transport": "http",
+      "legacy": "/api/v2/connectors/{connector_id}/runtime-types/discover",
+      "canonical": "/api/connectors/{connector_id}/runtime-types/discover"
+    },
+    {
+      "method": "GET",
+      "transport": "http",
+      "legacy": "/api/v2/connectors/{connector_id}/runtimes",
+      "canonical": "/api/connectors/{connector_id}/runtimes"
+    },
+    {
+      "method": "POST",
+      "transport": "http",
+      "legacy": "/api/v2/connectors/{connector_id}/runtimes",
+      "canonical": "/api/connectors/{connector_id}/runtimes"
+    },
+    {
+      "method": "POST",
+      "transport": "http",
+      "legacy": "/api/v2/connectors/{connector_id}/runtimes/discover",
+      "canonical": "/api/connectors/{connector_id}/runtimes/discover"
+    },
+    {
+      "method": "GET",
+      "transport": "http",
+      "legacy": "/api/v2/connectors/{connector_id}/runtimes/{runtime_id}",
+      "canonical": "/api/connectors/{connector_id}/runtimes/{runtime_id}"
+    },
+    {
+      "method": "PATCH",
+      "transport": "http",
+      "legacy": "/api/v2/connectors/{connector_id}/runtimes/{runtime_id}",
+      "canonical": "/api/connectors/{connector_id}/runtimes/{runtime_id}"
+    },
+    {
+      "method": "PUT",
+      "transport": "http",
+      "legacy": "/api/v2/connectors/{connector_id}/runtimes/{runtime_id}/active",
+      "canonical": "/api/connectors/{connector_id}/runtimes/{runtime_id}/active"
+    },
+    {
+      "method": "GET",
+      "transport": "http",
+      "legacy": "/api/v2/connectors/{connector_id}/runtimes/{runtime_id}/capabilities",
+      "canonical": "/api/connectors/{connector_id}/runtimes/{runtime_id}/capabilities"
+    },
+    {
+      "method": "GET",
+      "transport": "http",
+      "legacy": "/api/v2/connectors/{connector_id}/runtimes/{runtime_id}/catalogs/model",
+      "canonical": "/api/connectors/{connector_id}/runtimes/{runtime_id}/catalogs/model"
+    },
+    {
+      "method": "GET",
+      "transport": "http",
+      "legacy": "/api/v2/connectors/{connector_id}/runtimes/{runtime_id}/catalogs/permission",
+      "canonical": "/api/connectors/{connector_id}/runtimes/{runtime_id}/catalogs/permission"
+    },
+    {
+      "method": "GET",
+      "transport": "http",
+      "legacy": "/api/v2/connectors/{connector_id}/runtimes/{runtime_id}/catalogs/{kind}",
+      "canonical": "/api/connectors/{connector_id}/runtimes/{runtime_id}/catalogs/{kind}"
+    },
+    {
+      "method": "GET",
+      "transport": "http",
+      "legacy": "/api/v2/connectors/{connector_id}/runtimes/{runtime_id}/commands",
+      "canonical": "/api/connectors/{connector_id}/runtimes/{runtime_id}/commands"
+    },
+    {
+      "method": "DELETE",
+      "transport": "http",
+      "legacy": "/api/v2/connectors/{connector_id}/runtimes/{runtime_id}/config",
+      "canonical": "/api/connectors/{connector_id}/runtimes/{runtime_id}/config"
+    },
+    {
+      "method": "PUT",
+      "transport": "http",
+      "legacy": "/api/v2/connectors/{connector_id}/runtimes/{runtime_id}/config",
+      "canonical": "/api/connectors/{connector_id}/runtimes/{runtime_id}/config"
+    },
+    {
+      "method": "POST",
+      "transport": "http",
+      "legacy": "/api/v2/connectors/{connector_id}/sessions/archive-all",
+      "canonical": "/api/connectors/{connector_id}/sessions/archive-all"
+    },
+    {
+      "method": "POST",
+      "transport": "http",
+      "legacy": "/api/v2/connectors/{connector_id}/shell/exec",
+      "canonical": "/api/connectors/{connector_id}/shell/exec"
+    },
+    {
+      "method": "POST",
+      "transport": "http",
+      "legacy": "/api/v2/connectors/{connector_id}/shell/tasks",
+      "canonical": "/api/connectors/{connector_id}/shell/tasks"
+    },
+    {
+      "method": "GET",
+      "transport": "http",
+      "legacy": "/api/v2/connectors/{connector_id}/shell/tasks/{task_id}/wait",
+      "canonical": "/api/connectors/{connector_id}/shell/tasks/{task_id}/wait"
+    },
+    {
+      "method": "GET",
+      "transport": "http",
+      "legacy": "/api/v2/connectors/{connector_id}/terminals",
+      "canonical": "/api/connectors/{connector_id}/terminals",
+      "responseEnvelope": "terminals",
+      "responseSource": "protocol"
+    },
+    {
+      "method": "POST",
+      "transport": "http",
+      "legacy": "/api/v2/connectors/{connector_id}/terminals",
+      "canonical": "/api/connectors/{connector_id}/terminals",
+      "responseEnvelope": "terminal",
+      "responseSource": "protocol"
+    },
+    {
+      "method": "GET",
+      "transport": "http",
+      "legacy": "/api/v2/connectors/{connector_id}/terminals-v2",
+      "canonical": "/api/connectors/{connector_id}/terminals",
+      "responseEnvelope": "result",
+      "responseSource": "protocol"
+    },
+    {
+      "method": "POST",
+      "transport": "http",
+      "legacy": "/api/v2/connectors/{connector_id}/terminals-v2",
+      "canonical": "/api/connectors/{connector_id}/terminals",
+      "responseEnvelope": "result",
+      "responseSource": "protocol"
+    },
+    {
+      "method": "DELETE",
+      "transport": "http",
+      "legacy": "/api/v2/connectors/{connector_id}/terminals-v2/{terminal_id}",
+      "canonical": "/api/connectors/{connector_id}/terminals/{terminal_id}",
+      "responseEnvelope": "result",
+      "responseSource": "protocol"
+    },
+    {
+      "method": "PATCH",
+      "transport": "http",
+      "legacy": "/api/v2/connectors/{connector_id}/terminals-v2/{terminal_id}",
+      "canonical": "/api/connectors/{connector_id}/terminals/{terminal_id}",
+      "responseEnvelope": "result",
+      "responseSource": "protocol"
+    },
+    {
+      "method": "PATCH",
+      "transport": "http",
+      "legacy": "/api/v2/connectors/{connector_id}/terminals-v2/{terminal_id}/persistence",
+      "canonical": "/api/connectors/{connector_id}/terminals/{terminal_id}/persistence",
+      "responseEnvelope": "result",
+      "responseSource": "protocol"
+    },
+    {
+      "method": "POST",
+      "transport": "http",
+      "legacy": "/api/v2/connectors/{connector_id}/terminals-v2/{terminal_id}/resize",
+      "canonical": "/api/connectors/{connector_id}/terminals/{terminal_id}/resize",
+      "responseEnvelope": "result",
+      "responseSource": "protocol"
+    },
+    {
+      "method": "GET",
+      "transport": "http",
+      "legacy": "/api/v2/connectors/{connector_id}/terminals-v2/{terminal_id}/snapshot",
+      "canonical": "/api/connectors/{connector_id}/terminals/{terminal_id}/snapshot",
+      "responseEnvelope": "result",
+      "responseSource": "protocol"
+    },
+    {
+      "method": "WEBSOCKET",
+      "transport": "websocket",
+      "legacy": "/api/v2/connectors/{connector_id}/terminals-v2/{terminal_id}/stream",
+      "canonical": "/api/connectors/{connector_id}/terminals/{terminal_id}/stream"
+    },
+    {
+      "method": "POST",
+      "transport": "http",
+      "legacy": "/api/v2/connectors/{connector_id}/terminals-v2/{terminal_id}/write",
+      "canonical": "/api/connectors/{connector_id}/terminals/{terminal_id}/write",
+      "responseEnvelope": "result",
+      "responseSource": "protocol"
+    },
+    {
+      "method": "DELETE",
+      "transport": "http",
+      "legacy": "/api/v2/connectors/{connector_id}/terminals/{terminal_id}",
+      "canonical": "/api/connectors/{connector_id}/terminals/{terminal_id}",
+      "responseEnvelope": "terminal",
+      "responseSource": "protocol"
+    },
+    {
+      "method": "PATCH",
+      "transport": "http",
+      "legacy": "/api/v2/connectors/{connector_id}/terminals/{terminal_id}",
+      "canonical": "/api/connectors/{connector_id}/terminals/{terminal_id}",
+      "responseEnvelope": "terminal",
+      "responseSource": "protocol"
+    },
+    {
+      "method": "POST",
+      "transport": "http",
+      "legacy": "/api/v2/connectors/{connector_id}/terminals/{terminal_id}/resize",
+      "canonical": "/api/connectors/{connector_id}/terminals/{terminal_id}/resize",
+      "responseEnvelope": "terminal",
+      "responseSource": "protocol"
+    },
+    {
+      "method": "WEBSOCKET",
+      "transport": "websocket",
+      "legacy": "/api/v2/connectors/{connector_id}/terminals/{terminal_id}/stream",
+      "canonical": "/api/connectors/{connector_id}/terminals/{terminal_id}/stream"
+    },
+    {
+      "method": "PATCH",
+      "transport": "http",
+      "legacy": "/api/v2/connectors/{target_id}/terminals/{terminal_id}/persistence",
+      "canonical": "/api/connectors/{target_id}/terminals/{terminal_id}/persistence"
+    },
+    {
+      "method": "GET",
+      "transport": "http",
+      "legacy": "/api/v2/connectors/{target_id}/terminals/{terminal_id}/snapshot",
+      "canonical": "/api/connectors/{target_id}/terminals/{terminal_id}/snapshot"
+    },
+    {
+      "method": "POST",
+      "transport": "http",
+      "legacy": "/api/v2/connectors/{target_id}/terminals/{terminal_id}/write",
+      "canonical": "/api/connectors/{target_id}/terminals/{terminal_id}/write"
+    },
+    {
+      "method": "WEBSOCKET",
+      "transport": "websocket",
+      "legacy": "/api/v2/dashboard/ws",
+      "canonical": "/api/dashboard/ws"
+    },
+    {
+      "method": "GET",
+      "transport": "http",
+      "legacy": "/api/v2/files",
+      "canonical": "/api/files"
+    },
+    {
+      "method": "POST",
+      "transport": "http",
+      "legacy": "/api/v2/files/uploads",
+      "canonical": "/api/files/uploads"
+    },
+    {
+      "method": "GET",
+      "transport": "http",
+      "legacy": "/api/v2/files/uploads/{upload_id}",
+      "canonical": "/api/files/uploads/{upload_id}"
+    },
+    {
+      "method": "POST",
+      "transport": "http",
+      "legacy": "/api/v2/files/uploads/{upload_id}/cancel",
+      "canonical": "/api/files/uploads/{upload_id}/cancel"
+    },
+    {
+      "method": "POST",
+      "transport": "http",
+      "legacy": "/api/v2/files/uploads/{upload_id}/complete",
+      "canonical": "/api/files/uploads/{upload_id}/complete"
+    },
+    {
+      "method": "PUT",
+      "transport": "http",
+      "legacy": "/api/v2/files/uploads/{upload_id}/parts/{part}",
+      "canonical": "/api/files/uploads/{upload_id}/parts/{part}"
+    },
+    {
+      "method": "GET",
+      "transport": "http",
+      "legacy": "/api/v2/files/{file_id}",
+      "canonical": "/api/files/{file_id}"
+    },
+    {
+      "method": "GET",
+      "transport": "http",
+      "legacy": "/api/v2/files/{file_id}/content",
+      "canonical": "/api/files/{file_id}/content"
+    },
+    {
+      "method": "POST",
+      "transport": "http",
+      "legacy": "/api/v2/files/{file_id}/migrate",
+      "canonical": "/api/files/{file_id}/migrate"
+    },
+    {
+      "method": "POST",
+      "transport": "http",
+      "legacy": "/api/v2/files/{file_id}/restore",
+      "canonical": "/api/files/{file_id}/restore"
+    },
+    {
+      "method": "POST",
+      "transport": "http",
+      "legacy": "/api/v2/files/{file_id}/trash",
+      "canonical": "/api/files/{file_id}/trash"
+    },
+    {
+      "method": "GET",
+      "transport": "http",
+      "legacy": "/api/v2/files/{file_id}/versions",
+      "canonical": "/api/files/{file_id}/versions"
+    },
+    {
+      "method": "GET",
+      "transport": "http",
+      "legacy": "/api/v2/health",
+      "canonical": "/api/health"
+    },
+    {
+      "method": "GET",
+      "transport": "http",
+      "legacy": "/api/v2/health/live",
+      "canonical": "/api/health/live"
+    },
+    {
+      "method": "GET",
+      "transport": "http",
+      "legacy": "/api/v2/health/ready",
+      "canonical": "/api/health/ready"
+    },
+    {
+      "method": "GET",
+      "transport": "http",
+      "legacy": "/api/v2/models/capabilities",
+      "canonical": "/api/models/capabilities"
+    },
+    {
+      "method": "GET",
+      "transport": "http",
+      "legacy": "/api/v2/models/catalog",
+      "canonical": "/api/models/catalog"
+    },
+    {
+      "method": "GET",
+      "transport": "http",
+      "legacy": "/api/v2/models/operations/{identifier}",
+      "canonical": "/api/models/operations/{identifier}"
+    },
+    {
+      "method": "GET",
+      "transport": "http",
+      "legacy": "/api/v2/models/personal/default",
+      "canonical": "/api/models/personal/default"
+    },
+    {
+      "method": "PUT",
+      "transport": "http",
+      "legacy": "/api/v2/models/personal/default",
+      "canonical": "/api/models/personal/default"
+    },
+    {
+      "method": "GET",
+      "transport": "http",
+      "legacy": "/api/v2/models/personal/providers",
+      "canonical": "/api/models/personal/providers"
+    },
+    {
+      "method": "POST",
+      "transport": "http",
+      "legacy": "/api/v2/models/personal/providers",
+      "canonical": "/api/models/personal/providers"
+    },
+    {
+      "method": "DELETE",
+      "transport": "http",
+      "legacy": "/api/v2/models/personal/providers/{provider_id}",
+      "canonical": "/api/models/personal/providers/{provider_id}"
+    },
+    {
+      "method": "PATCH",
+      "transport": "http",
+      "legacy": "/api/v2/models/personal/providers/{provider_id}",
+      "canonical": "/api/models/personal/providers/{provider_id}"
+    },
+    {
+      "method": "POST",
+      "transport": "http",
+      "legacy": "/api/v2/models/personal/providers/{provider_id}/validate",
+      "canonical": "/api/models/personal/providers/{provider_id}/validate"
+    },
+    {
+      "method": "POST",
+      "transport": "http",
+      "legacy": "/api/v2/models/personal/providers/{provider_id}/verify",
+      "canonical": "/api/models/personal/providers/{provider_id}/verify"
+    },
+    {
+      "method": "POST",
+      "transport": "http",
+      "legacy": "/api/v2/models/{provider_id}/{protocol}/{operation:path}",
+      "canonical": "/api/models/{provider_id}/{protocol}/{operation:path}"
+    },
+    {
+      "method": "GET",
+      "transport": "http",
+      "legacy": "/api/v2/navigation",
+      "canonical": "/api/navigation"
+    },
+    {
+      "method": "GET",
+      "transport": "http",
+      "legacy": "/api/v2/oauth/authorize",
+      "canonical": "/api/oauth/authorize"
+    },
+    {
+      "method": "POST",
+      "transport": "http",
+      "legacy": "/api/v2/oauth/authorize",
+      "canonical": "/api/oauth/authorize"
+    },
+    {
+      "method": "POST",
+      "transport": "http",
+      "legacy": "/api/v2/oauth/token",
+      "canonical": "/api/oauth/token"
+    },
+    {
+      "method": "POST",
+      "transport": "http",
+      "legacy": "/api/v2/pairing/claim",
+      "canonical": "/api/pairing/claim"
+    },
+    {
+      "method": "POST",
+      "transport": "http",
+      "legacy": "/api/v2/pairing/poll",
+      "canonical": "/api/pairing/poll"
+    },
+    {
+      "method": "POST",
+      "transport": "http",
+      "legacy": "/api/v2/pairing/start",
+      "canonical": "/api/pairing/start"
+    },
+    {
+      "method": "GET",
+      "transport": "http",
+      "legacy": "/api/v2/projects",
+      "canonical": "/api/projects"
+    },
+    {
+      "method": "POST",
+      "transport": "http",
+      "legacy": "/api/v2/projects",
+      "canonical": "/api/projects"
+    },
+    {
+      "method": "DELETE",
+      "transport": "http",
+      "legacy": "/api/v2/projects/{project_id}",
+      "canonical": "/api/projects/{project_id}"
+    },
+    {
+      "method": "PATCH",
+      "transport": "http",
+      "legacy": "/api/v2/projects/{project_id}",
+      "canonical": "/api/projects/{project_id}"
+    },
+    {
+      "method": "GET",
+      "transport": "http",
+      "legacy": "/api/v2/projects/{project_id}/sessions",
+      "canonical": "/api/projects/{project_id}/sessions"
+    },
+    {
+      "method": "POST",
+      "transport": "http",
+      "legacy": "/api/v2/projects/{project_id}/sessions/archive-all",
+      "canonical": "/api/projects/{project_id}/sessions/archive-all"
+    },
+    {
+      "method": "GET",
+      "transport": "http",
+      "legacy": "/api/v2/public/shares/{share_id}",
+      "canonical": "/api/public/shares/{share_id}"
+    },
+    {
+      "method": "GET",
+      "transport": "http",
+      "legacy": "/api/v2/public/shares/{share_id}/attachments/{file_id}",
+      "canonical": "/api/public/shares/{share_id}/attachments/{file_id}"
+    },
+    {
+      "method": "GET",
+      "transport": "http",
+      "legacy": "/api/v2/resources/agents",
+      "canonical": "/api/resources/agents"
+    },
+    {
+      "method": "POST",
+      "transport": "http",
+      "legacy": "/api/v2/resources/agents",
+      "canonical": "/api/resources/agents"
+    },
+    {
+      "method": "DELETE",
+      "transport": "http",
+      "legacy": "/api/v2/resources/agents/{resource_id}",
+      "canonical": "/api/resources/agents/{resource_id}"
+    },
+    {
+      "method": "PUT",
+      "transport": "http",
+      "legacy": "/api/v2/resources/agents/{resource_id}",
+      "canonical": "/api/resources/agents/{resource_id}"
+    },
+    {
+      "method": "GET",
+      "transport": "http",
+      "legacy": "/api/v2/resources/agents/{resource_id}/versions",
+      "canonical": "/api/resources/agents/{resource_id}/versions"
+    },
+    {
+      "method": "GET",
+      "transport": "http",
+      "legacy": "/api/v2/resources/extensions",
+      "canonical": "/api/resources/extensions"
+    },
+    {
+      "method": "POST",
+      "transport": "http",
+      "legacy": "/api/v2/resources/extensions",
+      "canonical": "/api/resources/extensions"
+    },
+    {
+      "method": "POST",
+      "transport": "http",
+      "legacy": "/api/v2/resources/extensions/install",
+      "canonical": "/api/resources/extensions/install"
+    },
+    {
+      "method": "DELETE",
+      "transport": "http",
+      "legacy": "/api/v2/resources/extensions/{resource_id}",
+      "canonical": "/api/resources/extensions/{resource_id}"
+    },
+    {
+      "method": "PUT",
+      "transport": "http",
+      "legacy": "/api/v2/resources/extensions/{resource_id}",
+      "canonical": "/api/resources/extensions/{resource_id}"
+    },
+    {
+      "method": "GET",
+      "transport": "http",
+      "legacy": "/api/v2/resources/extensions/{resource_id}/versions",
+      "canonical": "/api/resources/extensions/{resource_id}/versions"
+    },
+    {
+      "method": "GET",
+      "transport": "http",
+      "legacy": "/api/v2/resources/knowledge-bases",
+      "canonical": "/api/resources/knowledge-bases"
+    },
+    {
+      "method": "POST",
+      "transport": "http",
+      "legacy": "/api/v2/resources/knowledge-bases",
+      "canonical": "/api/resources/knowledge-bases"
+    },
+    {
+      "method": "DELETE",
+      "transport": "http",
+      "legacy": "/api/v2/resources/knowledge-bases/{resource_id}",
+      "canonical": "/api/resources/knowledge-bases/{resource_id}"
+    },
+    {
+      "method": "PUT",
+      "transport": "http",
+      "legacy": "/api/v2/resources/knowledge-bases/{resource_id}",
+      "canonical": "/api/resources/knowledge-bases/{resource_id}"
+    },
+    {
+      "method": "GET",
+      "transport": "http",
+      "legacy": "/api/v2/resources/knowledge-bases/{resource_id}/versions",
+      "canonical": "/api/resources/knowledge-bases/{resource_id}/versions"
+    },
+    {
+      "method": "GET",
+      "transport": "http",
+      "legacy": "/api/v2/resources/skills",
+      "canonical": "/api/resources/skills"
+    },
+    {
+      "method": "POST",
+      "transport": "http",
+      "legacy": "/api/v2/resources/skills",
+      "canonical": "/api/resources/skills"
+    },
+    {
+      "method": "DELETE",
+      "transport": "http",
+      "legacy": "/api/v2/resources/skills/{resource_id}",
+      "canonical": "/api/resources/skills/{resource_id}"
+    },
+    {
+      "method": "PUT",
+      "transport": "http",
+      "legacy": "/api/v2/resources/skills/{resource_id}",
+      "canonical": "/api/resources/skills/{resource_id}"
+    },
+    {
+      "method": "GET",
+      "transport": "http",
+      "legacy": "/api/v2/resources/skills/{resource_id}/versions",
+      "canonical": "/api/resources/skills/{resource_id}/versions"
+    },
+    {
+      "method": "GET",
+      "transport": "http",
+      "legacy": "/api/v2/resources/tools",
+      "canonical": "/api/resources/tools"
+    },
+    {
+      "method": "POST",
+      "transport": "http",
+      "legacy": "/api/v2/resources/tools",
+      "canonical": "/api/resources/tools"
+    },
+    {
+      "method": "DELETE",
+      "transport": "http",
+      "legacy": "/api/v2/resources/tools/{resource_id}",
+      "canonical": "/api/resources/tools/{resource_id}"
+    },
+    {
+      "method": "PUT",
+      "transport": "http",
+      "legacy": "/api/v2/resources/tools/{resource_id}",
+      "canonical": "/api/resources/tools/{resource_id}"
+    },
+    {
+      "method": "GET",
+      "transport": "http",
+      "legacy": "/api/v2/resources/tools/{resource_id}/versions",
+      "canonical": "/api/resources/tools/{resource_id}/versions"
+    },
+    {
+      "method": "GET",
+      "transport": "http",
+      "legacy": "/api/v2/runtime/catalogs/{kind}",
+      "canonical": "/api/runtime/catalogs/{kind}"
+    },
+    {
+      "method": "GET",
+      "transport": "http",
+      "legacy": "/api/v2/runtime/events",
+      "canonical": "/api/runtime/events"
+    },
+    {
+      "method": "POST",
+      "transport": "http",
+      "legacy": "/api/v2/runtime/sessions",
+      "canonical": "/api/runtime/sessions"
+    },
+    {
+      "method": "GET",
+      "transport": "http",
+      "legacy": "/api/v2/runtime/sessions/{session_id}",
+      "canonical": "/api/runtime/sessions/{session_id}"
+    },
+    {
+      "method": "POST",
+      "transport": "http",
+      "legacy": "/api/v2/runtime/sessions/{session_id}/interrupt",
+      "canonical": "/api/runtime/sessions/{session_id}/interrupt"
+    },
+    {
+      "method": "POST",
+      "transport": "http",
+      "legacy": "/api/v2/runtime/sessions/{session_id}/messages",
+      "canonical": "/api/runtime/sessions/{session_id}/messages"
+    },
+    {
+      "method": "DELETE",
+      "transport": "http",
+      "legacy": "/api/v2/server-agent",
+      "canonical": "/api/server-agent"
+    },
+    {
+      "method": "GET",
+      "transport": "http",
+      "legacy": "/api/v2/server-agent",
+      "canonical": "/api/server-agent"
+    },
+    {
+      "method": "POST",
+      "transport": "http",
+      "legacy": "/api/v2/server-agent",
+      "canonical": "/api/server-agent"
+    },
+    {
+      "method": "GET",
+      "transport": "http",
+      "legacy": "/api/v2/sessions",
+      "canonical": "/api/sessions"
+    },
+    {
+      "method": "POST",
+      "transport": "http",
+      "legacy": "/api/v2/sessions",
+      "canonical": "/api/sessions"
+    },
+    {
+      "method": "POST",
+      "transport": "http",
+      "legacy": "/api/v2/sessions/archive",
+      "canonical": "/api/sessions/archive"
+    },
+    {
+      "method": "POST",
+      "transport": "http",
+      "legacy": "/api/v2/sessions/create-and-start",
+      "canonical": "/api/sessions/create-and-start"
+    },
+    {
+      "method": "GET",
+      "transport": "http",
+      "legacy": "/api/v2/sessions/list",
+      "canonical": "/api/sessions/list"
+    },
+    {
+      "method": "GET",
+      "transport": "http",
+      "legacy": "/api/v2/sessions/local/{session_id}/{file_id}",
+      "canonical": "/api/sessions/local/{session_id}/{file_id}"
+    },
+    {
+      "method": "POST",
+      "transport": "http",
+      "legacy": "/api/v2/sessions/read",
+      "canonical": "/api/sessions/read"
+    },
+    {
+      "method": "POST",
+      "transport": "http",
+      "legacy": "/api/v2/sessions/unarchive",
+      "canonical": "/api/sessions/unarchive"
+    },
+    {
+      "method": "POST",
+      "transport": "http",
+      "legacy": "/api/v2/sessions/{action}",
+      "canonical": "/api/sessions/{action}"
+    },
+    {
+      "method": "GET",
+      "transport": "http",
+      "legacy": "/api/v2/sessions/{session_id}/agent-artifacts",
+      "canonical": "/api/sessions/{session_id}/agent-artifacts"
+    },
+    {
+      "method": "GET",
+      "transport": "http",
+      "legacy": "/api/v2/sessions/{session_id}/agent-artifacts/{artifact_id}/download",
+      "canonical": "/api/sessions/{session_id}/agent-artifacts/{artifact_id}/download"
+    },
+    {
+      "method": "GET",
+      "transport": "http",
+      "legacy": "/api/v2/sessions/{session_id}/agent-artifacts/{artifact_id}/preview",
+      "canonical": "/api/sessions/{session_id}/agent-artifacts/{artifact_id}/preview"
+    },
+    {
+      "method": "GET",
+      "transport": "http",
+      "legacy": "/api/v2/sessions/{session_id}/agent-binding",
+      "canonical": "/api/sessions/{session_id}/agent-binding"
+    },
+    {
+      "method": "PUT",
+      "transport": "http",
+      "legacy": "/api/v2/sessions/{session_id}/agent-binding",
+      "canonical": "/api/sessions/{session_id}/agent-binding"
+    },
+    {
+      "method": "POST",
+      "transport": "http",
+      "legacy": "/api/v2/sessions/{session_id}/attachments",
+      "canonical": "/api/sessions/{session_id}/attachments"
+    },
+    {
+      "method": "POST",
+      "transport": "http",
+      "legacy": "/api/v2/sessions/{session_id}/attachments/from-file",
+      "canonical": "/api/sessions/{session_id}/attachments/from-file"
+    },
+    {
+      "method": "GET",
+      "transport": "http",
+      "legacy": "/api/v2/sessions/{session_id}/attachments/{file_id}",
+      "canonical": "/api/sessions/{session_id}/attachments/{file_id}"
+    },
+    {
+      "method": "GET",
+      "transport": "http",
+      "legacy": "/api/v2/sessions/{session_id}/attachments/{file_id}/open",
+      "canonical": "/api/sessions/{session_id}/attachments/{file_id}/open"
+    },
+    {
+      "method": "GET",
+      "transport": "http",
+      "legacy": "/api/v2/sessions/{session_id}/events",
+      "canonical": "/api/sessions/{session_id}/events"
+    },
+    {
+      "method": "GET",
+      "transport": "http",
+      "legacy": "/api/v2/sessions/{session_id}/meta",
+      "canonical": "/api/sessions/{session_id}/meta"
+    },
+    {
+      "method": "PATCH",
+      "transport": "http",
+      "legacy": "/api/v2/sessions/{session_id}/meta",
+      "canonical": "/api/sessions/{session_id}/meta"
+    },
+    {
+      "method": "GET",
+      "transport": "http",
+      "legacy": "/api/v2/sessions/{session_id}/runtime/capabilities",
+      "canonical": "/api/sessions/{session_id}/runtime/capabilities"
+    },
+    {
+      "method": "GET",
+      "transport": "http",
+      "legacy": "/api/v2/sessions/{session_id}/runtime/catalogs/model",
+      "canonical": "/api/sessions/{session_id}/runtime/catalogs/model"
+    },
+    {
+      "method": "GET",
+      "transport": "http",
+      "legacy": "/api/v2/sessions/{session_id}/runtime/catalogs/permission",
+      "canonical": "/api/sessions/{session_id}/runtime/catalogs/permission"
+    },
+    {
+      "method": "GET",
+      "transport": "http",
+      "legacy": "/api/v2/sessions/{session_id}/runtime/catalogs/{kind}",
+      "canonical": "/api/sessions/{session_id}/runtime/catalogs/{kind}"
+    },
+    {
+      "method": "GET",
+      "transport": "http",
+      "legacy": "/api/v2/sessions/{session_id}/runtime/commands",
+      "canonical": "/api/sessions/{session_id}/runtime/commands"
+    },
+    {
+      "method": "POST",
+      "transport": "http",
+      "legacy": "/api/v2/sessions/{session_id}/runtime/commands",
+      "canonical": "/api/sessions/{session_id}/runtime/commands"
+    },
+    {
+      "method": "POST",
+      "transport": "http",
+      "legacy": "/api/v2/sessions/{session_id}/runtime/interrupt",
+      "canonical": "/api/sessions/{session_id}/runtime/interrupt"
+    },
+    {
+      "method": "POST",
+      "transport": "http",
+      "legacy": "/api/v2/sessions/{session_id}/runtime/messages",
+      "canonical": "/api/sessions/{session_id}/runtime/messages"
+    },
+    {
+      "method": "GET",
+      "transport": "http",
+      "legacy": "/api/v2/sessions/{session_id}/runtime/notices",
+      "canonical": "/api/sessions/{session_id}/runtime/notices"
+    },
+    {
+      "method": "POST",
+      "transport": "http",
+      "legacy": "/api/v2/sessions/{session_id}/runtime/notices/{notice_id}/respond",
+      "canonical": "/api/sessions/{session_id}/runtime/notices/{notice_id}/respond"
+    },
+    {
+      "method": "PATCH",
+      "transport": "http",
+      "legacy": "/api/v2/sessions/{session_id}/runtime/selections",
+      "canonical": "/api/sessions/{session_id}/runtime/selections"
+    },
+    {
+      "method": "GET",
+      "transport": "http",
+      "legacy": "/api/v2/sessions/{session_id}/runtime/state",
+      "canonical": "/api/sessions/{session_id}/runtime/state"
+    },
+    {
+      "method": "POST",
+      "transport": "http",
+      "legacy": "/api/v2/sessions/{session_id}/runtime/steer",
+      "canonical": "/api/sessions/{session_id}/runtime/steer"
+    },
+    {
+      "method": "POST",
+      "transport": "http",
+      "legacy": "/api/v2/sessions/{session_id}/shares",
+      "canonical": "/api/sessions/{session_id}/shares"
+    },
+    {
+      "method": "GET",
+      "transport": "http",
+      "legacy": "/api/v2/sessions/{session_id}/skill-runs",
+      "canonical": "/api/sessions/{session_id}/skill-runs"
+    },
+    {
+      "method": "GET",
+      "transport": "http",
+      "legacy": "/api/v2/sessions/{session_id}/skill-runs/{run_id}",
+      "canonical": "/api/sessions/{session_id}/skill-runs/{run_id}"
+    },
+    {
+      "method": "GET",
+      "transport": "http",
+      "legacy": "/api/v2/sessions/{session_id}/snapshot",
+      "canonical": "/api/sessions/{session_id}/snapshot"
+    },
+    {
+      "method": "POST",
+      "transport": "http",
+      "legacy": "/api/v2/sessions/{session_id}/sync",
+      "canonical": "/api/sessions/{session_id}/sync"
+    },
+    {
+      "method": "DELETE",
+      "transport": "http",
+      "legacy": "/api/v2/sessions/{session_id}/takeover",
+      "canonical": "/api/sessions/{session_id}/takeover"
+    },
+    {
+      "method": "POST",
+      "transport": "http",
+      "legacy": "/api/v2/sessions/{session_id}/takeover",
+      "canonical": "/api/sessions/{session_id}/takeover"
+    },
+    {
+      "method": "GET",
+      "transport": "http",
+      "legacy": "/api/v2/sessions/{session_id}/terminals",
+      "canonical": "/api/sessions/{session_id}/terminals",
+      "responseEnvelope": "terminals",
+      "responseSource": "protocol"
+    },
+    {
+      "method": "POST",
+      "transport": "http",
+      "legacy": "/api/v2/sessions/{session_id}/terminals",
+      "canonical": "/api/sessions/{session_id}/terminals",
+      "responseEnvelope": "terminal",
+      "responseSource": "protocol"
+    },
+    {
+      "method": "DELETE",
+      "transport": "http",
+      "legacy": "/api/v2/sessions/{session_id}/terminals/{terminal_id}",
+      "canonical": "/api/sessions/{session_id}/terminals/{terminal_id}",
+      "responseEnvelope": "terminal",
+      "responseSource": "protocol"
+    },
+    {
+      "method": "PATCH",
+      "transport": "http",
+      "legacy": "/api/v2/sessions/{session_id}/terminals/{terminal_id}",
+      "canonical": "/api/sessions/{session_id}/terminals/{terminal_id}",
+      "responseEnvelope": "terminal",
+      "responseSource": "protocol"
+    },
+    {
+      "method": "POST",
+      "transport": "http",
+      "legacy": "/api/v2/sessions/{session_id}/terminals/{terminal_id}/resize",
+      "canonical": "/api/sessions/{session_id}/terminals/{terminal_id}/resize",
+      "responseEnvelope": "terminal",
+      "responseSource": "protocol"
+    },
+    {
+      "method": "WEBSOCKET",
+      "transport": "websocket",
+      "legacy": "/api/v2/sessions/{session_id}/terminals/{terminal_id}/stream",
+      "canonical": "/api/sessions/{session_id}/terminals/{terminal_id}/stream"
+    },
+    {
+      "method": "GET",
+      "transport": "http",
+      "legacy": "/api/v2/sessions/{session_id}/timeline",
+      "canonical": "/api/sessions/{session_id}/timeline"
+    },
+    {
+      "method": "WEBSOCKET",
+      "transport": "websocket",
+      "legacy": "/api/v2/sessions/{session_id}/ws",
+      "canonical": "/api/sessions/{session_id}/ws"
+    },
+    {
+      "method": "PATCH",
+      "transport": "http",
+      "legacy": "/api/v2/sessions/{target_id}/terminals/{terminal_id}/persistence",
+      "canonical": "/api/sessions/{target_id}/terminals/{terminal_id}/persistence"
+    },
+    {
+      "method": "GET",
+      "transport": "http",
+      "legacy": "/api/v2/sessions/{target_id}/terminals/{terminal_id}/snapshot",
+      "canonical": "/api/sessions/{target_id}/terminals/{terminal_id}/snapshot"
+    },
+    {
+      "method": "POST",
+      "transport": "http",
+      "legacy": "/api/v2/sessions/{target_id}/terminals/{terminal_id}/write",
+      "canonical": "/api/sessions/{target_id}/terminals/{terminal_id}/write"
+    },
+    {
+      "method": "DELETE",
+      "transport": "http",
+      "legacy": "/api/v2/shares/{share_id}",
+      "canonical": "/api/shares/{share_id}"
+    },
+    {
+      "method": "POST",
+      "transport": "http",
+      "legacy": "/api/v2/ws-ticket",
+      "canonical": "/api/ws-ticket"
+    },
+    {
+      "method": "POST",
+      "transport": "http",
+      "legacy": "/api/v2/admin/agents/demo",
+      "canonical": "/api/admin/agents/initialize"
+    },
+    {
+      "method": "GET",
+      "transport": "http",
+      "legacy": "/api/v2/sessions/{session_id}/office-plans",
+      "canonical": "/api/sessions/{session_id}/plans"
+    },
+    {
+      "method": "GET",
+      "transport": "http",
+      "legacy": "/api/v2/sessions/{session_id}/office-plans/{plan_id}",
+      "canonical": "/api/sessions/{session_id}/plans/{plan_id}"
+    },
+    {
+      "method": "PUT",
+      "transport": "http",
+      "legacy": "/api/v2/sessions/{session_id}/office-plans/{plan_id}",
+      "canonical": "/api/sessions/{session_id}/plans/{plan_id}"
+    },
+    {
+      "method": "GET",
+      "transport": "http",
+      "legacy": "/api/v2/sessions/{session_id}/agent-evidence",
+      "canonical": "/api/sessions/{session_id}/evidence"
+    },
+    {
+      "method": "GET",
+      "transport": "http",
+      "legacy": "/api/v2/sessions/{session_id}/agent-evidence/{evidence_id}",
+      "canonical": "/api/sessions/{session_id}/evidence/{evidence_id}"
+    }
+  ]
+}

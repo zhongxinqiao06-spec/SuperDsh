@@ -1,0 +1,45 @@
+{
+  "description": "仅复制自有管理端静态资产，不在运行时依赖旧包。",
+  "assets": [
+    {
+      "path": "icon.svg",
+      "source": "apps/admin/public/icon.svg",
+      "owner": "SuperDsh product asset"
+    },
+    {
+      "path": "fonts/geist-mono-latin-wght-normal.woff2",
+      "source": "apps/admin/src/app/fonts/geist-mono/geist-mono-latin-wght-normal.woff2",
+      "license": "fonts/LICENSE-geist-mono.txt"
+    },
+    {
+      "path": "fonts/geist-latin-wght-normal.woff2",
+      "source": "apps/admin/src/app/fonts/geist/geist-latin-wght-normal.woff2",
+      "license": "fonts/LICENSE.txt"
+    },
+    {
+      "path": "images/website/starbridge-hero.webp",
+      "source": "apps/admin/public/images/website/starbridge-hero.webp",
+      "owner": "SuperDsh product asset"
+    },
+    {
+      "owner": "SuperDsh product asset",
+      "source": "apps/admin/public/images/website/desktop-workbench.webp",
+      "path": "images/website/desktop-workbench.webp"
+    },
+    {
+      "owner": "SuperDsh product asset",
+      "source": "apps/admin/public/images/website/mobile-workbench.webp",
+      "path": "images/website/mobile-workbench.webp"
+    },
+    {
+      "owner": "SuperDsh product asset",
+      "source": "apps/admin/public/images/website/agents-desktop.webp",
+      "path": "images/website/agents-desktop.webp"
+    },
+    {
+      "owner": "SuperDsh product asset",
+      "source": "apps/admin/public/images/website/sales-example.csv",
+      "path": "images/website/sales-example.csv"
+    }
+  ]
+}

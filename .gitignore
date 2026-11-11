@@ -48,3 +48,20 @@ apps/android/replay_pid*.log
 apps/android/hs_err_pid*.log
 # Prepared, checksum-verified document fonts. Downloaded during setup/build.
 apps/admin/.office-fonts/
+
+# New Web Admin: generated output and private configuration are not committed.
+apps/web-admin/backend/config/model-defaults.json
+apps/web-admin/fronted/dist/
+apps/web-admin/engine-adapter/dist/
+apps/web-admin/fronted/.vite/
+apps/web-admin/backend/.venv/
+apps/web-admin/backend/build/
+apps/web-admin/backend/dist/
+apps/web-admin/**/*.egg-info/
+apps/web-admin/**/__pycache__/
+apps/web-admin/**/.pytest_cache/
+apps/web-admin/**/.ruff_cache/
+apps/web-admin/**/.mypy_cache/
+apps/web-admin/backend/resources/build-info.json
+apps/web-admin/**/.env*
+!apps/web-admin/**/.env.example

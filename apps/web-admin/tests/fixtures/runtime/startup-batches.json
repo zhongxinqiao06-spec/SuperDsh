@@ -1,0 +1,117 @@
+[
+  {
+    "streamId": "synthetic-native-stream",
+    "batchSeq": 1,
+    "projectionVersion": 2,
+    "operations": [
+      {
+        "kind": "notifications",
+        "notifications": [
+          {
+            "method": "session.inventory.begin",
+            "params": { "scanToken": "synthetic-native-stream" }
+          }
+        ]
+      }
+    ]
+  },
+  {
+    "streamId": "synthetic-native-stream",
+    "batchSeq": 2,
+    "projectionVersion": 2,
+    "operations": [
+      {
+        "kind": "notifications",
+        "notifications": [
+          {
+            "method": "session.inventory.complete",
+            "params": {
+              "scanToken": "synthetic-native-stream",
+              "complete": true,
+              "sessions": []
+            }
+          }
+        ]
+      }
+    ]
+  },
+  {
+    "streamId": "synthetic-native-stream",
+    "batchSeq": 3,
+    "projectionVersion": 2,
+    "operations": [
+      {
+        "kind": "notifications",
+        "notifications": [
+          {
+            "method": "catalog.model.update",
+            "params": {
+              "runtime": "dsh",
+              "revision": 5,
+              "models": [
+                {
+                  "id": "synthetic-model-selection",
+                  "title": "合成模型",
+                  "selectionId": "synthetic-model-selection",
+                  "enabled": true,
+                  "reasoningItems": [],
+                  "metadata": {
+                    "provider": "synthetic-provider",
+                    "providerName": "合成供应商",
+                    "model": "synthetic-model",
+                    "modelName": "合成模型",
+                    "reasoningEffort": null
+                  }
+                }
+              ],
+              "metadata": {
+                "failures": [],
+                "routableProviders": ["synthetic-provider"]
+              }
+            }
+          },
+          {
+            "method": "catalog.permission.update",
+            "params": {
+              "runtime": "dsh",
+              "revision": 3,
+              "permissions": [
+                {
+                  "id": "synthetic-read-only",
+                  "title": "read-only",
+                  "selectionId": "synthetic-read-only",
+                  "enabled": true,
+                  "metadata": { "preset": "read-only" }
+                }
+              ]
+            }
+          },
+          {
+            "method": "runtime.capability.updated",
+            "params": {
+              "runtime": "dsh",
+              "revision": 6,
+              "capabilities": [
+                {
+                  "capabilityId": "session.send_message",
+                  "runtime": "dsh",
+                  "scope": "runtime",
+                  "supported": true,
+                  "available": true,
+                  "allowed": true
+                }
+              ],
+              "metadata": {
+                "readOnly": false,
+                "attachments": true,
+                "userQuestions": true,
+                "approval": true,
+                "modelCatalogFailures": []
+              }
+            }
+          }
+        ]
+      }
+    ]
+  }
+]

@@ -1,0 +1,7 @@
+{
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "node ../../../scripts/web-admin.ts fronted-dev"
+  }
+}

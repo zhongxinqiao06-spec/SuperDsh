@@ -17,14 +17,20 @@ const excluded = new Set([
   '.superdsh',
   '.next',
   'generated',
+  '__pycache__',
+  '.venv',
+  '.pytest_cache',
+  '.ruff_cache',
+  '.mypy_cache',
 ])
 const buildOutput =
-  /^(?:apps\/admin\/(?:out|\.next-[^/]+)|apps\/desktop(?:\/core|\/plugins\/harness)?\/(?:lib|dist)|apps\/desktop\/ui\/(?:client|dist|native-ui)|dsh-community-market\/(?:lib|dist))(?:\/|$)/u
+  /^(?:apps\/admin\/(?:out|\.next-[^/]+)|apps\/web-admin\/(?:fronted|engine-adapter)\/dist|apps\/web-admin\/backend\/(?:build|dist|[^/]+\.egg-info)|apps\/desktop(?:\/core|\/plugins\/harness)?\/(?:lib|dist)|apps\/desktop\/ui\/(?:client|dist|native-ui)|dsh-community-market\/(?:lib|dist))(?:\/|$)/u
 const generated =
-  /(?:^|\/)(?:next-env\.d\.ts|api-catalog\.ts|slot-catalog\.ts|client-manifest\.json|build-sources\.json|source-manifest\.json|module-packages\.json|migration-paths\.json|tsconfig\.paths\.json)$|\/apps\/admin\/server\/contracts\/(?:openapi-v2|legacy-routes)\.json$/u
+  /(?:^|\/)(?:next-env\.d\.ts|api-catalog\.ts|slot-catalog\.ts|client-manifest\.json|build-sources\.json|source-manifest\.json|module-packages\.json|migration-paths\.json|tsconfig\.paths\.json)$|\/apps\/admin\/server\/contracts\/(?:openapi-v2|legacy-routes)\.json$|\/apps\/web-admin\/(?:contracts\/[^/]+\.schema\.json|tests\/fixtures\/baselines\/[^/]+\.json|backend\/resources\/(?:navigation|build-info)\.json)$/u
 const extensions = new Set([
   '.ts',
   '.tsx',
+  '.vue',
   '.js',
   '.mjs',
   '.cjs',
@@ -49,6 +55,7 @@ export function ownedCodeFiles(directory = root) {
   }
   const files = [
     'apps/admin',
+    'apps/web-admin',
     'apps/desktop',
     'dsh-community-market',
     'scripts',
@@ -56,7 +63,7 @@ export function ownedCodeFiles(directory = root) {
   ].flatMap((path) => walk(join(directory, path)))
   for (const name of readdirSync(directory))
     if (
-      /^(?:tsconfig.*\.json|eslint\.config\.mjs|\.prettierrc\.json|compose\.yml)$/u.test(
+      /^(?:tsconfig.*\.json|eslint\.config\.mjs|\.prettierrc\.json|compose(?:\.web-admin)?\.yml)$/u.test(
         name,
       )
     )
@@ -72,7 +79,7 @@ export async function runCodeQuality(mode, directory = root) {
     const { ESLint } = await import('eslint')
     const eslint = new ESLint({ cwd: directory })
     const results = await eslint.lintFiles(
-      files.filter((path) => /\.[cm]?[jt]sx?$/u.test(path)),
+      files.filter((path) => /(?:\.[cm]?[jt]sx?|\.vue)$/u.test(path)),
     )
     const formatter = await eslint.loadFormatter('stylish')
     const output = formatter.format(results)

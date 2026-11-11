@@ -44,3 +44,5 @@ apps/desktop/ui/client-manifest.json
 apps/desktop/ui/build-sources.json
 apps/admin/out
 apps/admin/next-env.d.ts
+apps/web-admin/backend/config/**
+!apps/web-admin/backend/config/model-defaults.example.json

@@ -1,0 +1,106 @@
+{
+  "scope": "已发布桌面/Android请求构造的源码审查；字段可接纳不代表真机、系统权限、签名或所有行为验收。运行结果只从本轮runner报告读取。",
+  "fullDeviceParity": false,
+  "groups": [
+    {
+      "id": "native-refresh",
+      "sources": [
+        "apps/android/app/src/main/java/com/agentsanywhere/app/api/Auth.kt:18",
+        "apps/desktop/core/src/main/platform-account.ts:298"
+      ],
+      "routes": ["POST /auth/refresh"],
+      "fields": ["refreshToken", "clientName"],
+      "finding": "原客户端的clientName明确接纳并忽略，不改既有会话名称。",
+      "tests": [
+        "tests/contracts/test_identity_navigation_parity.py",
+        "tests/backend/test_identity_input_regression.py"
+      ],
+      "status": "differential-and-isolated-database-covered"
+    },
+    {
+      "id": "android-projects",
+      "sources": [
+        "apps/android/app/src/main/java/com/agentsanywhere/app/api/SessionsApi.kt:39"
+      ],
+      "routes": [
+        "POST /projects",
+        "GET /projects/{project_id}/sessions",
+        "GET /sessions",
+        "POST /projects/{project_id}/sessions/archive-all",
+        "POST /sessions/read"
+      ],
+      "fields": [
+        "manuallyCreated",
+        "connectorId",
+        "workspacePath",
+        "archived",
+        "scope",
+        "limit",
+        "cursor",
+        "ids数组"
+      ],
+      "finding": "保留false项目、设备OS路径身份、受管项目、默认100/完整目录/tuple游标、数组批量读及全量归档。旧实际archive-all忽略scope，保持该行为。",
+      "tests": [
+        "tests/backend/test_project_client_parity.py",
+        "tests/backend/test_project_client_regression.py",
+        "tests/backend/test_session_listing_differential.py",
+        "tests/backend/test_session_listing_regression.py",
+        "tests/backend/test_conversation_batch_differential.py",
+        "tests/backend/test_conversation_batch_regression.py"
+      ],
+      "status": "differential-and-isolated-database-covered"
+    },
+    {
+      "id": "android-first-message-attachments",
+      "sources": [
+        "apps/android/app/src/main/java/com/agentsanywhere/app/feature/sessions/SessionsController.kt:793",
+        "apps/android/app/src/main/java/com/agentsanywhere/app/api/SessionsApi.kt:147"
+      ],
+      "routes": ["POST /sessions/create-and-start"],
+      "fields": [
+        "projectId",
+        "runtime",
+        "runtimeId省略时跟随runtime",
+        "clientMessageId",
+        "content",
+        "selections",
+        "attachments[].fileId",
+        "attachments[].contentBase64",
+        "attachments[].size",
+        "attachments[].sha256",
+        "attachments[].name",
+        "attachments[].mediaType"
+      ],
+      "finding": "实际Android首次发送为内联文件；既有会话则先multipart上传再按fileId发送。内联stage保留别名、内容校验、会话绑定、只发一次收据及下载能力。",
+      "tests": [
+        "tests/backend/test_inline_attachment_parity.py",
+        "tests/backend/test_inline_attachment_regression.py",
+        "tests/backend/test_session_import_regression.py"
+      ],
+      "status": "differential-and-isolated-database-covered"
+    },
+    {
+      "id": "android-pairing",
+      "sources": [
+        "apps/android/app/src/main/java/com/agentsanywhere/app/api/DevicesApi.kt"
+      ],
+      "routes": ["POST /pairing/claim"],
+      "fields": ["code", "name", "serverUrl", "connectorId", "connectorToken"],
+      "finding": "领取方serverUrl字段必须接纳；连接地址仍使用发起时冻结的serverUrl，不能改写。",
+      "tests": ["tests/backend/test_device_client_payloads.py"],
+      "status": "isolated-database-client-payload-covered"
+    },
+    {
+      "id": "remaining-android-request-constructors",
+      "sources": [
+        "apps/android/app/src/main/java/com/agentsanywhere/app/api/Auth.kt",
+        "apps/android/app/src/main/java/com/agentsanywhere/app/api/FilesApi.kt",
+        "apps/android/app/src/main/java/com/agentsanywhere/app/api/PersonalModelsApi.kt",
+        "apps/android/app/src/main/java/com/agentsanywhere/app/api/ServerAgentApi.kt",
+        "apps/android/app/src/main/java/com/agentsanywhere/app/api/RealtimeApi.kt"
+      ],
+      "finding": "已读实际字段组合：OAuth表单/移动扫码/头像和显示名/邮箱绑定/改密、文件root查询参数与maxBytes、个人供应商模型字段和清除默认selection:null、prepare及票据scope、events after游标。除分别记录修复外，未再发现明确的字段被forbid阻断；此结论仅限源码字段审查。",
+      "status": "static-request-field-review-only"
+    }
+  ]
+}

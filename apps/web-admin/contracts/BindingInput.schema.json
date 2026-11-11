@@ -1,0 +1,16 @@
+{
+  "additionalProperties": false,
+  "description": "会话绑定只接受资源标识，不接收伪造的冻结快照。",
+  "properties": {
+    "agentDefinitionId": {
+      "maxLength": 80,
+      "title": "Agentdefinitionid",
+      "type": "string"
+    }
+  },
+  "required": [
+    "agentDefinitionId"
+  ],
+  "title": "BindingInput",
+  "type": "object"
+}

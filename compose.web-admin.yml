@@ -1,0 +1,96 @@
+name: starbridge-web-admin
+services:
+  postgres:
+    extends:
+      file: apps/web-admin/deployment/compose.dependencies.yml
+      service: postgres
+    ports: !reset []
+    restart: unless-stopped
+  redis:
+    extends:
+      file: apps/web-admin/deployment/compose.dependencies.yml
+      service: redis
+    ports: !reset []
+    restart: unless-stopped
+  qdrant:
+    extends:
+      file: apps/web-admin/deployment/compose.dependencies.yml
+      service: qdrant
+    ports: !reset []
+    restart: unless-stopped
+  minio:
+    extends:
+      file: apps/web-admin/deployment/compose.dependencies.yml
+      service: minio
+    ports: !reset []
+    restart: unless-stopped
+  minio-init:
+    extends:
+      file: apps/web-admin/deployment/compose.dependencies.yml
+      service: minio-init
+  backend:
+    build:
+      context: .
+      dockerfile: apps/web-admin/deployment/Dockerfile.backend
+      args:
+        NODE_IMAGE: ${WEB_ADMIN_IMAGE_NODE:?Use web-admin command}
+        PYTHON_IMAGE: ${WEB_ADMIN_IMAGE_PYTHON:?Use web-admin command}
+        UV_VERSION: ${WEB_ADMIN_UV_VERSION:?Use web-admin command}
+        SOURCE_COMMIT: ${WEB_ADMIN_SOURCE_COMMIT:?Use web-admin command}
+    init: true
+    restart: unless-stopped
+    stop_grace_period: 90s
+    environment:
+      WEB_ADMIN_DATABASE_URL: ${WEB_ADMIN_DATABASE_URL}
+      WEB_ADMIN_REDIS_URL: ${WEB_ADMIN_REDIS_URL}
+      WEB_ADMIN_SECRET: ${WEB_ADMIN_SECRET}
+      WEB_ADMIN_ENCRYPTION_KEY: ${WEB_ADMIN_ENCRYPTION_KEY}
+      WEB_ADMIN_INITIAL_ADMIN_USERNAME: ${WEB_ADMIN_INITIAL_ADMIN_USERNAME}
+      WEB_ADMIN_INITIAL_ADMIN_PASSWORD: ${WEB_ADMIN_INITIAL_ADMIN_PASSWORD}
+      WEB_ADMIN_INITIAL_ADMIN_DISPLAY_NAME: ${WEB_ADMIN_INITIAL_ADMIN_DISPLAY_NAME}
+      WEB_ADMIN_PUBLIC_ORIGIN: ${WEB_ADMIN_PUBLIC_ORIGIN}
+      WEB_ADMIN_ALLOWED_ORIGINS: ${WEB_ADMIN_ALLOWED_ORIGINS}
+      WEB_ADMIN_PROVIDER_ALLOWED_ORIGINS: ${WEB_ADMIN_PROVIDER_ALLOWED_ORIGINS}
+      WEB_ADMIN_MODEL_DEFAULTS_FILE: /app/apps/web-admin/backend/config/model-defaults.json
+      WEB_ADMIN_QDRANT_URL: ${WEB_ADMIN_QDRANT_URL}
+      WEB_ADMIN_QDRANT_API_KEY: ${WEB_ADMIN_QDRANT_API_KEY}
+      WEB_ADMIN_STORAGE_ENDPOINT: ${WEB_ADMIN_STORAGE_ENDPOINT}
+      WEB_ADMIN_STORAGE_USER: ${WEB_ADMIN_STORAGE_USER}
+      WEB_ADMIN_STORAGE_PASSWORD: ${WEB_ADMIN_STORAGE_PASSWORD}
+      WEB_ADMIN_STORAGE_BUCKET: ${WEB_ADMIN_STORAGE_BUCKET}
+    depends_on:
+      postgres: { condition: service_healthy }
+      redis: { condition: service_healthy }
+      qdrant: { condition: service_started }
+      minio-init: { condition: service_completed_successfully }
+    volumes:
+      - runtime-data:/data/runtime
+      - files-data:/data/files
+      - config-data:/data/config
+      # 明文凭据只通过正式配置只读挂载，不进入镜像或测试 fixture。
+      - type: bind
+        source: ${WEB_ADMIN_MODEL_DEFAULTS_SOURCE}
+        target: /app/apps/web-admin/backend/config/model-defaults.json
+        read_only: true
+        bind:
+          create_host_path: false
+  fronted:
+    build:
+      context: .
+      dockerfile: apps/web-admin/deployment/Dockerfile.fronted
+      args:
+        NODE_IMAGE: ${WEB_ADMIN_IMAGE_NODE}
+        NGINX_IMAGE: ${WEB_ADMIN_IMAGE_NGINX}
+        SOURCE_COMMIT: ${WEB_ADMIN_SOURCE_COMMIT}
+    restart: unless-stopped
+    ports: ['${WEB_ADMIN_FRONTED_PORT}:8080']
+    depends_on:
+      backend: { condition: service_healthy }
+volumes:
+  postgres-data:
+  redis-data:
+  qdrant-data:
+  minio-data:
+  runtime-data:
+  files-data:
+  config-data:

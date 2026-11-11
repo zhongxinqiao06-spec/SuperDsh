@@ -1,0 +1,25 @@
+# 独立验证镜像：真实LibreOffice/PDFium，不复用旧管理端运行时。
+ARG PYTHON_IMAGE
+FROM ${PYTHON_IMAGE} AS office-fonts
+RUN apt-get update && apt-get install -y --no-install-recommends fonts-noto-cjk python3-fonttools && rm -rf /var/lib/apt/lists/*
+COPY apps/web-admin/deployment/prepare-fonts.py /tmp/prepare-fonts.py
+RUN /usr/bin/python3 /tmp/prepare-fonts.py /usr/share/fonts/opentype/noto /opt/office-fonts && cp /usr/share/doc/fonts-noto-cjk/copyright /opt/office-fonts/LICENSE
+
+FROM ${PYTHON_IMAGE}
+ARG UV_VERSION
+RUN apt-get update && apt-get install -y --no-install-recommends libreoffice-writer libreoffice-calc libreoffice-impress fonts-liberation fontconfig && rm -rf /var/lib/apt/lists/*
+COPY --from=office-fonts /opt/office-fonts /usr/local/share/fonts/superdsh-cjk
+RUN fc-cache -f
+RUN pip install --no-cache-dir uv==${UV_VERSION}
+WORKDIR /validation/apps/web-admin/backend
+ENV UV_PROJECT_ENVIRONMENT=/opt/venv UV_LINK_MODE=copy PYTHONDONTWRITEBYTECODE=1 PYTHONIOENCODING=utf-8
+COPY apps/web-admin/backend/pyproject.toml apps/web-admin/backend/uv.lock ./
+RUN uv sync --frozen --no-install-project
+COPY apps/web-admin/backend/app ./app
+COPY apps/web-admin/backend/toolkits ./toolkits
+COPY apps/web-admin/backend/resources ./resources
+COPY apps/web-admin/tests/backend/test_office_documents.py ./../tests/backend/test_office_documents.py
+COPY apps/web-admin/tests/integration/office_rendering.py ./../tests/integration/office_rendering.py
+COPY apps/web-admin/tests/integration/office_differential_rendering.py ./../tests/integration/office_differential_rendering.py
+ENV PATH=/opt/venv/bin:$PATH WEB_ADMIN_OFFICE_EXECUTABLE=/usr/bin/libreoffice
+CMD ["python", "-m", "pytest", "-c", "pyproject.toml", "../tests/backend/test_office_documents.py", "../tests/integration/office_rendering.py", "../tests/integration/office_differential_rendering.py", "-q"]

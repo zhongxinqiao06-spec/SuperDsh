@@ -1,0 +1,205 @@
+[
+  {
+    "id": "overview",
+    "route": "#/overview",
+    "title": "总览",
+    "englishTitle": "Overview",
+    "icon": "gauge",
+    "permissions": []
+  },
+  {
+    "id": "access.users",
+    "route": "#/access/users",
+    "title": "用户管理",
+    "englishTitle": "Users",
+    "icon": "users",
+    "permissions": [
+      "users.read"
+    ]
+  },
+  {
+    "id": "access.roles",
+    "route": "#/access/roles",
+    "title": "角色与权限",
+    "englishTitle": "Roles and permissions",
+    "icon": "shield",
+    "permissions": [
+      "roles.manage"
+    ]
+  },
+  {
+    "id": "access.menus",
+    "route": "#/access/menus",
+    "title": "菜单管理",
+    "englishTitle": "Navigation menus",
+    "icon": "menu",
+    "permissions": [
+      "menus.read",
+      "menus.manage"
+    ]
+  },
+  {
+    "id": "agents",
+    "route": "#/agents",
+    "title": "智能体列表",
+    "englishTitle": "Agents",
+    "icon": "bot",
+    "permissions": [
+      "agents.manage"
+    ]
+  },
+  {
+    "id": "knowledge",
+    "route": "#/knowledge",
+    "title": "知识库",
+    "englishTitle": "Knowledge bases",
+    "icon": "book-open",
+    "permissions": [
+      "agents.manage"
+    ]
+  },
+  {
+    "id": "skills",
+    "route": "#/skills",
+    "title": "技能管理",
+    "englishTitle": "Skills",
+    "icon": "sparkles",
+    "permissions": [
+      "agents.manage"
+    ]
+  },
+  {
+    "id": "tools",
+    "route": "#/tools",
+    "title": "工具管理",
+    "englishTitle": "Tools",
+    "icon": "wrench",
+    "permissions": [
+      "agents.manage"
+    ]
+  },
+  {
+    "id": "models",
+    "route": "#/models",
+    "title": "聊天模型",
+    "englishTitle": "Platform models",
+    "icon": "key",
+    "permissions": [
+      "models.manage"
+    ]
+  },
+  {
+    "id": "models.multimodal",
+    "route": "#/models/multimodal",
+    "title": "多模态模型",
+    "englishTitle": "Multimodal models",
+    "icon": "sparkles",
+    "permissions": [
+      "models.manage"
+    ]
+  },
+  {
+    "id": "system.storage",
+    "route": "#/system/storage",
+    "title": "文件存储",
+    "englishTitle": "File storage",
+    "icon": "folder",
+    "permissions": [
+      "storage.manage"
+    ]
+  },
+  {
+    "id": "account.files",
+    "route": "#/account/files",
+    "title": "我的文件",
+    "englishTitle": "My files",
+    "icon": "folder",
+    "permissions": [
+      "files.read"
+    ]
+  },
+  {
+    "id": "devices",
+    "route": "#/operations/devices",
+    "title": "设备运维",
+    "englishTitle": "Device operations",
+    "icon": "monitor",
+    "permissions": [
+      "devices.inventory.read"
+    ]
+  },
+  {
+    "id": "workbench",
+    "route": "#/workspace",
+    "title": "Agent 工作台",
+    "englishTitle": "Agent workspace",
+    "icon": "bot",
+    "permissions": [
+      "sessions.read",
+      "sessions.run",
+      "devices.read"
+    ]
+  },
+  {
+    "id": "system.service",
+    "route": "#/system/service",
+    "title": "服务配置",
+    "englishTitle": "Service configuration",
+    "icon": "settings",
+    "permissions": [
+      "settings.manage"
+    ]
+  },
+  {
+    "id": "system.audit",
+    "route": "#/system/audit",
+    "title": "审计日志",
+    "englishTitle": "Audit log",
+    "icon": "history",
+    "permissions": [
+      "audit.read"
+    ]
+  },
+  {
+    "id": "account.profile",
+    "route": "#/account/profile",
+    "title": "账号资料",
+    "englishTitle": "Account profile",
+    "icon": "user",
+    "permissions": []
+  },
+  {
+    "id": "account.security",
+    "route": "#/account/security",
+    "title": "账号安全与登录记录",
+    "englishTitle": "Security and sign-ins",
+    "icon": "shield",
+    "permissions": []
+  },
+  {
+    "id": "account.models",
+    "route": "#/account/models",
+    "title": "个人模型",
+    "englishTitle": "Personal models",
+    "icon": "key",
+    "permissions": [
+      "models.personal.manage"
+    ]
+  },
+  {
+    "id": "account.appearance",
+    "route": "#/account/appearance",
+    "title": "外观设置",
+    "englishTitle": "Appearance",
+    "icon": "paintbrush",
+    "permissions": []
+  },
+  {
+    "id": "account.mobile",
+    "route": "#/account/mobile",
+    "title": "手机登录会话",
+    "englishTitle": "Mobile sign-ins",
+    "icon": "smartphone",
+    "permissions": []
+  }
+]

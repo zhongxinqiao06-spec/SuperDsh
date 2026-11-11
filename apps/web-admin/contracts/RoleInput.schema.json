@@ -1,0 +1,45 @@
+{
+  "additionalProperties": false,
+  "description": "角色名称、权限与并发版本。",
+  "properties": {
+    "name": {
+      "maxLength": 64,
+      "minLength": 1,
+      "title": "Name",
+      "type": "string"
+    },
+    "description": {
+      "default": "",
+      "maxLength": 500,
+      "title": "Description",
+      "type": "string"
+    },
+    "permissions": {
+      "items": {
+        "type": "string"
+      },
+      "maxItems": 100,
+      "title": "Permissions",
+      "type": "array"
+    },
+    "revision": {
+      "anyOf": [
+        {
+          "minimum": 1,
+          "type": "integer"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Revision"
+    }
+  },
+  "required": [
+    "name",
+    "permissions"
+  ],
+  "title": "RoleInput",
+  "type": "object"
+}

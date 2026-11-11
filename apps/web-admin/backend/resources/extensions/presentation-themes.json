@@ -1,0 +1,41 @@
+[
+  {
+    "id": "business-clean",
+    "version": "1.0.0",
+    "name": "商务简洁",
+    "fontFace": "Noto Sans CJK SC",
+    "background": "F8FAFC",
+    "foreground": "173044",
+    "accent": "087F8C",
+    "secondary": "326B9B",
+    "surface": "EAF0F5",
+    "muted": "627688",
+    "density": "comfortable"
+  },
+  {
+    "id": "brand-proposal",
+    "version": "1.0.0",
+    "name": "品牌提案",
+    "fontFace": "Noto Sans CJK SC",
+    "background": "17212B",
+    "foreground": "F3F1EB",
+    "accent": "F0BE78",
+    "secondary": "80B9AE",
+    "surface": "263540",
+    "muted": "B4C1C8",
+    "density": "comfortable"
+  },
+  {
+    "id": "training",
+    "version": "1.0.0",
+    "name": "培训说明",
+    "fontFace": "Noto Sans CJK SC",
+    "background": "FBFAF6",
+    "foreground": "27344B",
+    "accent": "525DC1",
+    "secondary": "238C83",
+    "surface": "EEF0F9",
+    "muted": "6B7285",
+    "density": "comfortable"
+  }
+]

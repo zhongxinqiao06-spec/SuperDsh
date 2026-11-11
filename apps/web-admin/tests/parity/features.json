@@ -1,0 +1,1617 @@
+{
+  "schemaVersion": 1,
+  "purpose": "第二阶段功能索引与第三阶段执行证据分组；源码引用不代表通过，只关联本轮实际执行产物，未验项不自动关闭。",
+  "baseline": "apps/web-admin/tests/fixtures/baselines/source-fingerprint.json",
+  "tasks": [
+    {
+      "id": "P2-01",
+      "title": "基准清单与纵向任务切片",
+      "moduleIds": [],
+      "tests": [
+        {
+          "path": "apps/web-admin/tests/backend/test_compatibility_proxy_phase_two.py",
+          "cases": [
+            "test_multisegment_encoding_and_websocket_scope_are_preserved",
+            "test_websocket_target_validation_uses_nested_router_and_transport",
+            "test_registered_compatibility_targets_and_frozen_contract_coverage",
+            "test_declared_response_envelope_only_wraps_success",
+            "test_proxy_legacy_operation_secret_filtering_and_upstream_status",
+            "test_proxy_single_session_revocation_interrupts_waiting_stream_and_closes_connection",
+            "test_provider_rejects_private_targets_redirects_and_malformed_json"
+          ],
+          "evidence": "indexed-only"
+        }
+      ],
+      "requiredDifferentialEvidence": [
+        "positive",
+        "authorization",
+        "failure-recovery",
+        "concurrency-if-applicable"
+      ],
+      "status": "awaiting-differential-execution"
+    },
+    {
+      "id": "P2-02",
+      "title": "视觉系统、公共交互与官网",
+      "moduleIds": ["account.appearance"],
+      "tests": [
+        {
+          "path": "apps/web-admin/tests/fronted/phase-two-management.test.ts",
+          "cases": [
+            "Markdown 将恶意HTML与脚本链接渲染为文本，同时保留安全格式",
+            "资料保存失败保留草稿，成功仅更新本人身份",
+            "账号切换后拒绝迟到的资料保存回写",
+            "官网场景保留键盘切换、示例数据与幻灯交互",
+            "授权与取消只允许产品回调和本地续接入口"
+          ],
+          "evidence": "indexed-only"
+        },
+        {
+          "path": "apps/web-admin/tests/fronted/routing-and-drafts.test.ts",
+          "cases": [
+            "21个模块保持唯一ID，旧Hash按权限和子路由转换",
+            "菜单隐藏不改变直接访问权限，空分组不会出现",
+            "同账号切页保留File，换代际清空并撤销所有预览",
+            "API客户端只构造同源规范路径并编码查询参数"
+          ],
+          "evidence": "indexed-only"
+        },
+        {
+          "path": "apps/web-admin/tests/e2e/foundation-shell.spec.ts",
+          "cases": [
+            "官网进入登录，后台用户CRUD失败保稿，不准备DSH",
+            "角色权限阻止直接路由挂载，未知入口显示404",
+            "菜单409保留草稿，重新加载可恢复服务端最新配置",
+            "工作台按需准备一次、切模块保草稿、退出清理账号状态",
+            "语言主题保存，窄屏导航切换后关闭且内容不横向溢出"
+          ],
+          "evidence": "indexed-only"
+        },
+        {
+          "path": "apps/web-admin/tests/e2e/phase-two-management-live.spec.ts",
+          "cases": ["第二阶段真实管理页面、示例与智能体编辑闭环"],
+          "evidence": "indexed-only"
+        },
+        {
+          "path": "apps/web-admin/tests/fronted/markdown-renderer.test.ts",
+          "cases": [
+            "保留表格、公式和语法高亮，将图表拆为独立异步片段",
+            "HTML、脚本链接、公式宏与远程图片不能产生主动内容"
+          ],
+          "evidence": "indexed-only"
+        },
+        {
+          "path": "apps/web-admin/tests/e2e/workbench-richtext.spec.ts",
+          "cases": ["公开分享渲染表格、公式与 Mermaid，主动 HTML 不执行"],
+          "evidence": "indexed-only"
+        }
+      ],
+      "requiredDifferentialEvidence": [
+        "positive",
+        "authorization",
+        "failure-recovery",
+        "concurrency-if-applicable"
+      ],
+      "status": "awaiting-differential-execution"
+    },
+    {
+      "id": "P2-03",
+      "title": "账户完整流程与身份状态",
+      "moduleIds": [
+        "account.profile",
+        "account.security",
+        "account.appearance",
+        "account.mobile"
+      ],
+      "tests": [
+        {
+          "path": "apps/web-admin/tests/backend/test_identity.py",
+          "cases": [
+            "test_auth_refresh_replay_and_session_revocation",
+            "test_security_session_search_paging_activity_and_revoke",
+            "test_legacy_cookie_menu_cas_and_revocation",
+            "test_pkce_challenge_and_single_use"
+          ],
+          "evidence": "indexed-only"
+        },
+        {
+          "path": "apps/web-admin/tests/backend/test_account_management_phase_two.py",
+          "cases": [
+            "test_settings_email_registration_recovery_and_audit",
+            "test_mobile_confirmation_single_use_and_revocation",
+            "test_external_oauth_pkce_cookie_binding_and_one_use",
+            "test_announcement_dashboard_permissions_and_timezones",
+            "test_dashboard_daily_activity_histograms_and_historical_snapshot"
+          ],
+          "evidence": "indexed-only"
+        },
+        {
+          "path": "apps/web-admin/tests/fronted/login-page.test.ts",
+          "cases": [
+            "直接显示空白登录表单并完成正常登录",
+            "注册关闭时旧注册路径显示登录表单",
+            "服务端开放普通注册时保留注册能力但不发送初始化令牌"
+          ],
+          "evidence": "indexed-only"
+        },
+        {
+          "path": "apps/web-admin/tests/fronted/session-controller.test.ts",
+          "cases": [
+            "并发刷新只发一个请求，并保持同账号代际",
+            "登出先封锁身份，等待在途刷新后撤销Cookie，迟到响应不能复活账号",
+            "旧账号刷新不能覆盖后登录的新账号",
+            "网络登出失败后刷新页面仍不自动恢复旧Cookie身份"
+          ],
+          "evidence": "indexed-only"
+        }
+      ],
+      "requiredDifferentialEvidence": [
+        "positive",
+        "authorization",
+        "failure-recovery",
+        "concurrency-if-applicable"
+      ],
+      "status": "awaiting-differential-execution"
+    },
+    {
+      "id": "P2-04",
+      "title": "用户、角色与菜单完整管理",
+      "moduleIds": ["access.users", "access.roles", "access.menus"],
+      "tests": [
+        {
+          "path": "apps/web-admin/tests/backend/test_identity.py",
+          "cases": [
+            "test_auth_refresh_replay_and_session_revocation",
+            "test_security_session_search_paging_activity_and_revoke",
+            "test_legacy_cookie_menu_cas_and_revocation",
+            "test_pkce_challenge_and_single_use"
+          ],
+          "evidence": "indexed-only"
+        },
+        {
+          "path": "apps/web-admin/tests/e2e/foundation-live.spec.ts",
+          "cases": ["真实新平台：配置初始化后登录、刷新、用户与角色菜单闭环"],
+          "evidence": "indexed-only"
+        }
+      ],
+      "requiredDifferentialEvidence": [
+        "positive",
+        "authorization",
+        "failure-recovery",
+        "concurrency-if-applicable"
+      ],
+      "status": "awaiting-differential-execution"
+    },
+    {
+      "id": "P2-05",
+      "title": "总览与管理页面生命周期",
+      "moduleIds": ["overview"],
+      "tests": [
+        {
+          "path": "apps/web-admin/tests/backend/test_account_management_phase_two.py",
+          "cases": [
+            "test_settings_email_registration_recovery_and_audit",
+            "test_mobile_confirmation_single_use_and_revocation",
+            "test_external_oauth_pkce_cookie_binding_and_one_use",
+            "test_announcement_dashboard_permissions_and_timezones",
+            "test_dashboard_daily_activity_histograms_and_historical_snapshot"
+          ],
+          "evidence": "indexed-only"
+        }
+      ],
+      "requiredDifferentialEvidence": [
+        "positive",
+        "authorization",
+        "failure-recovery",
+        "concurrency-if-applicable"
+      ],
+      "status": "awaiting-differential-execution"
+    },
+    {
+      "id": "P2-06",
+      "title": "平台、个人与多模态模型",
+      "moduleIds": ["models", "models.multimodal", "account.models"],
+      "tests": [
+        {
+          "path": "apps/web-admin/tests/backend/test_models_agents_knowledge.py",
+          "cases": [
+            "test_provider_secret_scope_default_and_configuration_projection",
+            "test_model_revision_roles_parameters_and_injected_network",
+            "test_real_document_parsers_preserve_locations",
+            "test_parser_rejects_corruption_empty_scan_and_invalid_vectors",
+            "test_agent_assets_bindings_revisions_and_publishing",
+            "test_knowledge_index_failure_retry_sources_restore_and_restart",
+            "test_public_agent_assets_do_not_grant_management_and_duplicate_upload_is_clean",
+            "test_embedding_change_rolls_back_failure_and_keeps_key_private",
+            "test_cancelled_index_has_persistent_failed_receipt"
+          ],
+          "evidence": "indexed-only"
+        },
+        {
+          "path": "apps/web-admin/tests/backend/test_office_multimodal_phase_two.py",
+          "cases": [
+            "test_image_receipt_resumes_storage_without_paid_post_after_restart",
+            "test_vision_incomplete_and_bad_images_never_auto_replay",
+            "test_concurrent_and_cancelled_generation_keeps_unknown_receipt_without_replay"
+          ],
+          "evidence": "indexed-only"
+        },
+        {
+          "path": "apps/web-admin/tests/backend/test_compatibility_proxy_phase_two.py",
+          "cases": [
+            "test_multisegment_encoding_and_websocket_scope_are_preserved",
+            "test_websocket_target_validation_uses_nested_router_and_transport",
+            "test_registered_compatibility_targets_and_frozen_contract_coverage",
+            "test_declared_response_envelope_only_wraps_success",
+            "test_proxy_legacy_operation_secret_filtering_and_upstream_status",
+            "test_proxy_single_session_revocation_interrupts_waiting_stream_and_closes_connection",
+            "test_provider_rejects_private_targets_redirects_and_malformed_json"
+          ],
+          "evidence": "indexed-only"
+        },
+        {
+          "path": "apps/web-admin/tests/fronted/models-agents-knowledge.test.ts",
+          "cases": [
+            "模型草稿不复制密钥，取消编辑不改变原目录",
+            "个人模型提交失败保留草稿，成功提交不携带响应元数据",
+            "发布失败保留原发布状态，试用只暂存草稿并导航",
+            "账号代际变化后迟到保存不关闭新账号界面或刷新目录",
+            "Agent字段与知识来源定位不凭空构造，Embedding设置永不回填密钥"
+          ],
+          "evidence": "indexed-only"
+        },
+        {
+          "path": "apps/web-admin/tests/fronted/editor-drafts.test.ts",
+          "cases": [
+            "能力切换原子清除新草稿参数，保留原参数对象",
+            "供应商模型行编辑创建新数组和新行，原模型不可变",
+            "模型连接名称通过事件更新且不污染原连接"
+          ],
+          "evidence": "indexed-only"
+        }
+      ],
+      "requiredDifferentialEvidence": [
+        "positive",
+        "authorization",
+        "failure-recovery",
+        "concurrency-if-applicable"
+      ],
+      "status": "awaiting-differential-execution"
+    },
+    {
+      "id": "P2-07",
+      "title": "Agent 定义、资源绑定与试运行",
+      "moduleIds": ["agents"],
+      "tests": [
+        {
+          "path": "apps/web-admin/tests/backend/test_models_agents_knowledge.py",
+          "cases": [
+            "test_provider_secret_scope_default_and_configuration_projection",
+            "test_model_revision_roles_parameters_and_injected_network",
+            "test_real_document_parsers_preserve_locations",
+            "test_parser_rejects_corruption_empty_scan_and_invalid_vectors",
+            "test_agent_assets_bindings_revisions_and_publishing",
+            "test_knowledge_index_failure_retry_sources_restore_and_restart",
+            "test_public_agent_assets_do_not_grant_management_and_duplicate_upload_is_clean",
+            "test_embedding_change_rolls_back_failure_and_keeps_key_private",
+            "test_cancelled_index_has_persistent_failed_receipt"
+          ],
+          "evidence": "indexed-only"
+        },
+        {
+          "path": "apps/web-admin/tests/backend/test_example_packages.py",
+          "cases": [
+            "test_examples_are_editable_idempotent_and_do_not_restore_deleted",
+            "test_invalid_package_rolls_back_resources_and_generated_assets"
+          ],
+          "evidence": "indexed-only"
+        },
+        {
+          "path": "apps/web-admin/tests/fronted/models-agents-knowledge.test.ts",
+          "cases": [
+            "模型草稿不复制密钥，取消编辑不改变原目录",
+            "个人模型提交失败保留草稿，成功提交不携带响应元数据",
+            "发布失败保留原发布状态，试用只暂存草稿并导航",
+            "账号代际变化后迟到保存不关闭新账号界面或刷新目录",
+            "Agent字段与知识来源定位不凭空构造，Embedding设置永不回填密钥"
+          ],
+          "evidence": "indexed-only"
+        },
+        {
+          "path": "apps/web-admin/tests/fronted/editor-drafts.test.ts",
+          "cases": ["智能体固定技能变更发出新策略，原策略保持不变"],
+          "evidence": "indexed-only"
+        }
+      ],
+      "requiredDifferentialEvidence": [
+        "positive",
+        "authorization",
+        "failure-recovery",
+        "concurrency-if-applicable"
+      ],
+      "status": "awaiting-differential-execution"
+    },
+    {
+      "id": "P2-08",
+      "title": "知识库、解析、索引与检索",
+      "moduleIds": ["knowledge"],
+      "tests": [
+        {
+          "path": "apps/web-admin/tests/backend/test_models_agents_knowledge.py",
+          "cases": [
+            "test_provider_secret_scope_default_and_configuration_projection",
+            "test_model_revision_roles_parameters_and_injected_network",
+            "test_real_document_parsers_preserve_locations",
+            "test_parser_rejects_corruption_empty_scan_and_invalid_vectors",
+            "test_agent_assets_bindings_revisions_and_publishing",
+            "test_knowledge_index_failure_retry_sources_restore_and_restart",
+            "test_public_agent_assets_do_not_grant_management_and_duplicate_upload_is_clean",
+            "test_embedding_change_rolls_back_failure_and_keeps_key_private",
+            "test_cancelled_index_has_persistent_failed_receipt"
+          ],
+          "evidence": "indexed-only"
+        },
+        {
+          "path": "apps/web-admin/tests/fronted/editor-drafts.test.ts",
+          "cases": ["Embedding 维度清空不会写入 undefined 或修改原草稿"],
+          "evidence": "indexed-only"
+        }
+      ],
+      "requiredDifferentialEvidence": [
+        "positive",
+        "authorization",
+        "failure-recovery",
+        "concurrency-if-applicable"
+      ],
+      "status": "awaiting-differential-execution"
+    },
+    {
+      "id": "P2-09",
+      "title": "技能管理与技能程序",
+      "moduleIds": ["skills"],
+      "tests": [
+        {
+          "path": "apps/web-admin/tests/backend/test_extension_skill_management.py",
+          "cases": [
+            "test_node_package_locked_install_secret_rollback_and_cas",
+            "test_python_extension_real_locked_environment_and_bad_archives",
+            "test_mcp_stdio_real_discovery_call_error_and_schema_revocation",
+            "test_mcp_http_discovery_selection_credentials_and_schema_change",
+            "test_skill_cycles_are_atomic_during_edit_and_restore",
+            "test_skill_archive_publish_matching_and_asset_compensation"
+          ],
+          "evidence": "indexed-only"
+        },
+        {
+          "path": "apps/web-admin/tests/backend/test_resources_and_skills.py",
+          "cases": [
+            "test_resource_encryption_snapshots_owner_and_seed_once",
+            "test_skill_auxiliary_confirmation_revision_receipts_and_restart"
+          ],
+          "evidence": "indexed-only"
+        },
+        {
+          "path": "apps/web-admin/tests/fronted/skills-tools.test.ts",
+          "cases": [
+            "按Schema显示嵌套字段，已配置秘密留空保留且清空是显式操作",
+            "预设保留字段类型并排除writeOnly默认秘密，局部引用正确展开",
+            "prepare/execute必须相邻且工具授权不能扩大，阶段ID始终唯一",
+            "MCP发现不自动授权，并且更改端点会拒绝迟到的旧发现结果"
+          ],
+          "evidence": "indexed-only"
+        }
+      ],
+      "requiredDifferentialEvidence": [
+        "positive",
+        "authorization",
+        "failure-recovery",
+        "concurrency-if-applicable"
+      ],
+      "status": "awaiting-differential-execution"
+    },
+    {
+      "id": "P2-10",
+      "title": "工具、扩展与 MCP",
+      "moduleIds": ["tools"],
+      "tests": [
+        {
+          "path": "apps/web-admin/tests/backend/test_extension_skill_management.py",
+          "cases": [
+            "test_node_package_locked_install_secret_rollback_and_cas",
+            "test_python_extension_real_locked_environment_and_bad_archives",
+            "test_mcp_stdio_real_discovery_call_error_and_schema_revocation",
+            "test_mcp_http_discovery_selection_credentials_and_schema_change",
+            "test_skill_cycles_are_atomic_during_edit_and_restore",
+            "test_skill_archive_publish_matching_and_asset_compensation"
+          ],
+          "evidence": "indexed-only"
+        },
+        {
+          "path": "apps/web-admin/tests/backend/test_configuration_projection.py",
+          "cases": [
+            "test_nested_references_combinations_patterns_and_arrays_hide_secrets",
+            "test_anchors_cycles_depth_limits_and_nested_merge"
+          ],
+          "evidence": "indexed-only"
+        },
+        {
+          "path": "apps/web-admin/tests/backend/test_configuration_persistence.py",
+          "cases": [
+            "test_nested_secret_update_preserves_old_and_failed_update_rolls_back"
+          ],
+          "evidence": "indexed-only"
+        },
+        {
+          "path": "apps/web-admin/tests/fronted/skills-tools.test.ts",
+          "cases": [
+            "按Schema显示嵌套字段，已配置秘密留空保留且清空是显式操作",
+            "预设保留字段类型并排除writeOnly默认秘密，局部引用正确展开",
+            "prepare/execute必须相邻且工具授权不能扩大，阶段ID始终唯一",
+            "MCP发现不自动授权，并且更改端点会拒绝迟到的旧发现结果"
+          ],
+          "evidence": "indexed-only"
+        }
+      ],
+      "requiredDifferentialEvidence": [
+        "positive",
+        "authorization",
+        "failure-recovery",
+        "concurrency-if-applicable"
+      ],
+      "status": "awaiting-differential-execution"
+    },
+    {
+      "id": "P2-11",
+      "title": "存储、我的文件与资源附件",
+      "moduleIds": ["system.storage", "account.files"],
+      "tests": [
+        {
+          "path": "apps/web-admin/tests/backend/test_files_devices_management.py",
+          "cases": [
+            "test_file_references_trash_alias_and_version_contract",
+            "test_bind_and_trash_race_never_publish_deleted_reference",
+            "test_inventory_pagination_owner_search_and_storage_aggregates"
+          ],
+          "evidence": "indexed-only"
+        },
+        {
+          "path": "apps/web-admin/tests/backend/test_workspace_phase2.py",
+          "cases": [
+            "test_chunk_upload_resume_checksum_and_download",
+            "test_asset_delegation_and_foreign_owner_are_explicit",
+            "test_pairing_single_claim_and_revocation",
+            "test_workspace_path_and_write_conflict",
+            "test_projection_replay_sequence_share_and_ticket",
+            "test_real_managed_terminal_is_closed"
+          ],
+          "evidence": "indexed-only"
+        },
+        {
+          "path": "apps/web-admin/tests/fronted/files-storage-devices.test.ts",
+          "cases": [
+            "存储密钥空白保留，半份凭据拒绝且编辑不改原配置",
+            "保存冲突保留连接草稿，不自动重发或丢掉修订",
+            "运维阻断要求写权限，失败后保留设备与原因",
+            "运行配置深拷贝并在Schema边界拒绝空必填、非法枚举与损坏数组",
+            "主动文档不可作为图片或HTML预览执行"
+          ],
+          "evidence": "indexed-only"
+        },
+        {
+          "path": "apps/web-admin/tests/fronted/editor-drafts.test.ts",
+          "cases": ["存储连接名称通过事件更新且不污染原连接"],
+          "evidence": "indexed-only"
+        }
+      ],
+      "requiredDifferentialEvidence": [
+        "positive",
+        "authorization",
+        "failure-recovery",
+        "concurrency-if-applicable"
+      ],
+      "status": "awaiting-differential-execution"
+    },
+    {
+      "id": "P2-12",
+      "title": "设备、运行实例与 DSH 生命周期",
+      "moduleIds": ["devices"],
+      "tests": [
+        {
+          "path": "apps/web-admin/tests/backend/test_device_operations_phase2.py",
+          "cases": [
+            "test_local_transfer_preview_consumption_and_path_binding",
+            "test_local_shell_actual_process_and_durable_idempotency",
+            "test_local_shell_timeout_records_failure_and_closes_process",
+            "test_remote_download_uses_real_connector_upload_and_integrity",
+            "test_remote_terminal_relay_and_shell_contracts",
+            "test_remote_runtime_configuration_remains_protocol_driven"
+          ],
+          "evidence": "indexed-only"
+        },
+        {
+          "path": "apps/web-admin/tests/backend/test_files_devices_management.py",
+          "cases": [
+            "test_file_references_trash_alias_and_version_contract",
+            "test_bind_and_trash_race_never_publish_deleted_reference",
+            "test_inventory_pagination_owner_search_and_storage_aggregates"
+          ],
+          "evidence": "indexed-only"
+        },
+        {
+          "path": "apps/web-admin/tests/integration/test_dsh_runtime.py",
+          "cases": ["test_real_fixed_host_lifecycle_and_cancel"],
+          "evidence": "indexed-only"
+        },
+        {
+          "path": "apps/web-admin/tests/integration/test_dsh_process_tree.py",
+          "cases": ["test_windows_job_reaps_descendant_after_root_exits"],
+          "evidence": "indexed-only"
+        }
+      ],
+      "requiredDifferentialEvidence": [
+        "positive",
+        "authorization",
+        "failure-recovery",
+        "concurrency-if-applicable"
+      ],
+      "status": "awaiting-differential-execution"
+    },
+    {
+      "id": "P2-13",
+      "title": "工作台框架、项目与创建会话",
+      "moduleIds": ["workbench"],
+      "tests": [
+        {
+          "path": "apps/web-admin/tests/backend/test_workspace_phase2.py",
+          "cases": [
+            "test_chunk_upload_resume_checksum_and_download",
+            "test_asset_delegation_and_foreign_owner_are_explicit",
+            "test_pairing_single_claim_and_revocation",
+            "test_workspace_path_and_write_conflict",
+            "test_projection_replay_sequence_share_and_ticket",
+            "test_real_managed_terminal_is_closed"
+          ],
+          "evidence": "indexed-only"
+        },
+        {
+          "path": "apps/web-admin/tests/fronted/routing-and-drafts.test.ts",
+          "cases": [
+            "21个模块保持唯一ID，旧Hash按权限和子路由转换",
+            "菜单隐藏不改变直接访问权限，空分组不会出现",
+            "同账号切页保留File，换代际清空并撤销所有预览",
+            "API客户端只构造同源规范路径并编码查询参数"
+          ],
+          "evidence": "indexed-only"
+        },
+        {
+          "path": "apps/web-admin/tests/e2e/workbench-richtext.spec.ts",
+          "cases": [
+            "工作台等待审批可中断，方案冲突保稿，来源和诊断草稿有实际入口"
+          ],
+          "evidence": "indexed-only"
+        }
+      ],
+      "requiredDifferentialEvidence": [
+        "positive",
+        "authorization",
+        "failure-recovery",
+        "concurrency-if-applicable"
+      ],
+      "status": "awaiting-differential-execution"
+    },
+    {
+      "id": "P2-14",
+      "title": "会话流、快照、订阅与恢复",
+      "moduleIds": ["workbench"],
+      "tests": [
+        {
+          "path": "apps/web-admin/tests/backend/test_workspace_phase2.py",
+          "cases": [
+            "test_chunk_upload_resume_checksum_and_download",
+            "test_asset_delegation_and_foreign_owner_are_explicit",
+            "test_pairing_single_claim_and_revocation",
+            "test_workspace_path_and_write_conflict",
+            "test_projection_replay_sequence_share_and_ticket",
+            "test_real_managed_terminal_is_closed"
+          ],
+          "evidence": "indexed-only"
+        },
+        {
+          "path": "apps/web-admin/tests/fronted/session-stream.test.ts",
+          "cases": [
+            "连续事件合并、重复去重、间隙取快照，切会话后旧事件不能覆盖",
+            "票据返回前换账号不建立连接，重连计时器随卸载撤销"
+          ],
+          "evidence": "indexed-only"
+        },
+        {
+          "path": "apps/web-admin/tests/fronted/workbench-protocol.test.ts",
+          "cases": [
+            "保留运行时 actionId 与选项身份，未选择不能默认确认",
+            "迟到修订不覆盖已有时间线，断线间隙不前移游标"
+          ],
+          "evidence": "indexed-only"
+        },
+        {
+          "path": "apps/web-admin/tests/fronted/workbench-state.test.ts",
+          "cases": [
+            "跟随新内容时滚到底部，向上阅读和展开历史保持位置，卸载清理观察器"
+          ],
+          "evidence": "indexed-only"
+        }
+      ],
+      "requiredDifferentialEvidence": [
+        "positive",
+        "authorization",
+        "failure-recovery",
+        "concurrency-if-applicable"
+      ],
+      "status": "awaiting-differential-execution"
+    },
+    {
+      "id": "P2-15",
+      "title": "审批、输入、回顾与公开分享",
+      "moduleIds": ["workbench"],
+      "tests": [
+        {
+          "path": "apps/web-admin/tests/backend/test_workspace_phase2.py",
+          "cases": [
+            "test_chunk_upload_resume_checksum_and_download",
+            "test_asset_delegation_and_foreign_owner_are_explicit",
+            "test_pairing_single_claim_and_revocation",
+            "test_workspace_path_and_write_conflict",
+            "test_projection_replay_sequence_share_and_ticket",
+            "test_real_managed_terminal_is_closed"
+          ],
+          "evidence": "indexed-only"
+        },
+        {
+          "path": "apps/web-admin/tests/backend/test_tool_execution_phase2.py",
+          "cases": [
+            "test_action_requires_exact_confirmation_and_replays_receipt",
+            "test_concurrent_confirmation_and_unknown_results_never_repeat",
+            "test_ordinary_artifact_has_real_receipt_and_no_fabricated_skill",
+            "test_skill_confirmation_advances_exact_stage_and_old_revision_rejected",
+            "test_concurrent_artifact_publication_keeps_one_file",
+            "test_submit_auxiliary_action_confirms_without_advancing_stage",
+            "test_diagnostic_draft_remains_downloadable_but_cannot_satisfy_delivery"
+          ],
+          "evidence": "indexed-only"
+        },
+        {
+          "path": "apps/web-admin/tests/fronted/workbench-protocol.test.ts",
+          "cases": [
+            "保留运行时 actionId 与选项身份，未选择不能默认确认",
+            "迟到修订不覆盖已有时间线，断线间隙不前移游标"
+          ],
+          "evidence": "indexed-only"
+        },
+        {
+          "path": "apps/web-admin/tests/backend/test_office_execution.py",
+          "cases": [
+            "test_configured_illustration_confirmation_artifact_revision_and_revocation"
+          ],
+          "evidence": "indexed-only"
+        },
+        {
+          "path": "apps/web-admin/tests/e2e/workbench-richtext.spec.ts",
+          "cases": [
+            "工作台等待审批可中断，方案冲突保稿，来源和诊断草稿有实际入口",
+            "公开分享渲染表格、公式与 Mermaid，主动 HTML 不执行"
+          ],
+          "evidence": "indexed-only"
+        },
+        {
+          "path": "apps/web-admin/tests/backend/test_plan_reference_phase2.py",
+          "cases": [
+            "test_plan_edit_invalidates_exact_confirmation_and_keeps_completed_history",
+            "test_reference_rechecks_real_asset_and_rejects_forged_quote"
+          ],
+          "evidence": "indexed-only"
+        }
+      ],
+      "requiredDifferentialEvidence": [
+        "positive",
+        "authorization",
+        "failure-recovery",
+        "concurrency-if-applicable"
+      ],
+      "status": "awaiting-differential-execution"
+    },
+    {
+      "id": "P2-16",
+      "title": "文件工作区、编辑器与终端",
+      "moduleIds": ["workbench"],
+      "tests": [
+        {
+          "path": "apps/web-admin/tests/backend/test_device_operations_phase2.py",
+          "cases": [
+            "test_local_transfer_preview_consumption_and_path_binding",
+            "test_local_shell_actual_process_and_durable_idempotency",
+            "test_local_shell_timeout_records_failure_and_closes_process",
+            "test_remote_download_uses_real_connector_upload_and_integrity",
+            "test_remote_terminal_relay_and_shell_contracts",
+            "test_remote_runtime_configuration_remains_protocol_driven"
+          ],
+          "evidence": "indexed-only"
+        },
+        {
+          "path": "apps/web-admin/tests/backend/test_workspace_phase2.py",
+          "cases": [
+            "test_chunk_upload_resume_checksum_and_download",
+            "test_asset_delegation_and_foreign_owner_are_explicit",
+            "test_pairing_single_claim_and_revocation",
+            "test_workspace_path_and_write_conflict",
+            "test_projection_replay_sequence_share_and_ticket",
+            "test_real_managed_terminal_is_closed"
+          ],
+          "evidence": "indexed-only"
+        },
+        {
+          "path": "apps/web-admin/tests/fronted/file-preview.test.ts",
+          "cases": [
+            "路由只接受字符串并限制行列，来源URL禁止外域和脚本协议",
+            "一次性票据只交换一次，刷新复用受限会话且不可进入编辑",
+            "保存摘要冲突保留草稿，不重试有副作用的写入",
+            "路径切换后迟到文件不能覆盖新路径或创建泄漏的URL",
+            "文件读取失败后允许目录浏览，目录失败时保留原错误"
+          ],
+          "evidence": "indexed-only"
+        },
+        {
+          "path": "apps/web-admin/tests/fronted/markdown-renderer.test.ts",
+          "cases": [
+            "保留表格、公式和语法高亮，将图表拆为独立异步片段",
+            "HTML、脚本链接、公式宏与远程图片不能产生主动内容"
+          ],
+          "evidence": "indexed-only"
+        },
+        {
+          "path": "apps/web-admin/tests/e2e/workbench-richtext.spec.ts",
+          "cases": ["公开分享渲染表格、公式与 Mermaid，主动 HTML 不执行"],
+          "evidence": "indexed-only"
+        },
+        {
+          "path": "apps/web-admin/tests/fronted/workbench-state.test.ts",
+          "cases": ["同账号重进恢复所选标签，关闭或换号不会复用旧选择"],
+          "evidence": "indexed-only"
+        }
+      ],
+      "requiredDifferentialEvidence": [
+        "positive",
+        "authorization",
+        "failure-recovery",
+        "concurrency-if-applicable"
+      ],
+      "status": "awaiting-differential-execution"
+    },
+    {
+      "id": "P2-17",
+      "title": "可配置 Office 工具包与通用成果契约",
+      "moduleIds": ["workbench"],
+      "tests": [
+        {
+          "path": "apps/web-admin/tests/backend/test_office_documents.py",
+          "cases": [
+            "test_office_archive_rejects_active_embedded_workbook_and_xml_entities",
+            "test_native_conditional_distinct_escapes_identifiers_and_recalculates",
+            "test_editable_document_has_table_citation_and_template_header",
+            "test_spreadsheet_formulas_cached_results_chart_and_source_sheet",
+            "test_spreadsheet_input_formulas_recomputed_and_cycles_rejected",
+            "test_presentation_native_chart_design_and_template_mapping",
+            "test_presentation_refuses_overlapping_content_and_unauthorized_sources",
+            "test_spreadsheet_template_formulas_recalculated_and_cached_across_hidden_sheets",
+            "test_spreadsheet_template_invalid_calculation_never_publishes_verified_artifact",
+            "test_document_template_rejects_active_simple_and_complex_fields",
+            "test_document_template_preserves_safe_fields_and_checks_all_parts"
+          ],
+          "evidence": "indexed-only"
+        },
+        {
+          "path": "apps/web-admin/tests/backend/test_office_multimodal_phase_two.py",
+          "cases": [
+            "test_image_receipt_resumes_storage_without_paid_post_after_restart",
+            "test_vision_incomplete_and_bad_images_never_auto_replay",
+            "test_concurrent_and_cancelled_generation_keeps_unknown_receipt_without_replay"
+          ],
+          "evidence": "indexed-only"
+        },
+        {
+          "path": "apps/web-admin/tests/backend/test_tool_execution_phase2.py",
+          "cases": [
+            "test_action_requires_exact_confirmation_and_replays_receipt",
+            "test_concurrent_confirmation_and_unknown_results_never_repeat",
+            "test_ordinary_artifact_has_real_receipt_and_no_fabricated_skill",
+            "test_skill_confirmation_advances_exact_stage_and_old_revision_rejected",
+            "test_concurrent_artifact_publication_keeps_one_file",
+            "test_submit_auxiliary_action_confirms_without_advancing_stage",
+            "test_diagnostic_draft_remains_downloadable_but_cannot_satisfy_delivery"
+          ],
+          "evidence": "indexed-only"
+        },
+        {
+          "path": "apps/web-admin/tests/integration/office_rendering.py",
+          "cases": [
+            "test_real_office_rendering_preserves_chinese_text_and_editable_sources"
+          ],
+          "evidence": "indexed-only"
+        },
+        {
+          "path": "apps/web-admin/tests/backend/test_office_execution.py",
+          "cases": [
+            "test_configured_illustration_confirmation_artifact_revision_and_revocation"
+          ],
+          "evidence": "indexed-only"
+        },
+        {
+          "path": "apps/web-admin/tests/e2e/workbench-richtext.spec.ts",
+          "cases": [
+            "工作台等待审批可中断，方案冲突保稿，来源和诊断草稿有实际入口"
+          ],
+          "evidence": "indexed-only"
+        },
+        {
+          "path": "apps/web-admin/tests/backend/test_plan_reference_phase2.py",
+          "cases": [
+            "test_plan_edit_invalidates_exact_confirmation_and_keeps_completed_history",
+            "test_reference_rechecks_real_asset_and_rejects_forged_quote"
+          ],
+          "evidence": "indexed-only"
+        }
+      ],
+      "requiredDifferentialEvidence": [
+        "positive",
+        "authorization",
+        "failure-recovery",
+        "concurrency-if-applicable"
+      ],
+      "status": "awaiting-differential-execution"
+    },
+    {
+      "id": "P2-18",
+      "title": "服务配置、公告、审计与手机连接",
+      "moduleIds": ["system.service", "system.audit", "account.mobile"],
+      "tests": [
+        {
+          "path": "apps/web-admin/tests/backend/test_account_management_phase_two.py",
+          "cases": [
+            "test_settings_email_registration_recovery_and_audit",
+            "test_mobile_confirmation_single_use_and_revocation",
+            "test_external_oauth_pkce_cookie_binding_and_one_use",
+            "test_announcement_dashboard_permissions_and_timezones",
+            "test_dashboard_daily_activity_histograms_and_historical_snapshot"
+          ],
+          "evidence": "indexed-only"
+        },
+        {
+          "path": "apps/web-admin/tests/backend/test_identity.py",
+          "cases": [
+            "test_auth_refresh_replay_and_session_revocation",
+            "test_security_session_search_paging_activity_and_revoke",
+            "test_legacy_cookie_menu_cas_and_revocation",
+            "test_pkce_challenge_and_single_use"
+          ],
+          "evidence": "indexed-only"
+        }
+      ],
+      "requiredDifferentialEvidence": [
+        "positive",
+        "authorization",
+        "failure-recovery",
+        "concurrency-if-applicable"
+      ],
+      "status": "awaiting-differential-execution"
+    },
+    {
+      "id": "P2-19",
+      "title": "可选的 LangGraph 技能/工具实现",
+      "moduleIds": [],
+      "tests": [
+        {
+          "path": "apps/web-admin/tests/backend/test_resources_and_skills.py",
+          "cases": [
+            "test_resource_encryption_snapshots_owner_and_seed_once",
+            "test_skill_auxiliary_confirmation_revision_receipts_and_restart"
+          ],
+          "evidence": "indexed-only"
+        },
+        {
+          "path": "apps/web-admin/tests/backend/test_tool_execution_phase2.py",
+          "cases": [
+            "test_action_requires_exact_confirmation_and_replays_receipt",
+            "test_concurrent_confirmation_and_unknown_results_never_repeat",
+            "test_ordinary_artifact_has_real_receipt_and_no_fabricated_skill",
+            "test_skill_confirmation_advances_exact_stage_and_old_revision_rejected",
+            "test_concurrent_artifact_publication_keeps_one_file",
+            "test_submit_auxiliary_action_confirms_without_advancing_stage",
+            "test_diagnostic_draft_remains_downloadable_but_cannot_satisfy_delivery"
+          ],
+          "evidence": "indexed-only"
+        },
+        {
+          "path": "apps/web-admin/tests/backend/test_office_execution.py",
+          "cases": [
+            "test_configured_illustration_confirmation_artifact_revision_and_revocation"
+          ],
+          "evidence": "indexed-only"
+        }
+      ],
+      "requiredDifferentialEvidence": [
+        "positive",
+        "authorization",
+        "failure-recovery",
+        "concurrency-if-applicable"
+      ],
+      "status": "awaiting-differential-execution"
+    },
+    {
+      "id": "P2-20",
+      "title": "分批集成与独立部署回归",
+      "moduleIds": [],
+      "tests": [
+        {
+          "path": "apps/web-admin/tests/backend/test_initial_admin.py",
+          "cases": [
+            "test_configured_admin_is_ready_before_first_request",
+            "test_concurrent_initialization_creates_only_one_admin",
+            "test_restart_preserves_changed_password_and_permissions",
+            "test_initial_admin_rejects_incomplete_or_invalid_config"
+          ],
+          "evidence": "indexed-only"
+        },
+        {
+          "path": "apps/web-admin/tests/backend/test_migration_and_static.py",
+          "cases": [
+            "test_unknown_database_is_not_auto_stamped",
+            "test_expired_bootstrap_remains_expired",
+            "test_production_spa_keeps_api_and_assets_404"
+          ],
+          "evidence": "indexed-only"
+        },
+        {
+          "path": "apps/web-admin/tests/backend/test_workers.py",
+          "cases": ["test_worker_success_timeout_cancel_and_close"],
+          "evidence": "indexed-only"
+        },
+        {
+          "path": "apps/web-admin/tests/tooling/test_control_channel.py",
+          "cases": ["test_control_pipe_does_not_block_spawn"],
+          "evidence": "indexed-only"
+        },
+        {
+          "path": "apps/web-admin/tests/tooling/test_import_isolation.py",
+          "cases": ["test_platform_import_excludes_native_worker_libraries"],
+          "evidence": "indexed-only"
+        },
+        {
+          "path": "apps/web-admin/tests/integration/test_dsh_runtime.py",
+          "cases": ["test_real_fixed_host_lifecycle_and_cancel"],
+          "evidence": "indexed-only"
+        },
+        {
+          "path": "apps/web-admin/tests/e2e/foundation-live.spec.ts",
+          "cases": ["真实新平台：配置初始化后登录、刷新、用户与角色菜单闭环"],
+          "evidence": "indexed-only"
+        },
+        {
+          "path": "apps/web-admin/tests/e2e/phase-two-management-live.spec.ts",
+          "cases": ["第二阶段真实管理页面、示例与智能体编辑闭环"],
+          "evidence": "indexed-only"
+        }
+      ],
+      "requiredDifferentialEvidence": [
+        "positive",
+        "authorization",
+        "failure-recovery",
+        "concurrency-if-applicable"
+      ],
+      "status": "awaiting-differential-execution"
+    },
+    {
+      "id": "P2-21",
+      "title": "向差异验证阶段交接",
+      "moduleIds": [],
+      "tests": [
+        {
+          "path": "apps/web-admin/tests/backend/test_compatibility_proxy_phase_two.py",
+          "cases": [
+            "test_multisegment_encoding_and_websocket_scope_are_preserved",
+            "test_websocket_target_validation_uses_nested_router_and_transport",
+            "test_registered_compatibility_targets_and_frozen_contract_coverage",
+            "test_declared_response_envelope_only_wraps_success",
+            "test_proxy_legacy_operation_secret_filtering_and_upstream_status",
+            "test_proxy_single_session_revocation_interrupts_waiting_stream_and_closes_connection",
+            "test_provider_rejects_private_targets_redirects_and_malformed_json"
+          ],
+          "evidence": "indexed-only"
+        },
+        {
+          "path": "apps/web-admin/tests/tooling/parity.test.ts",
+          "cases": [
+            "模板匹配忽略参数名但保留方法和多段边界",
+            "契约摘要保留校验约束并拒绝循环引用失控",
+            "测试索引不得作为已执行证据"
+          ],
+          "evidence": "indexed-only"
+        },
+        {
+          "path": "apps/web-admin/tests/e2e/phase-two-management-live.spec.ts",
+          "cases": ["第二阶段真实管理页面、示例与智能体编辑闭环"],
+          "evidence": "indexed-only"
+        }
+      ],
+      "requiredDifferentialEvidence": [
+        "positive",
+        "authorization",
+        "failure-recovery",
+        "concurrency-if-applicable"
+      ],
+      "status": "awaiting-differential-execution"
+    }
+  ],
+  "modules": [
+    {
+      "id": "overview",
+      "title": "总览",
+      "legacyRoute": "#/overview",
+      "taskIds": ["P2-05"],
+      "visualStatus": "not-run",
+      "interactionStatus": "not-run"
+    },
+    {
+      "id": "access.users",
+      "title": "用户管理",
+      "legacyRoute": "#/access/users",
+      "taskIds": ["P2-04"],
+      "visualStatus": "not-run",
+      "interactionStatus": "not-run"
+    },
+    {
+      "id": "access.roles",
+      "title": "角色与权限",
+      "legacyRoute": "#/access/roles",
+      "taskIds": ["P2-04"],
+      "visualStatus": "not-run",
+      "interactionStatus": "not-run"
+    },
+    {
+      "id": "access.menus",
+      "title": "菜单管理",
+      "legacyRoute": "#/access/menus",
+      "taskIds": ["P2-04"],
+      "visualStatus": "not-run",
+      "interactionStatus": "not-run"
+    },
+    {
+      "id": "agents",
+      "title": "智能体列表",
+      "legacyRoute": "#/agents",
+      "taskIds": ["P2-07"],
+      "visualStatus": "not-run",
+      "interactionStatus": "not-run"
+    },
+    {
+      "id": "knowledge",
+      "title": "知识库",
+      "legacyRoute": "#/knowledge",
+      "taskIds": ["P2-08"],
+      "visualStatus": "not-run",
+      "interactionStatus": "not-run"
+    },
+    {
+      "id": "skills",
+      "title": "技能管理",
+      "legacyRoute": "#/skills",
+      "taskIds": ["P2-09"],
+      "visualStatus": "not-run",
+      "interactionStatus": "not-run"
+    },
+    {
+      "id": "tools",
+      "title": "工具管理",
+      "legacyRoute": "#/tools",
+      "taskIds": ["P2-10"],
+      "visualStatus": "not-run",
+      "interactionStatus": "not-run"
+    },
+    {
+      "id": "models",
+      "title": "聊天模型",
+      "legacyRoute": "#/models",
+      "taskIds": ["P2-06"],
+      "visualStatus": "not-run",
+      "interactionStatus": "not-run"
+    },
+    {
+      "id": "models.multimodal",
+      "title": "多模态模型",
+      "legacyRoute": "#/models/multimodal",
+      "taskIds": ["P2-06"],
+      "visualStatus": "not-run",
+      "interactionStatus": "not-run"
+    },
+    {
+      "id": "system.storage",
+      "title": "文件存储",
+      "legacyRoute": "#/system/storage",
+      "taskIds": ["P2-11"],
+      "visualStatus": "not-run",
+      "interactionStatus": "not-run"
+    },
+    {
+      "id": "account.files",
+      "title": "我的文件",
+      "legacyRoute": "#/account/files",
+      "taskIds": ["P2-11"],
+      "visualStatus": "not-run",
+      "interactionStatus": "not-run"
+    },
+    {
+      "id": "devices",
+      "title": "设备运维",
+      "legacyRoute": "#/operations/devices",
+      "taskIds": ["P2-12"],
+      "visualStatus": "not-run",
+      "interactionStatus": "not-run"
+    },
+    {
+      "id": "workbench",
+      "title": "Agent 工作台",
+      "legacyRoute": "#/workspace",
+      "taskIds": ["P2-13", "P2-14", "P2-15", "P2-16", "P2-17"],
+      "visualStatus": "not-run",
+      "interactionStatus": "not-run"
+    },
+    {
+      "id": "system.service",
+      "title": "服务配置",
+      "legacyRoute": "#/system/service",
+      "taskIds": ["P2-18"],
+      "visualStatus": "not-run",
+      "interactionStatus": "not-run"
+    },
+    {
+      "id": "system.audit",
+      "title": "审计日志",
+      "legacyRoute": "#/system/audit",
+      "taskIds": ["P2-18"],
+      "visualStatus": "not-run",
+      "interactionStatus": "not-run"
+    },
+    {
+      "id": "account.profile",
+      "title": "账号资料",
+      "legacyRoute": "#/account/profile",
+      "taskIds": ["P2-03"],
+      "visualStatus": "not-run",
+      "interactionStatus": "not-run"
+    },
+    {
+      "id": "account.security",
+      "title": "账号安全与登录记录",
+      "legacyRoute": "#/account/security",
+      "taskIds": ["P2-03"],
+      "visualStatus": "not-run",
+      "interactionStatus": "not-run"
+    },
+    {
+      "id": "account.models",
+      "title": "个人模型",
+      "legacyRoute": "#/account/models",
+      "taskIds": ["P2-06"],
+      "visualStatus": "not-run",
+      "interactionStatus": "not-run"
+    },
+    {
+      "id": "account.appearance",
+      "title": "外观设置",
+      "legacyRoute": "#/account/appearance",
+      "taskIds": ["P2-02", "P2-03"],
+      "visualStatus": "not-run",
+      "interactionStatus": "not-run"
+    },
+    {
+      "id": "account.mobile",
+      "title": "手机登录会话",
+      "legacyRoute": "#/account/mobile",
+      "taskIds": ["P2-03", "P2-18"],
+      "visualStatus": "not-run",
+      "interactionStatus": "not-run"
+    }
+  ],
+  "nonMenuScenarios": [
+    {
+      "id": "public.website",
+      "title": "官网场景切换与导航",
+      "route": "/",
+      "taskIds": ["P2-02"],
+      "status": "awaiting-differential-execution"
+    },
+    {
+      "id": "public.privacy",
+      "title": "隐私说明",
+      "route": "/privacy",
+      "taskIds": ["P2-02"],
+      "status": "awaiting-differential-execution"
+    },
+    {
+      "id": "auth.login",
+      "title": "登录与错误恢复",
+      "route": "/login",
+      "taskIds": ["P2-03"],
+      "status": "awaiting-differential-execution"
+    },
+    {
+      "id": "auth.register",
+      "title": "普通注册开关与邮箱验证码",
+      "route": "/register",
+      "taskIds": ["P2-03"],
+      "status": "awaiting-differential-execution"
+    },
+    {
+      "id": "auth.recovery",
+      "title": "邮箱/恢复码重置弹窗",
+      "route": "/login",
+      "taskIds": ["P2-03"],
+      "status": "awaiting-differential-execution"
+    },
+    {
+      "id": "auth.oauth-native",
+      "title": "桌面/手机/插件OAuth与取消回跳",
+      "route": "/oauth/authorize",
+      "taskIds": ["P2-03"],
+      "status": "awaiting-differential-execution"
+    },
+    {
+      "id": "auth.oauth-provider",
+      "title": "外部OAuth绑定与一次性finalize",
+      "route": "/login",
+      "taskIds": ["P2-03"],
+      "status": "awaiting-differential-execution"
+    },
+    {
+      "id": "mobile.confirmation",
+      "title": "扫码确认、拒绝、过期与单次兑换",
+      "route": "/account/mobile",
+      "taskIds": ["P2-03", "P2-18"],
+      "status": "awaiting-differential-execution"
+    },
+    {
+      "id": "service.announcement",
+      "title": "公告门禁、Markdown与已读",
+      "route": "/console",
+      "taskIds": ["P2-18"],
+      "status": "awaiting-differential-execution"
+    },
+    {
+      "id": "account.avatar",
+      "title": "头像上传、清除与资料草稿",
+      "route": "/account/profile",
+      "taskIds": ["P2-03"],
+      "status": "awaiting-differential-execution"
+    },
+    {
+      "id": "models.configuration-dialog",
+      "title": "模型配置与密钥留空保留弹窗",
+      "route": "/models",
+      "taskIds": ["P2-06"],
+      "status": "awaiting-differential-execution"
+    },
+    {
+      "id": "agents.try-dialog",
+      "title": "Agent发布、复制与试用弹窗",
+      "route": "/agents",
+      "taskIds": ["P2-07"],
+      "status": "awaiting-differential-execution"
+    },
+    {
+      "id": "skills.program-editor",
+      "title": "技能草稿阶段编辑、发布与恢复",
+      "route": "/skills",
+      "taskIds": ["P2-09"],
+      "status": "awaiting-differential-execution"
+    },
+    {
+      "id": "tools.mcp-dialog",
+      "title": "MCP发现、选择、Schema变化与连接",
+      "route": "/tools",
+      "taskIds": ["P2-10"],
+      "status": "awaiting-differential-execution"
+    },
+    {
+      "id": "workbench.project",
+      "title": "项目与跨路由草稿",
+      "route": "/workspace/projects/:id",
+      "taskIds": ["P2-13"],
+      "status": "awaiting-differential-execution"
+    },
+    {
+      "id": "workbench.session",
+      "title": "会话时间线、重连、草稿和附件",
+      "route": "/workspace/sessions/:id",
+      "taskIds": ["P2-13", "P2-14"],
+      "status": "awaiting-differential-execution"
+    },
+    {
+      "id": "workbench.approval",
+      "title": "审批/补充输入卡片和过期回应",
+      "route": "/workspace/sessions/:id",
+      "taskIds": ["P2-15"],
+      "status": "awaiting-differential-execution"
+    },
+    {
+      "id": "workbench.review",
+      "title": "回顾与重试操作",
+      "route": "/workspace/sessions/:id",
+      "taskIds": ["P2-15"],
+      "status": "awaiting-differential-execution"
+    },
+    {
+      "id": "workbench.artifact",
+      "title": "成果抽屉、证据与预览",
+      "route": "/workspace/sessions/:id",
+      "taskIds": ["P2-17"],
+      "status": "awaiting-differential-execution"
+    },
+    {
+      "id": "files.independent-preview",
+      "title": "一次性预览票据与独立窗口",
+      "route": "/preview",
+      "taskIds": ["P2-11", "P2-16"],
+      "status": "awaiting-differential-execution"
+    },
+    {
+      "id": "files.editor-conflict",
+      "title": "编辑保存冲突与离开确认",
+      "route": "/workspace/sessions/:id",
+      "taskIds": ["P2-16"],
+      "status": "awaiting-differential-execution"
+    },
+    {
+      "id": "terminal.tabs",
+      "title": "终端创建、重命名、切换、尺寸和重进",
+      "route": "/workspace/sessions/:id",
+      "taskIds": ["P2-16"],
+      "status": "awaiting-differential-execution"
+    },
+    {
+      "id": "share.public",
+      "title": "公开分享访问与撤销",
+      "route": "/share/:shareId",
+      "taskIds": ["P2-15"],
+      "status": "awaiting-differential-execution"
+    },
+    {
+      "id": "extensions.example-copy",
+      "title": "示例编辑、禁用、删除和显式复制",
+      "route": "/agents",
+      "taskIds": ["P2-07", "P2-09", "P2-10"],
+      "status": "awaiting-differential-execution"
+    },
+    {
+      "id": "engine.recovery",
+      "title": "引擎诊断、租约、取消和恢复",
+      "route": "/workspace",
+      "taskIds": ["P2-12", "P2-19"],
+      "status": "awaiting-differential-execution"
+    }
+  ],
+  "evidenceGroups": [
+    {
+      "id": "evidence-gates",
+      "planTaskIds": ["P3-01", "P3-12", "P3-14"],
+      "taskIds": ["P2-01", "P2-21"],
+      "suiteId": "evidence-gates",
+      "command": "corepack yarn web-admin:parity",
+      "sources": [
+        "apps/web-admin/tests/tooling/parity-execution.ts",
+        "apps/web-admin/tests/tooling/parity-execution.test.ts",
+        "apps/web-admin/tests/tooling/parity.test.ts",
+        "apps/web-admin/tests/parity/live/normalization.test.ts"
+      ],
+      "artifacts": ["{runDir}/evidence-gates/results.xml"],
+      "status": "requires-current-run-evidence",
+      "scope": "契约展开、动态字段白名单及证据新鲜度反例；不代表业务等价。"
+    },
+    {
+      "id": "identity-management-model-handler",
+      "planTaskIds": ["P3-03", "P3-07"],
+      "taskIds": ["P2-03", "P2-04", "P2-05", "P2-06"],
+      "suiteId": "handler-and-office",
+      "command": "corepack yarn web-admin:parity",
+      "sources": [
+        "apps/web-admin/tests/contracts/test_identity_navigation_parity.py",
+        "apps/web-admin/tests/backend/test_identity_input_differential.py",
+        "apps/web-admin/tests/parity/identity-input-oracle.ts",
+        "apps/web-admin/tests/parity/legacy-identity-navigation-oracle.ts",
+        "apps/web-admin/tests/parity/legacy-management-model-oracle.ts"
+      ],
+      "artifacts": [
+        "{runDir}/handler-and-office/results.xml",
+        "{runDir}/handler-and-office/identity-navigation-evidence.json"
+      ],
+      "status": "requires-current-run-evidence",
+      "scope": "实际旧handler与新ASGI/服务使用同语义输入；存储与认证端口为合成内存，错误比较和动态归一化范围逐条记入证据。"
+    },
+    {
+      "id": "runtime-handler",
+      "planTaskIds": ["P3-03", "P3-04", "P3-06", "P3-08"],
+      "taskIds": ["P2-09", "P2-12", "P2-13", "P2-14", "P2-15", "P2-19"],
+      "suiteId": "handler-and-office",
+      "command": "corepack yarn web-admin:parity",
+      "sources": [
+        "apps/web-admin/tests/backend/test_runtime_differential.py",
+        "apps/web-admin/tests/backend/test_conversation_query_differential.py",
+        "apps/web-admin/tests/backend/test_conversation_batch_differential.py",
+        "apps/web-admin/tests/parity/conversation-batch-oracle.ts",
+        "apps/web-admin/tests/backend/test_session_listing_differential.py",
+        "apps/web-admin/tests/backend/test_project_client_parity.py",
+        "apps/web-admin/tests/backend/test_project_client_regression.py",
+        "apps/web-admin/tests/backend/test_session_import_parity.py",
+        "apps/web-admin/tests/backend/test_session_import_regression.py",
+        "apps/web-admin/tests/backend/test_inline_attachment_parity.py",
+        "apps/web-admin/tests/backend/test_inline_attachment_regression.py",
+        "apps/web-admin/tests/backend/test_device_client_payloads.py",
+        "apps/web-admin/tests/parity/session-list-oracle.ts",
+        "apps/web-admin/tests/parity/conversation-query-oracle.ts",
+        "apps/web-admin/tests/parity/runtime-oracle.ts"
+      ],
+      "artifacts": ["{runDir}/handler-and-office/results.xml"],
+      "status": "requires-current-run-evidence",
+      "scope": "旧真实运行边界处理器与新服务的选择器、分享、技能匹配、投影及通知规则；无真实DSH进程或设备。"
+    },
+    {
+      "id": "office-file-structure",
+      "planTaskIds": ["P3-09"],
+      "taskIds": ["P2-18"],
+      "suiteId": "handler-and-office",
+      "command": "corepack yarn web-admin:parity",
+      "sources": [
+        "apps/web-admin/tests/backend/test_office_differential.py",
+        "apps/web-admin/tests/parity/office-oracle.ts"
+      ],
+      "artifacts": ["{runDir}/handler-and-office/results.xml"],
+      "status": "requires-current-run-evidence",
+      "scope": "同输入生成真实Word/Excel/PowerPoint文件，比较OOXML语义结构；不代替原生Office编辑性或完整视觉。"
+    },
+    {
+      "id": "live-http-and-websocket",
+      "planTaskIds": ["P3-02", "P3-03", "P3-04", "P3-07"],
+      "taskIds": [
+        "P2-01",
+        "P2-03",
+        "P2-04",
+        "P2-06",
+        "P2-11",
+        "P2-12",
+        "P2-14",
+        "P2-16"
+      ],
+      "suiteId": "live-http",
+      "command": "corepack yarn web-admin:parity",
+      "sources": [
+        "apps/web-admin/tests/parity/live/run.ts",
+        "apps/web-admin/tests/parity/live/environment.ts",
+        "apps/web-admin/tests/parity/live/scenarios.ts",
+        "apps/web-admin/tests/parity/live/management-scenarios.ts",
+        "apps/web-admin/tests/parity/live/device-scenarios.ts",
+        "apps/web-admin/tests/parity/live/normalization.ts"
+      ],
+      "artifacts": ["{runDir}/live-http/http-evidence.json"],
+      "status": "requires-current-run-evidence",
+      "scope": "独立PostgreSQL/Redis/Home下真实旧新HTTP及七WS握手、明确登记的管理/设备/附件场景；全入口认证边界不等于所有正向业务覆盖，收尾须确认资源回收。"
+    },
+    {
+      "id": "ui-fixture-differential",
+      "planTaskIds": ["P3-05"],
+      "taskIds": [
+        "P2-02",
+        "P2-03",
+        "P2-04",
+        "P2-05",
+        "P2-06",
+        "P2-07",
+        "P2-08",
+        "P2-09",
+        "P2-10",
+        "P2-11",
+        "P2-12",
+        "P2-13",
+        "P2-14",
+        "P2-15",
+        "P2-16",
+        "P2-17",
+        "P2-20"
+      ],
+      "command": "node apps/web-admin/tests/parity/capture-ui.ts && node apps/web-admin/tests/parity/interact-ui.ts",
+      "sources": [
+        "apps/web-admin/tests/parity/capture-ui.ts",
+        "apps/web-admin/tests/parity/interact-ui.ts"
+      ],
+      "artifacts": [
+        "{WEB_ADMIN_UI_OUTPUT}/ui-capture.json",
+        "{WEB_ADMIN_UI_OUTPUT}/ui-interactions.json"
+      ],
+      "status": "separate-environment-and-current-run-required",
+      "scope": "依赖已运行的旧新前端，使用合成HTTP数据及隔离浏览器上下文；须核对旧构建来源及人工判读差异，截图生成和无pageerror不能判等价。默认parity不启动或复用这些环境。"
+    },
+    {
+      "id": "full-isolated-regression",
+      "planTaskIds": ["P3-06", "P3-07", "P3-08", "P3-09", "P3-10", "P3-14"],
+      "taskIds": [
+        "P2-01",
+        "P2-03",
+        "P2-04",
+        "P2-06",
+        "P2-07",
+        "P2-08",
+        "P2-09",
+        "P2-10",
+        "P2-12",
+        "P2-13",
+        "P2-14",
+        "P2-15",
+        "P2-16",
+        "P2-17",
+        "P2-18",
+        "P2-19",
+        "P2-20",
+        "P2-21"
+      ],
+      "command": "corepack yarn web-admin:check",
+      "sources": [
+        "apps/web-admin/tests/tooling/check.ts",
+        "apps/web-admin/tests/tooling/check-evidence.ts",
+        "apps/web-admin/tests/integration/test_dsh_runtime.py",
+        "apps/web-admin/tests/tooling/office-rendering.ts",
+        "apps/web-admin/tests/e2e/run-live.ts"
+      ],
+      "artifacts": [
+        "{checkReportDir}/summary.json",
+        "{checkReportDir}/pytest-junit.xml",
+        "{checkReportDir}/dsh-evidence.json",
+        "{checkReportDir}/fronted-tests.json",
+        "{checkReportDir}/commands/results.json",
+        "{checkReportDir}/live-browser/browser-results.json"
+      ],
+      "status": "separate-current-run-required",
+      "scope": "静态、完整新应用回归、真实固定DSH配合受控供应商、Office渲染与浏览器闭环；不能将新应用单侧回归算成双侧差分。"
+    },
+    {
+      "id": "container-lifecycle",
+      "planTaskIds": ["P3-10", "P3-11", "P3-12"],
+      "taskIds": ["P2-19", "P2-21"],
+      "command": "node apps/web-admin/tests/tooling/deployment.ts --backend-image starbridge-web-admin-backend --fronted-image starbridge-web-admin-fronted",
+      "sources": ["apps/web-admin/tests/tooling/deployment.ts"],
+      "artifacts": [],
+      "status": "separate-environment-and-current-run-required",
+      "scope": "已构建镜像的启动、反代和引擎生命周期；调用者须保存本轮命令日志与退出状态，该runner未生成结构报告。依赖Docker环境及本轮执行，不从Dockerfile存在推导通过。"
+    }
+  ],
+  "environmentGates": [
+    {
+      "id": "visual-browser",
+      "reason": "完整视觉和交互结论须关联独立本轮UI报告、旧构建来源及差异审阅；默认自动parity不关闭此门禁。"
+    },
+    {
+      "id": "desktop-real",
+      "reason": "协议/Headless证据不能替代真实桌面权限、登录和窗口交互。"
+    },
+    {
+      "id": "android-real",
+      "reason": "尚未完成真机身份、签名、系统权限和交互验收。"
+    },
+    {
+      "id": "external-paid-model",
+      "reason": "受控供应商证明提交语义；已授权的独立真实模型实测记录不能扩张为所有供应商、参数和双侧差分通过。"
+    },
+    {
+      "id": "external-oauth-email",
+      "reason": "受控OAuth/邮件接收器不能替代真实外部账号验收。"
+    },
+    {
+      "id": "office-native-client",
+      "reason": "文件结构/渲染不代表Office原生客户端可编辑性全覆盖。"
+    }
+  ]
+}

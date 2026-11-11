@@ -1,0 +1,99 @@
+name: New Web Admin
+on:
+  pull_request:
+    branches: [main, master]
+  push:
+    branches: [main, master]
+  workflow_dispatch:
+permissions:
+  contents: read
+concurrency:
+  group: web-admin-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+jobs:
+  foundation:
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+          submodules: recursive
+          persist-credentials: false
+      - name: Read shared toolchain metadata
+        id: versions
+        run: |
+          python3 - <<'PY'
+          import json, os
+          with open('apps/web-admin/deployment/runtime.json') as source:
+              metadata = json.load(source)
+          with open(os.environ['GITHUB_OUTPUT'], 'a') as output:
+              for name, value in metadata['toolchain'].items():
+                  output.write(f'{name}={value}\n')
+              output.write(f"uv={metadata['uvVersion']}\n")
+              output.write(f"buildkit={metadata['builder']['image']}\n")
+          PY
+      - uses: actions/setup-node@v6
+        with:
+          node-version: ${{ steps.versions.outputs.node }}
+      - uses: actions/setup-python@v6
+        with:
+          python-version: ${{ steps.versions.outputs.python }}
+      - run: corepack enable && corepack yarn install --immutable
+      - name: Install the centrally selected uv tool
+        run: python -m pip install "uv==${{ steps.versions.outputs.uv }}"
+      - run: corepack yarn web-admin:sync
+      - name: Install the headless browser
+        run: node node_modules/playwright/cli.js install --with-deps chromium
+      - run: corepack yarn web-admin:check
+      - name: Run fresh selected parity suites
+        run: corepack yarn web-admin:parity
+      - name: Preserve bounded parity evidence
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: web-admin-parity-${{ github.run_id }}-${{ github.run_attempt }}
+          # 只上传脱敏报告和测试结果，不上传运行目录、数据库、Home或机器缓存。
+          include-hidden-files: true
+          if-no-files-found: warn
+          path: |
+            .superdsh-work/web-admin-validation/parity-*/parity-report.json
+            .superdsh-work/web-admin-validation/parity-*/parity-report.md
+            .superdsh-work/web-admin-validation/parity-*/new-contracts.json
+            .superdsh-work/web-admin-validation/parity-*/evidence-gates/results.xml
+            .superdsh-work/web-admin-validation/parity-*/handler-and-office/results.xml
+            .superdsh-work/web-admin-validation/parity-*/handler-and-office/identity-navigation-evidence.json
+            .superdsh-work/web-admin-validation/parity-*/live-http/http-evidence.json
+            .superdsh-work/web-admin-validation/check-report-*/summary.json
+            .superdsh-work/web-admin-validation/check-report-*/pytest-junit.xml
+            .superdsh-work/web-admin-validation/check-report-*/dsh-evidence.json
+            .superdsh-work/web-admin-validation/check-report-*/fronted-tests.json
+            .superdsh-work/web-admin-validation/check-report-*/commands/results.json
+            .superdsh-work/web-admin-validation/check-report-*/live-browser/browser-results.json
+            .superdsh-work/web-admin-validation/office-*/office-junit.xml
+            .superdsh-work/web-admin-validation/office-*/office-paired-rendering/*/comparison.json
+      - run: corepack yarn web-admin:build
+      - name: Check independent deployment configuration
+        run: node scripts/web-admin.ts compose-config
+      - name: Create the job-owned builder
+        run: docker buildx create --name web-admin-ci --driver docker-container --driver-opt "image=${{ steps.versions.outputs.buildkit }}" --driver-opt default-load=true
+      - name: Build new runtime images
+        env:
+          BUILDX_BUILDER: web-admin-ci
+        run: docker compose --env-file .superdsh-work/web-admin-production/config/compose.env -f compose.web-admin.yml build
+      - name: Verify isolated deployment and DSH lifecycle
+        run: node apps/web-admin/tests/tooling/deployment.ts --backend-image starbridge-web-admin-backend --fronted-image starbridge-web-admin-fronted
+      - name: Preserve isolated deployment results
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: web-admin-deployment-${{ github.run_id }}-${{ github.run_attempt }}
+          include-hidden-files: true
+          if-no-files-found: warn
+          path: .superdsh-work/web-admin-validation/deployment-*/results.json
+      - name: Remove the job-owned builder
+        if: always()
+        run: |
+          if docker buildx inspect web-admin-ci >/dev/null 2>&1; then
+            docker buildx rm web-admin-ci
+          fi

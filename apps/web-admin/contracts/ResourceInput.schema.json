@@ -1,0 +1,141 @@
+{
+  "additionalProperties": false,
+  "description": "工具实现、配置、技能正文及组合引用保持分离。",
+  "properties": {
+    "name": {
+      "maxLength": 200,
+      "minLength": 1,
+      "title": "Name",
+      "type": "string"
+    },
+    "description": {
+      "default": "",
+      "maxLength": 5000,
+      "title": "Description",
+      "type": "string"
+    },
+    "enabled": {
+      "default": true,
+      "title": "Enabled",
+      "type": "boolean"
+    },
+    "published": {
+      "default": false,
+      "title": "Published",
+      "type": "boolean"
+    },
+    "version": {
+      "anyOf": [
+        {
+          "minimum": 1,
+          "type": "integer"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Version"
+    },
+    "instructions": {
+      "default": "",
+      "maxLength": 100000,
+      "title": "Instructions",
+      "type": "string"
+    },
+    "requiredToolIds": {
+      "items": {
+        "type": "string"
+      },
+      "maxItems": 100,
+      "title": "Requiredtoolids",
+      "type": "array"
+    },
+    "toolIds": {
+      "items": {
+        "type": "string"
+      },
+      "maxItems": 100,
+      "title": "Toolids",
+      "type": "array"
+    },
+    "skillIds": {
+      "items": {
+        "type": "string"
+      },
+      "maxItems": 100,
+      "title": "Skillids",
+      "type": "array"
+    },
+    "assetIds": {
+      "items": {
+        "type": "string"
+      },
+      "maxItems": 100,
+      "title": "Assetids",
+      "type": "array"
+    },
+    "settings": {
+      "additionalProperties": true,
+      "title": "Settings",
+      "type": "object"
+    },
+    "implementation": {
+      "anyOf": [
+        {
+          "additionalProperties": true,
+          "type": "object"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Implementation"
+    },
+    "manifest": {
+      "anyOf": [
+        {
+          "additionalProperties": true,
+          "type": "object"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Manifest"
+    },
+    "program": {
+      "anyOf": [
+        {
+          "additionalProperties": true,
+          "type": "object"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Program"
+    },
+    "programDraft": {
+      "anyOf": [
+        {
+          "additionalProperties": true,
+          "type": "object"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Programdraft"
+    }
+  },
+  "required": [
+    "name"
+  ],
+  "title": "ResourceInput",
+  "type": "object"
+}

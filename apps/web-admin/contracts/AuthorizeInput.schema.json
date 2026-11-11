@@ -1,0 +1,46 @@
+{
+  "additionalProperties": false,
+  "description": "只支持授权码和 S256，回调白名单由服务层检查。",
+  "properties": {
+    "client_id": {
+      "maxLength": 100,
+      "title": "Client Id",
+      "type": "string"
+    },
+    "redirect_uri": {
+      "maxLength": 2048,
+      "title": "Redirect Uri",
+      "type": "string"
+    },
+    "code_challenge": {
+      "maxLength": 128,
+      "title": "Code Challenge",
+      "type": "string"
+    },
+    "code_challenge_method": {
+      "default": "S256",
+      "title": "Code Challenge Method",
+      "type": "string"
+    },
+    "response_type": {
+      "default": "",
+      "title": "Response Type",
+      "type": "string"
+    },
+    "state": {
+      "default": "",
+      "maxLength": 2048,
+      "title": "State",
+      "type": "string"
+    },
+    "scope": {
+      "default": "",
+      "maxLength": 1000,
+      "title": "Scope",
+      "type": "string"
+    }
+  },
+  "required": ["client_id", "redirect_uri", "code_challenge"],
+  "title": "AuthorizeInput",
+  "type": "object"
+}

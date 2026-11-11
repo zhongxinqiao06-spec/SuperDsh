@@ -1,0 +1,51 @@
+{
+  "description": "登录只接受白名单字段并忽略扩展元数据；其他写入DTO仍严格拒绝额外字段。",
+  "properties": {
+    "identifier": {
+      "default": "",
+      "title": "Identifier",
+      "type": "string"
+    },
+    "email": {
+      "default": "",
+      "title": "Email",
+      "type": "string"
+    },
+    "password": {
+      "anyOf": [
+        {
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Password"
+    },
+    "passwordVerifier": {
+      "anyOf": [
+        {
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Passwordverifier"
+    },
+    "clientType": {
+      "default": "browser",
+      "title": "Clienttype",
+      "type": "string"
+    },
+    "clientName": {
+      "default": "Browser",
+      "title": "Clientname",
+      "type": "string"
+    }
+  },
+  "title": "LoginInput",
+  "type": "object"
+}

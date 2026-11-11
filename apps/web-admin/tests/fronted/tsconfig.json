@@ -1,0 +1,14 @@
+{
+  "extends": "../../fronted/tsconfig.json",
+  "compilerOptions": {
+    "types": ["vite/client", "vitest/globals", "node"],
+    "paths": { "@/*": ["../../fronted/src/*"] }
+  },
+  "include": [
+    "./**/*.ts",
+    "../../fronted/src/**/*.ts",
+    "../../fronted/src/**/*.vue",
+    "../../fronted/src/**/*.d.ts"
+  ],
+  "exclude": []
+}

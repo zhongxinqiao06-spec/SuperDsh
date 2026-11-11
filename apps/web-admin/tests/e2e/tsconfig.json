@@ -1,0 +1,9 @@
+{
+  "extends": "../fronted/tsconfig.json",
+  "compilerOptions": {
+    "types": ["node"],
+    "allowImportingTsExtensions": true
+  },
+  "include": ["./**/*.ts"],
+  "exclude": []
+}

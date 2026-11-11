@@ -1,0 +1,595 @@
+/* 管理页公共布局；页面不再覆盖按钮、表单和弹窗的基础皮肤。 */
+.management-page {
+  gap: 20px;
+}
+.page-heading h1 {
+  line-height: 1.35;
+  margin: 0;
+}
+.toolbar-spacer {
+  flex: 1;
+}
+.filter-bar,
+.management-page > form.toolbar,
+.toolbar-panel {
+  padding: 16px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-card);
+  background: var(--card);
+  box-shadow: var(--shadow-card);
+}
+.filter-bar {
+  justify-content: flex-start;
+  gap: 8px;
+}
+.filter-bar .el-input,
+.management-page > .toolbar .el-input {
+  width: min(360px, 100%);
+}
+.toolbar .el-button + .el-button,
+.filter-bar .el-button + .el-button {
+  margin-left: 0;
+}
+.management-page .table-wrap,
+:is(.management-page, .management-list-body) > .el-table {
+  background: var(--card);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-card);
+  box-shadow: var(--shadow-card);
+}
+:is(.management-page, .management-list-body) > .el-table {
+  overflow: hidden;
+}
+.management-page .data-table {
+  min-width: 640px;
+  font-size: 14px;
+  white-space: normal;
+}
+.management-page .data-table th,
+:is(.management-page, .management-list-body) > .el-table th.el-table__cell {
+  background: color-mix(in oklch, var(--muted) 55%, var(--card));
+  color: var(--muted-foreground);
+  font-size: 12px;
+  font-weight: 500;
+  white-space: nowrap;
+}
+.management-page .data-table th,
+.management-page .data-table td {
+  padding: 16px;
+  vertical-align: top;
+}
+.management-page .data-table tbody tr:hover {
+  background: color-mix(in oklch, var(--muted) 40%, var(--card));
+}
+.management-page .data-table td strong {
+  font-weight: 550;
+}
+.management-page .data-table td small,
+.resource-table-note {
+  display: block;
+  margin-top: 5px;
+  font-size: 12px;
+  line-height: 1.65;
+  color: var(--muted-foreground);
+}
+.management-page .resource-description {
+  min-width: 220px;
+  max-width: 420px;
+  overflow-wrap: anywhere;
+}
+.resource-summary {
+  min-width: 150px;
+  font-size: 12px;
+  color: var(--muted-foreground);
+}
+.resource-summary p {
+  margin: 0 0 4px;
+}
+.row-actions {
+  border: 0;
+  padding: 0;
+  margin: 0;
+  min-inline-size: 0;
+  display: inline-flex;
+  align-items: center;
+  flex-wrap: nowrap;
+  gap: 4px;
+  white-space: nowrap;
+}
+.row-actions .el-button + .el-button {
+  margin-left: 0;
+}
+.row-actions .el-button {
+  min-height: 32px;
+  padding: 0 8px;
+  font-size: 13px;
+}
+.row-actions:disabled .el-button {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+.danger-action {
+  color: var(--destructive);
+}
+.el-dropdown-menu {
+  padding: 6px;
+}
+.el-dropdown-menu__item {
+  min-height: 34px;
+  border-radius: 6px;
+}
+.el-dropdown-menu__item--divided {
+  margin: 6px 0 0;
+}
+.status-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 3px 8px;
+  border-radius: 6px;
+  font-size: 12px;
+  line-height: 18px;
+  white-space: nowrap;
+  background: var(--muted);
+  color: var(--muted-foreground);
+}
+.status-badge.is-active {
+  color: var(--success);
+  background: color-mix(in oklch, var(--success) 9%, var(--card));
+}
+.status-badge.is-active::before {
+  content: '';
+  width: 5px;
+  height: 5px;
+  border-radius: 50%;
+  background: currentColor;
+}
+.management-pagination,
+.management-page > .el-pagination {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 8px;
+  min-height: 48px;
+  padding: 8px 0;
+  font-size: 13px;
+}
+.management-pagination .pagination-total,
+.management-page > .el-pagination .el-pagination__total {
+  margin-right: auto;
+  color: var(--muted-foreground);
+}
+.pagination-size {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  color: var(--muted-foreground);
+}
+.pagination-size select {
+  height: 32px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-control);
+  padding: 4px 8px;
+  background: var(--card);
+  color: var(--foreground);
+  font: inherit;
+}
+.management-pagination .el-button {
+  height: 32px;
+  min-height: 32px;
+  margin: 0;
+}
+.role-grid,
+.user-editor-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 16px;
+}
+.user-editor-roles {
+  grid-column: 1 / -1;
+}
+.role-card {
+  padding: 20px;
+  border: 1px solid var(--border);
+  background: var(--card);
+  border-radius: var(--radius-card);
+}
+.role-card header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+.role-card h2,
+.models-section-heading h2 {
+  margin: 0;
+  font-size: 16px;
+}
+.role-card p {
+  margin: 8px 0;
+}
+.role-card header small,
+.role-card-description {
+  color: var(--muted-foreground);
+}
+.resource-health {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 12px;
+  padding: 16px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-card);
+  background: var(--card);
+}
+.resource-health > span:not(.status-dot):not(.toolbar-spacer) {
+  color: var(--muted-foreground);
+}
+.status-dot {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: var(--warning);
+}
+.status-dot.ready {
+  background: var(--success);
+}
+.resource-assets {
+  margin-top: 20px;
+}
+.resource-assets > summary {
+  cursor: pointer;
+  margin-bottom: 12px;
+}
+.management-page .empty-cell {
+  padding: 48px 24px;
+  text-align: center;
+}
+.management-page > .el-empty {
+  padding: 48px 24px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-card);
+  background: var(--card);
+}
+.management-dialog .stack {
+  gap: 20px;
+}
+.dialog-actions {
+  margin: 0;
+}
+.dialog-error {
+  margin: 0 0 12px;
+  text-align: left;
+}
+.management-dialog .field {
+  font-size: 14px;
+  font-weight: 500;
+}
+.management-dialog .field small {
+  font-weight: 400;
+}
+.form-section {
+  min-width: 0;
+}
+.form-section > header {
+  margin-bottom: 20px;
+}
+.form-section h3 {
+  margin: 0 0 6px;
+  font-size: 16px;
+  font-weight: 600;
+}
+.form-section header p {
+  margin: 0;
+  color: var(--muted-foreground);
+  font-size: 13px;
+}
+.field-heading {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 12px;
+}
+.field-error {
+  color: var(--destructive);
+  font-size: 12px;
+}
+.string-list-editor {
+  min-width: 0;
+  border: 0;
+  padding: 0;
+  margin: 0;
+}
+.string-list-editor legend {
+  margin-bottom: 12px;
+  font-weight: 500;
+}
+.string-list-row {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  margin-bottom: 10px;
+}
+.string-list-index {
+  min-width: 24px;
+  padding-top: 9px;
+  color: var(--muted-foreground);
+  font-size: 12px;
+  font-variant-numeric: tabular-nums;
+}
+.string-list-editor .el-textarea__inner {
+  min-height: 36px;
+}
+.string-list-editor > p {
+  font-size: 13px;
+  margin: 0;
+}
+.data-table-shell {
+  min-width: 0;
+}
+.data-table-mobile {
+  display: none;
+}
+.resource-card {
+  padding: 20px;
+  background: var(--card);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-card);
+}
+.resource-card header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+}
+.resource-card h3 {
+  margin: 0;
+  font-size: 15px;
+}
+.resource-card > p {
+  color: var(--muted-foreground);
+  font-size: 13px;
+  margin: 12px 0;
+  overflow-wrap: anywhere;
+}
+.resource-card footer {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  margin-top: 16px;
+}
+.resource-card footer > small {
+  color: var(--muted-foreground);
+}
+.resource-description details {
+  margin-top: 6px;
+  font-size: 12px;
+  color: var(--muted-foreground);
+}
+.resource-description summary {
+  cursor: pointer;
+}
+.resource-description .description-preview {
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+.date-time {
+  display: inline-flex;
+  flex-direction: column;
+  white-space: nowrap;
+  font-size: 12px;
+  font-variant-numeric: tabular-nums;
+}
+.date-time span:last-child {
+  color: var(--muted-foreground);
+  margin-top: 4px;
+}
+.overview-page .quick-links a {
+  align-items: center;
+  gap: 12px;
+  padding: 20px;
+  background: var(--card);
+}
+.overview-page .summary {
+  gap: 16px;
+  font-size: 14px;
+}
+.overview-page .summary dt {
+  font-size: inherit;
+}
+.overview-page .summary dd {
+  margin-top: 4px;
+}
+@media (max-width: 767px) {
+  .role-grid,
+  .user-editor-grid {
+    grid-template-columns: minmax(0, 1fr);
+  }
+  .filter-bar .el-input {
+    width: auto;
+    flex: 1;
+    min-width: 120px;
+  }
+  .management-pagination .pagination-total {
+    width: 100%;
+  }
+  .has-mobile-view > .table-wrap {
+    display: none;
+  }
+  .data-table-mobile {
+    display: grid;
+    gap: 12px;
+  }
+  .management-dialog.el-dialog,
+  .agent-definition-dialog.el-dialog,
+  .long-text-dialog.el-dialog {
+    width: 100%;
+    max-width: 100%;
+    height: 100dvh;
+    max-height: 100dvh;
+    margin: 0;
+    border: 0;
+    border-radius: 0;
+  }
+  .management-dialog .el-dialog__body,
+  .agent-definition-dialog .el-dialog__body {
+    flex: 1;
+  }
+  .el-dialog__body {
+    padding: 20px 16px;
+  }
+  .el-dialog__header {
+    padding-left: 16px;
+  }
+  .el-dialog__footer {
+    padding: 12px 16px max(12px, env(safe-area-inset-bottom));
+  }
+}
+
+/* 页面级分页独占列表底栏，弹窗与卡片中的子分页按自身内容排版。 */
+.console-content:has(> .paged-page) {
+  display: flex;
+  flex-direction: column;
+}
+.console-content:has(> .paged-page) > .el-alert {
+  flex: none;
+}
+.paged-page {
+  flex: 1 1 0;
+  min-height: 0;
+}
+.paged-page > :not(.management-list) {
+  flex-shrink: 0;
+}
+.management-list {
+  display: flex;
+  flex-direction: column;
+  flex: 1 1 0;
+  min-height: 6rem;
+  min-width: 0;
+  gap: 12px;
+}
+.management-list-body {
+  flex: 1 1 0;
+  min-height: 0;
+  min-width: 0;
+  overflow: auto;
+  overscroll-behavior: contain;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+.management-list-body > * {
+  flex-shrink: 0;
+}
+.management-list > .management-pagination {
+  flex: none;
+  border-top: 1px solid var(--border);
+}
+.pagination-controls {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-inline-start: auto;
+}
+.management-page td:has(> .row-actions) {
+  width: 1%;
+  white-space: nowrap;
+}
+.management-page .row-actions .el-button + .el-button {
+  margin-inline-start: 0;
+}
+@media (max-width: 767px) {
+  .row-actions {
+    flex-wrap: wrap;
+    white-space: normal;
+  }
+  .resource-card footer {
+    align-items: flex-start;
+    flex-direction: column;
+  }
+  .resource-card .row-actions {
+    gap: 4px 8px;
+  }
+  .management-list {
+    gap: 8px;
+  }
+}
+
+/* 根据列表本身的可用宽度切换卡片，保留同一份记录、焦点和操作按钮。 */
+.has-card-rows {
+  container-type: inline-size;
+}
+@container (max-width: 639px) {
+  .has-card-rows > .table-wrap {
+    background: transparent;
+    border: 0;
+    box-shadow: none;
+    overflow: visible;
+  }
+  .has-card-rows .data-table {
+    display: block;
+    min-width: 0;
+  }
+  .has-card-rows thead {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    overflow: hidden;
+    clip-path: inset(50%);
+  }
+  .has-card-rows tbody {
+    display: grid;
+    gap: 12px;
+  }
+  .has-card-rows tbody tr {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 12px 16px;
+    padding: 16px;
+    border: 1px solid var(--border);
+    border-radius: var(--radius-card);
+    background: var(--card);
+  }
+  .has-card-rows .data-table td {
+    display: block;
+    min-width: 0;
+    width: auto;
+    padding: 0;
+    border: 0;
+    white-space: normal;
+    overflow-wrap: anywhere;
+  }
+  .has-card-rows .data-table td:first-child,
+  .has-card-rows td:has(.row-actions),
+  .has-card-rows td[colspan] {
+    grid-column: 1 / -1;
+  }
+  .has-card-rows td[data-label]::before {
+    content: attr(data-label);
+    display: block;
+    margin-bottom: 4px;
+    font-size: 12px;
+    color: var(--muted-foreground);
+  }
+  .has-card-rows .row-actions {
+    display: flex;
+    flex-wrap: wrap;
+    border-top: 1px solid var(--border);
+    padding-top: 8px;
+  }
+  .has-card-rows .empty-cell {
+    height: auto;
+    text-align: start;
+  }
+}
+@media (max-width: 480px) {
+  .models-search .el-input {
+    flex-basis: 100%;
+  }
+}

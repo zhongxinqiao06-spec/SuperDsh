@@ -1,0 +1,196 @@
+/* 账号与服务保留摘要卡片结构，外观使用公共主题尺度。 */
+.settings-page {
+  gap: 16px;
+}
+.settings-page > .page-heading {
+  margin-bottom: 4px;
+}
+.settings-page > .page-heading h1 {
+  margin-bottom: 0;
+}
+.settings-card {
+  border: 1px solid var(--border);
+  border-radius: var(--radius-card);
+  overflow: hidden;
+  background: var(--card);
+}
+.settings-card-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 20px 24px;
+}
+.settings-card-header h2 {
+  margin: 0;
+  font-size: 16px;
+  font-weight: 600;
+}
+.settings-card-header p {
+  margin: 4px 0 0;
+  color: var(--muted-foreground);
+  font-size: 14px;
+}
+.settings-card-content {
+  border-top: 1px solid var(--border);
+}
+.settings-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 16px 24px;
+  font-size: 14px;
+}
+.settings-row + .settings-row {
+  border-top: 1px solid var(--border);
+}
+.settings-row p {
+  margin: 4px 0 0;
+  color: var(--muted-foreground);
+}
+.settings-row-label {
+  color: var(--muted-foreground);
+}
+.settings-row-value {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  overflow-wrap: anywhere;
+}
+.settings-details {
+  margin: 0;
+}
+.settings-details > div {
+  display: grid;
+  grid-template-columns: 128px minmax(0, 1fr);
+  gap: 16px;
+  padding: 16px 24px;
+}
+.settings-details > div + div {
+  border-top: 1px solid var(--border);
+}
+.settings-details dt {
+  color: var(--muted-foreground);
+}
+.settings-details dd {
+  margin: 0;
+  overflow-wrap: anywhere;
+}
+.profile-heading {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+}
+.profile-heading .el-avatar {
+  color: var(--primary-foreground);
+  background: var(--primary);
+  font-size: 22px;
+}
+.profile-heading strong {
+  display: block;
+  font-size: 16px;
+}
+.profile-heading small {
+  color: var(--muted-foreground);
+}
+.appearance-options {
+  display: flex;
+  flex-direction: column;
+  padding: 8px;
+  gap: 8px;
+}
+.appearance-option {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 12px 16px;
+  min-height: 64px;
+  border-radius: 10px;
+  cursor: pointer;
+}
+.appearance-option:has(input:checked) {
+  background: color-mix(in oklch, var(--muted) 70%, transparent);
+}
+.appearance-option input {
+  accent-color: var(--primary);
+  width: 16px;
+  height: 16px;
+}
+.appearance-option small {
+  display: block;
+  margin-top: 4px;
+  color: var(--muted-foreground);
+}
+.settings-language {
+  width: 160px;
+}
+.security-signins {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  padding: 20px 24px;
+  overflow-x: auto;
+}
+.service-page {
+  gap: 24px;
+}
+.service-page > .page-heading {
+  margin-bottom: 0;
+  align-items: flex-start;
+}
+.service-page > .page-heading p {
+  line-height: 1.4;
+}
+.service-page .settings-card {
+  border-radius: var(--radius-card);
+  box-shadow: var(--shadow-card);
+}
+.service-page .settings-card-header {
+  padding: 20px;
+}
+.service-page .settings-card-header h2 {
+  font-weight: 500;
+}
+.service-page .settings-card-content {
+  border-top: 0;
+}
+.service-page .settings-details > div {
+  padding: 12px 20px;
+}
+.service-page .settings-row {
+  padding: 4px 20px;
+}
+.service-page .settings-row:last-child {
+  padding-bottom: 20px;
+}
+.service-page .settings-row + .settings-row {
+  border-top: 0;
+}
+.service-information-value {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+}
+.service-information-value .el-button {
+  height: 20px;
+  min-height: 20px;
+  padding: 0 4px;
+}
+.service-page .settings-details > div:last-child {
+  padding-bottom: 32px;
+}
+@media (max-width: 640px) {
+  .settings-card-header,
+  .settings-row {
+    padding: 16px;
+  }
+  .settings-details > div {
+    grid-template-columns: 96px minmax(0, 1fr);
+    padding: 12px 16px;
+  }
+  .settings-row-value {
+    flex-wrap: wrap;
+  }
+}

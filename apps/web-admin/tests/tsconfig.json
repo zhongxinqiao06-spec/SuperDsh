@@ -1,0 +1,14 @@
+{
+  "extends": "../fronted/tsconfig.json",
+  "compilerOptions": {
+    "target": "ES2024",
+    "lib": ["ES2024", "DOM", "DOM.Iterable"],
+    "types": ["node", "vite/client"],
+    "allowImportingTsExtensions": true,
+    "allowJs": true,
+    "checkJs": false,
+    "paths": { "@/*": ["../fronted/src/*"] }
+  },
+  "include": ["**/*.ts", "tooling/*.mjs", "../fronted/src/**/*.d.ts"],
+  "exclude": ["fixtures/baselines"]
+}

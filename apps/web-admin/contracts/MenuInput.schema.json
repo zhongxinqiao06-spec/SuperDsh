@@ -1,0 +1,25 @@
+{
+  "additionalProperties": false,
+  "description": "菜单更新必须携带当前配置版本。",
+  "properties": {
+    "version": {
+      "minimum": 1,
+      "title": "Version",
+      "type": "integer"
+    },
+    "items": {
+      "items": {
+        "additionalProperties": true,
+        "type": "object"
+      },
+      "maxItems": 128,
+      "title": "Items",
+      "type": "array"
+    }
+  },
+  "required": [
+    "version"
+  ],
+  "title": "MenuInput",
+  "type": "object"
+}

@@ -126,6 +126,16 @@ corepack.cmd yarn server:dev
 
 已有数据库需同时设置 `AGENT_SERVER_DB_URL`、`AGENT_SERVER_REDIS_URL` 及原鉴权/模型加密密钥，不自动创建开发账号。默认网页端口由 `SUPERDSH_SERVER_PORT` 控制，兼容 API 用 `AGENT_SERVER_PORT`。统一入口无需 `AGENTS_ANYWHERE_API` 代理配置；清除遗留 `NEXT_OUTPUT=export`。详细配置见[服务端说明](apps/admin/server/README.md)。
 
+### 新管理端 Vue 与 Python
+
+新实现位于 `apps/web-admin/fronted` 和 `apps/web-admin/backend`，与旧管理端独立运行。后端遵循若依 `controller → service → dao` 分层，DSH 保持固定执行引擎。启动、独立 Docker 部署、初始化和测试清理见 [Web Admin 开发说明](apps/web-admin/README.md)，实施状态见[第一份计划](docs/plans/web-admin-01-foundation.md)。
+
+```powershell
+corepack.cmd yarn web-admin:sync
+corepack.cmd yarn web-admin:deps:up
+corepack.cmd yarn web-admin:dev
+```
+
 ### 安卓
 
 Android Studio 打开 `apps/android`；准备 SDK / AVD 后：

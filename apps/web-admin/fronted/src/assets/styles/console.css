@@ -1,0 +1,316 @@
+/* 还原旧管理端的壳层比例：桌面侧栏 15rem、页头 3.5rem，内容滚动交给页面。 */
+.console-shell {
+  display: flex;
+  height: 100svh;
+  min-height: 0;
+  overflow: hidden;
+  background: var(--background);
+  color: var(--foreground);
+}
+.console-sidebar {
+  display: flex;
+  flex: 0 0 240px;
+  width: 240px;
+  min-height: 0;
+  border-right: 1px solid var(--sidebar-border, var(--border));
+  background: var(--sidebar);
+  color: var(--sidebar-foreground, var(--foreground));
+}
+.sidebar-collapsed .console-sidebar {
+  display: none;
+}
+.console-sidebar-content {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  min-width: 0;
+  min-height: 0;
+}
+.sidebar-brand {
+  padding: 20px;
+  border-bottom: 1px solid var(--sidebar-border, var(--border));
+}
+.sidebar-brand a {
+  font-size: 18px;
+  font-weight: 600;
+  line-height: 28px;
+  letter-spacing: -0.45px;
+}
+.sidebar-brand p {
+  margin: 4px 0 0;
+  color: var(--muted-foreground);
+  font-size: 12px;
+  line-height: 16px;
+}
+.console-navigation {
+  flex: 1;
+  min-height: 0;
+  padding: 12px;
+  overflow: hidden auto;
+  scrollbar-width: none;
+}
+.console-navigation::-webkit-scrollbar {
+  display: none;
+}
+.console-navigation > * + *,
+.nav-children > * + * {
+  margin-top: 4px;
+}
+.nav-link,
+.nav-group {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+  padding: 10px 12px;
+  border: 0;
+  border-radius: calc(var(--radius) - 2px);
+  color: color-mix(
+    in oklch,
+    var(--sidebar-foreground, var(--foreground)) 80%,
+    transparent
+  );
+  background: transparent;
+  font-size: 14px;
+  line-height: 20px;
+  text-align: left;
+  transition:
+    color 150ms,
+    background-color 150ms;
+}
+.nav-group {
+  color: var(--muted-foreground);
+}
+.nav-label {
+  flex: 1;
+}
+.nav-link:hover,
+.nav-group:hover,
+.nav-link.active,
+.nav-fallback:hover,
+.menu-recovery:hover,
+.account-row > a:hover {
+  background: var(--sidebar-accent, var(--muted));
+}
+.nav-link.active {
+  color: var(--sidebar-accent-foreground, var(--foreground));
+  font-weight: 500;
+}
+.nav-chevron {
+  margin-left: auto;
+  transition: transform 150ms;
+}
+.nav-chevron-closed {
+  transform: rotate(-90deg);
+}
+.nav-children {
+  margin-left: 20px;
+  padding-left: 8px;
+  border-left: 1px solid var(--sidebar-border, var(--border));
+}
+.nav-fallback {
+  display: block;
+  padding: 12px;
+  border-radius: calc(var(--radius) - 2px);
+  font-size: 14px;
+}
+.sidebar-footer {
+  flex-shrink: 0;
+  padding: 12px;
+  border-top: 1px solid var(--sidebar-border, var(--border));
+}
+.sidebar-footer > * + * {
+  margin-top: 8px;
+}
+.menu-recovery {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 12px;
+  border-radius: calc(var(--radius) - 2px);
+  color: var(--muted-foreground);
+  font-size: 12px;
+  line-height: 16px;
+}
+.account-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.account-row > a {
+  flex: 1;
+  min-width: 0;
+  padding: 8px 12px;
+  border-radius: calc(var(--radius) - 2px);
+}
+.account-row strong,
+.account-row small {
+  display: block;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.account-row strong {
+  font-size: 14px;
+  font-weight: 500;
+  line-height: 20px;
+}
+.account-row small {
+  color: var(--muted-foreground);
+  font-size: 12px;
+  line-height: 16px;
+}
+.console-main {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  min-width: 0;
+  min-height: 0;
+}
+.console-header {
+  display: flex;
+  flex-shrink: 0;
+  align-items: center;
+  gap: 12px;
+  height: 56px;
+  padding: 0 16px;
+  border-bottom: 1px solid var(--border);
+  background: color-mix(in oklch, var(--card) 40%, transparent);
+}
+.console-icon-button {
+  display: inline-flex;
+  flex-shrink: 0;
+  align-items: center;
+  justify-content: center;
+  width: 32px;
+  height: 32px;
+  padding: 0;
+  border: 1px solid transparent;
+  border-radius: calc(var(--radius) - 2px);
+  color: inherit;
+  background: transparent;
+}
+.console-icon-button:hover {
+  background: var(--muted);
+}
+.console-icon-button:focus-visible,
+.console-navigation a:focus-visible,
+.console-navigation button:focus-visible,
+.sidebar-footer a:focus-visible {
+  outline: 2px solid var(--ring, var(--muted-foreground));
+  outline-offset: 2px;
+}
+.console-breadcrumb {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+  font-size: 14px;
+  line-height: 20px;
+}
+.console-breadcrumb > a,
+.breadcrumb-separator {
+  flex-shrink: 0;
+  color: var(--muted-foreground);
+}
+.console-breadcrumb > a:hover {
+  color: var(--foreground);
+}
+.breadcrumb-parent,
+.breadcrumb-current {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.breadcrumb-parent {
+  color: var(--muted-foreground);
+}
+.breadcrumb-current {
+  font-weight: 500;
+}
+.console-content {
+  flex: 1;
+  min-height: 0;
+  overflow: auto;
+}
+.console-content-workbench {
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+.console-content-workbench > .workbench-page {
+  flex: 1;
+  min-height: 0;
+}
+.console-content-workbench > .el-alert {
+  flex-shrink: 0;
+}
+.console-route-message {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 16px;
+  height: 100%;
+  padding: 32px;
+  text-align: center;
+}
+.console-route-message h1 {
+  margin: 0;
+  font-size: 36px;
+  font-weight: 600;
+  line-height: 40px;
+}
+.console-route-message p {
+  margin: 0;
+  color: var(--muted-foreground);
+}
+.console-route-return {
+  padding: 5px 12px;
+  border: 1px solid var(--border);
+  border-radius: calc(var(--radius) - 2px);
+  font-size: 14px;
+  line-height: 20px;
+}
+.console-route-return:hover {
+  background: var(--muted);
+}
+.mobile-toggle {
+  display: none;
+}
+.console-sidebar-drawer {
+  max-width: calc(100vw - 32px);
+  color: var(--foreground);
+  background: var(--popover, var(--card));
+}
+.console-sidebar-drawer .el-drawer__body {
+  display: flex;
+  padding: 0;
+  overflow: hidden;
+}
+.console-navigation-overlay {
+  background: rgb(0 0 0 / 30%);
+  backdrop-filter: blur(4px);
+}
+.mobile-navigation-close {
+  position: absolute;
+  top: 16px;
+  right: 16px;
+  width: 28px;
+  height: 28px;
+  background: var(--secondary, var(--muted));
+}
+@media (max-width: 767px) {
+  .console-sidebar,
+  .desktop-toggle {
+    display: none;
+  }
+  .mobile-toggle {
+    display: inline-flex;
+  }
+}
+
+/* 内容底色形成清晰层次；对话工作区继续保留独立的阅读背景。 */
+.console-content:not(.console-content-workbench) {
+  background: var(--canvas);
+}

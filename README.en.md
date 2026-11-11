@@ -126,6 +126,16 @@ Use `Ctrl+C` to stop web, API and their native Agents, then `corepack.cmd yarn s
 
 Existing databases require both `AGENT_SERVER_DB_URL` and `AGENT_SERVER_REDIS_URL`, plus original authentication/model keys; no development account is created. `SUPERDSH_SERVER_PORT` controls the web port and `AGENT_SERVER_PORT` the compatibility API. The unified entry needs no `AGENTS_ANYWHERE_API` proxy configuration; clear obsolete `NEXT_OUTPUT=export`. See the [server guide](apps/admin/server/README.md).
 
+### New Vue and Python admin
+
+The new implementation lives in `apps/web-admin/fronted` and `apps/web-admin/backend` and runs independently of the existing admin. Its Python backend follows RuoYi-style `controller → service → dao` layering while keeping the fixed DSH engine. See [Web Admin development](apps/web-admin/README.md) for startup, separate Docker deployment, initialization and test cleanup, and [phase one](docs/plans/web-admin-01-foundation.md) for implementation status.
+
+```powershell
+corepack.cmd yarn web-admin:sync
+corepack.cmd yarn web-admin:deps:up
+corepack.cmd yarn web-admin:dev
+```
+
 ### Android
 
 Open `apps/android` in Android Studio. With SDK / AVD prepared:

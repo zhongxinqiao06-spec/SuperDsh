@@ -1,0 +1,98 @@
+{
+  "additionalProperties": false,
+  "description": "新账号的密码只能在创建阶段提供，后续管理员使用恢复流程。",
+  "properties": {
+    "username": {
+      "default": "",
+      "title": "Username",
+      "type": "string"
+    },
+    "email": {
+      "anyOf": [
+        {
+          "maxLength": 254,
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Email"
+    },
+    "displayName": {
+      "anyOf": [
+        {
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Displayname"
+    },
+    "password": {
+      "anyOf": [
+        {
+          "maxLength": 1024,
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Password"
+    },
+    "passwordVerifier": {
+      "anyOf": [
+        {
+          "maxLength": 100,
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Passwordverifier"
+    },
+    "passwordSalt": {
+      "anyOf": [
+        {
+          "maxLength": 128,
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Passwordsalt"
+    },
+    "roles": {
+      "items": {
+        "type": "string"
+      },
+      "maxItems": 30,
+      "title": "Roles",
+      "type": "array"
+    },
+    "role": {
+      "anyOf": [
+        {
+          "maxLength": 100,
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Role"
+    }
+  },
+  "title": "UserCreateInput",
+  "type": "object"
+}

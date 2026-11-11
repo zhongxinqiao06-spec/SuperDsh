@@ -1,0 +1,395 @@
+/* Element Plus 保留交互能力；控件外观对应原管理端按钮、输入框和弹层。 */
+:root,
+.dark {
+  --el-font-family: var(--font-sans);
+  --el-font-size-base: 14px;
+  --el-color-primary: var(--primary);
+  --el-color-primary-dark-2: color-mix(
+    in oklch,
+    var(--primary),
+    var(--background) 20%
+  );
+  --el-color-primary-light-3: color-mix(
+    in oklch,
+    var(--primary),
+    var(--background) 30%
+  );
+  --el-color-primary-light-5: color-mix(
+    in oklch,
+    var(--primary),
+    var(--background) 50%
+  );
+  --el-color-primary-light-7: color-mix(
+    in oklch,
+    var(--primary),
+    var(--background) 70%
+  );
+  --el-color-primary-light-8: color-mix(
+    in oklch,
+    var(--primary),
+    var(--background) 80%
+  );
+  --el-color-primary-light-9: var(--muted);
+  --el-color-success: var(--success);
+  --el-color-warning: var(--warning);
+  --el-color-danger: var(--destructive);
+  --el-color-danger-light-9: color-mix(
+    in oklch,
+    var(--destructive) 10%,
+    var(--background)
+  );
+  --el-color-danger-light-8: color-mix(
+    in oklch,
+    var(--destructive) 20%,
+    var(--background)
+  );
+  --el-bg-color: var(--background);
+  --el-bg-color-overlay: var(--popover);
+  --el-bg-color-page: var(--background);
+  --el-text-color-primary: var(--foreground);
+  --el-text-color-regular: var(--foreground);
+  --el-text-color-secondary: var(--muted-foreground);
+  --el-text-color-placeholder: var(--muted-foreground);
+  --el-text-color-disabled: var(--muted-foreground);
+  --el-border-color: var(--border);
+  --el-border-color-light: var(--border);
+  --el-border-color-lighter: var(--border);
+  --el-border-color-extra-light: var(--border);
+  --el-border-color-dark: var(--ring);
+  --el-border-color-hover: var(--ring);
+  --el-border-radius-base: var(--radius-control);
+  --el-border-radius-small: var(--radius-control);
+  --el-component-size: var(--control-height);
+  --el-fill-color: var(--muted);
+  --el-fill-color-light: var(--muted);
+  --el-fill-color-lighter: color-mix(in oklch, var(--muted) 50%, transparent);
+  --el-fill-color-extra-light: var(--muted);
+  --el-fill-color-dark: var(--accent);
+  --el-fill-color-darker: var(--accent);
+  --el-fill-color-blank: var(--background);
+  --el-disabled-bg-color: var(--muted);
+  --el-disabled-text-color: var(--muted-foreground);
+  --el-disabled-border-color: var(--border);
+  --el-mask-color: rgb(0 0 0 / 30%);
+}
+.el-button {
+  height: var(--control-height);
+  padding: 0 14px;
+  border-radius: var(--radius-control);
+  font-weight: 500;
+  --el-button-text-color: var(--foreground);
+  --el-button-hover-text-color: var(--foreground);
+  --el-button-hover-border-color: var(--border);
+  --el-button-hover-bg-color: var(--muted);
+  --el-button-active-text-color: var(--foreground);
+  --el-button-active-border-color: var(--ring);
+  --el-button-active-bg-color: var(--muted);
+}
+.el-button + .el-button {
+  margin-left: 8px;
+}
+.el-button--small {
+  height: var(--control-height-small);
+  padding: 0 10px;
+  font-size: 13px;
+}
+.el-button--large {
+  height: 40px;
+  padding: 0 16px;
+  font-size: 14px;
+}
+.el-button--primary {
+  --el-button-bg-color: var(--primary);
+  --el-button-border-color: transparent;
+  --el-button-text-color: var(--primary-foreground);
+  --el-button-hover-text-color: var(--primary-foreground);
+  --el-button-hover-bg-color: color-mix(
+    in oklch,
+    var(--primary) 80%,
+    transparent
+  );
+  --el-button-hover-border-color: transparent;
+  --el-button-active-text-color: var(--primary-foreground);
+  --el-button-active-bg-color: var(--primary);
+  --el-button-active-border-color: transparent;
+  --el-button-disabled-text-color: var(--primary-foreground);
+  --el-button-disabled-bg-color: var(--primary);
+  --el-button-disabled-border-color: transparent;
+}
+.el-button--danger {
+  --el-button-bg-color: color-mix(
+    in oklch,
+    var(--destructive) 10%,
+    transparent
+  );
+  --el-button-border-color: transparent;
+  --el-button-text-color: var(--destructive);
+  --el-button-hover-text-color: var(--destructive);
+  --el-button-hover-bg-color: color-mix(
+    in oklch,
+    var(--destructive) 20%,
+    transparent
+  );
+  --el-button-hover-border-color: transparent;
+}
+.el-button.is-text,
+.el-button.is-link {
+  color: var(--foreground);
+}
+.el-button--danger.is-text,
+.el-button--danger.is-link {
+  color: var(--destructive);
+}
+.el-button.is-link {
+  height: auto;
+  padding: 0;
+}
+.el-button.is-disabled,
+.el-button.is-disabled:hover {
+  opacity: 0.5;
+}
+.el-button:focus-visible {
+  outline: 0;
+  border-color: var(--ring);
+  box-shadow: 0 0 0 3px color-mix(in oklch, var(--ring) 30%, transparent);
+}
+.el-input__wrapper,
+.el-select__wrapper,
+.el-textarea__inner {
+  min-height: var(--control-height);
+  background: var(--card);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-control);
+  box-shadow: none;
+  padding: 0 10px;
+  transition:
+    border-color 0.2s,
+    box-shadow 0.2s;
+}
+.el-input__inner {
+  height: 34px;
+  line-height: 34px;
+}
+.el-textarea__inner {
+  min-height: 64px;
+  padding: 8px 10px;
+  line-height: 1.7;
+  resize: vertical;
+}
+.el-input__wrapper:hover,
+.el-select__wrapper:hover,
+.el-textarea__inner:hover {
+  box-shadow: none;
+}
+.el-input__wrapper.is-focus,
+.el-select__wrapper.is-focused,
+.el-textarea__inner:focus {
+  border-color: var(--ring);
+  box-shadow: 0 0 0 3px color-mix(in oklch, var(--ring) 30%, transparent);
+}
+.el-input__inner:focus-visible,
+.el-textarea__inner:focus-visible {
+  outline: none;
+}
+.el-select-dropdown__item {
+  border-radius: var(--radius-xl);
+  margin: 0 4px;
+  height: 32px;
+  line-height: 32px;
+}
+.el-select-dropdown__item.is-selected {
+  color: var(--foreground);
+  background: var(--accent);
+  font-weight: 500;
+}
+.el-popper.is-light,
+.el-select__popper.el-popper {
+  color: var(--popover-foreground);
+  background: var(--popover);
+  border-color: var(--border);
+  border-radius: var(--radius-2xl);
+}
+.el-popper.is-dark,
+.el-popper.is-dark > .el-popper__arrow::before {
+  color: var(--background);
+  background: var(--foreground);
+  border-color: var(--foreground);
+}
+.el-overlay {
+  background: rgb(0 0 0 / 30%);
+  backdrop-filter: blur(4px);
+}
+.el-dialog,
+.el-message-box {
+  --el-dialog-padding-primary: 0px;
+  --el-dialog-border-radius: var(--radius-panel);
+  color: var(--popover-foreground);
+  background: var(--popover);
+  border-radius: var(--radius-panel);
+  border: 1px solid color-mix(in oklch, var(--foreground) 5%, transparent);
+  box-shadow: var(--shadow-overlay);
+}
+.el-overlay-dialog {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+.el-dialog {
+  margin: auto;
+  max-width: calc(100% - 32px);
+  max-height: calc(100svh - 32px);
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  flex-shrink: 0;
+  padding: 0;
+}
+/* 仅正文滚动；标题、关闭按钮和确认操作不参与长表单滚动。 */
+.el-dialog__body {
+  min-height: 0;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  scrollbar-gutter: stable;
+  padding: 24px;
+  overflow-wrap: anywhere;
+}
+.el-dialog__header {
+  flex: none;
+  margin: 0;
+  padding: 20px 64px 18px 24px;
+  border-bottom: 1px solid var(--border);
+}
+.el-dialog__title,
+.el-message-box__title {
+  color: var(--foreground);
+  font-size: 18px;
+  font-weight: 600;
+  line-height: 1.25;
+  letter-spacing: -0.02em;
+}
+.el-dialog__headerbtn {
+  top: 12px;
+  right: 12px;
+  width: 36px;
+  height: 36px;
+  border-radius: var(--radius-control);
+  background: var(--secondary);
+}
+.el-dialog__footer {
+  flex: none;
+  padding: 16px 24px;
+  border-top: 1px solid var(--border);
+  background: var(--popover);
+}
+.el-alert {
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  padding: 12px;
+}
+.el-alert--error.is-light {
+  color: var(--destructive);
+  border-color: color-mix(in oklch, var(--destructive) 40%, transparent);
+  background: transparent;
+}
+.el-alert--info.is-light {
+  color: var(--muted-foreground);
+  background: var(--muted);
+}
+/* 提示继承当前主题，不能在深色页面保留组件库浅色底与荧光文字。 */
+.el-alert--success.is-light,
+.el-alert--warning.is-light {
+  color: var(--foreground);
+  background: var(--muted);
+  border: 1px solid var(--border);
+}
+.el-tag {
+  border-radius: var(--radius-2xl);
+  font-weight: 500;
+}
+.el-tag.el-tag--primary,
+.el-tag.el-tag--info {
+  --el-tag-text-color: var(--foreground);
+  --el-tag-bg-color: var(--secondary);
+  --el-tag-border-color: transparent;
+}
+.el-tag.el-tag--success {
+  --el-tag-text-color: var(--success);
+  --el-tag-bg-color: color-mix(in oklch, var(--success) 8%, var(--card));
+  --el-tag-border-color: color-mix(in oklch, var(--success) 18%, var(--border));
+}
+.el-tag.el-tag--warning {
+  --el-tag-bg-color: color-mix(
+    in oklch,
+    var(--el-color-warning) 10%,
+    var(--background)
+  );
+  --el-tag-border-color: color-mix(
+    in oklch,
+    var(--el-color-warning) 30%,
+    var(--background)
+  );
+}
+.el-checkbox__input.is-checked .el-checkbox__inner::after {
+  border-color: var(--primary-foreground);
+}
+.el-radio__input.is-checked .el-radio__inner::after {
+  background: var(--primary-foreground);
+}
+.el-checkbox__label,
+.el-radio__label {
+  color: var(--foreground);
+}
+.el-switch.is-checked .el-switch__core .el-switch__action {
+  background: var(--primary-foreground);
+}
+.el-radio-button {
+  --el-radio-button-checked-text-color: var(--primary-foreground);
+}
+.el-pagination.is-background .el-pager li.is-active {
+  color: var(--primary-foreground);
+}
+.el-table {
+  --el-table-bg-color: var(--card);
+  --el-table-tr-bg-color: var(--card);
+  --el-table-header-bg-color: var(--muted);
+  --el-table-header-text-color: var(--muted-foreground);
+  --el-table-row-hover-bg-color: color-mix(
+    in oklch,
+    var(--muted) 50%,
+    transparent
+  );
+  font-size: 14px;
+}
+.el-table th.el-table__cell {
+  height: 40px;
+  font-weight: 500;
+}
+.el-tabs__item {
+  font-weight: 500;
+}
+@media (max-width: 767px) {
+  /* 避免移动浏览器聚焦时自动放大表单。 */
+  .el-input__inner,
+  .el-textarea__inner {
+    font-size: 16px;
+  }
+}
+
+.el-message-box {
+  padding: 24px;
+}
+.el-dialog__body > :last-child {
+  margin-bottom: 0;
+}
+.el-drawer {
+  background: var(--popover);
+}
+.el-drawer__header {
+  margin-bottom: 0;
+  padding: 20px 24px;
+  border-bottom: 1px solid var(--border);
+}
+.el-drawer__body {
+  min-height: 0;
+  overscroll-behavior: contain;
+}

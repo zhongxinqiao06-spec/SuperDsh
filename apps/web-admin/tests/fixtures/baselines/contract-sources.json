@@ -1,0 +1,38 @@
+[
+  {
+    "path": "apps/admin/server/contracts/openapi-v2.json",
+    "sha256": "e74bef93f8bc55fed27f47f07bcfe202a549a0e8f90a89620bd344c3f54353ee"
+  },
+  {
+    "path": "apps/admin/server/identity/routes.ts",
+    "sha256": "2d3a94e264cdf3150cebbf4d2773934b64294c0426b965de8751a3b07470c181"
+  },
+  {
+    "path": "apps/admin/server/identity/oauth.ts",
+    "sha256": "271fc6a3aedfdca8357fc641ef64830d9abfbeffda8696582bd75498a8d19794"
+  },
+  {
+    "path": "apps/admin/server/agents/contracts.ts",
+    "sha256": "72de47624bdab702b2bb482b73d1a04956e150550f0d3b0abdcc42aef2e6ad86"
+  },
+  {
+    "path": "apps/admin/server/agents/resource-contracts.ts",
+    "sha256": "3ce8cbd92e134f78b84b24494a34bc90bde7b3846871dd509600f38ca5f49591"
+  },
+  {
+    "path": "apps/admin/server/skills/definitions.ts",
+    "sha256": "f82e5f8946063628d4206e57f5dd7a6221e08fcaccacec9f0fa68fc4b6dc5301"
+  },
+  {
+    "path": "apps/desktop/core/src/contracts/skills.ts",
+    "sha256": "8e794e99adff467cd87a3ae8aa1911e31be3030d534450187585be9d570395aa"
+  },
+  {
+    "path": "apps/desktop/core/src/contracts/extensions.ts",
+    "sha256": "ca2e46c090f1faa107ddfe8f88eb2a7387d37a6fc06e2185c752c7b16c2ec964"
+  },
+  {
+    "path": "docs/agent-extension-development.md",
+    "sha256": "5dc81a2ce43bcbba53d033a8cb854e92c8256be351645c0a0ed63343caa27a4b"
+  }
+]

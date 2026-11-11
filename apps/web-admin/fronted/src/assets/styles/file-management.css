@@ -1,0 +1,15 @@
+/* 文件领域只保留内容差异，表格、筛选和分页均使用公共规范。 */
+.file-storage-usage {
+  margin: 0;
+  padding: 12px 16px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-control);
+  background: var(--card);
+  color: var(--muted-foreground);
+  font-size: 13px;
+}
+.file-name-cell {
+  min-width: 220px;
+  max-width: 460px;
+  overflow-wrap: anywhere;
+}

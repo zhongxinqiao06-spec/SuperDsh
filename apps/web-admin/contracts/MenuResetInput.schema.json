@@ -1,0 +1,16 @@
+{
+  "additionalProperties": false,
+  "description": "恢复默认只要求当前版本，不让客户端提交另一份默认菜单。",
+  "properties": {
+    "version": {
+      "minimum": 1,
+      "title": "Version",
+      "type": "integer"
+    }
+  },
+  "required": [
+    "version"
+  ],
+  "title": "MenuResetInput",
+  "type": "object"
+}

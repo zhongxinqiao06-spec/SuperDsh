@@ -1,0 +1,99 @@
+[build-system]
+requires = ["setuptools>=75,<81"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "superdsh-web-admin"
+dynamic = ["version"]
+requires-python = ">=3.12,<3.14"
+dependencies = [
+  "fastapi>=0.115,<1",
+  "uvicorn[standard]>=0.34,<1",
+  "sqlalchemy[asyncio]>=2.0,<3",
+  "asyncpg>=0.30,<1",
+  "alembic>=1.15,<2",
+  "pydantic-settings>=2.8,<3",
+  "cryptography>=44,<48",
+  "pyjwt>=2.10,<3",
+  "jsonschema>=4.23,<5",
+  "httpx>=0.28,<1",
+  "redis>=5.2,<7",
+  "langgraph>=0.3,<2",
+  "python-docx>=1.2.0",
+  "python-pptx>=1.0.2",
+  "openpyxl>=3.1.5",
+  "pillow>=13.0.0",
+  "reportlab>=5.1.0",
+  "pypdf>=7.0.0",
+  "pyyaml>=6.0.3",
+  "python-multipart>=0.0.33",
+  "mcp>=2.3.0",
+  "onnxruntime>=1.31.1",
+  "tokenizers>=0.23.3",
+  "numpy>=2.5.4",
+  "pywinpty>=3.1.2 ; sys_platform == 'win32'",
+  "defusedxml>=0.7.1",
+  "httpx2>=2.16.0",
+  "tzdata>=2026.6",
+  "pypdfium2>=5.15.0",
+]
+
+[dependency-groups]
+dev = [
+    "pytest>=8.3,<10",
+    "pytest-asyncio>=0.26,<2",
+    "ruff>=0.11,<1",
+    "mypy>=1.15,<2",
+    "types-jsonschema>=4.23",
+    "build>=1.2,<2",
+    "types-pyyaml>=6.0.12.20261103",
+    "types-openpyxl>=3.1.5.20261017",
+    "types-defusedxml>=0.7.0.20260504",
+    "types-reportlab>=5.1.0.20261104",
+]
+
+[tool.uv]
+# 开发直接运行源码；uv 只同步依赖，不隐式构建或安装本项目。
+package = false
+# 原生 uv 在运行 main.py 之前使用的下载/解析缓存同样外置。
+cache-dir = "../../../.superdsh-work/web-admin-tools/uv-cache"
+# 首次解析动态版本发生在 main.py 之前；仅对本项目元数据构建关闭字节码写入。
+extra-build-variables = { superdsh-web-admin = { PYTHONDONTWRITEBYTECODE = "1" } }
+
+[tool.setuptools.packages.find]
+include = ["app*", "toolkits*"]
+
+[tool.setuptools.dynamic]
+version = {attr = "app.build_metadata.__version__"}
+
+[tool.pytest.ini_options]
+testpaths = ["../tests/backend", "../tests/integration", "../tests/contracts"]
+asyncio_mode = "auto"
+asyncio_default_fixture_loop_scope = "function"
+addopts = "-p no:cacheprovider"
+markers = ["office_renderer: requires the isolated native LibreOffice validation image"]
+
+[tool.ruff]
+# 环境覆盖用于隔离测试；裸工具命令在 backend 工作目录运行。
+cache-dir = "${RUFF_CACHE_DIR:-../../../.superdsh-work/web-admin-tools/ruff}"
+target-version = "py312"
+line-length = 100
+src = [".", "../tests"]
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "UP", "B", "ASYNC"]
+ignore = ["E501"]
+
+[tool.ruff.lint.isort]
+known-first-party = ["app", "toolkits", "main", "fixtures", "architecture"]
+
+[tool.mypy]
+# mypy 显式使用配置文件目录，避免从仓库根执行时落回源码目录。
+cache_dir = "$MYPY_CONFIG_FILE_DIR/../../../.superdsh-work/web-admin-tools/mypy"
+plugins = ["pydantic.mypy"]
+python_version = "3.12"
+check_untyped_defs = true
+disallow_untyped_defs = true
+warn_unused_ignores = true
+no_implicit_optional = true
+files = ["app", "toolkits", "main.py", "../tests", "migrations", "../deployment/bootstrap.py"]
