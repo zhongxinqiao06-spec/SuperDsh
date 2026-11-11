@@ -106,6 +106,7 @@ Office 文档生成与预览需要 LibreOffice 和文档所用字体。Windows �
 
 - 开发和生产默认使用同一后端目录中的实际文件。开发执行 `web-admin:init` 后直接使用 `uv run python main.py`；模型文件不再放在 `.superdsh-work`。
 - Docker 由启动脚本导出 `WEB_ADMIN_MODEL_DEFAULTS_SOURCE` 作为宿主机源文件，只读挂载到容器内 `/app/apps/web-admin/backend/config/model-defaults.json`。实际文件被 Git 和 Docker 构建上下文排除，镜像只包含无凭据模板；Linux 部署需保证容器用户 UID 1000 可读取挂载文件。
+- 此服务器的原始模型配置只读挂载自 `/etc/superdsh/web-admin/model-defaults.json`。仓库中的 `deployment/model-defaults.json.gpg` 是完整原文的加密备份，解密口令单独保存在服务器的 `/etc/superdsh/web-admin/model-backup.pass`，请随主机密钥备份。恢复时在仓库根目录执行 `(umask 077 && gpg --batch --passphrase-file /etc/superdsh/web-admin/model-backup.pass --output /etc/superdsh/web-admin/model-defaults.restore --decrypt apps/web-admin/deployment/model-defaults.json.gpg)`，校验并设置属组 1000、权限 0440 后再替换挂载文件。
 - 模板为 `backend/config/model-defaults.example.json`。`WEB_ADMIN_CONFIG_ROOT` 仍用于数据库、管理员等运行设置，不再改变模型配置的默认位置；旧 `backend-environment.json` 内的模型路径会被原生入口忽略。分环境部署时，可在启动终端显式设置 `WEB_ADMIN_MODEL_DEFAULTS_FILE`，原生 Python 和根启动脚本均支持该覆盖。
 
 文件包含三个部分：
