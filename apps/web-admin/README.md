@@ -178,7 +178,7 @@ corepack yarn web-admin:logs
 corepack yarn web-admin:down
 ```
 
-在专用 Linux 主机上，可先用 `WEB_ADMIN_PUBLIC_ORIGIN` 指定用户实际访问的地址，在仓库根运行 `node scripts/web-admin.ts compose-config` 导出生产配置。需要使用 5174 时把生产 `config/settings.json` 的 `ports.frontedPort` 调为 5174 后重新导出。确认仓库根原有 `.env` 已备份，再把根 `.env` 链接至 `.superdsh-work/web-admin-production/config/compose.env`。此后在根目录执行 `docker compose up -d` 即启动该 Vue/FastAPI 版本，包括 Ollama 和中文知识检索模型。前后端镜像均以提交 SHA 为标签；更新时先 `git pull --ff-only`，再用相同的公开地址、模型挂载路径运行 `corepack yarn web-admin:up`，刷新提交号并构建。业务数据与生成的密钥保存在该部署自己的卷和配置目录。
+在专用 Linux 主机上，可先用 `WEB_ADMIN_PUBLIC_ORIGIN` 指定用户实际访问的地址，在仓库根运行 `node scripts/web-admin.ts compose-config` 导出生产配置。需要使用 5174 时把生产 `config/settings.json` 的 `ports.frontedPort` 调为 5174 后重新导出。确认仓库根原有 `.env` 已备份，再把根 `.env` 链接至 `.superdsh-work/web-admin-production/config/compose.env`。此后在根目录执行 `docker compose up -d` 即启动该 Vue/FastAPI 版本，包括 Ollama 和中文知识检索模型。前后端镜像均以提交 SHA 为标签；可在生产 `settings.json` 保存 `publicOrigin` 和 `modelDefaultsFile`（宿主机绝对路径）；旧内核若在空卷 initdb 报 EPERM，设置 `postgresVariant` 为 `bookworm` 再导出，已初始化的数据库保持原变体。更新时先 `git pull --ff-only`，再运行 `corepack yarn web-admin:up`，刷新提交号并构建。业务数据与生成的密钥保存在该部署自己的卷和配置目录。
 
 根 `compose.web-admin.yml` 使用 `starbridge-web-admin` project，前端 Nginx 与 Python 后端分别构建，PostgreSQL、Redis、Qdrant、对象存储、运行 Home、文件及配置均使用独立卷。只有前端端口公开；反代保留旧 API/WS 入口并交给同一 Python 兼容适配器。
 

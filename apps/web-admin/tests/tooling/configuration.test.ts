@@ -128,6 +128,46 @@ test('重复初始化复用原密钥，生产Compose与开发目录明确隔离'
   }
 })
 
+test('生产再次导出保留数据库变体、公开地址和模型文件', async () => {
+  const context = await fixture()
+  const previousModel = process.env.WEB_ADMIN_MODEL_DEFAULTS_FILE
+  const previousOrigin = process.env.WEB_ADMIN_PUBLIC_ORIGIN
+  delete process.env.WEB_ADMIN_MODEL_DEFAULTS_FILE
+  delete process.env.WEB_ADMIN_PUBLIC_ORIGIN
+  try {
+    const models = resolve(context.directory, 'private-models.json')
+    const initial = await loadBaseConfiguration(
+      'production',
+      context.directory,
+      models,
+    )
+    Object.assign(initial.configuration, {
+      postgresVariant: 'bookworm',
+      publicOrigin: 'https://platform.example.com',
+      modelDefaultsFile: models,
+    })
+    await writeFile(initial.configPath, JSON.stringify(initial.configuration))
+    const result = await composeBaseEnvironment('production', context.directory)
+    assert.equal(result.modelDefaultsFile, models)
+    assert.equal(
+      result.environment.WEB_ADMIN_PUBLIC_ORIGIN,
+      'https://platform.example.com',
+    )
+    const env = await readFile(result.envFile, 'utf8')
+    assert.match(env, /COMPOSE_FILE='compose.web-admin.yml'/)
+    assert.match(
+      env,
+      /WEB_ADMIN_IMAGE_POSTGRES='postgres:17-bookworm@sha256:[a-f0-9]{64}'/,
+    )
+  } finally {
+    if (previousModel !== undefined)
+      process.env.WEB_ADMIN_MODEL_DEFAULTS_FILE = previousModel
+    if (previousOrigin !== undefined)
+      process.env.WEB_ADMIN_PUBLIC_ORIGIN = previousOrigin
+    await context.cleanup()
+  }
+})
+
 test('旧配置补齐初始管理员并保留密钥，用户自定义值重复加载不覆盖', async () => {
   const context = await fixture()
   try {

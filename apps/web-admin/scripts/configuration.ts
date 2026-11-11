@@ -24,6 +24,7 @@ interface RuntimeMetadata {
     | 'alpine',
     string
   >
+  postgresBookworm: string
   storage: {
     bucket: string
     minioSource: string
@@ -122,13 +123,16 @@ export async function loadConfiguration(
   for (const child of ['runtime', 'files', 'logs'])
     await mkdir(resolve(root, child), { recursive: true })
   const modelDefaults = await ensureModelDefaults(
-    modelDefaultsFile ?? process.env.WEB_ADMIN_MODEL_DEFAULTS_FILE,
+    modelDefaultsFile ??
+      process.env.WEB_ADMIN_MODEL_DEFAULTS_FILE ??
+      configuration.modelDefaultsFile,
   )
   const ports = configuration.ports
   const host = mode === 'production' ? 'postgres' : '127.0.0.1'
   const dbPort = mode === 'production' ? 5432 : ports.postgresPort
   const publicOrigin =
     process.env.WEB_ADMIN_PUBLIC_ORIGIN ??
+    configuration.publicOrigin ??
     `http://localhost:${ports.frontedPort}`
   const environment = {
     WEB_ADMIN_DATABASE_URL: `postgresql+asyncpg://web_admin:${configuration.databasePassword}@${host}:${dbPort}/web_admin`,
@@ -238,6 +242,11 @@ export async function composeEnvironment(
   if (mode === 'production') values.COMPOSE_FILE = 'compose.web-admin.yml'
   for (const [name, value] of Object.entries(deploymentMetadata.images))
     values[`WEB_ADMIN_IMAGE_${name.toUpperCase()}`] = value
+  // 已有数据卷须保持 initdb 时的系统变体，后续发布继续读取同一选择。
+  if (config.postgresVariant === 'bookworm')
+    values.WEB_ADMIN_IMAGE_POSTGRES = deploymentMetadata.postgresBookworm
+  else if (config.postgresVariant && config.postgresVariant !== 'alpine')
+    throw new Error('postgresVariant 必须是 alpine 或 bookworm')
   const output = resolve(root, 'config/compose.env')
   const lines = Object.entries(values).map(
     ([key, value]) => `${key}='${String(value).replaceAll("'", "\\'")}'`,
