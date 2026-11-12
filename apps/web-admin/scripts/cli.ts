@@ -125,7 +125,7 @@ export async function main(command = 'help', args: string[] = []) {
       process.env.WEB_ADMIN_CONFIG_ROOT,
     )
     const file = production
-      ? resolve(repositoryRoot, 'compose.web-admin.yml')
+      ? resolve(repositoryRoot, 'compose.yml')
       : resolve(appRoot, 'deployment/compose.dependencies.yml')
     const action =
       command === 'up'

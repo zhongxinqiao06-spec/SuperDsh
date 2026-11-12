@@ -4,7 +4,7 @@
 
 ## 产品边界
 
-- 保持现有 `apps/admin` 源码、已有工作区修改、启动入口及默认部署不变。新应用不导入、代理到或启动旧管理端业务实现，不依赖退休后端。
+- 保持现有 `apps/admin` 源码、已有工作区修改、启动入口及显式 `compose.legacy.yml` 部署。根 Compose 默认启动 Vue 和 FastAPI。新应用不导入、代理到或启动旧管理端业务实现，不依赖退休后端。
 - 前端固定为 `fronted`，使用 Vue3 + TypeScript；平台业务后端固定为 `backend`，使用 Python FastAPI。DSH、桌面和 Android 的既有协议及身份边界保持兼容。
 - `backend/app` 只容纳 Python 后端源码，不放 `.mjs`、`.js` 或 TypeScript 桥接。固定 DSH 确需的引擎侧插件注册放独立 `engine-adapter/src`，使用 TypeScript；工具业务逻辑仍在 Python。引擎适配编译输出放 `engine-adapter/dist`，不提交、不混入源码；运行时不临时编译。仓库装配与构建脚本使用 TypeScript；后端原生 Python 启动统一由 `backend/main.py` 承担，命令为 `uv run python main.py`，保留配置加载、迁移和热重载，不复制 ASGI 业务装配。
 - 平台提供通用资源、配置、权限、版本、会话绑定、执行收据、确认、证据与成果能力。Office 等场景通过可配置工具、技能和智能体组合接入，不在核心按助手名称写分支。

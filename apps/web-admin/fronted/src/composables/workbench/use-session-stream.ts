@@ -1,3 +1,4 @@
+import { createUuid } from '@/utils/uuid'
 import { onScopeDispose, ref, watch, type Ref } from 'vue'
 import { conversationApi } from '@/api/workbench/conversation-api'
 import { apiUrl } from '@/utils/api-config'
@@ -20,7 +21,7 @@ export function useSessionStream(
   let retries = 0
   let closed = false
   let accountGeneration = sessionController.generation
-  const clientId = crypto.randomUUID()
+  const clientId = createUuid()
   const clear = () => {
     generation++
     if (timer) clearTimeout(timer)

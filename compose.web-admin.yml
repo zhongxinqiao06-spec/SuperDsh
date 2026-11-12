@@ -1,40 +1,102 @@
 name: starbridge-web-admin
 services:
+  config-init:
+    image: starbridge-web-admin-backend:${WEB_ADMIN_SOURCE_COMMIT:-local}
+    pull_policy: never
+    user: '0:0'
+    entrypoint: [python, /app/apps/web-admin/deployment/init_credentials.py]
+    restart: 'no'
+    environment:
+      WEB_ADMIN_POSTGRES_PASSWORD: ${WEB_ADMIN_POSTGRES_PASSWORD:-}
+      WEB_ADMIN_REDIS_PASSWORD: ${WEB_ADMIN_REDIS_PASSWORD:-}
+      WEB_ADMIN_MINIO_PASSWORD: ${WEB_ADMIN_MINIO_PASSWORD:-}
+      WEB_ADMIN_QDRANT_API_KEY: ${WEB_ADMIN_QDRANT_API_KEY:-}
+      WEB_ADMIN_SECRET: ${WEB_ADMIN_SECRET:-}
+      WEB_ADMIN_ENCRYPTION_KEY: ${WEB_ADMIN_ENCRYPTION_KEY:-}
+    volumes:
+      - config-data:/data/config
+      - postgres-data:/existing-db:ro
+      - postgres-auth:/auth/postgres
+      - redis-auth:/auth/redis
+      - qdrant-auth:/auth/qdrant
+      - minio-auth:/auth/minio
   postgres:
-    extends:
-      file: apps/web-admin/deployment/compose.dependencies.yml
-      service: postgres
-    ports: !reset []
+    image: ${WEB_ADMIN_IMAGE_POSTGRES:?Missing PostgreSQL image}
     restart: unless-stopped
+    environment:
+      POSTGRES_DB: web_admin
+      POSTGRES_USER: web_admin
+      POSTGRES_PASSWORD_FILE: /run/auth/password
+    volumes:
+      [postgres-data:/var/lib/postgresql/data, postgres-auth:/run/auth:ro]
+    depends_on:
+      config-init: { condition: service_completed_successfully }
+    healthcheck:
+      test: [CMD, pg_isready, -U, web_admin, -d, web_admin]
+      interval: 3s
+      timeout: 3s
+      retries: 20
   redis:
-    extends:
-      file: apps/web-admin/deployment/compose.dependencies.yml
-      service: redis
-    ports: !reset []
+    image: ${WEB_ADMIN_IMAGE_REDIS:?Missing Redis image}
     restart: unless-stopped
+    entrypoint: [/bin/sh, -ec]
+    command:
+      [
+        'exec docker-entrypoint.sh redis-server --appendonly yes --requirepass "$$(cat /run/auth/password)"',
+      ]
+    volumes: [redis-data:/data, redis-auth:/run/auth:ro]
+    depends_on:
+      config-init: { condition: service_completed_successfully }
+    healthcheck:
+      test:
+        [
+          CMD-SHELL,
+          'REDISCLI_AUTH="$$(cat /run/auth/password)" redis-cli ping | grep -qx PONG',
+        ]
+      interval: 3s
+      timeout: 3s
+      retries: 20
   qdrant:
-    extends:
-      file: apps/web-admin/deployment/compose.dependencies.yml
-      service: qdrant
-    ports: !reset []
+    image: ${WEB_ADMIN_IMAGE_QDRANT:?Missing Qdrant image}
     restart: unless-stopped
+    entrypoint: [/bin/sh, -ec]
+    command:
+      [
+        'export QDRANT__SERVICE__API_KEY="$$(cat /run/auth/password)" && exec ./entrypoint.sh',
+      ]
+    depends_on:
+      config-init: { condition: service_completed_successfully }
+    volumes: [qdrant-data:/qdrant/storage, qdrant-auth:/run/auth:ro]
   minio:
     extends:
-      file: apps/web-admin/deployment/compose.dependencies.yml
+      file: apps/web-admin/deployment/compose.minio.yml
       service: minio
-    ports: !reset []
     restart: unless-stopped
+    entrypoint: [/bin/sh, -ec]
+    command:
+      [
+        'export MINIO_ROOT_PASSWORD="$$(cat /run/auth/password)" && exec minio server /data',
+      ]
+    volumes: [minio-auth:/run/auth:ro]
+    depends_on:
+      config-init: { condition: service_completed_successfully }
   minio-init:
     extends:
-      file: apps/web-admin/deployment/compose.dependencies.yml
+      file: apps/web-admin/deployment/compose.minio.yml
       service: minio-init
+    entrypoint: [/bin/sh, -ec]
+    command:
+      [
+        'export MINIO_ROOT_PASSWORD="$$(cat /run/auth/password)" && exec /usr/local/bin/web-admin-minio-init',
+      ]
+    volumes: [minio-auth:/run/auth:ro]
   ollama:
-    extends: { file: compose.yml, service: ollama }
+    extends: { file: compose.ollama.yml, service: ollama }
   ollama-init:
-    extends: { file: compose.yml, service: ollama-init }
+    extends: { file: compose.ollama.yml, service: ollama-init }
   backend:
-    image: starbridge-web-admin-backend:${WEB_ADMIN_SOURCE_COMMIT:?Use web-admin command}
-    pull_policy: never
+    image: starbridge-web-admin-backend:${WEB_ADMIN_SOURCE_COMMIT:-local}
+    pull_policy: ${WEB_ADMIN_APP_PULL_POLICY:-build}
     build:
       context: .
       dockerfile: apps/web-admin/deployment/Dockerfile.backend
@@ -42,31 +104,34 @@ services:
         NODE_IMAGE: ${WEB_ADMIN_IMAGE_NODE:?Use web-admin command}
         PYTHON_IMAGE: ${WEB_ADMIN_IMAGE_PYTHON:?Use web-admin command}
         UV_VERSION: ${WEB_ADMIN_UV_VERSION:?Use web-admin command}
-        SOURCE_COMMIT: ${WEB_ADMIN_SOURCE_COMMIT:?Use web-admin command}
+        SOURCE_COMMIT: ${WEB_ADMIN_SOURCE_COMMIT:-local}
     env_file: apps/admin/deployment/ollama/embedding.env
     init: true
     restart: unless-stopped
     stop_grace_period: 90s
     environment:
-      WEB_ADMIN_DATABASE_URL: ${WEB_ADMIN_DATABASE_URL}
-      WEB_ADMIN_REDIS_URL: ${WEB_ADMIN_REDIS_URL}
-      WEB_ADMIN_SECRET: ${WEB_ADMIN_SECRET}
-      WEB_ADMIN_ENCRYPTION_KEY: ${WEB_ADMIN_ENCRYPTION_KEY}
-      WEB_ADMIN_INITIAL_ADMIN_USERNAME: ${WEB_ADMIN_INITIAL_ADMIN_USERNAME}
-      WEB_ADMIN_INITIAL_ADMIN_PASSWORD: ${WEB_ADMIN_INITIAL_ADMIN_PASSWORD}
-      WEB_ADMIN_INITIAL_ADMIN_DISPLAY_NAME: ${WEB_ADMIN_INITIAL_ADMIN_DISPLAY_NAME}
-      WEB_ADMIN_PUBLIC_ORIGIN: ${WEB_ADMIN_PUBLIC_ORIGIN}
-      WEB_ADMIN_ALLOWED_ORIGINS: ${WEB_ADMIN_ALLOWED_ORIGINS}
+      WEB_ADMIN_COMPOSE_CREDENTIALS: /data/config/compose-credentials.json
+      WEB_ADMIN_DATABASE_URL: ${WEB_ADMIN_DATABASE_URL:-}
+      WEB_ADMIN_REDIS_URL: ${WEB_ADMIN_REDIS_URL:-}
+      WEB_ADMIN_SECRET: ${WEB_ADMIN_SECRET:-}
+      WEB_ADMIN_ENCRYPTION_KEY: ${WEB_ADMIN_ENCRYPTION_KEY:-}
+      WEB_ADMIN_INITIAL_ADMIN_USERNAME: ${WEB_ADMIN_INITIAL_ADMIN_USERNAME:-}
+      WEB_ADMIN_INITIAL_ADMIN_PASSWORD: ${WEB_ADMIN_INITIAL_ADMIN_PASSWORD:-}
+      WEB_ADMIN_INITIAL_ADMIN_DISPLAY_NAME: ${WEB_ADMIN_INITIAL_ADMIN_DISPLAY_NAME:-}
+      WEB_ADMIN_PUBLIC_ORIGIN: ${WEB_ADMIN_PUBLIC_ORIGIN:-}
+      WEB_ADMIN_FRONTED_PORT: ${WEB_ADMIN_FRONTED_PORT:-5174}
+      WEB_ADMIN_ALLOWED_ORIGINS: ${WEB_ADMIN_ALLOWED_ORIGINS:-}
       WEB_ADMIN_PROVIDER_ALLOWED_ORIGINS: http://ollama:11434${WEB_ADMIN_PROVIDER_ALLOWED_ORIGINS:+,}${WEB_ADMIN_PROVIDER_ALLOWED_ORIGINS:-}
       WEB_ADMIN_EMBEDDING_TRUSTED_ORIGINS: http://ollama:11434${WEB_ADMIN_EMBEDDING_TRUSTED_ORIGINS:+,}${WEB_ADMIN_EMBEDDING_TRUSTED_ORIGINS:-}
       WEB_ADMIN_MODEL_DEFAULTS_FILE: /app/apps/web-admin/backend/config/model-defaults.json
-      WEB_ADMIN_QDRANT_URL: ${WEB_ADMIN_QDRANT_URL}
-      WEB_ADMIN_QDRANT_API_KEY: ${WEB_ADMIN_QDRANT_API_KEY}
-      WEB_ADMIN_STORAGE_ENDPOINT: ${WEB_ADMIN_STORAGE_ENDPOINT}
-      WEB_ADMIN_STORAGE_USER: ${WEB_ADMIN_STORAGE_USER}
-      WEB_ADMIN_STORAGE_PASSWORD: ${WEB_ADMIN_STORAGE_PASSWORD}
+      WEB_ADMIN_QDRANT_URL: ${WEB_ADMIN_QDRANT_URL:-http://qdrant:6333}
+      WEB_ADMIN_QDRANT_API_KEY: ${WEB_ADMIN_QDRANT_API_KEY:-}
+      WEB_ADMIN_STORAGE_ENDPOINT: ${WEB_ADMIN_STORAGE_ENDPOINT:-http://minio:9000}
+      WEB_ADMIN_STORAGE_USER: ${WEB_ADMIN_STORAGE_USER:-web-admin}
+      WEB_ADMIN_STORAGE_PASSWORD: ${WEB_ADMIN_STORAGE_PASSWORD:-}
       WEB_ADMIN_STORAGE_BUCKET: ${WEB_ADMIN_STORAGE_BUCKET}
     depends_on:
+      config-init: { condition: service_completed_successfully }
       postgres: { condition: service_healthy }
       redis: { condition: service_healthy }
       qdrant: { condition: service_started }
@@ -78,26 +143,30 @@ services:
       - config-data:/data/config
       # 明文凭据只通过正式配置只读挂载，不进入镜像或测试 fixture。
       - type: bind
-        source: ${WEB_ADMIN_MODEL_DEFAULTS_SOURCE}
+        source: ${WEB_ADMIN_MODEL_DEFAULTS_SOURCE:-./apps/web-admin/backend/config/model-defaults.example.json}
         target: /app/apps/web-admin/backend/config/model-defaults.json
         read_only: true
         bind:
           create_host_path: false
   fronted:
-    image: starbridge-web-admin-fronted:${WEB_ADMIN_SOURCE_COMMIT:?Use web-admin command}
-    pull_policy: never
+    image: starbridge-web-admin-fronted:${WEB_ADMIN_SOURCE_COMMIT:-local}
+    pull_policy: ${WEB_ADMIN_APP_PULL_POLICY:-build}
     build:
       context: .
       dockerfile: apps/web-admin/deployment/Dockerfile.fronted
       args:
         NODE_IMAGE: ${WEB_ADMIN_IMAGE_NODE}
         NGINX_IMAGE: ${WEB_ADMIN_IMAGE_NGINX}
-        SOURCE_COMMIT: ${WEB_ADMIN_SOURCE_COMMIT}
+        SOURCE_COMMIT: ${WEB_ADMIN_SOURCE_COMMIT:-local}
     restart: unless-stopped
-    ports: ['${WEB_ADMIN_FRONTED_PORT}:8080']
+    ports: ['${WEB_ADMIN_FRONTED_PORT:-5174}:8080']
     depends_on:
       backend: { condition: service_healthy }
 volumes:
+  postgres-auth:
+  redis-auth:
+  qdrant-auth:
+  minio-auth:
   ollama-data:
   postgres-data:
   redis-data:

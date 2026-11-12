@@ -1,8 +1,8 @@
 # SuperDsh
 
-SuperDsh includes a desktop Agent application, a full-stack Next.js + Node.js management platform, and an Android application. The platform centers on overview, access, models, devices and system management; chat is its Agent Workbench module. DeepSeek Harness is a required engine plugin managed by the product.
+SuperDsh includes a desktop Agent app, a Vue 3 management console with a FastAPI backend, and an Android app. The Agent Workbench uses DeepSeek Harness.
 
-**Server deployment:** after cloning, run `docker compose up -d` at the repository root. Compose builds the platform, starts Ollama and verifies the Chinese knowledge retrieval model. Once the platform is ready, open `http://SERVER_IP:5174`. Initial credentials are **`admin` / `admin123`**; change the password after signing in. Older Compose deployments still using their original random initial password are upgraded automatically once at startup; passwords changed by users are retained. See [Compose deployment and updates](apps/admin/deployment/README.md).
+Run `docker compose up -d` at the repository root to start the Vue console, FastAPI and Ollama. Open `http://SERVER_IP:5174`. The initial account is `admin` / `admin123`. Set `WEB_ADMIN_PUBLIC_ORIGIN` for your deployment URL and change the password after signing in. [Deployment guide](apps/web-admin/README.md#独立-docker-部署)
 
 **Use this page for daily development.** [中文](README.md) · [Origins](#upstream-foundations) · [Principles](#design-principles) · [Progress](#current-progress) · [Code](#project-structure) · [Startup](#daily-development) · [Integration](#three-client-integration) · [Checks](#checks-and-packaging)
 
@@ -169,7 +169,7 @@ Desktop can use local DeepSeek / API keys independently. Platform login/logout/s
 
 Web module switches retain account-scoped in-memory drafts, pending files and send results while releasing workbench subscriptions; reload/account switch clears temporary state. Android can view cached history and save drafts offline, with manual sending after reconnect.
 
-For production, clone with Git and run `docker compose up -d --build` at the repository root. Web, desktop and Android use port `5174`. Database connections, authentication/encryption keys and the first administrator initialize automatically and persist in dedicated volumes. For updates, run `git pull --ff-only origin main`, then the same Compose command. See [deployment and backups](apps/admin/deployment/README.md#服务器首次部署). Existing `SUPERDSH_SERVER_ENV` + `server:start` / systemd deployments remain documented in the [native guide](apps/admin/deployment/native.md).
+Update the checkout with `git pull --ff-only`, then run `docker compose up -d --build`. Keep the production volumes and the server’s plain JSON model configuration. Existing Next.js deployments use `docker compose -f compose.legacy.yml`. [Vue deployment guide](apps/web-admin/README.md#独立-docker-部署)
 
 ## Agent demo and development entry
 

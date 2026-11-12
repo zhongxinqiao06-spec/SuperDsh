@@ -106,7 +106,6 @@ Office 文档生成与预览需要 LibreOffice 和文档所用字体。Windows �
 
 - 开发和生产默认使用同一后端目录中的实际文件。开发执行 `web-admin:init` 后直接使用 `uv run python main.py`；模型文件不再放在 `.superdsh-work`。
 - Docker 由启动脚本导出 `WEB_ADMIN_MODEL_DEFAULTS_SOURCE` 作为宿主机源文件，只读挂载到容器内 `/app/apps/web-admin/backend/config/model-defaults.json`。实际文件被 Git 和 Docker 构建上下文排除，镜像只包含无凭据模板；Linux 部署需保证容器用户 UID 1000 可读取挂载文件。
-- 此服务器的原始模型配置只读挂载自 `/etc/superdsh/web-admin/model-defaults.json`。仓库中的 `deployment/model-defaults.json.gpg` 是完整原文的加密备份，解密口令单独保存在服务器的 `/etc/superdsh/web-admin/model-backup.pass`，请随主机密钥备份。恢复时在仓库根目录执行 `(umask 077 && gpg --batch --passphrase-file /etc/superdsh/web-admin/model-backup.pass --output /etc/superdsh/web-admin/model-defaults.restore --decrypt apps/web-admin/deployment/model-defaults.json.gpg)`，校验并设置属组 1000、权限 0440 后再替换挂载文件。
 - 模板为 `backend/config/model-defaults.example.json`。`WEB_ADMIN_CONFIG_ROOT` 仍用于数据库、管理员等运行设置，不再改变模型配置的默认位置；旧 `backend-environment.json` 内的模型路径会被原生入口忽略。分环境部署时，可在启动终端显式设置 `WEB_ADMIN_MODEL_DEFAULTS_FILE`，原生 Python 和根启动脚本均支持该覆盖。
 
 文件包含三个部分：
@@ -172,17 +171,11 @@ Linux/macOS 将解释器路径换为 `.venv/bin/python`。部署只安装运行�
 
 ## 独立 Docker 部署
 
-```powershell
-corepack yarn web-admin:up
-corepack yarn web-admin:logs
-corepack yarn web-admin:down
-```
+在仓库根执行 `docker compose up -d`。首次启动会构建 Vue 前端与 FastAPI 后端，生成并持久保存服务凭据，启动 Ollama 后校验中文检索模型。默认端口为 5174，使用服务器 IP 或域名时，将 `WEB_ADMIN_PUBLIC_ORIGIN` 设为实际公开地址。空库初始账号取自 `deployment/initial-admin.json`。
 
-在专用 Linux 主机上，可先用 `WEB_ADMIN_PUBLIC_ORIGIN` 指定用户实际访问的地址，在仓库根运行 `node scripts/web-admin.ts compose-config` 导出生产配置。需要使用 5174 时把生产 `config/settings.json` 的 `ports.frontedPort` 调为 5174 后重新导出。确认仓库根原有 `.env` 已备份，再把根 `.env` 链接至 `.superdsh-work/web-admin-production/config/compose.env`。此后在根目录执行 `docker compose up -d` 即启动该 Vue/FastAPI 版本，包括 Ollama 和中文知识检索模型。前后端镜像均以提交 SHA 为标签；可在生产 `settings.json` 保存 `publicOrigin` 和 `modelDefaultsFile`（宿主机绝对路径）；旧内核若在空卷 initdb 报 EPERM，设置 `postgresVariant` 为 `bookworm` 再导出，已初始化的数据库保持原变体。更新时先 `git pull --ff-only`，再运行 `corepack yarn web-admin:up`，刷新提交号并构建。业务数据与生成的密钥保存在该部署自己的卷和配置目录。
+模型配置使用普通 JSON。默认挂载无凭据模板，在根 `.env` 设置 `WEB_ADMIN_MODEL_DEFAULTS_SOURCE=/etc/superdsh/web-admin/model-defaults.json` 后，容器会只读挂载该原文。包含供应商密钥的文件由服务器保管，容器用户 UID 1000 需要读取权限。
 
-根 `compose.web-admin.yml` 使用 `starbridge-web-admin` project，前端 Nginx 与 Python 后端分别构建，PostgreSQL、Redis、Qdrant、对象存储、运行 Home、文件及配置均使用独立卷。只有前端端口公开；反代保留旧 API/WS 入口并交给同一 Python 兼容适配器。
-
-部署配置保存在 `.superdsh-work/web-admin-production/config`。`up --build` 和 `down` 不删除卷、不重新生成密钥。新旧根 Compose 与命令彼此独立。生产域名通过 `WEB_ADMIN_PUBLIC_ORIGIN` 配置，外部 OAuth 回调身份及 HTTPS 环境需对应真实部署设置。
+更新源码后运行 `docker compose up -d --build`。如需按发布提交标记镜像，使用 `WEB_ADMIN_SOURCE_COMMIT=$(git rev-parse HEAD) docker compose up -d --build`。备份 PostgreSQL 和配置、文件、运行目录及存储卷；配置卷保存数据库口令、会话签名和数据库模型凭据所需密钥。已有独立 Vue 部署升级时保留原来的 Compose 环境，首次启动会复用其中的六项凭据。旧主机保留初始化数据库时选定的 `WEB_ADMIN_IMAGE_POSTGRES`。原 Next.js/Node 部署保留在 `compose.legacy.yml`，使用原有 `starbridge` 项目和数据卷。
 
 MinIO 使用集中元数据内固定的源码归档、SHA-256 和构建镜像，构建时保留许可证，不依赖已无法匿名拉取的历史公共镜像。独立初始化器创建私有桶并保留已有对象。文件服务支持受管本地存储和 S3，存储页显式配置连接和策略；上传、迁移与物理清理通过持久收据恢复，容器启动本身不代表已经启用某个策略。
 

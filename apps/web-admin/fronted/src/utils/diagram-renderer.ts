@@ -1,3 +1,4 @@
+import { createUuid } from '@/utils/uuid'
 import DOMPurify from 'dompurify'
 
 let engine: Promise<(typeof import('mermaid'))['default']> | undefined
@@ -28,7 +29,7 @@ export async function renderDiagram(
   })
   const mermaid = await engine
   const result = await mermaid.render(
-    `diagram-${crypto.randomUUID()}`,
+    `diagram-${createUuid()}`,
     source,
     container,
   )

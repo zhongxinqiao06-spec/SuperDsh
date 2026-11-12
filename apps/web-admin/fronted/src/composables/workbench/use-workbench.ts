@@ -1,3 +1,4 @@
+import { createUuid } from '@/utils/uuid'
 import { computed, onMounted, onScopeDispose, ref, watch } from 'vue'
 import { ElMessageBox } from 'element-plus'
 import { useRoute, useRouter } from 'vue-router'
@@ -378,7 +379,7 @@ export function useWorkbench() {
     ])
     if (current.submission?.signature !== signature)
       current.submission = {
-        id: crypto.randomUUID(),
+        id: createUuid(),
         signature,
         attachments: [],
       }
@@ -638,7 +639,7 @@ export function useWorkbench() {
         archived.value = route.path === '/workspace/archived'
         const trial = consumeAgentTrial()
         if (trial) {
-          draftKey.value = `agent-trial:${crypto.randomUUID()}`
+          draftKey.value = `agent-trial:${createUuid()}`
           agentId.value = trial.agentId
           draft.value.text = trial.prompt
         }

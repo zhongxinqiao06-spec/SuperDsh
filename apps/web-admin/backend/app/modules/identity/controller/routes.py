@@ -43,6 +43,9 @@ def check_origin(request: Request) -> None:
     origins = set(request.app.state.settings.allowed_origins) | {
         request.app.state.settings.public_origin
     }
+    # 直接发布端口时由 Nginx 保留浏览器 Host，仅接受同一协议、主机和端口。
+    if request.app.state.settings.allow_request_origin:
+        origins.add(f"{request.url.scheme}://{request.url.netloc}")
     origin = request.headers.get("origin")
     if origin and origin not in origins:
         raise DomainError(403, "untrusted cookie request origin")

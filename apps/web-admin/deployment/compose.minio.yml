@@ -1,0 +1,32 @@
+services:
+  minio:
+    image: ${WEB_ADMIN_IMAGE_MINIO:?Use web-admin command}
+    build:
+      context: ./minio
+      args:
+        GO_IMAGE: ${WEB_ADMIN_IMAGE_GO}
+        ALPINE_IMAGE: ${WEB_ADMIN_IMAGE_ALPINE}
+        MINIO_SOURCE: ${WEB_ADMIN_MINIO_SOURCE}
+        MINIO_SHA256: ${WEB_ADMIN_MINIO_SHA256}
+        MC_SOURCE: ${WEB_ADMIN_MC_SOURCE}
+        MC_SHA256: ${WEB_ADMIN_MC_SHA256}
+    command: [server, /data]
+    environment:
+      MINIO_ROOT_USER: web-admin
+    volumes: [minio-data:/data]
+    healthcheck:
+      test:
+        [CMD, wget, -q, --spider, 'http://127.0.0.1:9000/minio/health/ready']
+      interval: 3s
+      timeout: 3s
+      retries: 30
+  minio-init:
+    image: ${WEB_ADMIN_IMAGE_MINIO:?Use web-admin command}
+    pull_policy: never
+    entrypoint: ['/usr/local/bin/web-admin-minio-init']
+    environment:
+      MINIO_ROOT_USER: web-admin
+      WEB_ADMIN_STORAGE_BUCKET: ${WEB_ADMIN_STORAGE_BUCKET}
+    depends_on:
+      minio: { condition: service_healthy }
+    restart: 'no'

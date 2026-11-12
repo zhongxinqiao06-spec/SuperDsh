@@ -28,6 +28,11 @@ const { values } = parseArgs({
   options: {
     'backend-image': { type: 'string' },
     'fronted-image': { type: 'string' },
+    'ollama-image': { type: 'string', default: 'starbridge-web-admin-ollama' },
+    'ollama-init-image': {
+      type: 'string',
+      default: 'starbridge-web-admin-ollama-init',
+    },
   },
 })
 assert(
@@ -48,6 +53,9 @@ const validationRoot = resolve(
 const directory = resolve(validationRoot, runId)
 const generatedFiles = new Set<string>()
 const services = [
+  'config-init',
+  'ollama',
+  'ollama-init',
   'postgres',
   'redis',
   'qdrant',
@@ -57,6 +65,11 @@ const services = [
   'fronted',
 ]
 const volumes = [
+  'postgres-auth',
+  'redis-auth',
+  'qdrant-auth',
+  'minio-auth',
+  'ollama-data',
   'postgres-data',
   'redis-data',
   'qdrant-data',
@@ -501,7 +514,10 @@ async function validate() {
         WEB_ADMIN_ALLOWED_ORIGINS: JSON.stringify([apiOrigin]),
       }
     }
+    if (name === 'config-init') value.image = backendImage
     if (name === 'fronted') value.image = frontedImage
+    if (name === 'ollama') value.image = values['ollama-image']
+    if (name === 'ollama-init') value.image = values['ollama-init-image']
     return `  ${name}:\n    ${Object.entries(value)
       .map(([key, item]) => `${key}: ${JSON.stringify(item)}`)
       .join(
@@ -537,8 +553,17 @@ async function validate() {
     const service = object(value)
     assert.equal(object(service.labels)[validationLabel], runId)
     if (Array.isArray(service.volumes))
-      for (const mount of service.volumes)
-        assert.equal(object(mount).type, 'volume', '生产验证不允许 host bind')
+      for (const mount of service.volumes) {
+        const item = object(mount)
+        if (item.type === 'bind') {
+          assert.equal(service.image, backendImage)
+          assert.equal(
+            resolve(String(item.source)),
+            resolve(directory, 'model-defaults.json'),
+          )
+          assert.equal(item.read_only, true)
+        } else assert.equal(item.type, 'volume')
+      }
   }
   passed('独立 Compose project、端口、命名卷与双标签隔离')
   await compose(

@@ -3,7 +3,7 @@
 ## Product ownership
 
 - Product applications: `apps/desktop`, `apps/admin` (Next.js pages and Node.js API v2), and `apps/android` (Kotlin/Gradle). Admin inherits root Yarn; Android retains Gradle. The retired Python backend is not a runtime dependency or fallback.
-- Platform backend: `apps/admin/server`. HTTP/WebSocket, identity, RBAC, SQL repositories, models and native Agent supervision share a Node entry. Browser code must not import server implementation or credentials. `server:dev` starts Next.js and Node API together on the host. Root `compose.yml` deploys the unified platform and its managed Harness child processes with PostgreSQL, Redis and Qdrant; the development dependency Compose remains database-only. Preserve persistent volumes and generated deployment secrets on updates.
+- Platform backend: `apps/admin/server`. HTTP/WebSocket, identity, RBAC, SQL repositories, models and native Agent supervision share a Node entry. Browser code must not import server implementation or credentials. `server:dev` starts Next.js and Node API together on the host. `compose.legacy.yml` deploys the Node platform and its managed Harness child processes with PostgreSQL, Redis and Qdrant; the development dependency Compose remains database-only. Preserve persistent volumes and generated deployment secrets on updates.
 - Agent execution remains a managed child process with a per-user Home and workspace in development and production. PostgreSQL leases prevent duplicate ownership. Product ownership checks are not an operating-system sandbox; never describe same-user processes as container-equivalent isolation. Preserve Harness's existing queue and protocols.
 - Desktop product entry: `apps/desktop`. Its assembly manifest preserves `@superdsh/desktop` and selects runtime assets.
 - `apps/desktop/ui`: product root/navigation, components, features, theme and browser build. Own the product root; never let a DSH root slot choose it.
@@ -16,7 +16,7 @@
 
 ## New Web Admin implementation
 
-- `apps/web-admin/fronted` and `apps/web-admin/backend` are the planned Vue3/TypeScript and Python/FastAPI implementation. Follow [Web Admin development rules](apps/web-admin/AGENTS.md) and the three plans under `docs/plans/web-admin-*`. Keep `apps/admin`, its existing worktree changes, old commands and default deployment intact.
+- `apps/web-admin/fronted` and `apps/web-admin/backend` are the planned Vue3/TypeScript and Python/FastAPI implementation. Follow [Web Admin development rules](apps/web-admin/AGENTS.md) and the three plans under `docs/plans/web-admin-*`. Keep `apps/admin`, its existing worktree changes, old commands and the explicit legacy deployment intact. Root `compose.yml` starts the Vue/FastAPI deployment.
 - New business routes are unversioned. Preserve existing clients through one declarative ingress compatibility mapping, not versioned business handlers. Read release and runtime versions from authoritative metadata; preserve locked dependencies and required protocol identifiers.
 - Separate folders by domain and responsibility, add meaningful Chinese comments to owned public contracts and complex logic, and enforce robustness requirements. Keep all new tests in `apps/web-admin/tests` and generated validation artifacts under `.superdsh-work/web-admin-validation`, outside production code and runtime images.
 

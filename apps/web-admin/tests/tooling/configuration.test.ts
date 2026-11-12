@@ -4,6 +4,7 @@ import { mkdir, mkdtemp, readFile, rm, writeFile } from 'node:fs/promises'
 import { relative, resolve, sep } from 'node:path'
 import { repositoryRoot } from '../../scripts/paths.ts'
 import {
+  deploymentMetadata,
   composeEnvironment as composeBaseEnvironment,
   loadConfiguration as loadBaseConfiguration,
 } from '../../scripts/configuration.ts'
@@ -70,7 +71,10 @@ test('正式模型配置只补空模板，重启保留内容，开发与生产�
       resolve(repositoryRoot, 'compose.web-admin.yml'),
       'utf8',
     )
-    assert.match(compose, /source: \$\{WEB_ADMIN_MODEL_DEFAULTS_SOURCE\}/u)
+    assert.match(
+      compose,
+      /source: \$\{WEB_ADMIN_MODEL_DEFAULTS_SOURCE:-[^}]+\}/u,
+    )
     assert.match(
       compose,
       /target: \/app\/apps\/web-admin\/backend\/config\/model-defaults\.json\s+read_only: true/u,
@@ -154,7 +158,7 @@ test('生产再次导出保留数据库变体、公开地址和模型文件', as
       'https://platform.example.com',
     )
     const env = await readFile(result.envFile, 'utf8')
-    assert.match(env, /COMPOSE_FILE='compose.web-admin.yml'/)
+    assert.match(env, /COMPOSE_FILE='compose.yml'/)
     assert.match(
       env,
       /WEB_ADMIN_IMAGE_POSTGRES='postgres:17-bookworm@sha256:[a-f0-9]{64}'/,
@@ -353,4 +357,34 @@ test('配置及 Compose 导出供应商来源，环境覆盖不写回原配置',
     else process.env.WEB_ADMIN_PROVIDER_ALLOWED_ORIGINS = original
     await context.cleanup()
   }
+})
+
+test('直接 Compose 启动使用与发布工具相同的固定构建输入', async () => {
+  const { parseEnv } = await import('node:util')
+  const env = parseEnv(
+    await readFile(
+      resolve(repositoryRoot, 'apps/web-admin/deployment/compose-defaults.env'),
+      'utf8',
+    ),
+  )
+  for (const [name, image] of Object.entries(deploymentMetadata.images))
+    assert.equal(env[`WEB_ADMIN_IMAGE_${name.toUpperCase()}`], image)
+  assert.equal(env.WEB_ADMIN_UV_VERSION, deploymentMetadata.uvVersion)
+  const storage = deploymentMetadata.storage
+  assert.deepEqual(
+    [
+      env.WEB_ADMIN_MINIO_SOURCE,
+      env.WEB_ADMIN_MINIO_SHA256,
+      env.WEB_ADMIN_MC_SOURCE,
+      env.WEB_ADMIN_MC_SHA256,
+      env.WEB_ADMIN_STORAGE_BUCKET,
+    ],
+    [
+      storage.minioSource,
+      storage.minioSha256,
+      storage.mcSource,
+      storage.mcSha256,
+      storage.bucket,
+    ],
+  )
 })

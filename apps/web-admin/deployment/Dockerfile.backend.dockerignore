@@ -39,6 +39,8 @@
 !apps/web-admin/engine-adapter/**
 !apps/web-admin/deployment/compatibility-routes.json
 !apps/web-admin/deployment/bootstrap.py
+!apps/web-admin/deployment/init_credentials.py
+!apps/web-admin/deployment/initial-admin.json
 !apps/web-admin/deployment/prepare-fonts.py
 .git
 .superdsh

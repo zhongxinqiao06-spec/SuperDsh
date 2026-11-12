@@ -1,3 +1,4 @@
+import { createUuid } from '@/utils/uuid'
 import { request } from '@/utils/request'
 import { apiUrl } from '@/utils/api-config'
 import { responseError } from '@/utils/errors'
@@ -39,7 +40,7 @@ export async function uploadFile(
   }
   const sha256 = bytesToHex(digest.digest())
   const key = `superdsh:upload:${owner}:${sha256}:${file.size}:${previousFileId ?? ''}:${file.name}`
-  const operation = localStorage.getItem(key) ?? crypto.randomUUID()
+  const operation = localStorage.getItem(key) ?? createUuid()
   localStorage.setItem(key, operation)
   const state = await request<UploadState>('/files/uploads', {
     method: 'POST',

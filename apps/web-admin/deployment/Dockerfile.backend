@@ -68,7 +68,7 @@ COPY apps/web-admin/backend/ ./apps/web-admin/backend/
 COPY apps/web-admin/contracts/ ./apps/web-admin/contracts/
 COPY apps/web-admin/deployment/compatibility-routes.json ./apps/web-admin/deployment/compatibility-routes.json
 COPY --from=engine-build /app/apps/web-admin/backend/resources/build-info.json ./apps/web-admin/backend/resources/build-info.json
-COPY apps/web-admin/deployment/bootstrap.py ./apps/web-admin/deployment/bootstrap.py
+COPY --chmod=0444 apps/web-admin/deployment/bootstrap.py apps/web-admin/deployment/init_credentials.py apps/web-admin/deployment/initial-admin.json ./apps/web-admin/deployment/
 RUN mkdir -p /data/runtime/.superdsh-work/pycache /data/files /data/config && chown -R webadmin:webadmin /data
 ENV PATH=/opt/venv/bin:$PATH PYTHONPATH=/app/apps/web-admin/backend PYTHONPYCACHEPREFIX=/data/runtime/.superdsh-work/pycache UV_CACHE_DIR=/data/runtime/.superdsh-work/uv-cache XDG_CACHE_HOME=/data/runtime/.superdsh-work/cache npm_config_cache=/data/runtime/.superdsh-work/npm-cache WEB_ADMIN_DATA_DIR=/data/runtime WEB_ADMIN_REPOSITORY_ROOT=/app WEB_ADMIN_OFFICE_EXECUTABLE=/usr/bin/libreoffice NODE_ENV=production
 USER webadmin

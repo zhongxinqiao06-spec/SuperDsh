@@ -1,3 +1,4 @@
+import { createUuid } from '@/utils/uuid'
 import { computed, ref, toRaw, watch } from 'vue'
 import { useResource } from '@/composables/use-resource'
 import { useMutation } from '@/composables/use-mutation'
@@ -71,7 +72,7 @@ export function useMenus() {
   }
   function addGroup(): void {
     editing.value = {
-      id: crypto.randomUUID(),
+      id: createUuid(),
       kind: 'group',
       moduleId: null,
       parentId: null,

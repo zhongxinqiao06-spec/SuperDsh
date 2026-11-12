@@ -18,6 +18,7 @@ class Settings(BaseSettings):
     encryption_key: SecretStr
     data_dir: Path
     redis_url: str = "redis://localhost:16380/0"
+    allow_request_origin: bool = False
     public_origin: str = "http://localhost:5175"
     allowed_origins: list[str] = Field(default_factory=lambda: ["http://localhost:5175"])
     setup_token: SecretStr = SecretStr("")

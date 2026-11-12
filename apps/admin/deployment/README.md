@@ -1,14 +1,16 @@
+> 此文档用于原 Next.js / Node 平台。默认 Vue / FastAPI 部署见[新版部署说明](../../web-admin/README.md#独立-docker-部署)。
+
 # 星桥智能平台：Docker Compose 部署与更新
 
-首次部署在仓库根执行 **`docker compose up -d`**。Compose 构建平台镜像，启动网页、Node API、Harness、PostgreSQL、Redis、Qdrant、MinIO 和 Ollama，并准备知识库向量模型。可直接使用默认配置，平台自动迁移数据库并在空库创建首个管理员。
+首次部署在仓库根执行 **`docker compose -f compose.legacy.yml up -d`**。Compose 构建平台镜像，启动网页、Node API、Harness、PostgreSQL、Redis、Qdrant、MinIO 和 Ollama，并准备知识库向量模型。可直接使用默认配置，平台自动迁移数据库并在空库创建首个管理员。
 
 代码仓库：[zhongxinqiao06-spec/SuperDsh](https://github.com/zhongxinqiao06-spec/SuperDsh)，默认分支 `main`。已有 Compose 部署看[常规更新](#常规更新)；已有原生、systemd 或旧 Python 部署先看[迁移边界](#旧-python-部署切换边界)。日常源码开发继续使用根 [README](../../../README.md#日常开发) 的命令。
 
 ## 在项目服务器上运行 Ollama 中文向量模型
 
-根 `compose.yml` 默认启动 Ollama，只在项目内网监听。首次构建从 Ollama 模型仓库下载 `quentinz/bge-small-zh-v1.5:q8_0` 的清单和四个数据块，逐个校验 SHA-256。镜像包含模型和上游许可证。启动时会从镜像将权重装入 `ollama-data`，已有正确数据直接复用，运行期间无需访问模型仓库。[模型来源](https://ollama.com/quentinz/bge-small-zh-v1.5/tags) · [原始模型](https://huggingface.co/BAAI/bge-small-zh-v1.5)
+根 `compose.legacy.yml` 默认启动 Ollama，只在项目内网监听。首次构建从 Ollama 模型仓库下载 `quentinz/bge-small-zh-v1.5:q8_0` 的清单和四个数据块，逐个校验 SHA-256。镜像包含模型和上游许可证。启动时会从镜像将权重装入 `ollama-data`，已有正确数据直接复用，运行期间无需访问模型仓库。[模型来源](https://ollama.com/quentinz/bge-small-zh-v1.5/tags) · [原始模型](https://huggingface.co/BAAI/bge-small-zh-v1.5)
 
-`ollama-init` 核对固定模型摘要并通过平台使用的 `/v1/embeddings` 接口验证 512 维向量，成功退出后平台启动。可用 `docker compose logs ollama-init` 和 `docker compose exec ollama ollama list` 检查。首次使用此部署默认值时，知识库会在检索时建立对应索引。已有管理员保存的检索设置优先；切换这些实例时，在知识检索设置中保存 Compose 配置列出的地址、模型名、摘要和维度，平台会重建索引。
+`ollama-init` 核对固定模型摘要并通过平台使用的 `/v1/embeddings` 接口验证 512 维向量，成功退出后平台启动。可用 `docker compose -f compose.legacy.yml logs ollama-init` 和 `docker compose -f compose.legacy.yml exec ollama ollama list` 检查。首次使用此部署默认值时，知识库会在检索时建立对应索引。已有管理员保存的检索设置优先；切换这些实例时，在知识检索设置中保存 Compose 配置列出的地址、模型名、摘要和维度，平台会重建索引。
 
 ## MinIO 与文件存储升级
 
@@ -43,7 +45,7 @@ corepack.cmd yarn server:files --apply --target=storage_ID
 ```bash
 git clone --branch main https://github.com/zhongxinqiao06-spec/SuperDsh.git
 cd SuperDsh
-docker compose up -d
+docker compose -f compose.legacy.yml up -d
 ```
 
 不需要在宿主机执行 `yarn install`、`server:sync` 或初始化上游子模块；镜像使用仓库固定的运行依赖归档。首次构建需要下载依赖；后续构建可复用 Docker 缓存。构建失败时先解决日志中的错误，不删除数据卷，也不更换锁文件或上游版本。
@@ -51,8 +53,8 @@ docker compose up -d
 查看启动状态和日志：
 
 ```bash
-docker compose ps -a
-docker compose logs --tail=100 platform
+docker compose -f compose.legacy.yml ps -a
+docker compose -f compose.legacy.yml logs --tail=100 platform
 curl --fail --silent --show-error http://127.0.0.1:5174/api/v2/health/ready
 ```
 
@@ -63,7 +65,7 @@ curl --fail --silent --show-error http://127.0.0.1:5174/api/v2/health/ready
 全新部署默认管理员账号为 **`admin`**，初始密码为 **`admin123`**。登录后请立即修改密码；也可在首次启动前用 `SUPERDSH_INITIAL_ADMIN_PASSWORD` 设置自己的初始密码。在服务器仓库根读取首次凭据记录：
 
 ```bash
-docker compose exec platform cat /data/config/initial-admin.txt
+docker compose -f compose.legacy.yml exec platform cat /data/config/initial-admin.txt
 ```
 
 该文件仅用于保存首次初始化信息。登录后可在平台修改密码；文件里的旧密码不会随密码修改更新，手工编辑文件也不会修改数据库密码。数据库密码、鉴权密钥和模型加密密钥保持原值。首次建号失败后的重试继续使用已经保存的首次凭据。
@@ -71,7 +73,7 @@ docker compose exec platform cat /data/config/initial-admin.txt
 **旧 Compose 部署直接拉取、构建、启动即可兼容新的初始密码，无需额外执行重置命令：**
 
 ```bash
-git pull --ff-only origin main && docker compose up -d --build
+git pull --ff-only origin main && docker compose -f compose.legacy.yml up -d --build
 ```
 
 首次升级启动时，平台会在独占数据库租约下核对 `initial-admin.txt`：记录的用户名必须与当前初始管理员配置一致，账号必须是启用且未删除的管理员，并且数据库密码仍匹配文件里的原始密码。满足条件后，自动对齐到当前初始密码（默认 `admin123`），同时撤销该账号的旧登录会话和恢复码，记录审计与一次性完成标记。此后重启、重建或修改 `.env` 都不会再次覆盖密码。
@@ -98,21 +100,21 @@ git pull --ff-only origin main && docker compose up -d --build
 
 ```bash
 git pull --ff-only origin main
-docker compose stop platform
-printf '%s' 'admin123' | docker compose run --rm -T --no-deps --volume "$PWD/apps/admin/deployment/reset-admin-password.mjs:/app/apps/admin/deployment/reset-admin-password.mjs:ro" platform node apps/admin/deployment/reset-admin-password.mjs --username admin --password-stdin
-docker compose start platform
+docker compose -f compose.legacy.yml stop platform
+printf '%s' 'admin123' | docker compose -f compose.legacy.yml run --rm -T --no-deps --volume "$PWD/apps/admin/deployment/reset-admin-password.mjs:/app/apps/admin/deployment/reset-admin-password.mjs:ro" platform node apps/admin/deployment/reset-admin-password.mjs --username admin --password-stdin
+docker compose -f compose.legacy.yml start platform
 ```
 
 这里将新脚本只读挂载到现有平台镜像，**无需为密码恢复重新构建镜像或在宿主机安装 Node**。命令要求平台已停止、目标账号存在且是启用状态的管理员，不会新建账号、提升权限、重新启用账号或重新生成密钥。脚本成功后使用 `admin / admin123` 登录并修改密码。`initial-admin.txt` 仍保留首次记录，不作为当前密码的凭证。
 
-如果恢复步骤失败，保留报错并用 `docker compose start platform` 恢复原服务，不删除卷或编辑数据库哈希。自定义管理员账号应将 `--username admin` 改为真实用户名；希望设置自己的密码时，可在 Bash 中用 `read -r -s -p 'New administrator password: ' admin_password` 读取，再将上面 `printf '%s' 'admin123'` 换为 `printf '%s' "$admin_password"`，执行后 `unset admin_password`。
+如果恢复步骤失败，保留报错并用 `docker compose -f compose.legacy.yml start platform` 恢复原服务，不删除卷或编辑数据库哈希。自定义管理员账号应将 `--username admin` 改为真实用户名；希望设置自己的密码时，可在 Bash 中用 `read -r -s -p 'New administrator password: ' admin_password` 读取，再将上面 `printf '%s' 'admin123'` 换为 `printf '%s' "$admin_password"`，执行后 `unset admin_password`。
 
 ### PostgreSQL 初始化报 Operation not permitted
 
 `dependency failed to start: container starbridge-postgres-1 is unhealthy` 是结果，先查看实际数据库日志：
 
 ```bash
-docker compose logs --tail=100 postgres
+docker compose -f compose.legacy.yml logs --tail=100 postgres
 docker version --format 'Docker Server: {{.Server.Version}}'
 uname -r
 # CentOS / RHEL 上补充检查：
@@ -132,11 +134,11 @@ SUPERDSH_POSTGRES_IMAGE=postgres:17-bookworm
 
 ```bash
 git pull --ff-only origin main
-docker compose stop postgres
-docker compose pull postgres
-docker compose up -d --no-build
-docker compose ps -a
-docker compose logs --tail=100 postgres platform
+docker compose -f compose.legacy.yml stop postgres
+docker compose -f compose.legacy.yml pull postgres
+docker compose -f compose.legacy.yml up -d --no-build
+docker compose -f compose.legacy.yml ps -a
+docker compose -f compose.legacy.yml logs --tail=100 postgres platform
 ```
 
 `.env` 的镜像选择会保留到下次更新。默认仍是 `postgres:17-alpine`，避免拉取代码时给已有数据库隐式更换发行版。**已有成功初始化的 Alpine 数据库不要直接套用这次新库处理步骤**：不同发行版的 libc、locale / collation 和扩展可能不同；优先在维护窗口升级 Docker / libseccomp，或通过备份、逻辑导出与恢复迁移到独立目标并验证。不要换 PostgreSQL 主版本、删除数据卷、使用 `chmod 777`，或把 `privileged` / `seccomp=unconfined` 作为部署修复。
@@ -189,20 +191,20 @@ free -h
 
 ```bash
 git pull --ff-only origin main
-docker compose stop platform
-docker compose stop postgres redis qdrant minio
+docker compose -f compose.legacy.yml stop platform
+docker compose -f compose.legacy.yml stop postgres redis qdrant minio
 # 此时按下文“一致备份”完成备份，确认成功后再继续。
-docker compose build
-docker compose up -d --no-build
-docker compose ps -a
+docker compose -f compose.legacy.yml build
+docker compose -f compose.legacy.yml up -d --no-build
+docker compose -f compose.legacy.yml ps -a
 curl --fail --silent --show-error http://127.0.0.1:5174/api/v2/health/ready
 ```
 
-逐条确认成功，不在构建失败后继续启动新镜像。仅构建失败、尚未启动新版本时，可用 `docker compose start postgres redis qdrant minio platform` 恢复原容器；已有数据迁移则按[回退步骤](#回退与停止)处理。停止容器保留卷和密钥，不使用 `down -v`、清理缓存或删除锁文件来处理内存不足。
+逐条确认成功，不在构建失败后继续启动新镜像。仅构建失败、尚未启动新版本时，可用 `docker compose -f compose.legacy.yml start postgres redis qdrant minio platform` 恢复原容器；已有数据迁移则按[回退步骤](#回退与停止)处理。停止容器保留卷和密钥，不使用 `down -v`、清理缓存或删除锁文件来处理内存不足。
 
 ## 默认配置与数据
 
-根 [compose.yml](../../../compose.yml) 是正式部署入口，[.env.example](../../../.env.example) 仅提供可选覆盖项。所有启动必需值均有默认值；部署密钥在首次启动时随机生成，保存在 `config-data` 卷中，不写入 Git。
+根 [compose.legacy.yml](../../../compose.legacy.yml) 是正式部署入口，[legacy.env.example](legacy.env.example) 仅提供可选覆盖项。所有启动必需值均有默认值；部署密钥在首次启动时随机生成，保存在 `config-data` 卷中，不写入 Git。
 
 | 项目                                     | 默认行为                                                              |
 | ---------------------------------------- | --------------------------------------------------------------------- |
@@ -216,9 +218,9 @@ curl --fail --silent --show-error http://127.0.0.1:5174/api/v2/health/ready
 | PostgreSQL / Redis / Qdrant / MinIO 数据 | `postgres-data` / `redis-data` / `qdrant-data` / `minio-data`         |
 | 首次账号                                 | `admin` / `admin123`，首次凭据保存于 `/data/config/initial-admin.txt` |
 
-Docker 卷实际名称默认带项目名前缀，例如 `starbridge_config-data`。源码目录、镜像与持久数据分离：`git pull`、镜像重建、容器重建和正常 `docker compose down` 均保留卷。**不要使用 `docker compose down -v` 删除生产数据。** 保持原项目名；改名会创建另一组新卷，看起来像一套空平台，不会自动迁移原数据。
+Docker 卷实际名称默认带项目名前缀，例如 `starbridge_config-data`。源码目录、镜像与持久数据分离：`git pull`、镜像重建、容器重建和正常 `docker compose -f compose.legacy.yml down` 均保留卷。**不要使用 `docker compose -f compose.legacy.yml down -v` 删除生产数据。** 保持原项目名；改名会创建另一组新卷，看起来像一套空平台，不会自动迁移原数据。
 
-可选项需要变更时，再把 `.env.example` 复制成仓库根 `.env`，按文件注释修改后运行 `docker compose up -d --build`：
+可选项需要变更时，再把 `apps/admin/deployment/legacy.env.example` 复制成仓库根 `.env`，按文件注释修改后运行 `docker compose -f compose.legacy.yml up -d --build`：
 
 | 可选变量                          | 默认值 / 用途                                                         |
 | --------------------------------- | --------------------------------------------------------------------- |
@@ -277,7 +279,7 @@ location / {
 
 ```bash
 git pull --ff-only origin main
-docker compose up -d --build
+docker compose -f compose.legacy.yml up -d --build
 ```
 
 无需重填配置。Compose 构建新镜像、重建平台容器，启动时自动执行支持的数据库迁移及上述一次性初始密码兼容；其他已有账号、模型密钥、资料和会话保留。更新会中断当前平台连接及运行中的 Agent，重启不会自动重放有副作用的任务，应安排维护时间。若有本地代码修改或分支分叉，先保留并处理，不使用强制 reset 或 clean 覆盖。
@@ -292,11 +294,11 @@ backup_dir="$HOME/starbridge-backups/$(date +%Y%m%d-%H%M%S)"
 umask 077
 mkdir -p "$backup_dir"
 git rev-parse HEAD > "$backup_dir/git-revision.txt"
-previous_image="$(docker compose images -q platform | head -n 1)"
+previous_image="$(docker compose -f compose.legacy.yml images -q platform | head -n 1)"
 docker image tag "$previous_image" "starbridge-platform:backup-$(date +%Y%m%d-%H%M%S)"
 printf '%s\n' "$previous_image" > "$backup_dir/platform-image.txt"
 git pull --ff-only origin main
-docker compose build
+docker compose -f compose.legacy.yml build
 ```
 
 逐条确认成功再继续。不要在备份完成前执行新平台启动，否则数据库可能先被迁移。
@@ -306,9 +308,9 @@ docker compose build
 下面使用已构建的平台镜像作为本地归档工具，无需宿主机 Node 或 PostgreSQL 客户端。先停止平台，再停止数据库依赖，等待命令完成；整个复制期间保持服务停止：
 
 ```bash
-docker compose stop platform
-docker compose stop postgres redis qdrant
-project="$(docker inspect "$(docker compose ps -aq platform)" --format '{{index .Config.Labels "com.docker.compose.project"}}')"
+docker compose -f compose.legacy.yml stop platform
+docker compose -f compose.legacy.yml stop postgres redis qdrant
+project="$(docker inspect "$(docker compose -f compose.legacy.yml ps -aq platform)" --format '{{index .Config.Labels "com.docker.compose.project"}}')"
 test -n "$project"
 minio_backup=()
 if docker volume inspect "${project}_minio-data" >/dev/null 2>&1; then
@@ -329,12 +331,12 @@ tar -tzf "$backup_dir/volumes.tar.gz" > "$backup_dir/contents.txt"
 
 这些命令沿用上节的 `backup_dir`、`previous_image`，使用默认卷定义；若自行改过 Compose 的卷名或改用外部数据库，须同步采用真实挂载和对应数据库备份方案。内置 Ollama 模型可以从已构建的镜像恢复；另行安装的模型需备份 `ollama-data`。已启用 MinIO 的部署备份七个业务数据卷；尚未升级的旧环境仍备份原六个卷，不创建空 MinIO 卷冒充备份。数据库、配套密钥、上传文件、Agent Home 和索引必须一致保留。可选 `.env`、反向代理配置及证书也应另存到同一受限备份位置；不要把含密钥的备份提交 Git。归档可列出不等同于恢复成功，应在独立环境演练恢复。
 
-备份失败就停止更新，原容器及卷仍保留；用 `docker compose start postgres redis qdrant platform` 恢复原容器，不要执行 `up` 启动尚未验证的新镜像。备份成功后启动新版本：
+备份失败就停止更新，原容器及卷仍保留；用 `docker compose -f compose.legacy.yml start postgres redis qdrant platform` 恢复原容器，不要执行 `up` 启动尚未验证的新镜像。备份成功后启动新版本：
 
 ```bash
-docker compose up -d --build
-docker compose ps -a
-docker compose logs --tail=100 platform
+docker compose -f compose.legacy.yml up -d --build
+docker compose -f compose.legacy.yml ps -a
+docker compose -f compose.legacy.yml logs --tail=100 platform
 curl --fail --silent --show-error http://127.0.0.1:5174/api/v2/health/ready
 ```
 
@@ -351,10 +353,10 @@ curl --fail --silent --show-error http://127.0.0.1:5174/api/v2/health/ready
 停止并保留所有数据：
 
 ```bash
-docker compose stop
+docker compose -f compose.legacy.yml stop
 ```
 
-恢复现有容器用 `docker compose start`；删除容器但保留卷用 `docker compose down`。不要加 `-v`。平台应先于依赖停止，正常退出会回收所属 Agent。
+恢复现有容器用 `docker compose -f compose.legacy.yml start`；删除容器但保留卷用 `docker compose -f compose.legacy.yml down`。不要加 `-v`。平台应先于依赖停止，正常退出会回收所属 Agent。
 
 新版本启动失败时先停止新平台、保留失败日志和数据副本。仅构建失败且新容器从未运行时，旧容器仍可启动；发生迁移或新写入后，不能只切旧 Git 提交 / 旧镜像就认为数据已回退。当前没有自动降级迁移。
 

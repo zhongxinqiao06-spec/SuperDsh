@@ -239,7 +239,10 @@ export async function composeEnvironment(
     WEB_ADMIN_MC_SOURCE: deploymentMetadata.storage.mcSource,
     WEB_ADMIN_MC_SHA256: deploymentMetadata.storage.mcSha256,
   }
-  if (mode === 'production') values.COMPOSE_FILE = 'compose.web-admin.yml'
+  if (mode === 'production') {
+    values.COMPOSE_FILE = 'compose.yml'
+    values.WEB_ADMIN_APP_PULL_POLICY = 'never'
+  }
   for (const [name, value] of Object.entries(deploymentMetadata.images))
     values[`WEB_ADMIN_IMAGE_${name.toUpperCase()}`] = value
   // 已有数据卷须保持 initdb 时的系统变体，后续发布继续读取同一选择。

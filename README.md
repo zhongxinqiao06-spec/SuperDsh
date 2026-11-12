@@ -1,8 +1,8 @@
 # SuperDsh
 
-SuperDsh 包含桌面 Agent 应用、Next.js + Node.js 全栈管理后台和安卓应用。后台以总览、权限、模型、设备和系统管理为主体，聊天是 Agent 工作台模块；DeepSeek Harness 是由产品调度的必需引擎插件。
+SuperDsh 包含桌面 Agent 应用、Vue 3 + FastAPI 管理平台和安卓应用。管理平台提供权限、模型、设备和 Agent 工作台，工作台使用 DeepSeek Harness。
 
-**服务器部署：** 首次部署在仓库根执行 `docker compose up -d`。Compose 自动构建平台、启动 Ollama 并校验中文知识检索模型。服务就绪后，访问 `http://服务器IP:5174`。初始账号为 **`admin` / `admin123`**，登录后请修改密码。旧 Compose 部署仍使用原始随机初始密码时，首次升级启动会自动对齐；已经自行修改的密码保留。完整步骤见[Compose 部署与更新](apps/admin/deployment/README.md)。
+在仓库根执行 `docker compose up -d` 即可启动 Vue 管理端、FastAPI 和 Ollama。访问 `http://服务器IP:5174`，首次登录使用 `admin` / `admin123`。将 `WEB_ADMIN_PUBLIC_ORIGIN` 配为实际访问地址，登录后修改密码。[部署说明](apps/web-admin/README.md#独立-docker-部署)
 
 **日常开发以本页为准。** [English](README.en.md) · [来源](#基于哪些项目改造) · [理念](#设计理念) · [进度](#目前完成进度) · [代码位置](#项目结构) · [启动](#日常开发) · [联调](#三端联调) · [检查](#检查与打包)
 
@@ -169,7 +169,7 @@ corepack.cmd yarn android:start --server http://127.0.0.1:8000
 
 网页切模块保留当前账号内存草稿、待上传附件和发送结果，释放工作台订阅；刷新或换账号清理临时状态。手机离线可查看已缓存历史、保存草稿，恢复后手动发送。
 
-生产部署从 Git 获取源码后，在仓库根运行 `docker compose up -d --build`，默认网页、桌面和安卓统一连接 `5174`。数据库连接、鉴权 / 加密密钥和首次管理员自动初始化并保存在独立持久卷；日常更新执行 `git pull --ff-only origin main` 后再次运行同一 Compose 命令。完整步骤与备份见[服务器部署](apps/admin/deployment/README.md#服务器首次部署)。原有 `SUPERDSH_SERVER_ENV` + `server:start` / systemd 方式继续见[原生部署](apps/admin/deployment/native.md)。
+更新线上版本时，运行 `git pull --ff-only` 后执行 `docker compose up -d --build`。保留生产卷和服务器上的模型 JSON 原文。原 Next.js 部署使用 `docker compose -f compose.legacy.yml`。[Vue 部署说明](apps/web-admin/README.md#独立-docker-部署)
 
 ## 智能体演示与开发入口
 
