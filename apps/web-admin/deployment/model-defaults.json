@@ -1,0 +1,113 @@
+{
+  "connections": [
+    {
+      "id": "connection-bb91e81d0b6f418f",
+      "name": "火山方舟 · Agent Plan",
+      "adapter": "volcengine-ark",
+      "baseUrl": "https://ark.cn-beijing.volces.com/api/plan/v3",
+      "region": "cn-beijing",
+      "enabled": true
+    },
+    {
+      "id": "platform-6a30a2a15136420f",
+      "name": "DeepSeek",
+      "adapter": "openai-completions",
+      "baseUrl": "https://api.deepseek.com",
+      "region": "",
+      "enabled": true
+    },
+    {
+      "id": "aliyun-token-plan",
+      "name": "阿里云百炼 · Token Plan",
+      "adapter": "openai-completions",
+      "baseUrl": "https://token-plan.cn-beijing.maas.aliyuncs.com/compatible-mode/v1",
+      "enabled": true,
+      "region": "cn-beijing"
+    }
+  ],
+  "configurations": [
+    {
+      "id": "chat_3bc2c4647454a3851e93b5abf140c575",
+      "connectionId": "platform-6a30a2a15136420f",
+      "name": "DeepSeek-V4-Pro",
+      "capability": "chat",
+      "modelId": "deepseek-v4-pro",
+      "enabled": true,
+      "parameters": {
+        "maxTokens": 4096,
+        "contextWindow": 1048576
+      },
+      "roleIds": []
+    },
+    {
+      "id": "chat_d5af63c954ea848700260bc5513efc2d",
+      "connectionId": "platform-6a30a2a15136420f",
+      "name": "DeepSeek-V4.1-Flash",
+      "capability": "chat",
+      "modelId": "deepseek-flash",
+      "enabled": true,
+      "parameters": {
+        "maxTokens": 4096,
+        "contextWindow": 1048576
+      },
+      "roleIds": []
+    },
+    {
+      "id": "configuration-1ba4ea6dd95a4f92",
+      "connectionId": "connection-bb91e81d0b6f418f",
+      "name": "Doubao Seed 2.1 Pro",
+      "capability": "chat",
+      "modelId": "doubao-seed-2.1-pro",
+      "enabled": true,
+      "parameters": {
+        "maxTokens": 4096
+      },
+      "roleIds": []
+    },
+    {
+      "id": "volcengine-vision-default",
+      "name": "火山 · Doubao Seed 2.1 Pro 视觉理解",
+      "connectionId": "connection-bb91e81d0b6f418f",
+      "capability": "vision.analyze",
+      "modelId": "doubao-seed-2.1-pro",
+      "enabled": true,
+      "parameters": {
+        "maxTokens": 4096,
+        "maxImages": 4,
+        "thinking": "disabled"
+      },
+      "roleIds": []
+    },
+    {
+      "id": "volcengine-image-default",
+      "name": "火山 · Seedream 5.0 Pro 生图与参考图编辑",
+      "connectionId": "connection-bb91e81d0b6f418f",
+      "capability": "image.generate",
+      "modelId": "doubao-seedream-5.0-pro",
+      "enabled": true,
+      "parameters": {
+        "imageProfile": "seedream-5",
+        "size": "2K",
+        "maxImages": 4
+      },
+      "roleIds": []
+    },
+    {
+      "id": "aliyun-token-plan-chat",
+      "name": "阿里云 · Qwen3.8 Flash",
+      "connectionId": "aliyun-token-plan",
+      "capability": "chat",
+      "modelId": "qwen3.8-flash",
+      "enabled": true,
+      "parameters": {
+        "maxTokens": 4096
+      },
+      "roleIds": []
+    }
+  ],
+  "defaults": {
+    "chat": "chat_d5af63c954ea848700260bc5513efc2d",
+    "vision.analyze": "volcengine-vision-default",
+    "image.generate": "volcengine-image-default"
+  }
+}

@@ -143,7 +143,7 @@ services:
       - config-data:/data/config
       # 明文凭据只通过正式配置只读挂载，不进入镜像或测试 fixture。
       - type: bind
-        source: ${WEB_ADMIN_MODEL_DEFAULTS_SOURCE:-./apps/web-admin/backend/config/model-defaults.example.json}
+        source: ${WEB_ADMIN_MODEL_DEFAULTS_SOURCE:-./apps/web-admin/deployment/model-defaults.json}
         target: /app/apps/web-admin/backend/config/model-defaults.json
         read_only: true
         bind:

@@ -173,7 +173,7 @@ Linux/macOS 将解释器路径换为 `.venv/bin/python`。部署只安装运行�
 
 在仓库根执行 `docker compose up -d`。首次启动会构建 Vue 前端与 FastAPI 后端，生成并持久保存服务凭据，启动 Ollama 后校验中文检索模型。默认端口为 5174，使用服务器 IP 或域名时，将 `WEB_ADMIN_PUBLIC_ORIGIN` 设为实际公开地址。空库初始账号取自 `deployment/initial-admin.json`。
 
-模型配置使用普通 JSON。默认挂载无凭据模板，在根 `.env` 设置 `WEB_ADMIN_MODEL_DEFAULTS_SOURCE=/etc/superdsh/web-admin/model-defaults.json` 后，容器会只读挂载该原文。包含供应商密钥的文件由服务器保管，容器用户 UID 1000 需要读取权限。
+模型配置使用普通 JSON。默认挂载仓库中的 `deployment/model-defaults.json`，其中包括供应商地址、模型参数和默认选项。填写供应商密钥时，在根 `.env` 设置 `WEB_ADMIN_MODEL_DEFAULTS_SOURCE=/etc/superdsh/web-admin/model-defaults.json` 后，容器会只读挂载该原文。包含供应商密钥的文件由服务器保管，容器用户 UID 1000 需要读取权限。
 
 更新源码后运行 `docker compose up -d --build`。如需按发布提交标记镜像，使用 `WEB_ADMIN_SOURCE_COMMIT=$(git rev-parse HEAD) docker compose up -d --build`。备份 PostgreSQL 和配置、文件、运行目录及存储卷；配置卷保存数据库口令、会话签名和数据库模型凭据所需密钥。已有独立 Vue 部署升级时保留原来的 Compose 环境，首次启动会复用其中的六项凭据。旧主机保留初始化数据库时选定的 `WEB_ADMIN_IMAGE_POSTGRES`。原 Next.js/Node 部署保留在 `compose.legacy.yml`，使用原有 `starbridge` 项目和数据卷。
 
