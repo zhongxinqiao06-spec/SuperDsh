@@ -34,7 +34,7 @@ python -s -m uv --version
 
 `python -m uv --version` 成功后，若 `uv` 命令仍不在 PATH，可将下方命令的 `uv` 替换为 `python -m uv`。
 
-首次准备在仓库根目录执行；已有前端依赖可跳过安装。`init` 先准备项目管理的 Python 和后端 `.venv`，再生成开发配置并启动 PostgreSQL、Redis，不启动前后端或构建镜像：
+在仓库根目录执行 `corepack yarn web-admin:deps:up`，Docker 会在 `superdsh-web-admin-dev` 项目内启动 PostgreSQL、Redis、Qdrant、MinIO 和 Ollama，创建对象存储桶并校验内置中文检索模型。前后端随后分别在宿主机启动。首次准备 Python 环境时，可用 `web-admin:init` 同时准备后端 `.venv` 和同一组依赖：
 
 ```powershell
 corepack yarn install --immutable
@@ -67,13 +67,13 @@ npm run dev
 
 打开 `http://localhost:5175`。前端 `package.json` 只提供本目录的运行命令，依赖继续使用根 Yarn 和锁文件，不需要在此执行 `npm install` 或产生第二份锁文件；该命令不会启动后端。分别在两个终端 Ctrl+C 关闭服务。
 
-开发配置位于 `.superdsh-work/web-admin-dev/config`，后端读取其中的 `backend-environment.json`，不把密钥复制到源码。修改 `settings.json` 的端口等配置后重新执行 `web-admin:init` 导出配置；两端需重启。`WEB_ADMIN_CONFIG_ROOT` 可显式选择另一开发配置目录，`UV_PROJECT_ENVIRONMENT` 可指定虚拟环境，`UV_PYTHON_INSTALL_DIR` 可指定受管 Python 安装目录；使用自定义值时，准备命令与原生启动终端应保持相同设置。开发 PostgreSQL、Redis 配置 `unless-stopped` 恢复策略；若手动停止过依赖、尚未初始化或正在使用旧容器配置，在仓库根目录重新执行 `corepack yarn web-admin:init`，再启动后端。该命令复用已有配置和数据卷，不需要 build。
+开发配置位于 `.superdsh-work/web-admin-dev/config`，后端读取其中的 `backend-environment.json`，不把密钥复制到源码。修改 `settings.json` 的端口等配置后重新执行 `web-admin:init` 导出配置；两端需重启。`WEB_ADMIN_CONFIG_ROOT` 可显式选择另一开发配置目录，`UV_PROJECT_ENVIRONMENT` 可指定虚拟环境，`UV_PYTHON_INSTALL_DIR` 可指定受管 Python 安装目录；使用自定义值时，准备命令与原生启动终端应保持相同设置。开发依赖只绑定回环地址。Ollama 默认为 `http://127.0.0.1:21434`，端口可在 `settings.json` 的 `ports.ollamaPort` 修改，然后重新运行 `web-admin:deps:up` 并重启宿主机后端。已有知识库保留活动模型和索引。若活动模型指向旧端口，在知识库 Embedding 设置中更新地址。停止整组依赖使用 `web-admin:deps:down`，数据卷和密钥会保留。
 
 `uv run python main.py` 只启动 Python 后端，前提是上述依赖已运行；它不会自行启动 Docker。若出现 `WinError 1225`、连接被拒绝或 PostgreSQL 连接失败，说明迁移阶段尚未连接到数据库，先检查 Docker 和开发依赖容器状态。恢复步骤为：
 
 ```powershell
-# 仓库根目录：恢复开发 PostgreSQL、Redis 并等待健康
-corepack yarn web-admin:init
+# 仓库根目录：恢复调试依赖和模型
+corepack yarn web-admin:deps:up
 
 # 后端目录：独立启动
 cd apps/web-admin/backend
@@ -84,7 +84,7 @@ uv run python main.py
 
 首次使用工作台 DSH 执行能力时，需要已有固定引擎产物；缺少时显式运行 `web-admin:sync`，该命令在准备 Python 依赖后构建引擎适配。它不是浏览基础管理页面的前置步骤，普通预览不会隐式构建引擎。
 
-完整开发中间件仍用 `web-admin:deps:up`，该命令包含对象存储镜像构建，不是预览的前置步骤。
+`web-admin:preview` 复用同一组调试依赖，准备完成后启动宿主机前后端。首次构建依赖镜像需要下载固定的模型文件和构建依赖。
 
 Office 文档生成与预览需要 LibreOffice 和文档所用字体。Windows 优先使用显式配置或已安装的 LibreOffice，未找到时自动使用固定 DSH 依赖树中已有的 LibreOfficeKit 原生渲染组件，校验安装清单与程序摘要，不在运行时下载。可在启动后端的终端设置 `$env:WEB_ADMIN_OFFICE_EXECUTABLE = '你的 LibreOffice 路径/program/soffice.com'` 指定 CLI，或通过 `WEB_ADMIN_OFFICE_NATIVE_MANIFEST` 指定原生组件的 `prebuilds.json`；显式 CLI 配置优先。Linux 使用 PATH 内的 `libreoffice`，Docker 镜像已声明渲染器及中文字体依赖。缺少渲染器时工具在方案准备阶段明确报错；实际渲染后检查文本、页数和字体，不返回虚假的预览或质量通过结果。临时渲染配置、缓存、PDF 和缩略图归 `.superdsh-work` 的运行目录。
 

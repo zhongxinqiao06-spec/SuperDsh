@@ -213,8 +213,12 @@ def create_app(settings: Settings | None = None) -> FastAPI:
             settings.data_dir / "embedding",
             settings.qdrant_url,
             settings.qdrant_api_key.get_secret_value(),
-            settings.provider_allowed_origins,
-            settings.embedding_trusted_origins,
+            ",".join(
+                filter(None, (settings.provider_allowed_origins, settings.managed_ollama_origin))
+            ),
+            ",".join(
+                filter(None, (settings.embedding_trusted_origins, settings.managed_ollama_origin))
+            ),
         ),
         identity.audit,
         identity.get_account,

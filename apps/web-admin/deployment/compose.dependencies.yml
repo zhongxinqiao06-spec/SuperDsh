@@ -2,7 +2,6 @@ name: superdsh-web-admin-dev
 services:
   postgres:
     image: ${WEB_ADMIN_IMAGE_POSTGRES:?Use web-admin command}
-    # Docker 重启后恢复已启用的开发数据库，手动停止的容器保持停止。
     restart: unless-stopped
     environment:
       POSTGRES_DB: web_admin
@@ -17,7 +16,6 @@ services:
       retries: 20
   redis:
     image: ${WEB_ADMIN_IMAGE_REDIS:?Use web-admin command}
-    # 缓存与数据库采用相同恢复策略，不自动启动可选中间件。
     restart: unless-stopped
     command:
       [
@@ -35,12 +33,28 @@ services:
       timeout: 3s
       retries: 20
   qdrant:
+    restart: unless-stopped
     image: ${WEB_ADMIN_IMAGE_QDRANT:?Use web-admin command}
     environment:
       QDRANT__SERVICE__API_KEY: ${WEB_ADMIN_QDRANT_API_KEY}
     ports: ['127.0.0.1:${WEB_ADMIN_QDRANT_PORT}:6333']
     volumes: [qdrant-data:/qdrant/storage]
+    healthcheck:
+      test:
+        - CMD
+        - bash
+        - -ec
+        - >-
+          exec 3<>/dev/tcp/127.0.0.1/6333;
+          printf 'GET /readyz HTTP/1.0\r\n\r\n' >&3;
+          read -r protocol status reason <&3;
+          test "$$status" = 200
+      interval: 3s
+      timeout: 3s
+      retries: 30
   minio:
+    pull_policy: never
+    restart: unless-stopped
     extends: { file: compose.minio.yml, service: minio }
     environment:
       MINIO_ROOT_PASSWORD: ${WEB_ADMIN_MINIO_PASSWORD}
@@ -50,7 +64,15 @@ services:
     environment:
       MINIO_ROOT_PASSWORD: ${WEB_ADMIN_MINIO_PASSWORD}
 
+  ollama:
+    extends: { file: ../../../compose.ollama.yml, service: ollama }
+    ports:
+      ['127.0.0.1:${WEB_ADMIN_OLLAMA_PORT:?Missing development port}:11434']
+  ollama-init:
+    extends: { file: ../../../compose.ollama.yml, service: ollama-init }
+
 volumes:
+  ollama-data:
   postgres-data:
   redis-data:
   qdrant-data:

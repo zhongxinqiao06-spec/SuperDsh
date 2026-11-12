@@ -5,8 +5,8 @@ import { composeEnvironment } from './configuration.ts'
 import { appRoot } from './paths.ts'
 import { run } from './processes.ts'
 
-/** 一次准备开发配置与基础数据库；原生 Python 启动不再依赖 Node 调度服务。 */
-export async function initializeDevelopment() {
+/** 为原生调试导出同一套连接配置，并等待中间件与一次性初始化任务就绪。 */
+export async function initializeDevelopment(rebuildDependencies = false) {
   await generateBuildInfo()
   const configuration = await composeEnvironment(
     'development',
@@ -30,21 +30,39 @@ export async function initializeDevelopment() {
     )}\n`,
     { mode: 0o600 },
   )
-  await run('docker', [
+  const compose = [
     'compose',
     '--env-file',
     configuration.envFile,
     '-f',
     resolve(appRoot, 'deployment/compose.dependencies.yml'),
+  ]
+  const build = rebuildDependencies ? ['--build'] : []
+  await run('docker', [
+    ...compose,
     'up',
-    '--no-build',
+    ...build,
     '-d',
     '--wait',
     '--wait-timeout',
     '90',
     'postgres',
     'redis',
+    'qdrant',
+    'minio',
+    'ollama',
   ])
+  // 逐一转发一次性任务的退出码，模型校验或建桶失败时不报告就绪。
+  for (const service of ['minio-init', 'ollama-init'])
+    await run('docker', [
+      ...compose,
+      'up',
+      ...build,
+      '--no-deps',
+      '--exit-code-from',
+      service,
+      service,
+    ])
   console.log(
     `开发配置已就绪：${configuration.configPath}；可分别启动后端 uv 与前端 npm run dev`,
   )

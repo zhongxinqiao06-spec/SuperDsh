@@ -132,6 +132,49 @@ test('重复初始化复用原密钥，生产Compose与开发目录明确隔离'
   }
 })
 
+test('旧开发配置保留密钥，Ollama 发布端口与原生后端使用同一模型清单', async () => {
+  const context = await fixture()
+  try {
+    const first = await loadConfiguration('development', context.directory)
+    const previous = JSON.parse(await readFile(first.configPath, 'utf8'))
+    delete previous.ports.ollamaPort
+    await writeFile(first.configPath, JSON.stringify(previous))
+    const upgraded = await loadConfiguration('development', context.directory)
+    assert.equal(
+      upgraded.configuration.ports.ollamaPort,
+      deploymentMetadata.development.ollamaPort,
+    )
+    assert.equal(
+      upgraded.configuration.databasePassword,
+      first.configuration.databasePassword,
+    )
+    upgraded.configuration.ports.ollamaPort = 31434
+    await writeFile(upgraded.configPath, JSON.stringify(upgraded.configuration))
+    const config = await composeEnvironment('development', context.directory)
+    const { parseEnv } = await import('node:util')
+    const exported = parseEnv(await readFile(config.envFile, 'utf8'))
+    const canonical = parseEnv(
+      await readFile(
+        resolve(repositoryRoot, 'apps/admin/deployment/ollama/embedding.env'),
+        'utf8',
+      ),
+    )
+    assert.equal(exported.WEB_ADMIN_OLLAMA_PORT, '31434')
+    assert.equal(
+      exported.WEB_ADMIN_MANAGED_OLLAMA_ORIGIN,
+      'http://127.0.0.1:31434',
+    )
+    assert.ok(exported.WEB_ADMIN_EMBEDDING_DEFAULT)
+    assert.ok(canonical.SUPERDSH_KNOWLEDGE_EMBEDDING_DEFAULT)
+    assert.deepEqual(JSON.parse(exported.WEB_ADMIN_EMBEDDING_DEFAULT), {
+      ...JSON.parse(canonical.SUPERDSH_KNOWLEDGE_EMBEDDING_DEFAULT),
+      baseUrl: 'http://127.0.0.1:31434/v1',
+    })
+  } finally {
+    await context.cleanup()
+  }
+})
+
 test('生产再次导出保留数据库变体、公开地址和模型文件', async () => {
   const context = await fixture()
   const previousModel = process.env.WEB_ADMIN_MODEL_DEFAULTS_FILE

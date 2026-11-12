@@ -25,7 +25,8 @@
     "postgresPort": 55435,
     "redisPort": 56380,
     "qdrantPort": 56334,
-    "minioPort": 59001
+    "minioPort": 59001,
+    "ollamaPort": 21434
   },
   "storage": {
     "bucket": "web-admin-files",

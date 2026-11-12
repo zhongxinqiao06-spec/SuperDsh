@@ -136,6 +136,8 @@ corepack.cmd yarn web-admin:deps:up
 corepack.cmd yarn web-admin:dev
 ```
 
+单独执行 `web-admin:deps:up` 会在同一个 Docker 项目中启动 PostgreSQL、Redis、Qdrant、MinIO 和 Ollama，并校验内置模型。Vue 和 FastAPI 通过 `web-admin:dev` 在宿主机调试。
+
 ### 安卓
 
 Android Studio 打开 `apps/android`；准备 SDK / AVD 后：

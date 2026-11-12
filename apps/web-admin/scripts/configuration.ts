@@ -3,6 +3,7 @@ import { execFileSync } from 'node:child_process'
 import { mkdir, readFile, writeFile, readdir, rename } from 'node:fs/promises'
 import { existsSync } from 'node:fs'
 import { resolve } from 'node:path'
+import { parseEnv } from 'node:util'
 import { appRoot, developmentRoot, repositoryRoot } from './paths.ts'
 import { initialAdminConfiguration } from './initial-admin.ts'
 import { providerOriginsEnvironment } from './provider-origins.ts'
@@ -39,6 +40,7 @@ interface RuntimeMetadata {
     redisPort: number
     qdrantPort: number
     minioPort: number
+    ollamaPort: number
   }
 }
 
@@ -79,8 +81,12 @@ export async function loadConfiguration(
     configuration.initialAdmin = await initialAdminConfiguration(
       configuration.initialAdmin,
     )
-    if (missingInitialAdmin) {
-      // 旧开发配置只补充新字段，保留原密钥与端口；原子替换避免中途退出写坏配置。
+    const missingOllamaPort =
+      mode === 'development' && configuration.ports.ollamaPort === undefined
+    if (missingOllamaPort)
+      configuration.ports.ollamaPort = deploymentMetadata.development.ollamaPort
+    if (missingInitialAdmin || missingOllamaPort) {
+      // 旧配置仅补充缺失字段，保留原密钥、自选端口及用户设置。
       const temporary = `${configPath}.${randomBytes(8).toString('hex')}.tmp`
       await writeFile(
         temporary,
@@ -134,7 +140,28 @@ export async function loadConfiguration(
     process.env.WEB_ADMIN_PUBLIC_ORIGIN ??
     configuration.publicOrigin ??
     `http://localhost:${ports.frontedPort}`
+  const developmentEmbedding: Record<string, string> = {}
+  if (mode === 'development') {
+    const port = ports.ollamaPort
+    if (!Number.isInteger(port) || port < 1 || port > 65535)
+      throw new Error('ollamaPort 必须为 1 至 65535 的整数')
+    const origin = `http://127.0.0.1:${port}`
+    // 宿主机使用发布端口，模型名称、版本及维度与容器初始化器共用同一清单。
+    const manifest = parseEnv(
+      await readFile(
+        resolve(repositoryRoot, 'apps/admin/deployment/ollama/embedding.env'),
+        'utf8',
+      ),
+    )
+    const raw = manifest.SUPERDSH_KNOWLEDGE_EMBEDDING_DEFAULT
+    if (!raw) throw new Error('Ollama 镜像缺少默认检索模型配置')
+    const profile = JSON.parse(raw)
+    profile.baseUrl = new URL(new URL(profile.baseUrl).pathname, origin).href
+    developmentEmbedding.WEB_ADMIN_EMBEDDING_DEFAULT = JSON.stringify(profile)
+    developmentEmbedding.WEB_ADMIN_MANAGED_OLLAMA_ORIGIN = origin
+  }
   const environment = {
+    ...developmentEmbedding,
     WEB_ADMIN_DATABASE_URL: `postgresql+asyncpg://web_admin:${configuration.databasePassword}@${host}:${dbPort}/web_admin`,
     WEB_ADMIN_REDIS_URL: `redis://:${configuration.redisPassword}@${mode === 'production' ? 'redis:6379' : `127.0.0.1:${ports.redisPort}`}/0`,
     WEB_ADMIN_SECRET: configuration.secret,
@@ -239,6 +266,8 @@ export async function composeEnvironment(
     WEB_ADMIN_MC_SOURCE: deploymentMetadata.storage.mcSource,
     WEB_ADMIN_MC_SHA256: deploymentMetadata.storage.mcSha256,
   }
+  if (mode === 'development')
+    values.WEB_ADMIN_OLLAMA_PORT = config.ports.ollamaPort
   if (mode === 'production') {
     values.COMPOSE_FILE = 'compose.yml'
     values.WEB_ADMIN_APP_PULL_POLICY = 'never'

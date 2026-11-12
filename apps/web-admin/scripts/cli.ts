@@ -16,12 +16,11 @@ const commandHelp: Record<string, string> = {
   sync: '冻结安装 Python 依赖，生成构建信息并编译固定 DSH 适配',
   prepare: '检查并修复 Python 虚拟环境、安装锁定依赖，不执行 build',
   requirements: '从现有锁文件导出完整运行、开发依赖，保留版本、平台条件与哈希',
-  init: '准备共用 Python 环境、生成开发配置并启动 PostgreSQL、Redis',
+  init: '准备共用 Python 环境、生成开发配置并启动完整开发依赖',
   'deps-up': '构建并启动独立开发依赖，配置和卷在重复启动时复用',
   'deps-down': '停止开发依赖，保留数据卷和密钥',
   dev: '迁移新库并启动 Vue 热更新与 Python API，Ctrl+C 协作关闭',
-  preview:
-    '检查并准备 Python 依赖，启动 PostgreSQL、Redis 与前后端源码，不执行 build',
+  preview: '检查并准备 Python 依赖，启动开发依赖与前后端源码',
   'fronted-dev': '单独启动 Vue 开发服务，代理到新 Python API',
   'backend-dev': '迁移新库并单独启动 Python API',
   migrate: '迁移显式配置的新数据库，拒绝接管未知旧库',
@@ -97,6 +96,7 @@ export async function main(command = 'help', args: string[] = []) {
   }
   if (command === 'prepare') return ensurePythonEnvironment()
   if (command === 'requirements') return exportPythonRequirements()
+  if (command === 'deps-up') return initializeDevelopment(true)
   if (command === 'init') {
     await ensurePythonEnvironment()
     return initializeDevelopment()
@@ -108,17 +108,13 @@ export async function main(command = 'help', args: string[] = []) {
     return
   }
   if (command === 'preview') {
-    // 预览只启动基础页面必需的数据库；依赖缺失应在启动容器前明确报错。
+    // 复用本地调试的依赖组，待模型和对象存储就绪后再启动宿主机应用。
     await ensurePythonEnvironment()
     await initializeDevelopment()
     // 复用源码启动与退出管理；不编译前端、引擎或应用镜像。
     return main('dev')
   }
-  if (
-    ['up', 'down', 'logs', 'deps-up', 'deps-down', 'compose-config'].includes(
-      command,
-    )
-  ) {
+  if (['up', 'down', 'logs', 'deps-down', 'compose-config'].includes(command)) {
     const production = !command.startsWith('deps-')
     const configuration = await composeEnvironment(
       production ? 'production' : 'development',
@@ -130,13 +126,11 @@ export async function main(command = 'help', args: string[] = []) {
     const action =
       command === 'up'
         ? ['up', '--build', '-d', '--wait', '--wait-timeout', '180']
-        : command === 'deps-up'
-          ? ['up', '--build', '-d', '--wait', '--wait-timeout', '90']
-          : command === 'logs'
-            ? ['logs', '--tail', '100', ...args]
-            : command === 'compose-config'
-              ? ['config', '--quiet']
-              : ['down']
+        : command === 'logs'
+          ? ['logs', '--tail', '100', ...args]
+          : command === 'compose-config'
+            ? ['config', '--quiet']
+            : ['down']
     await run('docker', [
       'compose',
       '--env-file',

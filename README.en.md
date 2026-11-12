@@ -136,6 +136,8 @@ corepack.cmd yarn web-admin:deps:up
 corepack.cmd yarn web-admin:dev
 ```
 
+Run `web-admin:deps:up` to start PostgreSQL, Redis, Qdrant, MinIO and Ollama in one Docker project and verify the bundled model. Run `web-admin:dev` to debug Vue and FastAPI on the host.
+
 ### Android
 
 Open `apps/android` in Android Studio. With SDK / AVD prepared:

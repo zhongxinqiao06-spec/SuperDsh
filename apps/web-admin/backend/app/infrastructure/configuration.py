@@ -5,7 +5,7 @@ from pathlib import Path
 from typing import Self
 from urllib.parse import urlsplit
 
-from pydantic import Field, SecretStr, field_validator, model_validator
+from pydantic import AliasChoices, Field, SecretStr, field_validator, model_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
@@ -38,9 +38,14 @@ class Settings(BaseSettings):
     model_defaults_file: Path | None = (
         Path(__file__).resolve().parents[2] / "config/model-defaults.json"
     )
+    # 宿主机开发后端只向知识库编码器开放受管 Ollama 地址。
+    managed_ollama_origin: str = ""
     embedding_trusted_origins: str = ""
     embedding_default: dict[str, object] | None = Field(
-        default=None, validation_alias="SUPERDSH_KNOWLEDGE_EMBEDDING_DEFAULT"
+        default=None,
+        validation_alias=AliasChoices(
+            "SUPERDSH_KNOWLEDGE_EMBEDDING_DEFAULT", "WEB_ADMIN_EMBEDDING_DEFAULT"
+        ),
     )
     qdrant_url: str = "http://localhost:56334"
     qdrant_api_key: SecretStr = SecretStr("")
