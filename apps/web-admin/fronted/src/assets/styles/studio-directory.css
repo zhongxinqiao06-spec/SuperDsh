@@ -1,0 +1,4 @@
+/* 为目录筛选分配紧凑宽度，窄屏沿用公共工具栏的换行布局。 */
+.filter-bar :deep(.el-select) {
+  width: min(9rem, 100%);
+}

@@ -1,6 +1,11 @@
 <script setup lang="ts">
 import { computed, nextTick, ref } from 'vue'
 import { websiteScenarios } from '@/utils/website/content'
+import {
+  salesExampleDownload,
+  salesMonths,
+  salesQuarter,
+} from '@/utils/website/sales-example'
 import { usePreferences } from '@/store/modules/preferences'
 const { tr } = usePreferences(),
   active = ref(0),
@@ -88,7 +93,7 @@ function text(value: readonly string[]) {
             {{ text(step) }}
           </li>
         </ul>
-        <router-link to="/login"
+        <router-link to="/office"
           >{{ tr('在工作台开始', 'Start in the workspace') }} ↗</router-link
         >
       </article>
@@ -108,16 +113,23 @@ function text(value: readonly string[]) {
               )
             }}
           </h3>
-          <strong class="website-demo-number">¥1,286,000.00</strong>
+          <strong class="website-demo-number"
+            >¥{{
+              (salesQuarter * 10000).toLocaleString('en-US', {
+                minimumFractionDigits: 2,
+                maximumFractionDigits: 2,
+              })
+            }}</strong
+          >
           <div class="website-sales-bars">
-            <div v-for="(value, index) in [38.6, 41.6, 48.4]" :key="value">
-              <span>{{ value }}</span
-              ><i :style="{ height: `${value * 2}px` }" /><span
-                >{{ index + 7 }}{{ tr('月', ' month') }}</span
-              >
+            <div v-for="item in salesMonths" :key="item.month[0]">
+              <span>{{ item.total }}</span
+              ><i :style="{ height: `${item.total * 2}px` }" /><span>{{
+                text(item.month)
+              }}</span>
             </div>
           </div>
-          <a href="/images/website/sales-example.csv" download
+          <a :href="salesExampleDownload" download
             >{{ tr('下载示例数据', 'Download example data') }} ↓</a
           ></template
         ><template v-else-if="active === 1"

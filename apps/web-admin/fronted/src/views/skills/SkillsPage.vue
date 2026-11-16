@@ -86,7 +86,11 @@ const vm = useSkills(),
             ><DateTime :value="row.updatedAt" /></template></el-table-column
         ><el-table-column :label="tr('操作', 'Actions')" min-width="270"
           ><template #default="{ row }"
-            ><RowActions :busy="vm.mutation.busy.value">
+            ><small
+              v-if="row.product === 'shared' && !vm.auth.can('agents.manage')"
+              class="muted"
+              >共享 · 可引用</small
+            ><RowActions v-else :busy="vm.mutation.busy.value">
               <el-button link @click="vm.edit(row)">{{
                 tr('编辑', 'Edit')
               }}</el-button>
@@ -135,6 +139,22 @@ const vm = useSkills(),
       ><label class="field"
         >{{ tr('名称', 'Name')
         }}<el-input v-model="vm.draft.name" maxlength="100" /></label
+      ><label class="field"
+        >发布到产品<select
+          v-model="vm.draft.product"
+          class="native-control"
+          :disabled="!vm.auth.can('agents.manage')"
+        >
+          <option v-if="vm.product === 'office'" value="office">
+            星桥办公
+          </option>
+          <option v-if="vm.product === 'entertainment'" value="entertainment">
+            星桥娱乐
+          </option>
+          <option v-if="vm.auth.can('agents.manage')" value="shared">
+            两套产品
+          </option>
+        </select></label
       ><label class="field"
         >{{ tr('用途说明', 'Purpose')
         }}<el-input
@@ -232,6 +252,7 @@ const vm = useSkills(),
         }}</el-radio></el-radio-group
       ><input
         v-if="vm.importKind.value === 'package'"
+        class="native-control"
         type="file"
         accept=".zip,application/zip"
         :aria-label="tr('技能ZIP包', 'Skill ZIP package')"

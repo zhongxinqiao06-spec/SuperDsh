@@ -151,13 +151,15 @@ const connectionsOpen = ref(false)
         :close-on-press-escape="!vm.mutation.busy.value"
         :show-close="!vm.mutation.busy.value"
       >
-        <p>新会话将使用平台默认模型，已有会话的选择保持不变。</p>
-        <el-alert
-          v-if="vm.mutation.error.value"
-          type="error"
-          :title="vm.mutation.error.value"
-          :closable="false"
-        />
+        <div class="stack">
+          <p>新会话将使用平台默认模型，已有会话的选择保持不变。</p>
+          <el-alert
+            v-if="vm.mutation.error.value"
+            type="error"
+            :title="vm.mutation.error.value"
+            :closable="false"
+          />
+        </div>
         <template #footer
           ><el-button
             :disabled="vm.mutation.busy.value"
@@ -290,8 +292,8 @@ const connectionsOpen = ref(false)
         width="min(800px,94vw)"
         class="management-dialog"
       >
-        <div class="connection-panel">
-          <div class="toolbar connection-actions">
+        <div class="stack">
+          <div class="toolbar">
             <el-button @click="vm.reload">刷新</el-button
             ><el-button type="primary" @click="vm.editConnection('new')"
               >新增连接</el-button
@@ -403,9 +405,6 @@ const connectionsOpen = ref(false)
 </template>
 
 <style scoped>
-.personal-models-page {
-  gap: 20px;
-}
 .personal-default-label {
   color: var(--muted-foreground);
   overflow-wrap: anywhere;
@@ -416,17 +415,6 @@ const connectionsOpen = ref(false)
   border: 1px solid var(--border);
   border-radius: 14px;
   color: var(--muted-foreground);
-}
-.connection-panel {
-  display: grid;
-  gap: 20px;
-}
-.connection-actions {
-  gap: 8px;
-}
-/* 按钮间距统一交给容器，避免组件默认 margin 与 gap 叠加。 */
-.connection-actions :deep(.el-button + .el-button) {
-  margin-left: 0;
 }
 .model-card {
   display: flex;

@@ -10,8 +10,8 @@ import '@/assets/styles/management.css'
 import '@/assets/styles/dashboard.css'
 import '@/assets/styles/workbench.css'
 import '@/assets/styles/website.css'
+import '@/assets/styles/studio.css'
 import App from '@/App.vue'
-import { normalizeInitialLocation, router } from '@/router/index'
+import { router } from '@/router/index'
 
-normalizeInitialLocation()
 createApp(App).use(createPinia()).use(ElementPlus).use(router).mount('#app')

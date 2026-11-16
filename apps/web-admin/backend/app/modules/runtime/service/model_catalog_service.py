@@ -48,6 +48,7 @@ def authorized_model_entries(configuration: Fields, entries: list[Fields]) -> li
                     **metadata,
                     "modelName": name,
                     "providerName": provider.get("name"),
+                    "providerId": provider.get("providerId"),
                     "source": provider.get("source"),
                 },
             }

@@ -142,13 +142,15 @@ test('配置来源清晰，默认选择贯穿首次和连续发送', async ({ pa
   await page.getByLabel('用户名或邮箱').fill('admin')
   await page.getByLabel('密码', { exact: true }).fill('Synthetic-password!')
   await page.getByRole('button', { name: '登录 ↵', exact: true }).click()
-  await expect(page.locator('[data-console-shell]')).toBeVisible()
-  await page.goto('/#/workspace')
-  const model = page.locator('.composer .runtime-model-select')
-  const permission = page.locator('.composer .runtime-permission-select')
+  await page.getByRole('link', { name: /办公工作台/ }).click()
+  // 首页和工作台共享输入组件；须等导航落到目标工作台，再操作该页面的选择器。
+  await expect(page).toHaveURL(/#\/workspace$/)
+  const composer = page.locator('.workbench-page .composer')
+  const model = composer.locator('.runtime-model-select')
+  const permission = composer.locator('.runtime-permission-select')
   await expect(model).toContainText('同名模型')
   await expect(permission).toContainText('配置权限')
-  await model.click()
+  await model.locator('.el-select__wrapper').click()
   const choices = page.locator(
     '.composer-model-menu:visible .el-select-dropdown__item',
   )
@@ -160,6 +162,12 @@ test('配置来源清晰，默认选择贯穿首次和连续发送', async ({ pa
     path: info.outputPath('model-menu.png'),
     animations: 'disabled',
   })
+  await choices.last().click()
+  await model.locator('.el-select__wrapper').click()
+  await expect(choices.last()).toHaveAttribute('aria-selected', 'true')
+  await choices.first().click()
+  await model.locator('.el-select__wrapper').click()
+  await expect(choices.first()).toHaveAttribute('aria-selected', 'true')
   await page.keyboard.press('Escape')
   await page.getByLabel('任务草稿').fill('第一次提问')
   await page.getByRole('button', { name: '发送', exact: true }).click()

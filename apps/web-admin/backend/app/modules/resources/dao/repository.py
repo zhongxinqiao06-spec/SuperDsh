@@ -4,7 +4,7 @@ from collections.abc import AsyncIterator
 from contextlib import asynccontextmanager
 from dataclasses import asdict
 
-from sqlalchemy import select
+from sqlalchemy import func, or_, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.infrastructure.database import Database, lock_transaction
@@ -35,12 +35,27 @@ class SqlResourceTransaction:
             else None
         )
 
-    async def all(self, kind: str, owner: str) -> list[Resource]:
+    async def all(self, kind: str, owner: str | None, product: str | None = None) -> list[Resource]:
+        conditions = []
+        if product is not None:
+            scope = func.coalesce(ResourceRow.payload["product"].astext, "office")
+            conditions.extend(
+                [
+                    scope.in_((product, "shared")),
+                    or_(
+                        ResourceRow.owner_id == owner,
+                        scope == "shared",
+                        ResourceRow.payload["productManaged"].as_boolean().is_(True),
+                    ),
+                ]
+            )
+        elif owner is not None:
+            conditions.append(ResourceRow.owner_id == owner)
         rows = await self.db.scalars(
             select(ResourceRow)
             .where(
                 ResourceRow.kind == kind,
-                ResourceRow.owner_id == owner,
+                *conditions,
                 ResourceRow.deleted.is_(False),
             )
             .order_by(ResourceRow.updated_at.desc(), ResourceRow.id)

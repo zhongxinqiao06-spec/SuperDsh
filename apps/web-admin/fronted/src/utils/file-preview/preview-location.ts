@@ -12,12 +12,36 @@ export function previewLocation(query: LocationQuery): PreviewLocation {
     root: text('root'),
     path: text('path'),
     name: text('name'),
-    previewToken: text('previewToken'),
+    previewToken: text('previewToken') || text('token'),
     sourceUrl: text('sourceUrl'),
     mediaType: text('mediaType'),
     line: positive('line'),
     column: positive('column'),
   }
+}
+
+/** 仅设备内文件可在登录后恢复；一次性票据和来源链接始终留在原窗口。 */
+export function workspacePreviewContinuation(
+  query: LocationQuery,
+): string | null {
+  if (['token', 'previewToken', 'sourceUrl'].some((key) => key in query))
+    return null
+  const location = previewLocation(query)
+  if (!location.connectorId || !location.path) return null
+  const parameters = new URLSearchParams()
+  for (const key of [
+    'connectorId',
+    'root',
+    'path',
+    'name',
+    'mediaType',
+    'line',
+    'column',
+  ]) {
+    const value = query[key]
+    if (typeof value === 'string' && value) parameters.set(key, value)
+  }
+  return '/preview?' + parameters.toString()
 }
 
 /** 不把任意 sourceUrl 当作带登录凭据的跳板；共享链接也必须由当前平台提供。 */

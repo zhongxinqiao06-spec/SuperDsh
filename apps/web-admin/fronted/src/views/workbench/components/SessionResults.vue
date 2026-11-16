@@ -2,6 +2,7 @@
 import { toRef } from 'vue'
 import AppIcon from '@/components/base/AppIcon.vue'
 import { useResults } from '@/composables/workbench/use-results'
+import ArtifactPreviewContent from './ArtifactPreviewContent.vue'
 import SessionRecords from './SessionRecords.vue'
 
 /** 技能阶段、真实成果和验证后的预览统一展示，不绑定特定办公工具名称。 */
@@ -28,6 +29,17 @@ const labels: Record<string, string> = {
       type="error"
       :closable="false"
     />
+    <p
+      v-if="
+        results.loaded.value &&
+        !results.error.value &&
+        !results.runs.value.length &&
+        !results.artifacts.value.length
+      "
+      class="office-results-empty"
+    >
+      当前会话暂无生成的文件。
+    </p>
     <details
       v-for="run in results.runs.value"
       :key="run.id"
@@ -72,25 +84,49 @@ const labels: Record<string, string> = {
       ><el-button @click="results.preview(artifact)">预览</el-button
       ><el-button @click="results.download(artifact)">下载</el-button>
     </article>
-    <el-dialog
-      :model-value="!!results.previewUrl.value"
-      :title="results.previewName.value"
-      class="session-preview-dialog"
-      width="85%"
-      @close="results.closePreview"
+    <section
+      v-if="results.previewUrl.value"
+      class="office-inline-preview"
+      aria-label="成果预览内容"
     >
-      <iframe
-        v-if="results.previewType.value === 'application/pdf'"
-        :src="results.previewUrl.value"
-        title="成果预览"
-        class="preview"
-      />
-      <img
-        v-else
-        :src="results.previewUrl.value"
-        :alt="results.previewName.value"
-        class="preview-image"
-      />
-    </el-dialog>
+      <header>
+        <strong>{{ results.previewName.value }}</strong
+        ><el-button
+          text
+          aria-label="关闭文件预览"
+          @click="results.closePreview()"
+          ><AppIcon name="x"
+        /></el-button>
+      </header>
+      <ArtifactPreviewContent :actions="results" />
+    </section>
   </section>
 </template>
+
+<style scoped>
+.office-inline-preview {
+  margin: 16px 0;
+  min-width: 0;
+}
+.office-inline-preview header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 6px;
+  margin-bottom: 8px;
+}
+.office-inline-preview strong {
+  overflow-wrap: anywhere;
+}
+.office-inline-preview :deep(.preview),
+.office-inline-preview :deep(.preview-image) {
+  display: block;
+  width: 100%;
+  max-width: 100%;
+  border: 1px solid var(--border);
+  border-radius: 3px;
+}
+.office-inline-preview :deep(.preview) {
+  height: min(52vh, 580px);
+}
+</style>

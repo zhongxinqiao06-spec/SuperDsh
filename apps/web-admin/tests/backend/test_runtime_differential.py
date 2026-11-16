@@ -33,7 +33,13 @@ from app.modules.identity.entity.bo.models import Account
 from app.modules.skills.service.matching import match_skills
 
 ROOT = Path(__file__).resolve().parents[4]
-ACCOUNT = Account("synthetic-owner", "synthetic", (), ("sessions.run", "sessions.read"), 1)
+ACCOUNT = Account(
+    "synthetic-owner",
+    "synthetic",
+    (),
+    ("sessions.run", "sessions.read", "products.office"),
+    1,
+)
 
 
 def oracle(inputs: list[dict[str, object]]) -> list[object]:
@@ -119,7 +125,9 @@ async def test_native_device_is_registered_once_by_prepare_not_listing() -> None
 
 
 @pytest.mark.parametrize("with_activity", [False, True])
-def test_session_activity_view_matches_actual_legacy_projection(with_activity: bool) -> None:
+def test_session_activity_view_matches_actual_legacy_projection(
+    with_activity: bool,
+) -> None:
     """同一持久事实送进旧新视图，空会话、消息活动和管理修改必须分开。"""
     _, row = conversation(True)
     row.cwd = ""
@@ -271,7 +279,9 @@ async def test_old_new_interrupt_authorization(
 
 
 @pytest.mark.parametrize("online", [False, True])
-async def test_metadata_notification_matches_legacy_hub_committed_session(online: bool) -> None:
+async def test_metadata_notification_matches_legacy_hub_committed_session(
+    online: bool,
+) -> None:
     """实际旧 Hub 与新 emit 使用同输入，元数据帧必须有完整会话且序号一致。"""
     service, row = conversation(True)
     row.sequence = 6
@@ -348,7 +358,9 @@ async def test_metadata_notification_matches_legacy_hub_committed_session(online
         },
     ],
 )
-def test_runtime_error_notice_matches_actual_legacy_hub(extra: dict[str, object]) -> None:
+def test_runtime_error_notice_matches_actual_legacy_hub(
+    extra: dict[str, object],
+) -> None:
     """旧 Hub 的 runtime.error 转换直接执行，默认信息及已有错误上下文都不能丢失。"""
     params = {"sessionId": "synthetic-session", "runtime": "dsh", **extra}
     prior = oracle([{"kind": "metadata-notification", "runtimeError": True, "params": params}])[0]
@@ -514,6 +526,7 @@ async def test_share_snapshot_matches_old_full_history_and_reply_validation(
     service, row = conversation(True)
     dao = AsyncMock(spec=ConversationDao)
     dao.snapshot_items.return_value = [TimelineRow(payload=item) for item in items]
+    dao.session.return_value = row
     transaction = AsyncMock()
     transaction.__aenter__.return_value = dao
     service.repository = Mock()

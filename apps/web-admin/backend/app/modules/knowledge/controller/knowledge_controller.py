@@ -5,6 +5,7 @@ from typing import Annotated
 from fastapi import APIRouter, Depends, Query, Request
 
 from app.api.dependencies import current_account
+from app.api.product_resources import ResourceAccount
 from app.modules.identity.entity.bo.models import Account
 from app.modules.knowledge.entity.vo.knowledge_vo import (
     EmbeddingInput,
@@ -27,7 +28,7 @@ def service(request: Request) -> KnowledgeService:
 @router.get("/admin/knowledge-bases")
 async def listing(
     request: Request,
-    account: AccountDep,
+    account: ResourceAccount,
     page: int = Query(1, ge=1),
     pageSize: int = Query(12, ge=1, le=100),
     search: str = Query("", max_length=100),
@@ -37,27 +38,29 @@ async def listing(
 
 
 @router.get("/admin/knowledge-bases/search-status")
-async def status(request: Request, account: AccountDep) -> dict[str, object]:
+async def status(request: Request, account: ResourceAccount) -> dict[str, object]:
     """检索依赖状态与普通 HTTP 存活分开。"""
     return await service(request).status(account)
 
 
 @router.post("/admin/knowledge-bases", status_code=201)
-async def create(body: KnowledgeInput, request: Request, account: AccountDep) -> dict[str, object]:
+async def create(
+    body: KnowledgeInput, request: Request, account: ResourceAccount
+) -> dict[str, object]:
     """新建配置返回旧 DTO 包装键。"""
     return {"knowledgeBase": await service(request).save(account, body)}
 
 
 @router.put("/admin/knowledge-bases/{identifier}")
 async def update(
-    identifier: str, body: KnowledgeInput, request: Request, account: AccountDep
+    identifier: str, body: KnowledgeInput, request: Request, account: ResourceAccount
 ) -> dict[str, object]:
     """按版本编辑资料集合。"""
     return {"knowledgeBase": await service(request).save(account, body, identifier)}
 
 
 @router.delete("/admin/knowledge-bases/{identifier}")
-async def remove(identifier: str, request: Request, account: AccountDep) -> dict[str, bool]:
+async def remove(identifier: str, request: Request, account: ResourceAccount) -> dict[str, bool]:
     """删除后冻结会话也不能继续获取其资料。"""
     await service(request).remove(account, identifier)
     return {"ok": True}
@@ -67,7 +70,7 @@ async def remove(identifier: str, request: Request, account: AccountDep) -> dict
 async def versions(
     identifier: str,
     request: Request,
-    account: AccountDep,
+    account: ResourceAccount,
     page: int = Query(1, ge=1),
     pageSize: int = Query(10, ge=1, le=50),
 ) -> dict[str, object]:
@@ -77,21 +80,23 @@ async def versions(
 
 @router.post("/admin/knowledge-bases/{identifier}/restore")
 async def restore(
-    identifier: str, body: RestoreInput, request: Request, account: AccountDep
+    identifier: str, body: RestoreInput, request: Request, account: ResourceAccount
 ) -> dict[str, object]:
     """回退追加新版本，响应保持 resource 包装。"""
     return {"resource": await service(request).restore(account, identifier, body)}
 
 
 @router.get("/admin/knowledge-bases/{identifier}/index")
-async def index_status(identifier: str, request: Request, account: AccountDep) -> dict[str, object]:
+async def index_status(
+    identifier: str, request: Request, account: ResourceAccount
+) -> dict[str, object]:
     """解析与索引失败在页面刷新后仍可见。"""
     return await service(request).document_status(account, identifier)
 
 
 @router.post("/admin/knowledge-bases/{identifier}/index")
 async def index(
-    identifier: str, request: Request, account: AccountDep, body: IndexInput | None = None
+    identifier: str, request: Request, account: ResourceAccount, body: IndexInput | None = None
 ) -> dict[str, object]:
     """索引单份或全部资料。"""
     return await service(request).index(account, identifier, body.assetId if body else None)
@@ -99,7 +104,7 @@ async def index(
 
 @router.post("/admin/knowledge-bases/{identifier}/search")
 async def search(
-    identifier: str, body: SearchInput, request: Request, account: AccountDep
+    identifier: str, body: SearchInput, request: Request, account: ResourceAccount
 ) -> dict[str, object]:
     """检索测试返回真实原文与定位字段。"""
     return await service(request).search(account, identifier, body.query)

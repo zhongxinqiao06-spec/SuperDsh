@@ -13,10 +13,15 @@ class AgentAssetRow(Base):
     """同一账号同名同类型同摘要上传幂等，避免重复产生资料。"""
 
     __tablename__ = "agent_assets"
-    __table_args__ = (UniqueConstraint("owner_id", "kind", "name", "sha256"),)
+    __table_args__ = (
+        UniqueConstraint(
+            "owner_id", "product", "kind", "name", "sha256", name="uq_agent_asset_product_content"
+        ),
+    )
     id: Mapped[str] = mapped_column(String(100), primary_key=True)
     owner_id: Mapped[str] = mapped_column(ForeignKey("users.id"), index=True)
     file_id: Mapped[str] = mapped_column(String(100))
+    product: Mapped[str] = mapped_column(String(32), default="personal", server_default="personal")
     name: Mapped[str] = mapped_column(String(150))
     kind: Mapped[str] = mapped_column(String(40))
     size: Mapped[int] = mapped_column(Integer)

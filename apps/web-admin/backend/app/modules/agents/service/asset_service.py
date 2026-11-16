@@ -17,6 +17,7 @@ from app.modules.agents.entity.vo.agent_vo import AssetInput
 from app.modules.files.service.file_service import FileService
 from app.modules.identity.entity.bo.models import Account
 from app.modules.knowledge.service.document_parser import parse_document_async
+from app.modules.resources.entity.bo.product_scope import resource_product
 from app.modules.resources.service.resources import ResourceService
 
 
@@ -64,7 +65,12 @@ class AssetService:
         """管理页只能选择自己的资料。"""
         account.require("agents.manage")
         async with self.database.sessions() as session:
-            return [asset_view(row) for row in await AgentDao(session).assets(account.user_id)]
+            return [
+                asset_view(row)
+                for row in await AgentDao(session).assets(
+                    account.user_id, resource_product(account)
+                )
+            ]
 
     async def get(
         self, account: Account, identifier: str, include_segments: bool = False
@@ -72,10 +78,12 @@ class AssetService:
         """知识检索每次读取时复查资产账号与文件状态。"""
         account.require("agents.manage")
         async with self.database.sessions() as session:
-            row = await AgentDao(session).asset(account.user_id, identifier)
+            row = await AgentDao(session).asset(
+                account.user_id, identifier, resource_product(account)
+            )
             if row is None:
                 raise DomainError(404, "资料不存在")
-        await self.files.read_asset(account, row.file_id)
+        await self.files.read_owned_asset(row.owner_id, row.file_id)
         return asset_view(row, include_segments)
 
     async def preview(
@@ -102,10 +110,12 @@ class AssetService:
         """提供文件内容给预览和执行适配，浏览器不获取存储对象路径。"""
         account.require("agents.manage")
         async with self.database.sessions() as session:
-            row = await AgentDao(session).asset(account.user_id, identifier)
+            row = await AgentDao(session).asset(
+                account.user_id, identifier, resource_product(account)
+            )
             if row is None:
                 raise DomainError(404, "资料不存在")
-        data, _ = await self.files.read_asset(account, row.file_id)
+        data, _ = await self.files.read_owned_asset(row.owner_id, row.file_id)
         return data, asset_view(row)
 
     async def upload(self, account: Account, body: AssetInput) -> dict[str, object]:
@@ -129,7 +139,11 @@ class AssetService:
         digest = hashlib.sha256(data).hexdigest()
         async with self.database.sessions() as session:
             existing = await AgentDao(session).matching(
-                account.user_id, body.kind, body.name, digest
+                account.user_id,
+                body.kind,
+                body.name,
+                digest,
+                resource_product(account) or "personal",
             )
             if existing and existing.deleted_at is None:
                 return asset_view(existing)
@@ -142,7 +156,13 @@ class AssetService:
             async with self.database.sessions() as session, session.begin():
                 await lock_transaction(session, "agent-assets:" + account.user_id)
                 dao = AgentDao(session)
-                existing = await dao.matching(account.user_id, body.kind, body.name, digest)
+                existing = await dao.matching(
+                    account.user_id,
+                    body.kind,
+                    body.name,
+                    digest,
+                    resource_product(account) or "personal",
+                )
                 duplicate = existing is not None and existing.deleted_at is None
                 if duplicate and existing:
                     row = existing
@@ -153,6 +173,7 @@ class AssetService:
                     row = AgentAssetRow(
                         id="asset-" + uuid4().hex,
                         owner_id=account.user_id,
+                        product=resource_product(account) or "personal",
                         file_id=str(entry["id"]),
                         name=body.name,
                         kind=body.kind,
@@ -191,14 +212,17 @@ class AssetService:
         """删除补偿只作用于未被配置引用的资料；原文件交统一回收站管理。"""
         account.require("agents.manage")
         async with self.database.sessions() as session, session.begin():
+            await lock_transaction(session, "web-admin:resource:configuration-graph")
             await lock_transaction(session, "web-admin:resource:" + account.user_id)
             await lock_transaction(session, "agent-assets:" + account.user_id)
             for kind in ("agent", "knowledge", "skill"):
                 for resource in await self.resources.catalog(account, kind):
                     if identifier in referenced_assets(resource):
                         raise DomainError(409, "资料正在被配置引用，不能删除")
-            row = await AgentDao(session).asset(account.user_id, identifier)
-            if row is None:
+            row = await AgentDao(session).asset(
+                account.user_id, identifier, resource_product(account)
+            )
+            if row is None or row.owner_id != account.user_id:
                 raise DomainError(404, "资料不存在")
             row.deleted_at = datetime.now(UTC)
             file_id = row.file_id
@@ -216,69 +240,62 @@ class AssetService:
             if kind == "knowledge" and asset["kind"] != "knowledge":
                 raise DomainError(422, "知识库只能引用知识资料")
 
+    async def _referenced(
+        self, identifiers: set[str], segments: bool = False
+    ) -> List[dict[str, object]]:
+        """只有服务端已校验的资源快照可以调用；原文件读取使用每条资料自己的所有者。"""
+        result: List[dict[str, object]] = []
+        async with self.database.sessions() as session:
+            for identifier in sorted(identifiers):
+                row = await AgentDao(session).referenced(identifier)
+                if row is None:
+                    raise DomainError(403, "关联资料已不可用")
+                await self.files.read_owned_asset(row.owner_id, row.file_id)
+                result.append(asset_view(row, segments))
+        return result
+
+    async def resource_assets(
+        self, account: Account, kind: str, identifier: str, segments: bool = False
+    ) -> List[dict[str, object]]:
+        """跨产品共享知识库、技能只公开由其维护者保存的具体资产引用。"""
+        resource = await self.resources.get(account, kind, identifier)
+        return await self._referenced(referenced_assets(resource), segments)
+
     async def execution_assets(
         self, account: Account, binding_id: str, include_segments: bool = False
     ) -> List[dict[str, object]]:
-        """绑定校验先于资产读取，允许使用已发布者资料但不授予管理权限。"""
+        """先验证产品、授权和存量绑定，再按每个资源冻结的引用读取资产。"""
         binding = await self.resources.authorize_binding(account, binding_id)
-        allowed: dict[str, str] = {}
-        for snapshot in binding.snapshots:
-            owner = str(snapshot.get("resourceOwnerId", account.user_id))
-            for identifier in referenced_assets(snapshot):
-                allowed[identifier] = owner
-        result: List[dict[str, object]] = []
-        async with self.database.sessions() as session:
-            dao = AgentDao(session)
-            for identifier, owner in allowed.items():
-                row = await dao.asset(owner, identifier)
-                if row is None:
-                    raise DomainError(403, "绑定的资料已不可用")
-                await self.files.read_owned_asset(owner, row.file_id)
-                result.append(asset_view(row, include_segments))
-        return result
+        ids = {
+            identifier
+            for snapshot in binding.snapshots
+            for identifier in referenced_assets(snapshot)
+        }
+        return await self._referenced(ids, include_segments)
 
     async def published_assets(self, account: Account, agent_id: str) -> List[dict[str, object]]:
-        """工作台展示发布链内的资料元数据，不允许任意指定发布者和资产集合。"""
+        """工作台仅获得本产品已发布资源链中的资料，无须授予发布者身份。"""
         bundle = await self.resources.published_bundle(account, agent_id)
-        owner = str(bundle["resourceOwnerId"])
-        resources = bundle.get("resources", [])
-        allowed: set[str] = set()
-        if isinstance(resources, list):
-            for item in resources:
-                if isinstance(item, dict):
-                    allowed.update(referenced_assets(item))
-        result: List[dict[str, object]] = []
-        async with self.database.sessions() as session:
-            for identifier in sorted(allowed):
-                row = await AgentDao(session).asset(owner, identifier)
-                if row is None:
-                    raise DomainError(403, "已发布智能体的资料不可用")
-                await self.files.read_owned_asset(owner, row.file_id)
-                result.append(asset_view(row))
-        return result
+        snapshots = bundle["resources"]
+        assert isinstance(snapshots, list)
+        ids = {
+            identifier
+            for snapshot in snapshots
+            if isinstance(snapshot, dict)
+            for identifier in referenced_assets(snapshot)
+        }
+        return await self._referenced(ids)
 
     async def execution_content(
         self, account: Account, binding_id: str, identifier: str
     ) -> tuple[bytes, dict[str, object]]:
-        """下载必须在当前有效绑定的资产名单内，不能使用猜测的 owner 或文件 ID。"""
-        allowed = await self.execution_assets(account, binding_id)
-        asset = next((item for item in allowed if item["id"] == identifier), None)
-        if asset is None:
-            raise DomainError(403, "资料未绑定到当前会话")
+        """再次验证所属绑定的引用，不接受客户端指定发布者或文件身份。"""
         binding = await self.resources.authorize_binding(account, binding_id)
-        owner = next(
-            (
-                str(item.get("resourceOwnerId", account.user_id))
-                for item in binding.snapshots
-                if identifier in referenced_assets(item)
-            ),
-            None,
-        )
-        if owner is None:
-            raise DomainError(403, "绑定资料的所有者不可用")
+        if not any(identifier in referenced_assets(snapshot) for snapshot in binding.snapshots):
+            raise DomainError(403, "资料未绑定到当前会话")
         async with self.database.sessions() as session:
-            row = await AgentDao(session).asset(owner, identifier)
+            row = await AgentDao(session).referenced(identifier)
             if row is None:
-                raise DomainError(403, "资料已不可用")
-        content, _ = await self.files.read_owned_asset(owner, row.file_id)
-        return content, asset
+                raise DomainError(403, "关联资料已不可用")
+            content, _ = await self.files.read_owned_asset(row.owner_id, row.file_id)
+            return content, asset_view(row)

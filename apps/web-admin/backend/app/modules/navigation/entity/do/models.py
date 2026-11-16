@@ -8,7 +8,7 @@ from app.infrastructure.database import Base
 
 
 class NavigationRow(Base):
-    """单平台全局菜单，更新通过版本条件串行化。"""
+    """平台内按产品保存菜单树和编辑版本，global 行承载已有办公配置。"""
 
     __tablename__ = "navigation_settings"
     id: Mapped[str] = mapped_column(String(20), primary_key=True)

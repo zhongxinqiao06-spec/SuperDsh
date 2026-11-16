@@ -31,6 +31,7 @@ class SkillPolicyInput(AgentInputBase):
 class AgentInput(AgentInputBase):
     """维护旧智能体 DTO 的名称、提示词、资源及发布状态。"""
 
+    product: Literal["office", "entertainment"] = "office"
     name: str = Field(min_length=1, max_length=80)
     description: str = Field(default="", max_length=500)
     instructions: str = Field(min_length=1, max_length=6000)

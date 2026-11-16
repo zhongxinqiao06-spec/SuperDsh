@@ -5,6 +5,7 @@ from uuid import uuid4
 
 from app.infrastructure.errors import DomainError
 from app.modules.identity.entity.bo.models import PERMISSIONS, Account, Role, User
+from app.modules.identity.entity.bo.product_roles import PRODUCT_ADMIN_ROLE, PRODUCTS
 from app.modules.identity.entity.bo.validation import account_username, collision_username
 from app.modules.identity.entity.bo.validation import display_name as validated_display_name
 from app.modules.identity.service.ports import (
@@ -12,18 +13,9 @@ from app.modules.identity.service.ports import (
     IdentitySecurity,
     IdentityTransaction,
 )
+from app.modules.identity.service.product_members import ProductMemberships
 
-from .identity import resolve_account
-
-
-async def current_actor(tx: IdentityTransaction, actor: Account, permission: str) -> Account:
-    """写事务内重新读取授权，防止请求鉴权之后发生撤权。"""
-    user = await tx.user(actor.user_id)
-    if not user or user.auth_version != actor.auth_version:
-        raise DomainError(401, "login session expired or revoked")
-    current = await resolve_account(tx, user, actor.session_id)
-    current.require(permission)
-    return current
+from .identity import current_actor, resolve_account
 
 
 def within_permissions(grants: list[str] | tuple[str, ...], actor: Account) -> None:
@@ -40,11 +32,39 @@ async def validate_roles(tx: IdentityTransaction, actor: Account, ids: list[str]
         within_permissions(roles[role].permissions, actor)
 
 
+def require_super_admin(actor: Account) -> None:
+    """全局账号处置及跨产品授权仅由受保护的超管角色执行。"""
+    if "admin" not in actor.roles:
+        raise DomainError(403, "此操作需要平台超级管理员")
+
+
+def protect_admin_assignment(actor: Account, previous: list[str], requested: list[str]) -> None:
+    """兼容旧自定义账号维护角色，同时保护两个产品管理员及超管角色的任免。"""
+    protected = {"admin", *PRODUCT_ADMIN_ROLE.values()}
+    if protected.intersection(set(previous).symmetric_difference(requested)):
+        require_super_admin(actor)
+
+
+def protect_cross_product_role(actor: Account, permissions: list[str]) -> None:
+    """涉及两个产品的自定义角色由平台超管维护，包括通过范围权限组成的角色。"""
+    products = {
+        product
+        for product in PRODUCTS
+        if any(
+            permission == f"products.{product}" or permission.startswith(f"products.{product}.")
+            for permission in permissions
+        )
+    }
+    if len(products) > 1:
+        require_super_admin(actor)
+
+
 class AccountManagement:
     """后台基础账号/角色能力，不提供他人文件和会话读取捷径。"""
 
     def __init__(self, repository: IdentityRepository, security: IdentitySecurity) -> None:
         self.repository, self.security = repository, security
+        self.product_members = ProductMemberships(repository)
 
     async def list_users(
         self, actor: Account, page: int, page_size: int, search: str
@@ -84,6 +104,7 @@ class AccountManagement:
             if roles != ["member"]:
                 actor.require("roles.manage")
             await validate_roles(tx, actor, roles)
+            protect_admin_assignment(actor, [], roles)
             if not explicit_username and email and await tx.find_user(username):
                 username = collision_username(username, email)
             if await tx.find_user(username) or (email and await tx.find_user(email)):
@@ -131,6 +152,9 @@ class AccountManagement:
                 if user_id == actor.user_id:
                     raise DomainError(409, "cannot change your own roles")
                 await validate_roles(tx, actor, roles)
+                protect_admin_assignment(actor, user.roles, roles)
+            if operation in {"delete", "restore", "reset"} or "disabled" in patch:
+                require_super_admin(actor)
             if user_id == actor.user_id and (
                 operation == "delete" or patch.get("disabled") is True
             ):
@@ -198,6 +222,7 @@ class AccountManagement:
             await tx.lock()
             actor = await current_actor(tx, actor, "roles.manage")
             within_permissions(permissions, actor)
+            protect_cross_product_role(actor, permissions)
             existing = next((item for item in await tx.roles() if item.id == role_id), None)
             if role_id and not existing:
                 raise DomainError(404, "role not found")
@@ -209,6 +234,7 @@ class AccountManagement:
                 )
             if existing:
                 within_permissions(existing.permissions, actor)
+                protect_cross_product_role(actor, existing.permissions)
             role = Role(
                 role_id or str(uuid4()),
                 name,
@@ -233,6 +259,7 @@ class AccountManagement:
             if not role:
                 raise DomainError(404, "role not found")
             within_permissions(role.permissions, actor)
+            protect_cross_product_role(actor, role.permissions)
             if role.builtin or any(role_id in user.roles for user in await tx.users()):
                 raise DomainError(409, "role is builtin or assigned")
             await tx.delete_role(role_id)

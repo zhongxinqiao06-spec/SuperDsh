@@ -15,7 +15,13 @@ from app.modules.conversations.service.conversation_service import ConversationS
 from app.modules.conversations.service.lifecycle_service import SessionLifecycleService
 from app.modules.identity.entity.bo.models import Account
 
-OWNER = Account("synthetic-owner", "synthetic", ("member",), ("sessions.run", "sessions.read"), 1)
+OWNER = Account(
+    "synthetic-owner",
+    "synthetic",
+    ("member",),
+    ("sessions.run", "sessions.read", "products.office"),
+    1,
+)
 
 
 def fixture() -> tuple[SessionLifecycleService, SessionRow, Mock, SimpleNamespace]:

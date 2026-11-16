@@ -10,6 +10,7 @@ from app.infrastructure.crypto import CredentialCipher
 from app.infrastructure.database import Database, lock_transaction
 from app.infrastructure.errors import DomainError
 from app.modules.identity.entity.bo.models import Account
+from app.modules.identity.entity.bo.product_roles import PRODUCTS, Product
 from app.modules.models.dao.model_dao import ModelDao
 from app.modules.models.entity.do.model_do import (
     ModelCapabilityDefaultRow,
@@ -21,6 +22,7 @@ from app.modules.models.service.catalog_verification import verify_model_catalog
 from app.modules.models.service.model_projection import synchronize_provider
 from app.modules.models.service.provider_transport import ProviderTransport
 
+ProductRoles = Callable[[Account, Product], Awaitable[tuple[str, ...]]]
 Audit = Callable[[str, str, str, dict[str, object]], Awaitable[None]]
 
 
@@ -50,9 +52,11 @@ class ModelService:
         allowed_origins: str = "",
         audit: Audit | None = None,
         transport: ProviderTransport | None = None,
+        product_roles: ProductRoles | None = None,
     ) -> None:
         self.database, self.cipher, self.audit = database, cipher, audit
         self.transport = transport or ProviderTransport(allowed_origins)
+        self.product_roles = product_roles
 
     async def record(
         self, actor: str, action: str, target: str, detail: dict[str, object] | None = None
@@ -200,9 +204,16 @@ class ModelService:
         await self.record(account.user_id, "models.default.save", scope)
         return selected.model_dump() if selected else None
 
-    async def catalog(self, account: Account) -> dict[str, object]:
+    async def catalog(self, account: Account, product: Product | None = None) -> dict[str, object]:
         """执行目录只包含当前用户个人与平台的启用模型，永远不含凭据和内网地址。"""
         account.require("models.use")
+        memberships: dict[Product, set[str]] = {}
+        for target in (product,) if product else PRODUCTS:
+            if "products." + target in account.permissions and self.product_roles:
+                memberships[target] = set(await self.product_roles(account, target))
+        if product is not None:
+            account.require("products." + product)
+        roles = set(account.roles) if product is None else memberships.get(product, set())
         async with self.database.sessions() as session:
             dao = ModelDao(session)
             rows = await dao.providers(account.user_id) + await dao.providers(None)
@@ -217,7 +228,8 @@ class ModelService:
                     item.model_id
                     for item in configurations
                     if item.enabled
-                    and (not item.role_ids or set(item.role_ids) & set(account.roles))
+                    and item.capability == "chat"
+                    and (not item.role_ids or set(item.role_ids) & roles)
                 }
                 # 固定 DSH 以字段缺失表示未配置；null 会被误认作显式 token 上限。
                 # 同时兼容数据库里早先保存的 null，只修输出，不覆盖用户参数或猜测数值。
@@ -253,10 +265,36 @@ class ModelService:
                 else None
                 for selection in selections
             ]
+            product_defaults = {}
+            for target in PRODUCTS:
+                if "products." + target not in account.permissions or (
+                    product and product != target
+                ):
+                    continue
+                override = await dao.product_default(target, "chat")
+                if override:
+                    config = await dao.configuration(override.configuration_id)
+                    choice = None
+                    if (
+                        config
+                        and config.enabled
+                        and (
+                            not config.role_ids
+                            or set(config.role_ids) & memberships.get(target, set())
+                        )
+                        and (config.connection_id, config.model_id) in visible
+                    ):
+                        choice = {"providerId": config.connection_id, "modelId": config.model_id}
+                    product_defaults[target] = choice
             return {
                 "scope": hashlib.sha256(("user:" + account.user_id).encode()).hexdigest(),
                 "providers": visible_rows,
-                "default": selections[0] or selections[1],
+                "default": (
+                    product_defaults.get("entertainment", selections[1])
+                    if product == "entertainment"
+                    else selections[0] or product_defaults.get("office", selections[1])
+                ),
+                "productDefaults": product_defaults,
                 "personalDefault": selections[0],
                 "platformDefault": selections[1],
                 "serverTime": datetime.now(UTC).isoformat(),

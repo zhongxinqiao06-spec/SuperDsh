@@ -1,0 +1,31 @@
+{
+  "id": "starbridge.text-edit",
+  "name": "剧本 AI 编辑工具",
+  "version": "1.0.0",
+  "description": "提交用户授权范围内的正文建议，采用由用户操作",
+  "license": "MIT",
+  "runtime": "python",
+  "entrypoint": "app/modules/studio/service/studio_agent.py",
+  "tools": [
+    {
+      "id": "studio_text_suggest",
+      "name": "提交正文修改建议",
+      "description": "只保存编辑请求对应的完整替换正文，不直接改动工程，用户对比后采用。",
+      "mode": "draft",
+      "permissions": ["products.entertainment", "sessions.run"],
+      "inputSchema": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "editId": { "type": "string" },
+          "replacement": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 12000
+          }
+        },
+        "required": ["editId", "replacement"]
+      }
+    }
+  ]
+}

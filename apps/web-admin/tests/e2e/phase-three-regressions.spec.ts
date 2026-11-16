@@ -169,18 +169,17 @@ test('资料取消编辑不写身份，手机菜单显隐不影响直接访问�
   ).toHaveValue('合成管理员')
   expect(state.requests).not.toContain('PUT /auth/me/profile')
   await page.goto('/#/account/mobile')
+  const mobileEntry = page
+    .getByRole('navigation', { name: '平台导航' })
+    .getByRole('link', { name: '手机登录记录', exact: true })
   await page.getByRole('button', { name: '在侧边栏隐藏', exact: true }).click()
-  await expect(
-    page.getByRole('link', { name: '手机登录会话', exact: true }),
-  ).toHaveCount(0)
+  await expect(mobileEntry).toHaveCount(0)
   await page.reload()
   await expect(
     page.getByRole('heading', { name: '手机登录会话', exact: true }),
   ).toBeVisible()
   await page.getByRole('button', { name: '在侧边栏显示', exact: true }).click()
-  await expect(
-    page.getByRole('link', { name: '手机登录会话', exact: true }),
-  ).toBeVisible()
+  await expect(mobileEntry).toBeVisible()
 })
 
 test('设备重置保留记录并展示一次性凭据，删除才调用 DELETE', async ({

@@ -7,11 +7,13 @@ from fastapi import APIRouter, Depends, Request
 
 from app.api.dependencies import current_account
 from app.modules.identity.entity.bo.models import Account
+from app.modules.identity.entity.bo.product_roles import Product
 from app.modules.models.entity.vo.model_vo import (
     CapabilityDefaultInput,
     ConfigurationInput,
     ConnectionInput,
     DefaultInput,
+    ProductDefaultInput,
     ProviderInput,
 )
 from app.modules.models.service.configuration_service import ConfigurationService
@@ -29,6 +31,27 @@ def service(request: Request) -> ModelService:
 def configurations(request: Request) -> ConfigurationService:
     """能力配置与供应商共享加密和外部连接策略。"""
     return request.app.state.services.model_configurations
+
+
+@router.get("/admin/products/{product}/model-defaults")
+async def product_defaults(
+    product: Product, request: Request, account: AccountDep
+) -> dict[str, object]:
+    """产品模型目录不包含供应商地址和密钥。"""
+    return await configurations(request).product_settings(account, product)
+
+
+@router.put("/admin/products/{product}/model-defaults/{capability}")
+async def set_product_default(
+    product: Product,
+    capability: str,
+    body: ProductDefaultInput,
+    request: Request,
+    account: AccountDep,
+) -> dict[str, object]:
+    return await configurations(request).set_product_default(
+        account, product, capability, body.configurationId
+    )
 
 
 def provider_routes(prefix: str, personal: bool) -> APIRouter:
@@ -90,9 +113,11 @@ router.include_router(provider_routes("/models/personal", True))
 
 
 @router.get("/models/catalog")
-async def catalog(request: Request, account: AccountDep) -> dict[str, object]:
+async def catalog(
+    request: Request, account: AccountDep, product: Product | None = None
+) -> dict[str, object]:
     """为工作台返回当前账号可执行模型。"""
-    return await service(request).catalog(account)
+    return await service(request).catalog(account, product)
 
 
 @router.get("/admin/models/configurations")
@@ -151,9 +176,11 @@ async def configuration_verify(
 
 
 @router.get("/models/capabilities")
-async def capabilities(request: Request, account: AccountDep) -> dict[str, object]:
+async def capabilities(
+    request: Request, account: AccountDep, product: Product | None = None
+) -> dict[str, object]:
     """仅返回用户当前角色可执行的能力。"""
-    return await configurations(request).catalog(account)
+    return await configurations(request).catalog(account, product)
 
 
 @router.get("/models/operations/{identifier}")

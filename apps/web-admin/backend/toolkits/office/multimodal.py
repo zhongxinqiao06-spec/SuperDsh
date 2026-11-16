@@ -13,6 +13,7 @@ import httpx
 
 from app.infrastructure.errors import DomainError
 from app.modules.identity.entity.bo.models import Account
+from app.modules.identity.entity.bo.product_roles import Product
 from app.modules.models.entity.vo.model_vo import CapabilityBinding
 from app.modules.models.service.configuration_service import ConfigurationService
 from app.modules.models.service.model_operation_service import ModelOperationService, OperationClaim
@@ -65,8 +66,14 @@ class MultimodalService:
         current = await self.get_account(account.user_id)
         if current.auth_version != account.auth_version:
             raise DomainError(403, "账号授权已变化")
-        await self.authorize_session(current, session_id)
-        return current, await self.configurations.resolve(current, binding)
+        session = await self.authorize_session(current, session_id)
+        definition = session.get("agentDefinition") if isinstance(session, dict) else None
+        product: Product = (
+            "entertainment"
+            if isinstance(definition, dict) and definition.get("product") == "entertainment"
+            else "office"
+        )
+        return current, await self.configurations.resolve(current, binding, product)
 
     async def inspect(
         self,

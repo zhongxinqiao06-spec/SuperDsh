@@ -118,6 +118,7 @@ const { tr } = usePreferences()
       @update:model-value="vm.editing.value = null"
       ><div class="stack">
         <input
+          class="native-control"
           type="file"
           accept="image/png,image/jpeg,image/webp,image/gif"
           :aria-label="tr('上传头像', 'Upload avatar')"

@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { onMounted, reactive } from 'vue'
-import { useRouter } from 'vue-router'
+import { useRoute, useRouter } from 'vue-router'
 import { authApi } from '@/api/auth/auth-api'
 import { accountApi } from '@/api/account/account-api'
 import { useMutation } from '@/composables/use-mutation'
@@ -12,6 +12,7 @@ import {
 } from '@/utils/auth/password-verifier'
 import { request } from '@/utils/request'
 import type { AuthResponse } from '@/types/auth/auth'
+import { signedInDestination } from '@/utils/auth/native-oauth'
 const props = defineProps<{
   pending: string
   status: string
@@ -21,7 +22,8 @@ const props = defineProps<{
 }>()
 const { tr } = usePreferences(),
   mutation = useMutation(),
-  router = useRouter()
+  router = useRouter(),
+  route = useRoute()
 const form = reactive({
   email: props.email,
   username: '',
@@ -68,7 +70,12 @@ async function submit() {
     sessionController.accept(response)
     form.password = ''
     form.confirm = ''
-    await router.replace('/overview')
+    await router.replace(
+      signedInDestination(
+        route.query.returnTo,
+        sessionController.current?.permissions,
+      ),
+    )
   }
 }
 async function sendCode() {

@@ -179,6 +179,8 @@ class ExecutionService:
         signature = hashlib.sha256(
             json.dumps(value, sort_keys=True, separators=(",", ":")).encode()
         ).hexdigest()
+        # 创作会话先绑定工程，再由首条消息在 DSH 创建。持久收据确保首次启动可核对。
+        create = create or row.source.get("deferredStart") is True
         binding_version = self.conversations.binding_version(row.agent_binding)
         async with self.conversations.repository.transaction() as dao:
             await dao.lock(identifier)
@@ -223,6 +225,10 @@ class ExecutionService:
                 "timelineAttachments": prepared,
             }
             params.pop("text", None)
+            params.pop("_starbridgeProduct", None)
+            if native and row.source.get("product") == "entertainment":
+                # 产品标记来自持久会话；仅供本机监督器选择默认配置，不传给 DSH。
+                params["_starbridgeProduct"] = "entertainment"
             if row.external_session_id:
                 params["externalSessionId"] = row.external_session_id
             if not native:
@@ -300,6 +306,10 @@ class ExecutionService:
                 if not receipt or not current:
                     raise DomainError(409, "session receipt unavailable")
                 receipt.state, receipt.result = "completed", {"accepted": True, **result}
+                if current.source.get("deferredStart"):
+                    current.source = {
+                        k: v for k, v in current.source.items() if k != "deferredStart"
+                    }
                 external = result.get("externalSessionId")
                 if isinstance(external, str) and not current.source.get("historyDeletedAt"):
                     current.external_session_id = external
@@ -363,6 +373,9 @@ class ExecutionService:
             "runtime": row.runtime_type,
             "externalSessionId": row.external_session_id,
         }
+        params.pop("_starbridgeProduct", None)
+        if native and action == "selections" and row.source.get("product") == "entertainment":
+            params["_starbridgeProduct"] = "entertainment"
         if action == "notice":
             action_id = value.get("actionId")
             if not isinstance(action_id, str) or not action_id:

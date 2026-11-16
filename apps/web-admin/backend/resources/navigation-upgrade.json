@@ -1,0 +1,65 @@
+{
+  "columns": ["id", "title", "icon", "parentId", "order"],
+  "office": [
+    ["access", "用户与权限", "users", null, 1],
+    ["agent-management", "智能体管理", "bot", null, 2],
+    ["model-management", "模型管理", "key", null, 3],
+    ["system", "系统管理", "settings", null, 6],
+    ["account", "个人中心", "user", null, 7],
+    ["overview", "总览", "gauge", null, 0],
+    ["access.users", "用户管理", "users", "access", 0],
+    ["access.roles", "角色与权限", "shield", "access", 1],
+    ["access.menus", "菜单管理", "menu", "access", 2],
+    ["models", "聊天模型", "key", "model-management", 0],
+    ["models.multimodal", "多模态模型", "sparkles", "model-management", 1],
+    ["system.storage", "文件存储", "folder", "system", 0],
+    ["account.files", "我的文件", "folder", "account", 0],
+    ["agents", "智能体列表", "bot", "agent-management", 0],
+    ["knowledge", "知识库", "book-open", "agent-management", 1],
+    ["skills", "技能管理", "sparkles", "agent-management", 2],
+    ["tools", "工具管理", "wrench", "agent-management", 3],
+    ["devices", "设备运维", "monitor", null, 4],
+    ["workbench", "Agent 工作台", "bot", null, 5],
+    ["system.service", "服务设置", "settings", "system", 1],
+    ["system.audit", "审计", "history", "system", 2],
+    ["account.profile", "账号资料", "user", "account", 1],
+    ["account.security", "账号安全与登录记录", "shield", "account", 2],
+    ["account.models", "个人模型", "key", "account", 3],
+    ["account.appearance", "外观设置", "paintbrush", "account", 4],
+    ["account.mobile", "手机登录记录", "smartphone", "account", 5]
+  ],
+  "entertainmentOverrides": {
+    "access": {
+      "order": 3
+    },
+    "agent-management": {
+      "order": 4
+    },
+    "model-management": {
+      "order": 5
+    },
+    "overview": {
+      "parentId": "system",
+      "order": 0
+    },
+    "system.storage": {
+      "order": 1
+    },
+    "system.service": {
+      "order": 2
+    },
+    "system.audit": {
+      "order": 3
+    },
+    "devices": {
+      "parentId": "system",
+      "order": 4
+    }
+  },
+  "entertainmentExcluded": ["workbench"],
+  "entertainmentAdded": [
+    ["studio.projects", "作品项目", "folder", null, 0],
+    ["studio.library", "素材库", "book-open", null, 1],
+    ["studio.tasks", "制作任务", "history", null, 2]
+  ]
+}

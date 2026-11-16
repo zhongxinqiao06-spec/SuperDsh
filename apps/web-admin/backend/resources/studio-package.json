@@ -1,0 +1,98 @@
+{
+  "id": "starbridge-studio",
+  "resources": [
+    {
+      "key": "studio_read",
+      "kind": "tool",
+      "logicalId": "studio_read",
+      "product": "entertainment",
+      "name": "读取作品",
+      "description": "获取当前会话绑定的作品、素材、分镜与候选，按镜头的稳定 ID 编辑。",
+      "enabled": true,
+      "published": false,
+      "settings": {},
+      "implementation": {
+        "sourceId": "starbridge.studio",
+        "toolId": "studio_read"
+      }
+    },
+    {
+      "key": "studio_asset",
+      "kind": "tool",
+      "logicalId": "studio_asset",
+      "product": "entertainment",
+      "name": "创建版本素材",
+      "description": "在当前项目创建角色、场景或道具。保留返回的版本 ID，用于分镜引用。",
+      "enabled": true,
+      "published": false,
+      "settings": {},
+      "implementation": {
+        "sourceId": "starbridge.studio",
+        "toolId": "studio_asset"
+      }
+    },
+    {
+      "key": "studio_propose",
+      "kind": "tool",
+      "logicalId": "studio_propose",
+      "product": "entertainment",
+      "name": "提交分镜方案",
+      "description": "读取工程后提交完整剧本分镜草案。沿用已有镜头、角色及台词 ID，用户逐字段决定是否采用；原文模式保留剧本与原台词。",
+      "enabled": true,
+      "published": false,
+      "settings": {},
+      "implementation": {
+        "sourceId": "starbridge.studio",
+        "toolId": "studio_propose"
+      }
+    },
+    {
+      "key": "studio_edit",
+      "kind": "tool",
+      "logicalId": "studio_edit",
+      "product": "entertainment",
+      "name": "修改指定镜头",
+      "description": "仅更新指定镜头提供的字段，保留其余编辑、角色素材、候选和台词。付费生成由用户确认。",
+      "enabled": true,
+      "published": false,
+      "settings": {},
+      "implementation": {
+        "sourceId": "starbridge.studio",
+        "toolId": "studio_edit"
+      }
+    },
+    {
+      "key": "studio_generate",
+      "kind": "tool",
+      "logicalId": "studio_generate",
+      "product": "entertainment",
+      "name": "生成镜头与配音",
+      "description": "准备并提交用户确认的镜头、台词或导出任务。用作品修订和稳定标识定位，执行返回任务号，可继续对话。",
+      "enabled": true,
+      "published": false,
+      "settings": {},
+      "implementation": {
+        "sourceId": "starbridge.studio",
+        "toolId": "studio_generate"
+      }
+    },
+    {
+      "key": "director",
+      "kind": "agent",
+      "name": "分镜导演",
+      "product": "entertainment",
+      "enabled": true,
+      "published": true,
+      "description": "拆解剧本、维护角色设定，按镜头修改工程。",
+      "instructions": "先调用 studio_read 读取当前作品、创作规格及用户剧本，确认当前准备步骤。遵守 document.adaptationMode：original 保留用户原文，新增或改动的台词必须来自原剧本；只有 adapt 模式允许改写。按剧本识别角色、场景、台词，通过 studio_asset 创建缺少的资产。调用 studio_propose 提交分镜草案，沿用稳定镜头和台词 ID；建议不会直接覆盖作品，由用户逐字段采用。shots 每项含 id、action、sceneId、scene、duration（毫秒）、references（素材版本 ID）、lines（含 id、role、text、voice）。sceneId 必须引用 scenes[].id 的稳定场次 ID；scene 填写人可读的地点环境，不能填 UUID，场次 ID 也不是素材版本 ID。lines.role 必须为 character 素材版本 ID，不能用角色名称或“旁白”；voice 只沿用已试听并确认的音色 ID，未确认时留空，绝不编造。scenes[].scriptRange 只能为剧本 Unicode 字符范围对象 {start,end}，start 包含、end 不包含；不是镜头时间码，无法精确定位时省略。studio_propose 只提交待审建议，不需要用户先批准生成草案；成功后引导用户到方案对比决定采用，不宣称已经写入作品。单独修改镜头时调用 studio_edit 并只传用户指定字段，保留已有台词、造型和剪辑。提示用户在角色与场景中比较参考图与音色，再确认分镜、预演并试做代表镜头。需要生成候选或导出时，使用 studio_generate，等用户在创作对话中确认后提交。获取任务号即结束本次提交，请勿重复生成，也不要声称尚未生成或采用的素材已完成。",
+      "toolIds": [
+        "studio_read",
+        "studio_asset",
+        "studio_propose",
+        "studio_edit",
+        "studio_generate"
+      ],
+      "skillIds": []
+    }
+  ]
+}

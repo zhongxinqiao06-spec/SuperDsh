@@ -33,6 +33,19 @@ class ModelOperationService:
     def __init__(self, database: Database, cipher: CredentialCipher) -> None:
         self.database, self.cipher = database, cipher
 
+    async def completed_result(
+        self, account: Account, scope: str, binding: CapabilityBinding, request_hash: str
+    ) -> dict[str, object] | None:
+        """复用同范围相同冻结输入的完成结果；调用方仍须复验产品、模型与资源授权。"""
+        account.require("models.use")
+        if not scope or len(scope) > 200 or len(request_hash) != 64:
+            raise DomainError(422, "模型结果复用范围或摘要无效")
+        async with self.database.sessions() as session:
+            row = await ModelDao(session).completed_operation(
+                account.user_id, scope, binding.configurationId, binding.revision, request_hash
+            )
+            return dict(row.result) if row is not None else None
+
     async def claim(
         self,
         account: Account,

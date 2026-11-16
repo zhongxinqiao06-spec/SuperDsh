@@ -4,12 +4,40 @@ import {
   applySessionEvent,
   mergeSessionSnapshot,
   mergeTimeline,
+  messageReasoning,
+  messageText,
 } from '@/utils/workbench/timeline'
 import type { SessionEvent, SessionSnapshot } from '@/types/workbench/models'
 import runtimeContract from '../../contracts/dsh-runtime.json'
 
 /** 使用固定 DSH 的实际 notice/action 字段验证用户确认与事件恢复。 */
 describe('工作台真实协议展示', () => {
+  it('DSH 思考过程与正式回复分开，兼容独立条目和混合块', () => {
+    const thought = {
+      id: 'thought',
+      type: 'system',
+      role: 'assistant',
+      content: { kind: 'reasoning', text: '先分析故事结构，不是正式回复。' },
+    }
+    expect(messageText(thought)).toBe('')
+    expect(messageReasoning(thought)).toBe('先分析故事结构，不是正式回复。')
+    const mixed = {
+      id: 'mixed',
+      type: 'message',
+      role: 'assistant',
+      content: {
+        blocks: [
+          { type: 'reasoning', text: '内部过程' },
+          { type: 'text', text: '这是可审阅的方案。' },
+        ],
+      },
+    }
+    expect(messageText(mixed)).toBe('这是可审阅的方案。')
+    expect(messageReasoning(mixed)).toBe('内部过程')
+    expect(
+      messageText({ id: 'plain', type: 'message', content: '正常英文回复' }),
+    ).toBe('正常英文回复')
+  })
   const notice = {
     id: 'notice',
     noticeId: 'notice',

@@ -1,5 +1,5 @@
 import { ref, type Ref } from 'vue'
-import { ElMessageBox } from 'element-plus'
+import { confirmSessionRemoval } from './use-session-actions'
 import { conversationApi } from '@/api/workbench/conversation-api'
 import { sessionController } from '@/store/session-controller'
 import { canControlSession } from '@/utils/workbench/session-access'
@@ -18,6 +18,7 @@ export function useSessionLifecycle(options: {
   refresh(): Promise<void>
   reload(): Promise<void>
   fresh(): void
+  canRemove?(): boolean
   removeDraft(id: string): void
   report(message: string): void
 }) {
@@ -26,22 +27,14 @@ export function useSessionLifecycle(options: {
     !options.signal.aborted && identity === sessionController.generation
   async function remove(row: WorkspaceSession): Promise<void> {
     const identity = sessionController.generation
-    try {
-      await ElMessageBox.confirm(
-        '删除后此会话将从历史记录移除，分享链接失效，无法在这里恢复。已生成的独立文件保留。正在执行的任务请先终止。',
-        '删除会话',
-        {
-          confirmButtonText: '删除',
-          cancelButtonText: '取消',
-          type: 'warning',
-        },
-      )
-    } catch {
+    if (
+      !(await confirmSessionRemoval(
+        row,
+        () => current(identity) && (options.canRemove?.() ?? true),
+      ))
+    )
       return
-    }
-    if (!current(identity)) return
     await options.run(async () => {
-      await conversationApi.remove(row.id)
       if (!current(identity)) return
       if (options.selected.value === row.id) options.fresh()
       options.removeDraft(row.id)

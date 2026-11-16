@@ -32,6 +32,7 @@ test('真实隔离文件：一次性预览、刷新与有摘要保护的编辑',
   const challenge: { salt: string } = await salt.json()
   // foundation 用例会验证改密；两种均是本次独立测试配置，不尝试真实账号。
   let token = ''
+  let acceptedPassword = ''
   for (const candidate of [password, `${password}-changed`]) {
     const response = await page.request.post(`${base}/api/auth/login`, {
       data: {
@@ -43,6 +44,7 @@ test('真实隔离文件：一次性预览、刷新与有摘要保护的编辑',
       },
     })
     if (response.ok()) {
+      acceptedPassword = candidate
       token = ((await response.json()) as { accessToken: string }).accessToken
       break
     }
@@ -102,9 +104,24 @@ test('真实隔离文件：一次性预览、刷新与有摘要保护的编辑',
     replay.getByText('预览访问已过期', { exact: true }),
   ).toBeVisible()
   await replay.close()
-  await page.goto(
-    `/#/preview?${new URLSearchParams({ connectorId: connector, path, name: path })}`,
+  // 在没有登录态的新窗口从设备深链开始，登录完成后须读到原文件。
+  const privateAddress = `/#/preview?${new URLSearchParams({ connectorId: connector, path, name: path })}`
+  const loggedOut = await page.request.post(base + '/api/auth/logout', {
+    headers: { Origin: base },
+    data: {},
+  })
+  expect(loggedOut.status()).toBe(204)
+  await page.goto(privateAddress)
+  await page.getByLabel('用户名或邮箱').fill(username)
+  await page.getByLabel('密码', { exact: true }).fill(acceptedPassword)
+  const loggedIn = page.waitForResponse(
+    (response) => new URL(response.url()).pathname === '/api/auth/login',
   )
+  await page.getByRole('button', { name: '登录 ↵' }).click()
+  const newSession: { accessToken: string } = await (await loggedIn).json()
+  await expect(
+    page.getByText('独立窗口真实预览正文', { exact: true }),
+  ).toBeVisible()
   await page.getByRole('button', { name: '编辑', exact: true }).click()
   await page
     .getByRole('textbox', { name: '文件内容编辑器' })
@@ -114,7 +131,7 @@ test('真实隔离文件：一次性预览、刷新与有摘要保护的编辑',
     page.getByText('独立窗口已保存正文', { exact: true }),
   ).toBeVisible()
   const actual = await page.request.post(prefix + '/readText', {
-    headers,
+    headers: { Authorization: `Bearer ${newSession.accessToken}` },
     data: { path },
   })
   expect(((await actual.json()) as { content: string }).content).toBe(

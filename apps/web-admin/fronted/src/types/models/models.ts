@@ -12,6 +12,7 @@ export type Capability =
   | 'chat'
   | 'image.generate'
   | 'vision.analyze'
+  | 'web.search'
   | 'speech.transcribe'
   | 'speech.synthesize'
   | 'video.generate'

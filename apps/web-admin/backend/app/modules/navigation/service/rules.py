@@ -27,7 +27,7 @@ def validate_items(
             raise DomainError(422, "invalid or duplicate menu id")
         ids.add(identifier)
         if (
-            item.get("kind") not in {"group", "page"}
+            item.get("kind") not in ("group", "page")
             or item.get("icon") not in icons
             or not isinstance(item.get("visible"), bool)
             or type(item.get("order")) is not int
@@ -58,7 +58,8 @@ def validate_items(
             or identifier in known
         ):
             raise DomainError(422, "groups must be root nodes without a module")
-    if pages != known:
+    required = {str(module["id"]) for module in modules if not module.get("contextual")}
+    if not required.issubset(pages):
         raise DomainError(422, "registered pages cannot be added or removed")
     by_id = {str(item["id"]): item for item in items}
     for item in items:
@@ -77,7 +78,11 @@ def validate_items(
 
 
 def filter_items(
-    items: list[dict[str, object]], modules: list[dict[str, object]], account: Account
+    items: list[dict[str, object]],
+    modules: list[dict[str, object]],
+    account: Account,
+    *,
+    all_menus: bool = False,
 ) -> list[dict[str, object]]:
     """沿祖先链应用可见性，再按模块权限过滤；不是后端授权替代品。"""
     by_id = {str(item["id"]): item for item in items}
@@ -86,7 +91,7 @@ def filter_items(
     for item in items:
         current: dict[str, object] | None = item
         allowed = True
-        while current:
+        while current and not all_menus:
             roles = current.get("roleIds")
             if not current.get("visible") or (
                 isinstance(roles, list) and roles and not set(roles).intersection(account.roles)

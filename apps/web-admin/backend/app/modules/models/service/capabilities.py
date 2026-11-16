@@ -1,6 +1,7 @@
 """供应商能力描述与参数规则，模型规格标识属于协议契约而非应用版本。"""
 
 import re
+from urllib.parse import urlsplit
 
 from app.infrastructure.errors import DomainError
 
@@ -82,6 +83,54 @@ CAPABILITIES: list[dict[str, object]] = [
         ),
         "cancellation": "abort-request",
     },
+    {
+        "id": "web.search",
+        "name": "联网资料查询",
+        "available": True,
+        "inputTypes": ["text"],
+        "outputTypes": ["text", "sources"],
+        "configurationSchema": schema(
+            {
+                "protocol": {
+                    "type": "string",
+                    "title": "联网接口协议",
+                    "enum": ["responses", "chat-completions"],
+                    "default": "responses",
+                },
+                "maxTokens": {"type": "integer", "minimum": 1, "maximum": 16384, "default": 4096},
+            }
+        ),
+        "cancellation": "abort-request",
+    },
+    {
+        "id": "video.generate",
+        "name": "动态镜头",
+        "available": True,
+        "inputTypes": ["text", "image"],
+        "outputTypes": ["video"],
+        "configurationSchema": schema(
+            {
+                "inputMode": {
+                    "type": "string",
+                    "title": "视频输入",
+                    "enum": ["text", "reference"],
+                    "default": "text",
+                }
+            }
+        ),
+        "cancellation": "stop-waiting",
+    },
+    {
+        "id": "speech.synthesize",
+        "name": "角色配音",
+        "available": True,
+        "inputTypes": ["text"],
+        "outputTypes": ["audio"],
+        "configurationSchema": schema(
+            {"voices": {"type": "string", "title": "可选音色（英文逗号分隔）"}}
+        ),
+        "cancellation": "stop-waiting",
+    },
     *[
         {
             "id": key,
@@ -94,8 +143,6 @@ CAPABILITIES: list[dict[str, object]] = [
         }
         for key, label in [
             ("speech.transcribe", "语音识别"),
-            ("speech.synthesize", "语音合成"),
-            ("video.generate", "视频生成"),
             ("embedding", "向量化"),
         ]
     ],
@@ -103,10 +150,34 @@ CAPABILITIES: list[dict[str, object]] = [
 
 
 def validate_parameters(
-    adapter: str, capability: str, model: str, values: dict[str, object]
+    adapter: str, capability: str, model: str, values: dict[str, object], base_url: str = ""
 ) -> dict[str, object]:
     """维持既有能力边界，非法参数在保存前失败，不自动换供应商或降低配置。"""
-    if capability not in {"chat", "image.generate", "vision.analyze"}:
+    if capability in {"video.generate", "speech.synthesize"}:
+        if (
+            adapter != "openai-completions"
+            or urlsplit(base_url).netloc != "token-plan.cn-beijing.maas.aliyuncs.com"
+        ):
+            raise DomainError(422, "请选择百炼 Token Plan 连接")
+        if (
+            capability == "video.generate"
+            and not values.keys() - {"inputMode"}
+            and values.get("inputMode", "text") in ("text", "reference")
+        ):
+            return {"inputMode": values.get("inputMode", "text")}
+        voices = values.get("voices")
+        if (
+            capability == "speech.synthesize"
+            and set(values) == {"voices"}
+            and isinstance(voices, str)
+        ):
+            options = [item.strip() for item in voices.split(",")]
+            if 1 <= len(options) <= 64 and all(
+                re.fullmatch(r"[\w.-]{1,100}", item) for item in options
+            ):
+                return {"voices": ",".join(dict.fromkeys(options))}
+        raise DomainError(422, "媒体参数无效，请检查模型与音色配置")
+    if capability not in {"chat", "image.generate", "vision.analyze", "web.search"}:
         raise DomainError(422, "此能力尚未接入，暂不能启用")
     if adapter == "volcengine-speech" or (capability != "chat" and adapter == "anthropic-messages"):
         raise DomainError(422, "该连接尚未实现所选能力")
@@ -114,6 +185,7 @@ def validate_parameters(
         "chat": {"maxTokens", "contextWindow"},
         "image.generate": {"imageProfile", "size", "maxImages"},
         "vision.analyze": {"maxTokens", "maxImages", "thinking"},
+        "web.search": {"maxTokens", "protocol"},
     }[capability]
     if values.keys() - allowed:
         raise DomainError(422, "包含不允许的模型参数")
@@ -178,6 +250,15 @@ def validate_parameters(
     }
     if capability == "chat" and "contextWindow" in values:
         result["contextWindow"] = number("contextWindow", 32768, 1024, 10485760)
+    if capability == "web.search":
+        protocol = values.get("protocol", "responses")
+        if (
+            not isinstance(protocol, str)
+            or protocol not in {"responses", "chat-completions"}
+            or adapter not in {"openai-completions", "openai-responses", "volcengine-ark"}
+        ):
+            raise DomainError(422, "联网协议或连接类型不受支持")
+        result["protocol"] = protocol
     if capability == "vision.analyze":
         if "thinking" in values and adapter != "volcengine-ark":
             raise DomainError(422, "当前供应商不支持火山深度思考参数")

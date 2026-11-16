@@ -1,4 +1,4 @@
-/* 还原旧管理端的壳层比例：桌面侧栏 15rem、页头 3.5rem，内容滚动交给页面。 */
+/* 桌面侧栏与移动抽屉共用授权菜单，主体与导航各自独立滚动。 */
 .console-shell {
   display: flex;
   height: 100svh;
@@ -9,8 +9,8 @@
 }
 .console-sidebar {
   display: flex;
-  flex: 0 0 240px;
-  width: 240px;
+  flex: 0 0 var(--rail-width);
+  width: var(--rail-width);
   min-height: 0;
   border-right: 1px solid var(--sidebar-border, var(--border));
   background: var(--sidebar);
@@ -27,30 +27,65 @@
   min-height: 0;
 }
 .sidebar-brand {
-  padding: 20px;
-  border-bottom: 1px solid var(--sidebar-border, var(--border));
+  display: flex;
+  align-items: center;
+  min-height: 76px;
+  padding: 20px 24px;
 }
-.sidebar-brand a {
-  font-size: 18px;
+.console-brand {
+  display: inline-flex;
+  gap: 10px;
+  align-items: center;
+  font-size: 20px;
+  line-height: 1.22;
   font-weight: 600;
-  line-height: 28px;
-  letter-spacing: -0.45px;
+  letter-spacing: -0.02em;
 }
-.sidebar-brand p {
-  margin: 4px 0 0;
+.console-brand small {
+  display: none;
+  margin-top: 3px;
   color: var(--muted-foreground);
-  font-size: 12px;
-  line-height: 16px;
+  font: 600 8px/1.4 var(--font-mono);
+  letter-spacing: 0.09em;
+}
+.console-brand-mark {
+  display: grid;
+  place-items: center;
+  width: 35px;
+  height: 35px;
+  border-radius: var(--radius-control);
+  background: transparent;
+  color: var(--primary);
+  font-size: 29px;
 }
 .console-navigation {
   flex: 1;
   min-height: 0;
-  padding: 12px;
+  padding: 12px 16px;
   overflow: hidden auto;
   scrollbar-width: none;
 }
 .console-navigation::-webkit-scrollbar {
   display: none;
+}
+.console-context-tabs {
+  flex: none;
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+  width: min(100%, 1440px);
+  margin: 0 auto;
+  padding: var(--space-4) var(--space-6) 0;
+}
+.console-context-tabs a {
+  padding: 6px 12px;
+  color: var(--muted-foreground);
+  border-radius: var(--radius);
+}
+.console-context-tabs a[aria-current='page'] {
+  color: var(--foreground);
+  background: var(--card);
+  box-shadow: inset 0 0 0 1px var(--border);
 }
 .console-navigation > * + *,
 .nav-children > * + * {
@@ -60,8 +95,9 @@
 .nav-group {
   display: flex;
   align-items: center;
-  gap: 8px;
+  gap: 10px;
   width: 100%;
+  min-height: 44px;
   padding: 10px 12px;
   border: 0;
   border-radius: calc(var(--radius) - 2px);
@@ -72,17 +108,27 @@
   );
   background: transparent;
   font-size: 14px;
-  line-height: 20px;
+  line-height: 22px;
+  font-weight: 400;
   text-align: left;
   transition:
-    color 150ms,
-    background-color 150ms;
+    color var(--transition-ui),
+    background-color var(--transition-ui);
 }
 .nav-group {
+  font-weight: 500;
   color: var(--muted-foreground);
+}
+.nav-link > .app-icon,
+.nav-group > .app-icon {
+  flex-shrink: 0;
 }
 .nav-label {
   flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 .nav-link:hover,
 .nav-group:hover,
@@ -93,7 +139,9 @@
   background: var(--sidebar-accent, var(--muted));
 }
 .nav-link.active {
-  color: var(--sidebar-accent-foreground, var(--foreground));
+  color: var(--nav-active-ink);
+  background: var(--nav-active-fill);
+  box-shadow: var(--shadow-button);
   font-weight: 500;
 }
 .nav-chevron {
@@ -104,9 +152,9 @@
   transform: rotate(-90deg);
 }
 .nav-children {
-  margin-left: 20px;
-  padding-left: 8px;
-  border-left: 1px solid var(--sidebar-border, var(--border));
+  /* 二级图标和文字整体内缩，确保分组、子项与选中背景均有明确层级。 */
+  margin: 4px 0 8px;
+  padding-inline-start: 20px;
 }
 .nav-fallback {
   display: block;
@@ -138,10 +186,27 @@
   gap: 8px;
 }
 .account-row > a {
+  display: flex;
+  align-items: center;
+  gap: 8px;
   flex: 1;
   min-width: 0;
   padding: 8px 12px;
   border-radius: calc(var(--radius) - 2px);
+}
+.account-row > a > span:last-child {
+  min-width: 0;
+}
+.account-monogram {
+  flex: none;
+  display: grid;
+  place-items: center;
+  width: 30px;
+  height: 30px;
+  background: var(--accent);
+  color: var(--brand-ink, var(--foreground));
+  border-radius: 50%;
+  font-weight: 600;
 }
 .account-row strong,
 .account-row small {
@@ -172,10 +237,34 @@
   flex-shrink: 0;
   align-items: center;
   gap: 12px;
-  height: 56px;
-  padding: 0 16px;
+  height: 60px;
+  padding: 0 var(--page-gutter, 24px);
   border-bottom: 1px solid var(--border);
-  background: color-mix(in oklch, var(--card) 40%, transparent);
+  background: var(--card);
+}
+.console-header-actions,
+.console-product-switch {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  flex-shrink: 0;
+}
+.console-header-actions {
+  margin-left: auto;
+}
+.console-product-switch {
+  font-size: 13px;
+  min-height: 32px;
+}
+.console-product-switch::before {
+  content: '';
+  width: 1px;
+  height: 16px;
+  margin-inline-end: 6px;
+  background: var(--border);
+}
+.console-product-switch:hover {
+  color: var(--brand-ink, var(--foreground));
 }
 .console-icon-button {
   display: inline-flex;
@@ -281,7 +370,7 @@
 .console-sidebar-drawer {
   max-width: calc(100vw - 32px);
   color: var(--foreground);
-  background: var(--popover, var(--card));
+  background: var(--sidebar);
 }
 .console-sidebar-drawer .el-drawer__body {
   display: flex;
@@ -289,8 +378,8 @@
   overflow: hidden;
 }
 .console-navigation-overlay {
-  background: rgb(0 0 0 / 30%);
-  backdrop-filter: blur(4px);
+  background: rgb(20 24 32 / 28%);
+  backdrop-filter: blur(2px);
 }
 .mobile-navigation-close {
   position: absolute;
@@ -300,7 +389,21 @@
   height: 28px;
   background: var(--secondary, var(--muted));
 }
-@media (max-width: 767px) {
+@media (max-width: 800px) {
+  .console-header {
+    height: 56px;
+    padding-inline: 10px;
+    gap: 6px;
+  }
+  .console-icon-button,
+  .console-product-switch,
+  .nav-link,
+  .nav-group {
+    min-height: 44px;
+  }
+  .console-icon-button {
+    min-width: 44px;
+  }
   .console-sidebar,
   .desktop-toggle {
     display: none;
@@ -313,4 +416,5 @@
 /* 内容底色形成清晰层次；对话工作区继续保留独立的阅读背景。 */
 .console-content:not(.console-content-workbench) {
   background: var(--canvas);
+  background-image: var(--surface-glow);
 }

@@ -3,6 +3,7 @@ import type { AgentDefinition, AgentDraft } from '@/types/agents/agents'
 /** 明确挑选写字段，历史时间和资源身份不能混入编辑请求。 */
 export function agentDraft(value?: AgentDefinition): AgentDraft {
   return {
+    product: value?.product ?? 'office',
     name: value?.name ?? '',
     description: value?.description ?? '',
     instructions: value?.instructions ?? '',

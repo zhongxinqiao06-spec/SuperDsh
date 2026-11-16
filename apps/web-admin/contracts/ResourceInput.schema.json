@@ -2,6 +2,12 @@
   "additionalProperties": false,
   "description": "工具实现、配置、技能正文及组合引用保持分离。",
   "properties": {
+    "product": {
+      "default": "office",
+      "enum": ["office", "entertainment", "shared"],
+      "title": "Product",
+      "type": "string"
+    },
     "name": {
       "maxLength": 200,
       "minLength": 1,
@@ -133,9 +139,7 @@
       "title": "Programdraft"
     }
   },
-  "required": [
-    "name"
-  ],
+  "required": ["name"],
   "title": "ResourceInput",
   "type": "object"
 }

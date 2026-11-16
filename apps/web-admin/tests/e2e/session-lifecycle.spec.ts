@@ -87,8 +87,7 @@ test('历史会话取消删除、运行拒删、终止确认与删除后刷新',
   await page.getByLabel('用户名或邮箱').fill('admin')
   await page.getByLabel('密码', { exact: true }).fill('Synthetic-password!')
   await page.getByRole('button', { name: '登录 ↵', exact: true }).click()
-  await expect(page.locator('[data-console-shell]')).toBeVisible()
-  await page.goto('/#/workspace')
+  await page.getByRole('link', { name: /办公工作台/ }).click()
   const item = page
     .locator('.sidebar-session')
     .filter({ hasText: session.title })

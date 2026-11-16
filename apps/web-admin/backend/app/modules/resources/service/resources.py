@@ -10,6 +10,7 @@ from uuid import NAMESPACE_URL, uuid4, uuid5
 
 from app.infrastructure.errors import DomainError
 from app.modules.identity.entity.bo.models import Account
+from app.modules.resources.entity.bo.product_scope import resource_product, writing_product
 from app.modules.resources.entity.bo.resources import Binding, Resource
 from app.modules.resources.service.configuration import merge_settings, redact_settings
 from app.modules.resources.service.ports import (
@@ -62,7 +63,7 @@ class ResourceService:
     async def initialize(self, account: Account) -> None:
         """资源包仅在账号首次初始化时导入，用户修改或删除后不自动恢复。"""
         package = self.default_package
-        if package is None:
+        if package is None or resource_product(account) == "entertainment":
             return
         # 此入口只接受装配时注入的产品资源，注册普通账号也可初始化；
         # 外部导入仍必须经过 import_package 的管理权限检查。
@@ -73,10 +74,90 @@ class ResourceService:
         )
         await self._import_package(bootstrap, package)
 
+    async def initialize_product(
+        self, account: Account, package: dict[str, object]
+    ) -> dict[str, str]:
+        """系统只为获准使用娱乐的账号装配预置包，资源仍按原发布与停用规则解析。"""
+        account.require("products.entertainment")
+        bootstrap = replace(account, permissions=(*account.permissions, "agents.manage"))
+        return await self._import_package(bootstrap, package)
+
     async def import_package(self, account: Account, package: dict[str, object]) -> dict[str, str]:
         """导入可信声明式资源包；两遍校验保证跨资源引用与所有默认配置原子提交。"""
         account.require("agents.manage")
         return await self._import_package(account, package)
+
+    async def refresh_product_tools(self, account: Account, package: dict[str, object]) -> int:
+        """显式更新受信预置工具的绑定，追加版本；不覆盖用户设置或恢复已删资源。
+
+        package 只由产品装配传入，HTTP 不接受任意包定义。普通创作者只能更新本账号
+        确定性 ID 对应、来源与工具身份均未被替换的预置工具，不能借此编辑他人配置。
+        """
+        account.require("products.entertainment")
+        account.require("sessions.run")
+        package_id, definitions = package.get("id"), package.get("resources")
+        if not isinstance(package_id, str) or not isinstance(definitions, list):
+            raise RuntimeError("默认资源包结构无效")
+        bootstrap = replace(account, permissions=(*account.permissions, "agents.manage"))
+        changed = 0
+        async with self.repository.transaction() as tx:
+            await tx.lock("configuration-graph")
+            await tx.lock(account.user_id)
+            if not await tx.initialized(account.user_id, package_id):
+                raise DomainError(409, "请先初始化本作品的助手")
+            for definition in definitions:
+                if not isinstance(definition, dict) or definition.get("kind") != "tool":
+                    continue
+                identifier = str(
+                    uuid5(
+                        NAMESPACE_URL,
+                        account.user_id + ":" + package_id + ":" + str(definition["key"]),
+                    )
+                )
+                current = await tx.get(identifier)
+                if (
+                    current is None
+                    or current.deleted
+                    or not current.enabled
+                    or current.owner_id != account.user_id
+                    or current.kind != "tool"
+                ):
+                    raise DomainError(
+                        409, "预置工具已停用或移除，请在工具管理中检查，已有配置保持不变"
+                    )
+                reference = definition.get("implementation")
+                previous = current.payload.get("implementation")
+                if (
+                    not isinstance(reference, dict)
+                    or not isinstance(previous, dict)
+                    or any(
+                        previous.get(key) != reference.get(key) for key in ("sourceId", "toolId")
+                    )
+                    or current.payload.get("product") != definition.get("product")
+                ):
+                    raise DomainError(
+                        409, "预置工具已使用自定义实现，请在工具管理中更新，已有配置保持不变"
+                    )
+                payload = copy.deepcopy(current.payload)
+                # 丢弃旧摘要仅发生在用户明确请求的绑定更新；正常解析与历史执行仍严格校验。
+                payload["implementation"] = copy.deepcopy(reference)
+                await self._validate_references(tx, bootstrap, "tool", payload, current.id)
+                if payload == current.payload:
+                    continue
+                settings = (
+                    json.loads(self.cipher.open(current.secret_ciphertext, current.id))
+                    if current.secret_ciphertext
+                    else {}
+                )
+                schema = payload.get("configurationSchema", {"type": "object"})
+                assert isinstance(schema, dict)
+                self.validator.validate(settings, schema)
+                current.payload = payload
+                current.version += 1
+                current.updated_at = datetime.now(UTC)
+                await tx.save(current, public_resource(current))
+                changed += 1
+        return changed
 
     async def package_status(
         self, account: Account, package: dict[str, object]
@@ -146,6 +227,7 @@ class ResourceService:
             return value
 
         async with self.repository.transaction() as tx:
+            await tx.lock("configuration-graph")
             await tx.lock(account.user_id)
             if await tx.initialized(account.user_id, package_id):
                 return identifiers
@@ -162,6 +244,9 @@ class ResourceService:
                 )
                 assert isinstance(resolved, dict)
                 payload = dict(resolved)
+                if product := resource_product(account):
+                    payload.setdefault("product", product)
+                    writing_product(account, str(item["kind"]), payload["product"])
                 now = datetime.now(UTC)
                 resource = Resource(
                     identifier,
@@ -202,17 +287,41 @@ class ResourceService:
         """安装代码权限与编辑智能体配置权限分开。"""
         account.require("extensions.manage" if kind == "extension" else "agents.manage")
 
+    @staticmethod
+    def _visible(account: Account, item: Resource) -> bool:
+        product = resource_product(account)
+        if product is None or item.kind == "extension":
+            return item.owner_id == account.user_id
+        scope = item.payload.get("product", "office")
+        return scope in (product, "shared") and (
+            item.owner_id == account.user_id
+            or scope == "shared"
+            or item.payload.get("productManaged") is True
+        )
+
+    async def _rows(self, tx: ResourceTransaction, account: Account, kind: str) -> List[Resource]:
+        product = resource_product(account) if kind != "extension" else None
+        return await tx.all(kind, account.user_id, product)
+
     async def _owned(
-        self, tx: ResourceTransaction, account: Account, resource_id: str, kind: str | None = None
+        self,
+        tx: ResourceTransaction,
+        account: Account,
+        resource_id: str,
+        kind: str | None = None,
+        *,
+        write: bool = False,
     ) -> Resource:
         resource = await tx.get(resource_id)
         if (
             resource is None
             or resource.deleted
-            or resource.owner_id != account.user_id
+            or not self._visible(account, resource)
             or (kind and resource.kind != kind)
         ):
             raise DomainError(404, "resource not found")
+        if write:
+            writing_product(account, resource.kind, resource.payload.get("product", "office"))
         return resource
 
     async def list(
@@ -223,7 +332,7 @@ class ResourceService:
         async with self.repository.transaction() as tx:
             items = [
                 resource
-                for resource in await tx.all(kind, account.user_id)
+                for resource in await self._rows(tx, account, kind)
                 if search.lower() in (resource.name + " " + resource.description).lower()
             ]
             return {
@@ -243,13 +352,20 @@ class ResourceService:
         """配置选择器读取本人资源全集，分页展示仍使用 list。"""
         self.require(account, kind)
         async with self.repository.transaction() as tx:
-            return [public_resource(resource) for resource in await tx.all(kind, account.user_id)]
+            return [public_resource(resource) for resource in await self._rows(tx, account, kind)]
 
-    async def published_agents(self, account: Account) -> List[dict[str, object]]:
+    async def published_agents(
+        self, account: Account, product: str = "office"
+    ) -> List[dict[str, object]]:
         """工作台只读发布目录，不因查看目录取得编辑他人资源的权限。"""
         account.require("sessions.run")
+        account.require("products." + product)
         async with self.repository.transaction() as tx:
-            return [public_resource(resource) for resource in await tx.published_agents()]
+            return [
+                public_resource(resource)
+                for resource in await tx.published_agents()
+                if resource.payload.get("product", "office") == product
+            ]
 
     async def _published_resources(
         self, tx: ResourceTransaction, account: Account, agent_id: str
@@ -258,6 +374,7 @@ class ResourceService:
         agent = await tx.get(agent_id)
         if agent is None or agent.deleted or agent.kind != "agent":
             raise DomainError(404, "agent not found")
+        account.require("products." + str(agent.payload.get("product", "office")))
         if not agent.published or not agent.enabled:
             raise DomainError(409, "agent is not published")
         pending: List[tuple[str, int | None]] = [(agent.id, None)]
@@ -265,10 +382,22 @@ class ResourceService:
         while pending:
             identifier, expected_version = pending.pop()
             resource = await tx.get(identifier)
-            if resource is None or resource.deleted or resource.owner_id != agent.owner_id:
+            if (
+                resource is None
+                or resource.deleted
+                or (
+                    resource.owner_id != agent.owner_id
+                    and resource.payload.get("product") != "shared"
+                    and resource.payload.get("productManaged") is not True
+                )
+            ):
                 raise DomainError(409, "published resource reference is unavailable")
             if not resource.enabled:
                 raise DomainError(403, "bound resource is disabled")
+            if resource.kind in {"skill", "tool", "knowledge"} and resource.payload.get(
+                "product", "office"
+            ) not in {"shared", agent.payload.get("product", "office")}:
+                raise DomainError(403, "关联资源已移出该产品")
             key = resource.id + ":" + str(expected_version or resource.version)
             if key in snapshots:
                 continue
@@ -325,8 +454,9 @@ class ResourceService:
         """回退追加新版本，保留不可变历史和当时的密文；并发编辑返回冲突。"""
         self.require(account, kind)
         async with self.repository.transaction() as tx:
-            await tx.lock(account.user_id)
-            resource = await self._owned(tx, account, resource_id, kind)
+            await tx.lock("configuration-graph")
+            await tx.lock(resource_id)
+            resource = await self._owned(tx, account, resource_id, kind, write=True)
             if resource.version != current_version:
                 raise DomainError(409, "resource version conflict", "revision_conflict")
             snapshot = await tx.snapshot(resource_id, version)
@@ -347,6 +477,7 @@ class ResourceService:
                     "updatedAt",
                 }
             }
+            writing_product(account, kind, payload.get("product", "office"))
             await self._validate_references(tx, account, kind, payload, resource_id)
             resource.name = str(snapshot["name"])
             resource.description = str(snapshot.get("description", ""))
@@ -373,7 +504,10 @@ class ResourceService:
 
             # 与保存/回退共用所有者事务锁，阻止并发编辑各自通过检查后组成引用环。
             existing = {
-                item.id: public_resource(item) for item in await tx.all("skill", account.user_id)
+                item.id: public_resource(item)
+                for item in await self._rows(tx, account, "skill")
+                if item.payload.get("product", "office")
+                in (payload.get("product", "office"), "shared")
             }
             validate_skill_graph(
                 payload, resource_id or str(payload.get("id", "__candidate__")), existing
@@ -400,6 +534,11 @@ class ResourceService:
                 raise DomainError(422, f"invalid {field}")
             for value in values:
                 target = await self._owned(tx, account, value, target_kind)
+                if target.payload.get("product", "office") not in {
+                    "shared",
+                    payload.get("product", "office"),
+                }:
+                    raise DomainError(422, "关联资源尚未发布到此产品")
                 if not target.enabled:
                     raise DomainError(409, "referenced resource is disabled")
         if kind == "tool":
@@ -417,6 +556,17 @@ class ResourceService:
                     descriptor = bound.get("descriptor")
                     if not isinstance(descriptor, dict):
                         raise DomainError(409, "tool descriptor is unavailable")
+                    if resource_product(account):
+                        permissions = descriptor.get("permissions", [])
+                        if isinstance(permissions, list):
+                            for permission in permissions:
+                                account.require(str(permission))
+                                if str(permission).startswith(
+                                    "products."
+                                ) and permission != "products." + str(
+                                    payload.get("product", "office")
+                                ):
+                                    raise DomainError(403, "工具实现未授权给该产品")
                     payload.update(bound)
                     payload["configurationSchema"] = descriptor.get(
                         "configurationSchema", {"type": "object"}
@@ -488,18 +638,29 @@ class ResourceService:
         """资源与新版本短事务提交；配置验证失败保留旧版及旧凭据。"""
         self.require(account, kind)
         async with self.repository.transaction() as tx:
-            await tx.lock(account.user_id)
-            previous = await self._owned(tx, account, resource_id, kind) if resource_id else None
+            await tx.lock("configuration-graph")
+            await tx.lock(resource_id or account.user_id)
+            previous = (
+                await self._owned(tx, account, resource_id, kind, write=True)
+                if resource_id
+                else None
+            )
             if previous and body.get("version", previous.version) != previous.version:
                 raise DomainError(409, "resource version conflict", "revision_conflict")
             resource_id = resource_id or str(uuid4())
             payload = {
                 key: copy.deepcopy(value)
                 for key, value in body.items()
-                if key not in {"name", "description", "enabled", "published", "version"}
+                if key
+                not in {"name", "description", "enabled", "published", "version", "productManaged"}
             }
             if previous:
                 payload = {**copy.deepcopy(previous.payload), **payload}
+            if product := resource_product(account):
+                payload.setdefault("product", product)
+                if previous is None:
+                    payload["productManaged"] = True
+            writing_product(account, kind, payload.get("product", "office"))
             await self._validate_references(tx, account, kind, payload, resource_id)
             ciphertext = previous.secret_ciphertext if previous else None
             if kind == "tool":
@@ -518,7 +679,7 @@ class ResourceService:
             resource = Resource(
                 resource_id,
                 kind,
-                account.user_id,
+                previous.owner_id if previous else account.user_id,
                 str(body["name"]),
                 str(body.get("description", "")),
                 bool(body.get("enabled", True)),
@@ -538,10 +699,11 @@ class ResourceService:
         """软删除立即阻止后续执行，保留历史冻结快照。"""
         self.require(account, kind)
         async with self.repository.transaction() as tx:
-            await tx.lock(account.user_id)
-            resource = await self._owned(tx, account, resource_id, kind)
+            await tx.lock("configuration-graph")
+            await tx.lock(resource_id)
+            resource = await self._owned(tx, account, resource_id, kind, write=True)
             for related_kind in ("agent", "skill"):
-                for related in await tx.all(related_kind, account.user_id):
+                for related in await tx.all(related_kind, None):
                     if related.id == resource_id:
                         continue
                     for field in ("toolIds", "requiredToolIds", "skillIds", "knowledgeBaseIds"):
@@ -570,6 +732,10 @@ class ResourceService:
         async with self.repository.transaction() as tx:
             resource = await self._owned(tx, account, resource_id, kind)
             items = await tx.versions(resource_id)
+            if product := resource_product(account):
+                items = [
+                    item for item in items if item.get("product", "office") in (product, "shared")
+                ]
             return {"items": items, "total": len(items), "currentVersion": resource.version}
 
     async def bind(
@@ -579,10 +745,13 @@ class ResourceService:
         account.require("sessions.run")
         async with self.repository.transaction() as tx:
             await tx.lock(account.user_id)
-            _, snapshots = await self._published_resources(tx, account, agent_id)
+            agent, snapshots = await self._published_resources(tx, account, agent_id)
             if self.tool_binding_resolver is not None:
                 snapshots = [
-                    await self.tool_binding_resolver(account, snapshot)
+                    await self.tool_binding_resolver(
+                        account,
+                        {**snapshot, "bindingProduct": agent.payload.get("product", "office")},
+                    )
                     if snapshot.get("kind") == "tool"
                     else snapshot
                     for snapshot in snapshots
@@ -598,6 +767,15 @@ class ResourceService:
             binding = await tx.binding(binding_id)
             if not binding or binding.owner_id != account.user_id:
                 raise DomainError(404, "binding not found")
+            bound_product = next(
+                (
+                    str(item.get("product", "office"))
+                    for item in binding.snapshots
+                    if item.get("kind") == "agent"
+                ),
+                "office",
+            )
+            account.require("products." + bound_product)
             for snapshot in binding.snapshots:
                 current = await tx.get(str(snapshot["id"]))
                 if (
@@ -608,6 +786,11 @@ class ResourceService:
                     raise DomainError(403, "bound resource is unavailable")
                 if not current.enabled or (current.kind == "agent" and not current.published):
                     raise DomainError(403, "bound resource is disabled")
+                if current.kind != "extension" and current.payload.get("product", "office") not in (
+                    bound_product,
+                    "shared",
+                ):
+                    raise DomainError(403, "绑定的资源已移出该产品")
                 implementation = snapshot.get("implementation")
                 if (
                     isinstance(implementation, dict)

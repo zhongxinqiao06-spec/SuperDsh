@@ -1,0 +1,127 @@
+<!doctype html>
+<html lang="zh-CN" data-product="entertainment">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width,initial-scale=1" />
+    <meta name="color-scheme" content="light dark" />
+    <title>星桥娱乐 · 星桥</title>
+    <script>
+      if (new URLSearchParams(location.search).get('product') === 'office') {
+        document.documentElement.dataset.product = 'office'
+        document.title = '星桥办公 · 星桥'
+      }
+    </script>
+    <link rel="stylesheet" href="website.css" />
+  </head>
+  <body class="site">
+    <svg aria-hidden="true" class="icon-sheet" xmlns="http://www.w3.org/2000/svg">
+      <defs>
+        <symbol id="bridge" viewBox="0 0 256 256">
+          <path d="M46 188v-43c0-40 30-70 70-70s70 30 70 70v43h-22v-43c0-27-21-48-48-48s-48 21-48 48v43H46Z M36 150h160v22H36z M190 35l7.5 20.5L218 63l-20.5 7.5L190 91l-7.5-20.5L162 63l20.5-7.5L190 35Z" />
+        </symbol>
+        <symbol id="arrow" viewBox="0 0 24 24"><path d="M4 12h15m-6-6 6 6-6 6" /></symbol>
+        <symbol id="up-right" viewBox="0 0 24 24"><path d="M6 18 18 6M7 6h11v11" /></symbol>
+        <symbol id="down" viewBox="0 0 24 24"><path d="M12 4v15m-6-6 6 6 6-6" /></symbol>
+        <symbol id="switch" viewBox="0 0 24 24"><rect x="3" y="3" width="7" height="7" rx="1.5"/><rect x="14" y="3" width="7" height="7" rx="1.5"/><rect x="3" y="14" width="7" height="7" rx="1.5"/><rect x="14" y="14" width="7" height="7" rx="1.5"/></symbol>
+      </defs>
+    </svg>
+    <a href="#main" class="skip">跳至正文</a>
+    <header class="masthead">
+      <div class="mast-inner">
+        <a href="website.html" class="brand" aria-label="星桥官网首页">
+          <svg class="brand-mark" aria-hidden="true"><use href="#bridge" /></svg>
+          <b>星桥</b><span>STARBRIDGE</span>
+        </a>
+        <nav class="product-nav" aria-label="浏览产品">
+          <a data-nav="entertainment" href="website.html?product=entertainment">星桥娱乐</a>
+          <a data-nav="office" href="website.html?product=office">星桥办公</a>
+        </nav>
+        <a class="mast-cta" href="launch.html"><svg class="icon" aria-hidden="true"><use href="#switch"/></svg><span>选择工作台</span></a>
+      </div>
+    </header>
+    <main id="main">
+      <div class="film-site">
+        <section class="film-hero" aria-labelledby="film-title">
+          <div class="film-inner">
+            <div class="film-copy">
+              <p class="product-caption"><i></i>STARBRIDGE STUDIO</p>
+              <h1 id="film-title">把剧本<br/>做成短片<span>。</span></h1>
+              <p class="film-lede">从分镜草案到可编辑的时间线，在同一个作品中<br class="wide-break"/>挑选镜头、编排配音、导出成片。</p>
+              <div class="film-actions">
+                <a href="studio.html?view=projects" class="button button-orange">进入创作台 <svg class="icon" aria-hidden="true"><use href="#up-right"/></svg></a>
+                <a href="#film-case" class="secondary-link">看制作流程 <svg class="icon" aria-hidden="true"><use href="#down"/></svg></a>
+              </div>
+            </div>
+            <section class="studio-preview" aria-label="《雨后站台》分镜板静态交互示例">
+              <div class="preview-bar"><div><svg class="brand-mark" aria-hidden="true"><use href="#bridge"/></svg><b>星桥娱乐</b></div><span>创作工作台</span></div>
+              <div class="studio-preview-head"><div><span>示例作品</span><h2>雨后站台</h2></div><span class="preview-current">分镜板</span></div>
+              <div class="preview-view"><img id="film-detail-image" src="assets/film.webp" alt="无人入镜的镜头与时间线制作台静物" fetchpriority="high"/><div class="preview-plaque"><span>工作台概念图</span></div></div>
+              <div class="preview-meta"><div class="shot-detail"><img id="shot-thumb" src="assets/shot-2.webp" alt="时刻表与车票，分镜缩略图"/><strong id="shot-label" aria-live="polite">镜头 02 · 时刻表与车票</strong></div><span id="shot-time">00:04 – 00:07</span></div>
+              <div class="preview-sequence"><div class="preview-line"><span>分镜序列</span><span>4 镜 / 00:16</span></div>
+                <div class="shot-selector" aria-label="选择示例镜头">
+                  <button type="button" data-shot="1" aria-pressed="false"><em>01</em>站台</button>
+                  <button type="button" data-shot="2" aria-pressed="true"><em>02</em>车票</button>
+                  <button type="button" data-shot="3" aria-pressed="false"><em>03</em>雨棚</button>
+                  <button type="button" data-shot="4" aria-pressed="false"><em>04</em>空车</button>
+                </div>
+              </div>
+            </section>
+          </div>
+        </section>
+        <section id="film-case" class="film-case wrap" aria-labelledby="case-title">
+          <div class="section-head"><h2 id="case-title">一部短片的制作现场</h2><a href="studio.html" class="text-link">打开作品 <svg class="icon" aria-hidden="true"><use href="#arrow"/></svg></a></div>
+          <div class="case-steps">
+            <article><div class="process-icon"><svg viewBox="0 0 32 32" aria-hidden="true"><path d="M6 7h17v19H6zm5 6h8m-8 5h5M23 11h3v16H10"/></svg></div><h3>剧本与导演</h3><p>拆解剧本，确认场景、台词与镜头草案。</p></article>
+            <article><div class="process-icon"><svg viewBox="0 0 32 32" aria-hidden="true"><rect x="4" y="8" width="24" height="16" rx="1"/><path d="M9 8v16m14-16v16M4 12h5m-5 8h5m14-8h5m-5 8h5"/></svg></div><h3>分镜与候选</h3><p>对比同一镜头的不同画面，选定采用版本。</p></article>
+            <article><div class="process-icon"><svg viewBox="0 0 32 32" aria-hidden="true"><path d="M5 8h21v5H5zm0 11h10v5H5zm13 0h9v5h-9zM12 4v24"/></svg></div><h3>剪辑与导出</h3><p>在时间线上对齐画面、台词和字幕，导出成片。</p></article>
+          </div>
+        </section>
+      </div>
+      <div class="office-site">
+        <section class="office-hero wrap" aria-labelledby="office-title">
+          <div class="office-copy">
+            <p class="office-caption"><span></span>STARBRIDGE OFFICE</p>
+            <h1 id="office-title">从经营数据<br/>到可编辑的<span>简报</span></h1>
+            <p class="office-lede">把团队资料、分析口径和企业模板带进会话，<br class="wide-break"/>核对来源，交付可以接着修改的工作文件。</p>
+            <div class="office-actions"><a href="office.html" class="button button-blue">进入办公台 <svg class="icon" aria-hidden="true"><use href="#up-right"/></svg></a><a href="#office-case" class="secondary-link">查看样表 <svg class="icon" aria-hidden="true"><use href="#down"/></svg></a></div>
+          </div>
+          <section class="office-preview" aria-label="星桥办公简报样例">
+            <div class="office-preview-bar"><span><svg class="brand-mark" aria-hidden="true"><use href="#bridge"/></svg>星桥办公</span><span>文件预览</span></div>
+            <div class="report-sheet">
+              <div class="report-cover-id"><b>星河商贸</b><span>虚构样例</span></div>
+              <h2>第三季度经营简报</h2>
+              <div class="report-main"><div class="report-stat"><span>季度销售额</span><strong>128.6<small>万元</small></strong></div><img src="assets/paper.webp" alt="经营简报与办公文具的无人静物" loading="lazy"/></div>
+              <div class="report-trend" aria-label="7 月至 9 月销售额分别为 38.6、41.6 和 48.4 万元"><div><span>7 月</span><i style="--ratio:79.75%"></i><b>38.6</b></div><div><span>8 月</span><i style="--ratio:85.95%"></i><b>41.6</b></div><div><span>9 月</span><i style="--ratio:100%"></i><b>48.4</b></div></div>
+            </div>
+          </section>
+        </section>
+        <section id="office-case" class="office-case wrap" aria-labelledby="office-case-title">
+          <div class="office-case-heading"><div><span class="case-kicker">办公样例</span><h2 id="office-case-title">第三季度销售明细</h2></div><a class="text-link" href="assets/sales-example.csv" download>下载示例 CSV <svg class="icon" aria-hidden="true"><use href="#down"/></svg></a></div>
+          <table><caption>星河商贸 · 虚构演示数据，单位为万元</caption><thead><tr><th>月份</th><th>华东</th><th>华南</th><th>华北</th><th>西部</th><th>合计</th></tr></thead>
+            <tbody><tr><th>7 月</th><td>14.0</td><td>10.6</td><td>8.0</td><td>6.0</td><td>38.6</td></tr><tr><th>8 月</th><td>15.6</td><td>11.4</td><td>8.8</td><td>5.8</td><td>41.6</td></tr><tr><th>9 月</th><td>19.0</td><td>13.2</td><td>10.0</td><td>6.2</td><td>48.4</td></tr></tbody>
+          </table>
+        </section>
+      </div>
+    </main>
+    <footer class="site-footer wrap"><b>星桥 <span>STARBRIDGE</span></b><a href="launch.html">选择工作台 <svg class="icon" aria-hidden="true"><use href="#up-right"/></svg></a></footer>
+    <script>
+      document.querySelector('[data-nav="' + document.documentElement.dataset.product + '"]').setAttribute('aria-current','page')
+      const shots = [['站台全景','00:00 – 00:04'],['时刻表与车票','00:04 – 00:07'],['雨棚中景','00:07 – 00:12'],['远去的空车','00:12 – 00:16']]
+      document.querySelectorAll('[data-shot]').forEach(function (button) {
+        button.addEventListener('click', function () {
+          const number = Number(button.dataset.shot)
+          document.querySelectorAll('[data-shot]').forEach(function (item) { item.setAttribute('aria-pressed',String(item === button)) })
+          document.getElementById('shot-label').textContent = '镜头 0' + number + ' · ' + shots[number - 1][0]
+          document.getElementById('shot-time').textContent = shots[number - 1][1]
+          const thumbnail = document.getElementById('shot-thumb')
+          thumbnail.src = 'assets/shot-' + number + '.webp'
+          thumbnail.alt = shots[number - 1][0] + '，分镜缩略图'
+          const monitor = document.getElementById('film-detail-image')
+          monitor.src = thumbnail.src
+          monitor.alt = '镜头 0' + number + '，' + shots[number - 1][0]
+          document.querySelector('.preview-plaque span').textContent = '镜头预览'
+        })
+      })
+    </script>
+  </body>
+</html>

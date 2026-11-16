@@ -85,6 +85,15 @@ class ModelCapabilityDefaultRow(Base):
     revision: Mapped[int] = mapped_column(Integer, default=0)
 
 
+class ProductModelDefaultRow(Base):
+    """按产品和模型能力独立覆盖平台默认值。"""
+
+    __tablename__ = "product_model_defaults"
+    product: Mapped[str] = mapped_column(String(32), primary_key=True)
+    capability: Mapped[str] = mapped_column(primary_key=True)
+    configuration_id: Mapped[str] = mapped_column(ForeignKey("model_configurations.id"))
+
+
 class ModelOperationRow(Base):
     """收费能力操作持久收据，由操作标识幂等提交和核对。"""
 

@@ -6,6 +6,7 @@ import re
 
 from app.integrations.dsh.bridge import RuntimeBridge
 from app.integrations.dsh.protocol import Fields, Json, RuntimeFailure, fields
+from app.modules.identity.entity.bo.product_roles import Product
 from app.modules.runtime.service.model_catalog_service import authorized_model_entries
 from app.modules.runtime.service.ports import ModelProvider
 
@@ -39,9 +40,9 @@ class ModelSelectionService:
             raise RuntimeFailure("model_default_invalid", "默认模型配置无效，请检查模型设置", 409)
         return f"superdsh-{scope}-{provider}", model
 
-    async def annotate(self, owner: str, catalog: Fields) -> Fields:
+    async def annotate(self, owner: str, catalog: Fields, product: Product = "office") -> Fields:
         """仅展示该账号配置的连接，标明默认值及来源，不把内置条目当作已配密钥。"""
-        configuration = await self.models.catalog(owner)
+        configuration = await self.models.catalog(owner, product)
         target = self.target(configuration)
         values = catalog.get("models")
         if not isinstance(values, list):
@@ -60,14 +61,16 @@ class ModelSelectionService:
             )
         return {**catalog, "models": models}
 
-    async def validate_explicit(self, owner: str, params: Fields, bridge: RuntimeBridge) -> None:
+    async def validate_explicit(
+        self, owner: str, params: Fields, bridge: RuntimeBridge, product: Product = "office"
+    ) -> None:
         """拒绝旧草稿、已撤销或其他账号的模型标识，推理变体同样必须属于授权模型。"""
         selections = fields(params.get("selections") or {})
         identifier = selections.get("model")
         if identifier is None:
             return
         runtime = fields(await bridge.request("catalog.listModels", {}))
-        catalog = await self.annotate(owner, runtime)
+        catalog = await self.annotate(owner, runtime, product)
         values = catalog.get("models")
         assert isinstance(values, list)
         for raw in values:
@@ -91,14 +94,23 @@ class ModelSelectionService:
             409,
         )
 
-    async def apply_default(self, owner: str, params: Fields, bridge: RuntimeBridge) -> Fields:
+    async def apply_default(
+        self, owner: str, params: Fields, bridge: RuntimeBridge, product: Product = "office"
+    ) -> Fields:
         """按已授权目录的个人／平台默认值选择；同步未完成时明确失败，禁止换供应商。"""
         raw_selections = params.get("selections")
         selections = {} if raw_selections is None else fields(raw_selections)
         if selections.get("model") is not None:
-            await self.validate_explicit(owner, params, bridge)
+            await self.validate_explicit(owner, params, bridge, product)
             return params
-        configuration = await self.models.catalog(owner)
+        configuration = await self.models.catalog(owner, product)
+        if product == "entertainment":
+            # 创作会话的缺省选择来自作品所属产品，个人办公偏好不参与选择。
+            overrides = fields(configuration.get("productDefaults") or {})
+            configuration = {
+                **configuration,
+                "default": overrides.get(product, configuration.get("platformDefault")),
+            }
         target = self.target(configuration)
         if target is None:
             raise RuntimeFailure(

@@ -3,6 +3,8 @@ import { computed, ref, watch } from 'vue'
 import MarkdownContent from '@/components/MarkdownContent.vue'
 import type { RuntimeNotice } from '@/types/workbench/models'
 import { objectValue } from '@/utils/workbench/timeline'
+import { useNoticePlans } from '@/composables/workbench/use-notice-plans'
+import PlanReviewDetails from './PlanReviewDetails.vue'
 import {
   answersComplete,
   inputForm,
@@ -10,11 +12,19 @@ import {
 } from '@/utils/workbench/interaction'
 
 /** 采用运行时声明的actionId与问题选项；确认必须由用户明确选择。 */
-const props = defineProps<{ notice: RuntimeNotice; disabled?: boolean }>()
+const props = defineProps<{
+  notice: RuntimeNotice
+  disabled?: boolean
+  sessionId?: string
+}>()
 const emit = defineEmits<{
   respond: [id: string, response: Record<string, unknown>]
 }>()
 const form = computed(() => inputForm(props.notice))
+const review = useNoticePlans({
+  session: () => props.sessionId,
+  form: () => form.value,
+})
 const drafts = ref<Record<string, QuestionAnswer>>({})
 const actions = computed(() =>
   Array.isArray(props.notice.actions)
@@ -46,7 +56,12 @@ watch(
   { immediate: true },
 )
 function submit() {
-  if (!answersComplete(form.value, drafts.value) || !form.value) return
+  if (
+    !answersComplete(form.value, drafts.value) ||
+    !form.value ||
+    !review.canSubmit(drafts.value)
+  )
+    return
   const answers = Object.fromEntries(
     form.value.questions.map((question) => {
       const answer = drafts.value[question.id]!
@@ -73,6 +88,30 @@ function submit() {
     <template v-if="form">
       <fieldset v-for="question in form.questions" :key="question.id">
         <legend>{{ question.prompt }}</legend>
+        <div
+          v-if="review.requiresPlan(question.id)"
+          class="form-stack interaction-plan"
+        >
+          <PlanReviewDetails
+            v-if="review.plans.value[question.id]"
+            :plan="review.plans.value[question.id]!"
+          />
+          <p v-else-if="review.loading.value" role="status">
+            正在读取本次执行方案…
+          </p>
+          <template v-if="review.errors.value[question.id]">
+            <el-alert
+              :title="'暂时无法核对方案：' + review.errors.value[question.id]"
+              type="error"
+              :closable="false"
+            />
+            <el-button
+              :disabled="disabled || review.loading.value"
+              @click="review.reload"
+              >重新读取方案</el-button
+            >
+          </template>
+        </div>
         <MarkdownContent v-if="question.detail" :content="question.detail" />
         <template v-if="drafts[question.id]">
           <el-checkbox-group
@@ -98,6 +137,10 @@ function submit() {
               v-for="option in question.options"
               :key="option.id"
               :value="option.id"
+              :disabled="
+                option.id === question.approveOptionId &&
+                !review.ready(question.id)
+              "
               >{{ option.label }}
               <small>{{ option.description }}</small></el-radio
             ></el-radio-group
@@ -118,7 +161,11 @@ function submit() {
       </fieldset>
       <el-button
         type="primary"
-        :disabled="disabled || !answersComplete(form, drafts)"
+        :disabled="
+          disabled ||
+          !answersComplete(form, drafts) ||
+          !review.canSubmit(drafts)
+        "
         @click="submit"
         >提交回复</el-button
       >

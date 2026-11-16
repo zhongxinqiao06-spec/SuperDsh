@@ -238,6 +238,13 @@ class EvidenceService:
             "downloadUrl": f"/api/sessions/{artifact.session_id}/agent-artifacts/{artifact.id}/download",
         }
 
+    async def recent_office_deliverables(self, account: Account, limit: int) -> dict[str, object]:
+        """办公首页只展示本人可见的成果目录；预览、下载仍逐件核验收据与对象摘要。"""
+        for permission in ("products.office", "sessions.read", "files.read"):
+            account.require(permission)
+        async with self.repository.transaction() as tx:
+            return {"items": await tx.recent_office_deliverables(account.user_id, limit)}
+
     async def listing(self, account: Account, session_id: str) -> dict[str, object]:
         """上层已授权会话；成果本身仍必须通过绑定与真实对象校验。"""
         account.require("files.read")

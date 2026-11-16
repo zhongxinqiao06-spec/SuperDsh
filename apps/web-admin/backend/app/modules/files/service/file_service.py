@@ -2,20 +2,24 @@
 
 import asyncio
 import hashlib
+from collections.abc import AsyncIterator
 from datetime import UTC, datetime
 from pathlib import Path
 from typing import cast
 from uuid import uuid4
 
+from sqlalchemy.ext.asyncio import AsyncSession
+
 from app.infrastructure.crypto import CredentialCipher
 from app.infrastructure.database import Database
 from app.infrastructure.errors import DomainError
-from app.modules.files.dao.file_dao import FileRepository
+from app.modules.files.dao.file_dao import FileDao, FileRepository
 from app.modules.files.entity.bo.session_attachment import attachment_identity
 from app.modules.files.entity.do.models import FileEntryRow, FileReferenceRow
-from app.modules.files.service.content import media_type
+from app.modules.files.service.content import byte_range, media_type
 from app.modules.files.service.maintenance_service import MaintenanceService
 from app.modules.files.service.session_attachment_service import SessionAttachmentService
+from app.modules.files.service.staged_content import StagedContent
 from app.modules.files.service.storage_service import StorageService
 from app.modules.files.service.upload_service import UploadService
 from app.modules.identity.entity.bo.models import Account
@@ -99,7 +103,7 @@ class FileService:
             min(100, max(1, int(str(query.get("pageSize", 20))))),
         )
         async with self.repository.transaction() as dao:
-            rows = await dao.entries(account.user_id)
+            rows = await dao.entries(account.user_id, str(query.get("source", "")))
         search = str(query.get("search", query.get("q", ""))).casefold()
         deleted = str(query.get("deleted", query.get("trashed", "false"))).lower() == "true"
         category = str(query.get("category", ""))
@@ -116,6 +120,16 @@ class FileService:
             "page": page,
             "pageSize": size,
         }
+
+    async def stream(
+        self, account: Account, file_id: str, requested_range: str | None
+    ) -> tuple[AsyncIterator[bytes], dict[str, object], tuple[int, int] | None]:
+        """流式接口先验证账号与元数据，无需为预览加载整段视频。"""
+        row = await self._row(account, file_id)
+        span = byte_range(requested_range, row.size)
+        storage = await self.storage.get(row.storage_id)
+        start, end = span or (0, row.size - 1)
+        return storage.chunks(row.object_key, start, end), self.view(row), span
 
     async def read(self, account: Account, file_id: str) -> tuple[bytes, dict[str, object]]:
         """读取后核对大小和摘要，不向调用者提供未提交对象。"""
@@ -257,6 +271,15 @@ class FileService:
             )
         return value
 
+    async def ingest_media(
+        self, account: Account, identifier: str, path: Path, media_type: str
+    ) -> dict[str, object]:
+        """同一媒体任务的多次收藏只发布一个文件版本。"""
+        content = await asyncio.to_thread(StagedContent.media, path)
+        return await self._ingest(
+            account, path.name, content, media_type, None, None, file_id="studio_" + identifier
+        )
+
     async def ingest_artifact(
         self,
         account: Account,
@@ -279,7 +302,7 @@ class FileService:
         self,
         account: Account,
         name: str,
-        data: bytes,
+        data: StagedContent,
         claimed: str,
         previous: str | None,
         storage_id: str | None,
@@ -300,7 +323,7 @@ class FileService:
         self,
         account: Account,
         name: str,
-        data: bytes,
+        data: bytes | StagedContent,
         claimed: str,
         previous: str | None,
         storage_id: str | None,
@@ -308,11 +331,15 @@ class FileService:
         file_id: str | None = None,
     ) -> dict[str, object]:
         account.require(permission)
+        size = data.size if isinstance(data, StagedContent) else len(data)
+        checksum = (
+            data.digest if isinstance(data, StagedContent) else hashlib.sha256(data).hexdigest()
+        )
         if file_id:
             async with self.repository.transaction() as dao:
                 existing = await dao.entry(file_id, account.user_id)
                 if existing:
-                    if existing.deleted_at or existing.sha256 != hashlib.sha256(data).hexdigest():
+                    if existing.deleted_at or existing.sha256 != checksum:
                         raise DomainError(409, "file publication conflict")
                     return self.view(existing)
         from app.modules.files.entity.vo.file_dto import UploadInput
@@ -325,7 +352,7 @@ class FileService:
             raise DomainError(422, "invalid file name")
         policy = await self.storage.policy()
         maximum = cast(dict[str, object], policy["policy"])["maxFileBytes"]
-        if not data or len(data) > int(str(maximum)):
+        if not size or size > int(str(maximum)):
             raise DomainError(413, "file is too large or empty")
         actual = await asyncio.to_thread(media_type, data, name, claimed)
         chosen = storage_id or str(policy["activeConnectionId"])
@@ -339,9 +366,7 @@ class FileService:
                 if file_id:
                     await dao.lock(file_id)
                     duplicate = await dao.entry(file_id, account.user_id)
-                    if duplicate and (
-                        duplicate.deleted_at or duplicate.sha256 != hashlib.sha256(data).hexdigest()
-                    ):
+                    if duplicate and (duplicate.deleted_at or duplicate.sha256 != checksum):
                         raise DomainError(409, "file publication conflict")
                 old = await dao.entry(previous, account.user_id) if previous else None
                 if previous and (not old or old.deleted_at):
@@ -352,8 +377,8 @@ class FileService:
                     storage_id=chosen,
                     object_key=key,
                     name=name,
-                    size=len(data),
-                    sha256=hashlib.sha256(data).hexdigest(),
+                    size=size,
+                    sha256=checksum,
                     media_type=actual,
                     category=actual.split("/", 1)[0]
                     if actual.startswith(("image/", "audio/", "video/"))
@@ -380,6 +405,22 @@ class FileService:
     ) -> dict[str, object]:
         """调用领域先校验资源所有权，此处再校验文件所有权，重复绑定幂等。"""
         return await self._bind(account, file_id, kind, resource_id, "files.write")
+
+    async def bind_studio_asset(
+        self, session: AsyncSession, account: Account, file_id: str, asset_id: str
+    ) -> None:
+        """版本素材与文件引用在同一事务写入，失败时同时回滚。"""
+        account.require("files.write")
+        dao = FileDao(session)
+        await dao.lock(file_id)
+        row = await dao.entry(file_id, account.user_id)
+        if not row or row.deleted_at:
+            raise DomainError(404, "文件不存在或已回收")
+        await dao.save(
+            FileReferenceRow(
+                file_id=file_id, owner_id=account.user_id, kind="studio-asset", resource_id=asset_id
+            )
+        )
 
     async def _bind(
         self, account: Account, file_id: str, kind: str, resource_id: str, permission: str

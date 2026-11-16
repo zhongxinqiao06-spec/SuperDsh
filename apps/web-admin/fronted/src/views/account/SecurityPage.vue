@@ -191,16 +191,19 @@ const {
       width="min(440px,94vw)"
       @update:model-value="selected = null"
     >
-      <p>
-        {{ tr('确认撤销此客户端的登录？', 'Revoke this client session?') }}
-        {{ selected?.clientName }}
-      </p>
-      <el-alert
-        v-if="mutation.error.value"
-        :title="mutation.error.value"
-        type="error"
-        :closable="false"
-      /><template #footer>
+      <div class="stack">
+        <p>
+          {{ tr('确认撤销此客户端的登录？', 'Revoke this client session?') }}
+          {{ selected?.clientName }}
+        </p>
+        <el-alert
+          v-if="mutation.error.value"
+          :title="mutation.error.value"
+          type="error"
+          :closable="false"
+        />
+      </div>
+      <template #footer>
         <el-button @click="selected = null">
           {{ tr('取消', 'Cancel') }} </el-button
         ><el-button

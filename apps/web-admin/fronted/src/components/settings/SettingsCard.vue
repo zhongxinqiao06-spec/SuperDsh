@@ -10,7 +10,7 @@ defineProps<{ title: string; description?: string }>()
         <h2>{{ title }}</h2>
         <p v-if="description">{{ description }}</p>
       </div>
-      <slot name="action" />
+      <div v-if="$slots.action" class="toolbar"><slot name="action" /></div>
     </header>
     <div v-if="$slots.default" class="settings-card-content"><slot /></div>
   </section>

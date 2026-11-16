@@ -55,7 +55,7 @@ class SessionBatchService:
                 if (
                     not current
                     or current.owner_id != account.user_id
-                    or current.source.get("historyDeletedAt")
+                    or (current.source or {}).get("historyDeletedAt")
                 ):
                     raise DomainError(404, "session not found")
                 rows.append(current)
@@ -74,6 +74,10 @@ class SessionBatchService:
     ) -> dict[str, object]:
         """按已授权项目/设备取全部会话；旧scope字段不参与筛选，false表示取消归档。"""
         account.require("sessions.run")
+        product = value.get("product", "office")
+        if product not in ("office", "entertainment"):
+            raise DomainError(422, "unknown product")
+        account.require("products." + str(product))
         if project:
             async with self.conversations.repository.transaction() as dao:
                 bound = await dao.project(target)
@@ -89,7 +93,12 @@ class SessionBatchService:
             # 锁等待期间可能有其它修改，重新读取条件集合，保持持久状态权威。
             for row in rows:
                 await dao.refresh_session(row)
-            rows = [row for row in rows if not row.source.get("historyDeletedAt")]
+            rows = [
+                row
+                for row in rows
+                if not (row.source or {}).get("historyDeletedAt")
+                and (row.source or {}).get("product", "office") == product
+            ]
             operation = "unarchive" if value.get("archived") is False else "archive"
             for row in rows:
                 await self._apply(dao, row, operation)

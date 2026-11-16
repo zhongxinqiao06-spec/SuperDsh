@@ -1,6 +1,6 @@
 """以违规样本验证架构门禁，避免检查器永远返回成功。"""
 
-from architecture import inspect_python
+from tooling.architecture import inspect_python
 
 
 def test_layer_direction() -> None:

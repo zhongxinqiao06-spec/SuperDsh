@@ -113,7 +113,10 @@ const rows = computed(() =>
           </tr>
         </tbody>
       </DataTable>
-      <section v-if="vm.resource.data.value?.migrations.cleanup?.length">
+      <section
+        v-if="vm.resource.data.value?.migrations.cleanup?.length"
+        class="stack"
+      >
         <h2>待重试的对象清理</h2>
         <p>
           存储恢复后点击“清理过期文件”重试。文件迁移已完成的结果不受旧对象清理影响。
@@ -128,7 +131,10 @@ const rows = computed(() =>
           </li>
         </ul>
       </section>
-      <section v-if="vm.resource.data.value?.migrations.records.length">
+      <section
+        v-if="vm.resource.data.value?.migrations.records.length"
+        class="stack"
+      >
         <h2>文件迁移记录</h2>
         <p
           v-for="state in vm.resource.data.value.migrations.items"
@@ -196,7 +202,7 @@ const rows = computed(() =>
       @update:model-value="vm.policy.value = null"
       @submit="vm.savePolicy"
       ><template v-if="vm.policy.value"
-        ><label
+        ><label class="field"
           >新文件默认存储<el-select v-model="vm.policy.value.activeConnectionId"
             ><el-option
               v-for="item in vm.policy.value.connections"
@@ -204,18 +210,18 @@ const rows = computed(() =>
               :label="item.name"
               :value="item.id"
               :disabled="!item.enabled" /></el-select></label
-        ><label
+        ><label class="field"
           >上传上限（字节）<el-input-number
             v-model="vm.policy.value.policy.maxFileBytes"
             :min="1"
             :max="1073741824"
             :step="1048576" /></label
-        ><label
+        ><label class="field"
           >暂存保留（小时）<el-input-number
             v-model="vm.policy.value.policy.temporaryHours"
             :min="1"
             :max="720" /></label
-        ><label
+        ><label class="field"
           >回收站保留（天）<el-input-number
             v-model="vm.policy.value.policy.recycleDays"
             :min="1"
@@ -229,15 +235,18 @@ const rows = computed(() =>
       title="清理过期文件"
       width="min(480px, 94vw)"
       @update:model-value="vm.cleaning.value = false"
-      ><p>
-        按保留策略删除已过期且无资源引用的回收站文件及上传分片。此操作不可恢复。
-      </p>
-      <el-alert
-        v-if="vm.mutation.error.value"
-        :title="vm.mutation.error.value"
-        type="error"
-        :closable="false"
-      /><template #footer
+      ><div class="stack">
+        <p>
+          按保留策略删除已过期且无资源引用的回收站文件及上传分片。此操作不可恢复。
+        </p>
+        <el-alert
+          v-if="vm.mutation.error.value"
+          :title="vm.mutation.error.value"
+          type="error"
+          :closable="false"
+        />
+      </div>
+      <template #footer
         ><el-button
           :disabled="vm.mutation.busy.value"
           @click="vm.cleaning.value = false"

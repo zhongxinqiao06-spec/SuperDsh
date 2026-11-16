@@ -5,10 +5,12 @@ import re
 import zipfile
 
 from app.infrastructure.errors import DomainError
+from app.modules.files.service.staged_content import StagedContent
 
 
-def media_type(data: bytes, name: str, claimed: str) -> str:
+def media_type(content: bytes | StagedContent, name: str, claimed: str) -> str:
     """校验常见二进制签名与 Office 包结构，拒绝伪装为可内联媒体的内容。"""
+    data = content.head if isinstance(content, StagedContent) else content
     actual = ""
     if data.startswith(b"\x89PNG\r\n\x1a\n"):
         actual = "image/png"
@@ -36,7 +38,9 @@ def media_type(data: bytes, name: str, claimed: str) -> str:
             "pptx": ("ppt/presentation.xml", "presentationml.presentation"),
         }.get(suffix)
         try:
-            with zipfile.ZipFile(io.BytesIO(data)) as archive:
+            with zipfile.ZipFile(
+                content.path if isinstance(content, StagedContent) else io.BytesIO(data)
+            ) as archive:
                 if any(
                     info.file_size > 128 * 1024 * 1024
                     or ".." in info.filename.split("/")
@@ -64,7 +68,8 @@ def media_type(data: bytes, name: str, claimed: str) -> str:
         raise DomainError(422, "无法识别文件的实际格式")
     return (
         "text/plain"
-        if re.search(r"\.(txt|md|csv|json)$", name, re.I) and b"\0" not in data
+        if re.search(r"\.(txt|md|csv|json)$", name, re.I)
+        and not (content.contains_null if isinstance(content, StagedContent) else b"\0" in data)
         else "application/octet-stream"
     )
 

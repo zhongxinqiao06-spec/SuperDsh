@@ -50,7 +50,12 @@ function resize(event: Event): void {
     <div class="pagination-controls">
       <label v-if="pageSizes" class="pagination-size"
         >{{ tr('每页', 'Per page')
-        }}<select :value="pageSize" :disabled="loading" @change="resize">
+        }}<select
+          class="native-control native-control--small"
+          :value="pageSize"
+          :disabled="loading"
+          @change="resize"
+        >
           <option v-for="size in pageSizes" :key="size" :value="size">
             {{ size }}
           </option>

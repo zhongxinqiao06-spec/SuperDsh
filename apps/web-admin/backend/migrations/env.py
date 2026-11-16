@@ -24,9 +24,25 @@ from app.modules.navigation.entity.do import models as navigation_models
 from app.modules.resources.entity.do import models as resource_models
 from app.modules.runtime.entity.do import models as runtime_models
 from app.modules.skills.entity.do import models as skill_models
+from app.modules.studio.entity.do import (
+    asset_do,
+    foundation_do,
+    preparation_do,
+    production_do,
+    text_edit_do,
+    timeline_do,
+)
+from app.modules.studio.entity.do import models as studio_models
 
 # 导入只注册自有 DO 元数据，历史 revision 文件不依赖这份可变模型。
 MODEL_MODULES = (
+    text_edit_do,
+    production_do,
+    preparation_do,
+    asset_do,
+    foundation_do,
+    timeline_do,
+    studio_models,
     identity_models,
     navigation_models,
     resource_models,

@@ -1,5 +1,7 @@
 """基础资源编辑 DTO，配置内容由实现提供的 JSON Schema 再校验。"""
 
+from typing import Literal
+
 from pydantic import Field
 
 from app.modules.identity.entity.vo.dto import InputModel
@@ -8,6 +10,7 @@ from app.modules.identity.entity.vo.dto import InputModel
 class ResourceInput(InputModel):
     """工具实现、配置、技能正文及组合引用保持分离。"""
 
+    product: Literal["office", "entertainment", "shared"] = "office"
     name: str = Field(min_length=1, max_length=200)
     description: str = Field(default="", max_length=5000)
     enabled: bool = True

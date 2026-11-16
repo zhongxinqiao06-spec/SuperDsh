@@ -66,8 +66,10 @@ test('第二阶段真实管理页面、示例与智能体编辑闭环', async ({
               result.request().method() === 'GET',
           )
         : null
-    await page.goto(`/#${module.path}`)
+    await page.goto(`/#${module.path}`, { waitUntil: 'domcontentloaded' })
     await expect(content).toBeVisible()
+    await expect(content.getByRole('heading').first()).toBeVisible()
+    await expect(content.getByText('403', { exact: true })).toHaveCount(0)
     await expect(content).not.toContainText('此模块尚未迁移')
     await expect(content).not.toBeEmpty()
     if (settingsResponse) {
@@ -116,6 +118,7 @@ test('第二阶段真实管理页面、示例与智能体编辑闭环', async ({
   await dialog
     .getByRole('textbox', { name: '用途说明', exact: true })
     .fill('这是由用户编辑的普通组合，不绑定特定办公场景。')
+  await dialog.getByRole('tab', { name: '行为规范', exact: true }).click()
   await dialog
     .getByRole('textbox', { name: '工作要求', exact: true })
     .fill('只回答本次合成资料，不调用外部模型或工具。')

@@ -38,6 +38,7 @@ describe('旧智能体关联选择语义', () => {
     }
     const draft = agentDraft(source)
     expect(draft).toEqual({
+      product: 'office',
       name: source.name,
       description: source.description,
       instructions: source.instructions,

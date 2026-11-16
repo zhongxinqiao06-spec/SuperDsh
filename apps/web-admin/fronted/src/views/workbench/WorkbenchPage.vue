@@ -2,15 +2,11 @@
 import { computed, ref } from 'vue'
 import AppIcon from '@/components/base/AppIcon.vue'
 import { useWorkbench } from '@/composables/workbench/use-workbench'
-import { useAgentBinding } from '@/composables/workbench/use-agent-binding'
 import { useProjectManager } from '@/composables/workbench/use-project-manager'
 import { useTimelineScroll } from '@/composables/workbench/use-timeline-scroll'
 import { useAuthStore } from '@/store/modules/auth-store'
 import { usePreferences } from '@/store/modules/preferences'
-import {
-  canComposeSession,
-  canControlSession,
-} from '@/utils/workbench/session-access'
+import { canControlSession } from '@/utils/workbench/session-access'
 import WorkspaceSidebar from './components/WorkspaceSidebar.vue'
 import TimelineList from './components/TimelineList.vue'
 import InteractionCard from './components/InteractionCard.vue'
@@ -19,8 +15,7 @@ import TerminalPane from '@/views/terminal/components/TerminalPane.vue'
 import DeviceManager from '@/views/devices/components/DeviceManager.vue'
 import SessionResults from './components/SessionResults.vue'
 import SessionShares from './components/SessionShares.vue'
-import RuntimeSelectors from './components/RuntimeSelectors.vue'
-import NewSessionSelectors from './components/NewSessionSelectors.vue'
+import OfficeComposer from './components/OfficeComposer.vue'
 import ProjectEditor from './components/ProjectEditor.vue'
 import type { WorkspaceProject } from '@/types/workbench/models'
 
@@ -51,15 +46,8 @@ function newSession(project?: WorkspaceProject): void {
   else if (workspace.runtime.agent?.connectorId)
     workspace.draft.value.deviceId = workspace.runtime.agent.connectorId
 }
-async function useServerAgent(): Promise<void> {
-  await workspace.prepare()
-  const agent = workspace.runtime.agent
-  if (agent?.connectorId) {
-    workspace.draft.value.deviceId = agent.connectorId
-    workspace.project.value = agent.projectId ?? ''
-  }
-}
 const showSidebar = ref(!window.matchMedia('(max-width: 800px)').matches)
+const showResults = ref(!window.matchMedia('(max-width: 1100px)').matches)
 const results = ref<InstanceType<typeof SessionResults> | null>(null)
 const shares = ref<InstanceType<typeof SessionShares> | null>(null)
 const filePane = ref<InstanceType<typeof WorkspaceFilesPane> | null>(null)
@@ -83,21 +71,10 @@ const workspaceRoot = computed(
     )?.workspacePath ??
     '',
 )
-const canSend = computed(
-  () =>
-    auth.can('sessions.run') &&
-    auth.can('models.use') &&
-    canComposeSession(workspace.snapshot.value?.session),
-)
 const canControl = computed(
   () =>
     auth.can('sessions.run') &&
     canControlSession(workspace.snapshot.value?.session),
-)
-const binding = useAgentBinding(
-  workspace.selected,
-  canSend,
-  workspace.refreshSnapshot,
 )
 const notices = computed(() =>
   [
@@ -107,11 +84,6 @@ const notices = computed(() =>
     ['open', 'responding'].includes(String(item.status ?? 'open')),
   ),
 )
-function selectFiles(event: Event): void {
-  const input = event.target as HTMLInputElement
-  workspace.draft.value.files.push(...Array.from(input.files ?? []))
-  input.value = ''
-}
 async function closeFiles(done: () => void): Promise<void> {
   if (!filePane.value || (await filePane.value.beforeClose())) done()
 }
@@ -221,6 +193,16 @@ async function closeFiles(done: () => void): Promise<void> {
             >分享</span
           ></el-button
         >
+        <el-button
+          v-if="workspace.selected.value && auth.can('files.read')"
+          text
+          aria-label="成果预览"
+          :aria-expanded="showResults"
+          @click="showResults = !showResults"
+          ><AppIcon name="file-text" /><span class="workbench-action-label"
+            >成果预览</span
+          ></el-button
+        >
       </header>
       <el-alert
         v-if="
@@ -230,15 +212,6 @@ async function closeFiles(done: () => void): Promise<void> {
         type="error"
         :closable="false"
       />
-      <el-alert
-        v-if="binding.error.value"
-        :title="binding.error.value"
-        type="error"
-        :closable="false"
-        ><el-button link @click="binding.reload"
-          >重新加载绑定</el-button
-        ></el-alert
-      >
       <el-alert
         v-if="workspace.error.value || workspace.runtime.error"
         :title="workspace.error.value || workspace.runtime.error"
@@ -251,197 +224,89 @@ async function closeFiles(done: () => void): Promise<void> {
         type="error"
         :closable="false"
       />
-      <div class="workbench-conversation">
-        <header v-if="!workspace.selected.value" class="workbench-welcome">
-          <h2>接下来要构建什么？</h2>
-        </header>
-        <el-alert
-          v-if="workspace.snapshot.value?.session.archived"
-          title="此会话已归档，取消归档后可继续对话"
-          type="info"
-          :closable="false"
-        />
-        <el-alert
-          v-if="
-            workspace.snapshot.value &&
-            !workspace.snapshot.value.session.takeover &&
-            !workspace.snapshot.value.session.archived
-          "
-          title="当前会话为只读，接管后可以发送消息和控制任务"
-          type="info"
-          :closable="false"
-        />
-        <el-alert
-          v-if="workspace.shareUrl.value"
-          :title="workspace.shareUrl.value"
-          description="此链接包含创建时的会话快照，可以复制分享。"
-          type="success"
-          :closable="true"
-          @close="workspace.shareUrl.value = ''"
-        />
-        <div
-          v-show="
-            !!workspace.selected.value ||
-            !!workspace.timeline.value.length ||
-            !!notices.length
-          "
-          ref="timelineHost"
-          class="workbench-timeline"
-          @scroll.passive="timelineScroll.scroll"
-        >
-          <div ref="timelineContent" class="workbench-timeline-content">
-            <TimelineList
-              :items="workspace.timeline.value"
-              :has-more="workspace.snapshot.value?.timeline.hasMore"
-              :can-share="!!workspace.selected.value"
-              @share="shares?.show($event)"
-              @older="timelineScroll.older(workspace.older)"
-              @attachment="results?.attachment($event)"
-            /><InteractionCard
-              v-for="notice in notices"
-              :key="notice.id"
-              :notice="notice"
-              :disabled="
-                workspace.sending.value ||
-                workspace.responding.value ||
-                !canControl ||
-                notice.status === 'responding'
-              "
-              @respond="workspace.respond"
-            />
-            <SessionResults
-              v-if="auth.can('files.read')"
-              ref="results"
-              :session-id="workspace.selected.value"
-              :can-write="auth.can('files.write')"
-            />
-          </div>
-        </div>
-        <form class="composer" @submit.prevent="workspace.send">
-          <el-input
-            v-model="workspace.draft.value.text"
-            aria-label="任务草稿"
-            type="textarea"
-            :autosize="{ minRows: 3, maxRows: 8 }"
-            resize="none"
-            :disabled="!canSend"
-            placeholder="描述你的任务…"
+      <div class="office-conversation-layout">
+        <div class="workbench-conversation">
+          <header v-if="!workspace.selected.value" class="workbench-welcome">
+            <h2>接下来要构建什么？</h2>
+          </header>
+          <el-alert
+            v-if="workspace.snapshot.value?.session.archived"
+            title="此会话已归档，取消归档后可继续对话"
+            type="info"
+            :closable="false"
           />
-          <div class="draft-files">
-            <el-tag
-              v-for="(file, index) in workspace.draft.value.files"
-              :key="`${file.name}:${index}`"
-              closable
-              @close="workspace.draft.value.files.splice(index, 1)"
-              >{{ file.name }}</el-tag
-            >
-          </div>
-          <el-progress
-            v-if="workspace.uploadProgress.value"
-            :percentage="workspace.uploadProgress.value"
+          <el-alert
+            v-if="
+              workspace.snapshot.value &&
+              !workspace.snapshot.value.session.takeover &&
+              !workspace.snapshot.value.session.archived
+            "
+            title="当前会话为只读，接管后可以发送消息和控制任务"
+            type="info"
+            :closable="false"
           />
-          <div class="composer-actions">
-            <el-switch
-              v-if="workspace.snapshot.value"
-              :model-value="workspace.snapshot.value.session.takeover"
-              :disabled="
-                !auth.can('sessions.run') ||
-                workspace.snapshot.value.session.archived ||
-                workspace.takingOver.value
-              "
-              :loading="workspace.takingOver.value"
-              aria-label="接管会话"
-              active-text="接管"
-              @change="workspace.toggleTakeover"
-            />
-            <label class="upload-label" title="添加附件"
-              ><AppIcon name="paperclip" /><span class="workbench-sr-only"
-                >添加附件</span
-              ><input
-                type="file"
-                aria-label="添加附件"
-                multiple
-                :disabled="!canSend || workspace.sending.value"
-                @change="selectFiles"
-            /></label>
-            <div class="composer-options">
-              <NewSessionSelectors
-                v-if="!workspace.selected.value"
-                v-model:device-id="workspace.draft.value.deviceId"
-                v-model:agent-id="workspace.agentId.value"
-                :devices="workspace.devices.value"
-                :agents="workspace.agents.value"
-                :runtime="workspace.runtime.agent"
-                :stalled="workspace.runtimeReadiness.stalled.value"
-                :busy="workspace.runtime.busy"
-                :can-manage="auth.can('devices.manage')"
-                :disabled="!canSend || workspace.sending.value"
-                @update:device-id="workspace.project.value = ''"
-                @prepare="useServerAgent"
-                @reload="workspace.reload"
-              />
-              <el-select
-                v-if="workspace.selected.value"
-                :model-value="binding.current.value"
+          <el-alert
+            v-if="workspace.shareUrl.value"
+            :title="workspace.shareUrl.value"
+            description="此链接包含创建时的会话快照，可以复制分享。"
+            type="success"
+            :closable="true"
+            @close="workspace.shareUrl.value = ''"
+          />
+          <div
+            v-show="
+              !!workspace.selected.value ||
+              !!workspace.timeline.value.length ||
+              !!notices.length
+            "
+            ref="timelineHost"
+            class="workbench-timeline"
+            @scroll.passive="timelineScroll.scroll"
+          >
+            <div ref="timelineContent" class="workbench-timeline-content">
+              <TimelineList
+                :items="workspace.timeline.value"
+                :has-more="workspace.snapshot.value?.timeline.hasMore"
+                :can-share="!!workspace.selected.value"
+                @share="shares?.show($event)"
+                @older="timelineScroll.older(workspace.older)"
+                @attachment="results?.attachment($event)"
+              /><InteractionCard
+                v-for="notice in notices"
+                :key="notice.id"
+                :notice="notice"
+                :session-id="workspace.selected.value || undefined"
                 :disabled="
-                  !canSend || binding.loading.value || binding.saving.value
+                  workspace.sending.value ||
+                  workspace.responding.value ||
+                  !canControl ||
+                  notice.status === 'responding'
                 "
-                aria-label="会话智能体"
-                placeholder="通用对话"
-                @change="binding.change"
-              >
-                <el-option value="" label="通用对话" disabled />
-                <el-option
-                  v-for="agent in workspace.agents.value"
-                  :key="agent.id"
-                  :value="agent.id"
-                  :label="agent.name"
-                />
-              </el-select>
-              <RuntimeSelectors
-                :selection="workspace.runtimeSelections"
-                :existing="!!workspace.selected.value"
-                :disabled="
-                  !auth.can('sessions.run') ||
-                  !auth.can('models.use') ||
-                  workspace.sending.value
-                "
+                @respond="workspace.respond"
               />
             </div>
-            <el-button
-              v-if="
-                [
-                  'running',
-                  'starting',
-                  'waiting_approval',
-                  'waiting_input',
-                ].includes(workspace.snapshot.value?.session.status ?? '')
-              "
-              type="danger"
-              class="composer-stop"
-              aria-label="中断任务"
-              :disabled="!canControl || workspace.interrupting.value"
-              :loading="workspace.interrupting.value"
-              @click="workspace.interrupt"
-              ><AppIcon name="square" /><span>{{
-                workspace.interrupting.value ? '正在终止' : '中断任务'
-              }}</span></el-button
-            ><el-button
-              type="primary"
-              class="composer-send"
-              aria-label="发送"
-              native-type="submit"
-              :loading="workspace.sending.value"
-              :disabled="
-                !canSend ||
-                (!workspace.draft.value.text.trim() &&
-                  !workspace.draft.value.files.length)
-              "
-              ><AppIcon name="arrow-up"
-            /></el-button>
           </div>
-        </form>
-        <p class="composer-note">未发送的草稿会自动保留，请核实重要信息。</p>
+          <OfficeComposer :workspace="workspace" />
+          <p class="composer-note">未发送的草稿会自动保留，请核实重要信息。</p>
+        </div>
+        <aside
+          v-if="workspace.selected.value && auth.can('files.read')"
+          v-show="showResults"
+          class="office-results-pane"
+          aria-label="会话成果"
+        >
+          <header>
+            <h2>会话成果</h2>
+            <el-button text aria-label="收起成果" @click="showResults = false"
+              ><AppIcon name="x"
+            /></el-button>
+          </header>
+          <SessionResults
+            ref="results"
+            :session-id="workspace.selected.value"
+            :can-write="auth.can('files.write')"
+          />
+        </aside>
       </div>
     </main>
     <SessionShares ref="shares" :session-id="workspace.selected.value" />

@@ -9,6 +9,7 @@ from app.infrastructure.errors import DomainError
 from app.integrations.dsh.protocol import fields
 from app.modules.devices.service.device_service import DeviceService
 from app.modules.identity.entity.bo.models import Account
+from app.modules.identity.entity.bo.product_roles import Product
 from app.modules.identity.service.identity import IdentityService
 from app.modules.models.service.model_service import ModelService
 from app.modules.runtime.entity.bo.values import Fields
@@ -22,9 +23,9 @@ class ModelProxyService:
     ) -> None:
         self.models, self.identity, self.devices = models, identity, devices
 
-    async def catalog(self, owner: str) -> Fields:
+    async def catalog(self, owner: str, product: Product | None = None) -> Fields:
         """固定引擎的回环能力只获取脱敏目录。"""
-        return fields(await self.models.catalog(await self.identity.get_account(owner)))
+        return fields(await self.models.catalog(await self.identity.get_account(owner), product))
 
     async def connector(self, token: str) -> tuple[Account, dict[str, object]]:
         """Connector令牌先解析主体，再检查账号和模型权限。"""

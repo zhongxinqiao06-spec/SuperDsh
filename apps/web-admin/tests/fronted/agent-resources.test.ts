@@ -2,7 +2,7 @@ import { beforeEach, expect, it, vi } from 'vitest'
 
 const state = vi.hoisted(() => ({ generation: 1, initialize: vi.fn() }))
 vi.mock('@/api/agents/agents-api', () => ({
-  agentsApi: { initialize: state.initialize },
+  createAgentsApi: () => ({ initialize: state.initialize }),
 }))
 vi.mock('@/store/session-controller', () => ({ sessionController: state }))
 beforeEach(() => {
@@ -17,14 +17,16 @@ it('同登录并行资源列表共享准备，换号后重新准备', async () =
   const signal = new AbortController().signal
   expect(
     await Promise.all([
-      load(signal, async () => 'agents'),
-      load(signal, async () => 'skills'),
+      load('office', signal, async () => 'agents'),
+      load('office', signal, async () => 'skills'),
     ]),
   ).toEqual(['agents', 'skills'])
   expect(state.initialize).toHaveBeenCalledTimes(1)
-  state.generation++
-  await load(signal, async () => 'other-user')
+  await load('entertainment', signal, async () => 'studio')
   expect(state.initialize).toHaveBeenCalledTimes(2)
+  state.generation++
+  await load('office', signal, async () => 'other-user')
+  expect(state.initialize).toHaveBeenCalledTimes(3)
 })
 
 it('准备失败可重试，但原读取不能抢先执行', async () => {
@@ -33,9 +35,11 @@ it('准备失败可重试，但原读取不能抢先执行', async () => {
   const read = vi.fn(async () => 'ready'),
     signal = new AbortController().signal
   state.initialize.mockRejectedValueOnce(new Error('dependency unavailable'))
-  await expect(load(signal, read)).rejects.toThrow('dependency unavailable')
+  await expect(load('office', signal, read)).rejects.toThrow(
+    'dependency unavailable',
+  )
   expect(read).not.toHaveBeenCalled()
-  await expect(load(signal, read)).resolves.toBe('ready')
+  await expect(load('office', signal, read)).resolves.toBe('ready')
 })
 
 it('取消或换号阻止准备后的业务读取，不污染后续请求', async () => {
@@ -49,12 +53,12 @@ it('取消或换号阻止准备后的业务读取，不污染后续请求', asyn
   )
   const read = vi.fn(async () => 'old'),
     controller = new AbortController()
-  const pending = load(controller.signal, read)
+  const pending = load('office', controller.signal, read)
   controller.abort()
   complete()
   await expect(pending).rejects.toBeDefined()
   expect(read).not.toHaveBeenCalled()
-  const waiting = load(new AbortController().signal, read)
+  const waiting = load('office', new AbortController().signal, read)
   state.generation++
   await expect(waiting).rejects.toThrow('账号状态已变化')
   expect(read).not.toHaveBeenCalled()

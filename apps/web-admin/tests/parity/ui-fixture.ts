@@ -8,6 +8,7 @@ export async function installParityFixture(
   options: {
     signedIn?: boolean
     permissions?: string[]
+    bothProducts?: boolean
     state?: 'normal' | 'error' | 'loading'
   } = {},
 ) {
@@ -17,8 +18,24 @@ export async function installParityFixture(
       'utf8',
     ),
   ) as { permissions: Record<string, string> }
-  const permissions =
-    options.permissions ?? Object.keys(permissionCatalog.permissions)
+  // 差分基线内的旧账号在迁移时获得办公授权，娱乐功能另由产品验收覆盖。
+  const permissions = [
+    ...new Set([
+      ...(options.permissions ?? Object.keys(permissionCatalog.permissions)),
+      'products.office',
+      ...(options.bothProducts
+        ? [
+            'products.entertainment',
+            ...consoleModules.flatMap((module) => module.permissions),
+            ...['office', 'entertainment'].flatMap((product) =>
+              ['models', 'resources', 'menus', 'members'].map(
+                (action) => 'products.' + product + '.' + action + '.manage',
+              ),
+            ),
+          ]
+        : []),
+    ]),
+  ]
   const identity = {
     userId: 'parity-admin',
     username: 'admin',
@@ -56,17 +73,24 @@ export async function installParityFixture(
       revision: 1,
     },
   ]
-  const items = consoleModules.map((module, order) => ({
-    id: module.id,
-    kind: 'page',
-    moduleId: module.id,
-    parentId: null,
-    title: module.title,
-    icon: module.icon,
-    order,
-    visible: true,
-    roleIds: [],
-  }))
+  const officeModules = consoleModules.filter(
+    (module) => module.product !== 'entertainment',
+  )
+  const navigationItems = (product: 'office' | 'entertainment') =>
+    consoleModules
+      .filter((module) => !module.product || module.product === product)
+      .map((module, order) => ({
+        id: module.id,
+        kind: 'page',
+        moduleId: module.id,
+        parentId: null,
+        title: module.title,
+        icon: module.icon,
+        order,
+        visible: true,
+        roleIds: [],
+      }))
+  const items = navigationItems('office')
   const paging = { items: [], total: 0, page: 1, pageSize: 20 }
   const dashboardSettings = {
     intensity: { basis: 'messages', lightMax: 10, mediumMax: 50 },
@@ -102,11 +126,11 @@ export async function installParityFixture(
     '/admin/menus': {
       version: 1,
       items,
-      modules: consoleModules.map((module) => ({
+      modules: officeModules.map((module) => ({
         ...module,
         route: `#${module.path}`,
       })),
-      icons: consoleModules.map((module) => module.icon),
+      icons: officeModules.map((module) => module.icon),
       roles,
     },
     '/admin/users': {
@@ -145,6 +169,22 @@ export async function installParityFixture(
       tools: [],
     },
     '/admin/extensions': { items: [] },
+    '/admin/tools/sources': { items: [] },
+    '/studio/projects': paging,
+    '/studio/library': paging,
+    '/studio/jobs': paging,
+    '/products/office/members': paging,
+    '/products/entertainment/members': paging,
+    '/admin/products/office/model-defaults': {
+      configurations: [],
+      overrides: {},
+      defaults: [],
+    },
+    '/admin/products/entertainment/model-defaults': {
+      configurations: [],
+      overrides: {},
+      defaults: [],
+    },
     '/admin/models/configurations': {
       configurations: [],
       connections: [],
@@ -370,6 +410,14 @@ export async function installParityFixture(
       }
       if (path === '/announcement') return json(catalog[path])
       if (!state.signedIn) return json({ detail: '请登录' }, 401)
+      if (
+        path === '/navigation' &&
+        new URL(request.url()).searchParams.get('product') ===
+          'entertainment' &&
+        options.bothProducts
+      ) {
+        return json({ version: 1, items: navigationItems('entertainment') })
+      }
       if (
         !path.startsWith('/auth/') &&
         path !== '/navigation' &&

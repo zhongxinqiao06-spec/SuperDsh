@@ -12,7 +12,7 @@ from starlette.routing import WebSocketRoute
 
 from app.infrastructure.configuration import Settings
 from app.main import create_app
-from architecture import inspect_python
+from tooling.architecture import inspect_python
 
 
 async def collect(destination: Path) -> None:

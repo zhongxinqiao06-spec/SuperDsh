@@ -8,6 +8,6 @@ defineProps<{ title: string; description?: string }>()
       <h3>{{ title }}</h3>
       <p v-if="description">{{ description }}</p>
     </header>
-    <div class="stack"><slot /></div>
+    <div class="form-stack"><slot /></div>
   </section>
 </template>

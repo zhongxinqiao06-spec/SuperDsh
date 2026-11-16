@@ -1,5 +1,6 @@
 import { expect, test } from '@playwright/test'
 import { installFoundationFixture } from './foundation-fixture'
+import { captureDesign } from './design-capture'
 import type { DashboardOverview } from '../../fronted/src/types/service/system'
 
 /** 合成展示数据只用于排版，不接触真实账号、数据库或执行引擎。 */
@@ -35,7 +36,7 @@ const dashboard: DashboardOverview = {
 }
 
 for (const theme of ['light', 'dark']) {
-  test(`原端视觉规范：${theme} 控件、管理弹窗、工作台与窄屏`, async ({
+  test(`办公产品视觉规范：${theme} 控件、管理弹窗、工作台与窄屏`, async ({
     page,
   }, info) => {
     const errors: string[] = []
@@ -59,9 +60,10 @@ for (const theme of ['light', 'dark']) {
       path: info.outputPath(`login-${theme}.png`),
     })
     await page.getByRole('button', { name: '登录 ↵', exact: true }).click()
+    await page.getByRole('link', { name: /管理后台/ }).click()
     await expect(page.locator('.dashboard-metrics article')).toHaveCount(4)
-    await expect(page.locator('.console-sidebar')).toHaveCSS('width', '240px')
-    await expect(page.locator('.console-header')).toHaveCSS('height', '56px')
+    await expect(page.locator('.console-sidebar')).toHaveCSS('width', '248px')
+    await expect(page.locator('.console-header')).toHaveCSS('height', '60px')
     await expect(
       page.locator('.console-navigation .app-icon').first(),
     ).toBeVisible()
@@ -76,7 +78,7 @@ for (const theme of ['light', 'dark']) {
       path: info.outputPath(`users-${theme}.png`),
     })
     const create = page.getByRole('button', { name: '创建用户', exact: true })
-    await expect(create).toHaveCSS('height', '36px')
+    await expect(create).toHaveCSS('height', '40px')
     await expect(create).toHaveCSS('border-radius', '8px')
     // 深色主题下，框架默认白字不能覆盖浅色主按钮的前景语义。
     const contrast = await create.evaluate((button) => {
@@ -109,9 +111,10 @@ for (const theme of ['light', 'dark']) {
     await expect(dialog.locator('.el-dialog')).toHaveCSS('width', '672px')
     await expect(dialog.locator('.el-dialog')).toHaveCSS(
       'border-radius',
-      '18px',
+      '14px',
     )
     await dialog.getByLabel('用户名', { exact: true }).fill('仅验证展示')
+    await captureDesign(page, `office-user-dialog-${theme}.png`)
     await page.screenshot({
       animations: 'disabled',
       path: info.outputPath(`user-dialog-${theme}.png`),
@@ -143,9 +146,9 @@ for (const theme of ['light', 'dark']) {
     })
     await page.getByRole('button', { name: '打开导航', exact: true }).click()
     const navigation = page.getByRole('dialog')
-    await expect(navigation).toHaveCSS('width', '256px')
+    await expect(navigation).toHaveCSS('width', '280px')
     await navigation
-      .getByRole('link', { name: '用户管理', exact: true })
+      .getByRole('link', { name: '账号与角色', exact: true })
       .click()
     await expect(navigation).toBeHidden()
     await expect(

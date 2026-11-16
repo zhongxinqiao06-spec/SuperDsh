@@ -18,6 +18,7 @@ import { verifyOfficeRendering } from './office-rendering.ts'
 import { runParity } from './parity.ts'
 import { ownedCodeFiles } from '../../../../scripts/code-quality.mjs'
 import { finishCheckRun } from './check-evidence.ts'
+import { repositoryFormatFiles } from './format-scope.ts'
 
 /** 新应用静态与集成验证；跨端和视觉差异由独立parity报告继续跟踪。 */
 async function main() {
@@ -29,7 +30,10 @@ async function main() {
   await ensurePythonEnvironment()
   await verifyBaseline()
   await verifyOwnership()
-  const formattedFiles = ownedCodeFiles().filter(
+  await run(process.execPath, [
+    'apps/web-admin/tests/tooling/check-vue-templates.ts',
+  ])
+  const formattedFiles = repositoryFormatFiles(ownedCodeFiles()).filter(
     (file: string) =>
       file.replaceAll('\\', '/').includes('/apps/web-admin/') &&
       !file
@@ -50,6 +54,8 @@ async function main() {
     'apps/web-admin/tests/tooling/python-cache.test.ts',
     'apps/web-admin/tests/tooling/check-evidence.test.ts',
     'apps/web-admin/tests/tooling/engine-tool-cancellation.test.ts',
+    'apps/web-admin/tests/tooling/engine-tool-errors.test.ts',
+    'apps/web-admin/tests/tooling/format-scope.test.ts',
     'apps/web-admin/tests/parity/live/session-metadata.test.ts',
   ])
   const lint = new ESLint()

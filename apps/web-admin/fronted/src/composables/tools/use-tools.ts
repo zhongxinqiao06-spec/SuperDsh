@@ -1,5 +1,6 @@
+import { useCurrentProduct } from '@/composables/console/use-current-product'
 import { computed, reactive, ref, watch } from 'vue'
-import { toolsApi } from '@/api/tools/tools-api'
+import { createToolsApi } from '@/api/tools/tools-api'
 import { loadPreparedAgentResources } from '@/store/modules/agent-resources'
 import { useResource } from '@/composables/use-resource'
 import { useMutation } from '@/composables/use-mutation'
@@ -13,6 +14,7 @@ import type {
 export const implementationKey = (value: ImplementationRef) =>
   `${value.sourceId}@${value.version}:${value.toolId}`
 const blank = (): ToolDraft => ({
+  product: 'office',
   name: '',
   description: '',
   enabled: true,
@@ -22,13 +24,15 @@ const blank = (): ToolDraft => ({
 
 /** 配置与来源分开管理；更换实现时重新载入声明默认值，不隐式迁移秘密。 */
 export function useTools() {
+  const product = useCurrentProduct().value
+  const toolsApi = createToolsApi(product)
   const auth = useAuthStore(),
     page = ref(1),
     pageSize = ref(10),
     search = ref(''),
     query = ref('')
   const resource = useResource((signal) =>
-      loadPreparedAgentResources(signal, () =>
+      loadPreparedAgentResources(product, signal, () =>
         toolsApi.list(page.value, pageSize.value, search.value, signal),
       ),
     ),
@@ -85,8 +89,9 @@ export function useTools() {
     Object.assign(
       draft,
       value === 'new'
-        ? blank()
+        ? { ...blank(), product }
         : {
+            product: value.product ?? 'office',
             name: value.name,
             description: value.description,
             enabled: value.enabled,
@@ -148,6 +153,7 @@ export function useTools() {
     await Promise.all([sources.reload(), resource.reload()])
   }
   return {
+    product,
     auth,
     resource,
     sources,

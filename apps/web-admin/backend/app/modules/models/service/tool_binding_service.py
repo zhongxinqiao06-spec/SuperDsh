@@ -1,7 +1,10 @@
 """在资源绑定边界冻结Schema声明的模型能力，不按工具场景名称判断。"""
 
+from typing import cast
+
 from app.infrastructure.errors import DomainError
 from app.modules.identity.entity.bo.models import Account
+from app.modules.identity.entity.bo.product_roles import Product
 from app.modules.models.entity.vo.model_vo import CapabilityBinding
 from app.modules.models.service.configuration_service import ConfigurationService
 
@@ -27,7 +30,8 @@ class ToolModelBindingService:
         )
         if not declarations:
             return snapshot
-        catalog = await self.configurations.catalog(account)
+        product = cast(Product, snapshot.get("bindingProduct", "office"))
+        catalog = await self.configurations.catalog(account, product)
         configurations, defaults = catalog["configurations"], catalog["defaults"]
         assert isinstance(configurations, list) and isinstance(defaults, list)
         settings = snapshot.get("settings", {})
@@ -61,6 +65,6 @@ class ToolModelBindingService:
                     "capability": capability,
                 }
             )
-            await self.configurations.resolve(account, binding)
+            await self.configurations.resolve(account, binding, product)
             bindings[field] = binding.model_dump()
         return {**snapshot, "capabilityBindings": bindings}

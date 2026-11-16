@@ -5,6 +5,7 @@ from typing import Annotated
 from fastapi import APIRouter, Depends, Query, Request
 
 from app.api.dependencies import current_account
+from app.api.product_resources import ResourceAccount
 from app.modules.identity.entity.bo.models import Account
 from app.modules.resources.entity.vo.dto import ResourceInput
 from app.modules.resources.service.resources import ResourceService
@@ -24,7 +25,7 @@ def resource_router(kind: str, path: str) -> APIRouter:
     @child.get("")
     async def list_resources(
         request: Request,
-        account: AccountDep,
+        account: ResourceAccount,
         page: int = Query(1, ge=1),
         pageSize: int = Query(25, ge=1, le=200),
         search: str = Query("", max_length=200),
@@ -33,7 +34,7 @@ def resource_router(kind: str, path: str) -> APIRouter:
 
     @child.post("")
     async def create_resource(
-        body: ResourceInput, request: Request, account: AccountDep
+        body: ResourceInput, request: Request, account: ResourceAccount
     ) -> dict[str, object]:
         return await service(request).save(
             account, kind, body.model_dump(exclude_none=True, exclude_unset=True)
@@ -41,19 +42,19 @@ def resource_router(kind: str, path: str) -> APIRouter:
 
     @child.put("/{resource_id}")
     async def save_resource(
-        resource_id: str, body: ResourceInput, request: Request, account: AccountDep
+        resource_id: str, body: ResourceInput, request: Request, account: ResourceAccount
     ) -> dict[str, object]:
         return await service(request).save(
             account, kind, body.model_dump(exclude_none=True, exclude_unset=True), resource_id
         )
 
     @child.delete("/{resource_id}", status_code=204)
-    async def delete_resource(resource_id: str, request: Request, account: AccountDep) -> None:
+    async def delete_resource(resource_id: str, request: Request, account: ResourceAccount) -> None:
         await service(request).delete(account, kind, resource_id)
 
     @child.get("/{resource_id}/versions")
     async def versions(
-        resource_id: str, request: Request, account: AccountDep
+        resource_id: str, request: Request, account: ResourceAccount
     ) -> dict[str, object]:
         return await service(request).versions(account, kind, resource_id)
 

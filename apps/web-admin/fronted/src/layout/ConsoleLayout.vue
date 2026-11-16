@@ -1,22 +1,51 @@
 <script setup lang="ts">
-import { computed } from 'vue'
+import { computed, provide, watch } from 'vue'
+import { consoleMenuKey } from '@/layout/console-navigation'
 import { useConsole } from '@/composables/console/use-console'
 import AppIcon from '@/components/base/AppIcon.vue'
 import AnnouncementGate from '@/components/AnnouncementGate.vue'
 import ConsoleSidebar from '@/layout/components/ConsoleSidebar.vue'
+import AppearanceMenu from '@/layout/components/AppearanceMenu.vue'
 import '@/assets/styles/console.css'
+import { roleLabel } from '@/utils/access/role-labels'
 
 /** 产品拥有后台根布局；桌面和移动导航共用展示，菜单与路由权限分别判断。 */
 const vm = useConsole()
+provide(consoleMenuKey, vm.items)
+// 浮层挂到 body，产品语义要覆盖整份文档；离开控制台即恢复公共入口的配色。
+watch(
+  vm.product,
+  (product, _, onCleanup) => {
+    if (!product) return
+    document.documentElement.dataset.consoleProduct = product
+    onCleanup(() => {
+      delete document.documentElement.dataset.consoleProduct
+    })
+  },
+  { immediate: true, flush: 'sync' },
+)
 const sidebarProps = computed(() => ({
+  brand: vm.productName.value,
+  product: vm.product.value,
+  home: vm.home.value,
+  menuPath: vm.contextPath('/access/menus'),
+  accountPath: vm.contextPath('/account/profile'),
   items: vm.entries.value,
   expanded: vm.expanded.value,
   loading: vm.navigation.loading.value && !vm.navigation.data.value,
   error: vm.navigation.error.value,
   fallback: !vm.navigation.data.value,
   displayName: vm.auth.session?.displayName || vm.auth.session?.username || '—',
-  roles: vm.auth.session?.roles.join(', ') || '',
-  canManageMenus: vm.auth.can('menus.read') || vm.auth.can('menus.manage'),
+  roles:
+    vm.auth.session?.roles
+      .map((id) => roleLabel(id, vm.preferences.tr))
+      .join('、') || '',
+  canManageMenus:
+    vm.auth.can('menus.read') ||
+    vm.auth.can('menus.manage') ||
+    (vm.product.value &&
+      vm.auth.can('products.' + vm.product.value + '.menus.manage')) ||
+    false,
 }))
 function toggleGroup(id: string): void {
   vm.expanded.value = vm.expanded.value === id ? null : id
@@ -43,7 +72,7 @@ function toggleGroup(id: string): void {
       class="console-sidebar-drawer"
       modal-class="console-navigation-overlay"
       direction="ltr"
-      size="256px"
+      size="var(--navigation-drawer-width)"
       :title="vm.preferences.tr('平台导航', 'Platform navigation')"
       :with-header="false"
       :show-close="false"
@@ -90,8 +119,8 @@ function toggleGroup(id: string): void {
           class="console-breadcrumb"
           :aria-label="vm.preferences.tr('面包屑', 'Breadcrumb')"
         >
-          <router-link to="/overview">{{
-            vm.preferences.tr('星桥智能平台', 'Starbridge')
+          <router-link :to="vm.home.value">{{
+            vm.productName.value
           }}</router-link>
           <span class="breadcrumb-separator" aria-hidden="true">/</span>
           <template v-if="vm.parent.value">
@@ -100,10 +129,28 @@ function toggleGroup(id: string): void {
             }}</span>
             <span class="breadcrumb-separator" aria-hidden="true">/</span>
           </template>
-          <span class="breadcrumb-current" aria-current="page">{{
+          <template v-if="$route.meta.projectEditor">
+            <router-link to="/entertainment">{{ vm.title.value }}</router-link>
+            <span class="breadcrumb-separator" aria-hidden="true">/</span>
+            <span class="breadcrumb-current" aria-current="page">{{
+              vm.preferences.tr('作品工作台', 'Project workspace')
+            }}</span>
+          </template>
+          <span v-else class="breadcrumb-current" aria-current="page">{{
             vm.title.value
           }}</span>
         </nav>
+        <div class="console-header-actions">
+          <AppearanceMenu />
+          <router-link
+            v-if="vm.canSwitch.value"
+            class="console-product-switch"
+            to="/products"
+          >
+            <AppIcon name="arrow-left-right" />
+            <span>{{ vm.preferences.tr('切换产品', 'Switch product') }}</span>
+          </router-link>
+        </div>
       </header>
       <main
         class="console-content"
@@ -124,14 +171,27 @@ function toggleGroup(id: string): void {
           :closable="false"
         >
           <template #default>
-            <router-link to="/account/security">{{
+            <router-link :to="vm.contextPath('/account/security')">{{
               vm.preferences.tr('前往账号安全', 'Account security')
             }}</router-link>
           </template>
         </el-alert>
+        <nav
+          v-if="vm.permitted.value && vm.tabs.value.length > 1"
+          class="console-context-tabs"
+          :aria-label="vm.preferences.tr('相关设置', 'Related settings')"
+        >
+          <router-link
+            v-for="tab in vm.tabs.value"
+            :key="tab.id"
+            :to="tab.path"
+            :aria-current="tab.id === vm.module.value?.id ? 'page' : undefined"
+            >{{ tab.title }}</router-link
+          >
+        </nav>
         <router-view
           v-if="vm.permitted.value"
-          :key="`${vm.auth.generation}:${vm.module.value?.id}`"
+          :key="`${vm.auth.generation}:${vm.product.value}:${vm.module.value?.id}:${$route.params.project ?? ''}`"
         />
         <div v-else class="console-route-message" role="alert">
           <h1>{{ vm.module.value ? '403' : '404' }}</h1>
@@ -148,8 +208,8 @@ function toggleGroup(id: string): void {
                   )
             }}
           </p>
-          <router-link to="/overview" class="console-route-return">{{
-            vm.preferences.tr('返回总览', 'Back to overview')
+          <router-link :to="vm.home.value" class="console-route-return">{{
+            vm.preferences.tr('返回首页', 'Back to home')
           }}</router-link>
         </div>
       </main>

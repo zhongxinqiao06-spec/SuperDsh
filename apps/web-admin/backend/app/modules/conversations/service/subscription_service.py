@@ -30,6 +30,7 @@ class SubscriptionService:
 
     async def dashboard(self, account: Account) -> dict[str, object]:
         """分别检查读取权限；快照保留项目、会话、运行实例和分页信息。"""
+        account.require("products.office")
         account.require("devices.read")
         conversations = self.conversations
         connectors = (await conversations.devices.listing(account))["connectors"]
@@ -43,7 +44,7 @@ class SubscriptionService:
         if "sessions.read" in account.permissions:
             await conversations.projection.sync(account)
             async with conversations.repository.transaction() as dao:
-                rows = await dao.sessions(account.user_id)
+                rows = await dao.sessions(account.user_id, product="office")
             sessions = [await conversations.view(account, row) for row in rows]
         runtimes: list[object] = []
         for connector in connectors:

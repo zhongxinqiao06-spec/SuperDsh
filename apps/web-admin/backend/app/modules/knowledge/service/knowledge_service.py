@@ -18,6 +18,7 @@ from app.modules.knowledge.service.qdrant_service import QdrantService
 from app.modules.knowledge.service.source_chunks import source_chunks
 from app.modules.models.service.model_service import Audit
 from app.modules.models.service.provider_transport import ProviderTransport
+from app.modules.resources.entity.bo.product_scope import resource_product, scope_resources
 from app.modules.resources.service.resources import ResourceService
 
 
@@ -147,7 +148,11 @@ class KnowledgeService:
             if asset_id not in identifiers:
                 raise DomainError(404, "资料不属于当前知识库")
             identifiers = [asset_id]
-        return [await self.assets.get(account, value, True) for value in identifiers]
+        return [
+            asset
+            for asset in await self.assets.resource_assets(account, "knowledge", identifier, True)
+            if asset["id"] in identifiers
+        ]
 
     async def status(self, account: Account) -> dict[str, object]:
         """独立报告检索依赖健康，不用管理页可打开冒充索引可用。"""
@@ -187,7 +192,9 @@ class KnowledgeService:
         )
         # 长操作结束重新授权，已撤销权限的请求不能领取结果。
         if self.account_lookup:
-            account = await self.account_lookup(account.user_id)
+            account = scope_resources(
+                await self.account_lookup(account.user_id), resource_product(account)
+            )
         await self._assets(account, identifier, asset_id)
         if self.audit:
             await self.audit(account.user_id, "knowledge.index", identifier, result)
@@ -200,7 +207,9 @@ class KnowledgeService:
         await self.indexes.index(account.user_id, assets, embedding)
         sources = await self.qdrant.search(account.user_id, assets, query, embedding)
         if self.account_lookup:
-            account = await self.account_lookup(account.user_id)
+            account = scope_resources(
+                await self.account_lookup(account.user_id), resource_product(account)
+            )
         current = await self._assets(account, identifier)
         allowed = {str(item["sourceId"]) for asset in current for item in source_chunks(asset)}
         return {"sources": [item for item in sources if item["sourceId"] in allowed]}

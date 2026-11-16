@@ -26,6 +26,7 @@ from app.infrastructure.crypto import CredentialCipher, PasswordSecurity
 from app.infrastructure.database import Database
 from app.infrastructure.errors import DomainError
 from app.infrastructure.logging import configure_logging
+from app.infrastructure.schema_readiness import require_current_schema
 from app.infrastructure.schema_validation import JsonSchemaValidator
 from app.modules.agents.controller.agent_controller import router as agent_router
 from app.modules.agents.entity.vo.agent_vo import AssetInput
@@ -68,10 +69,12 @@ from app.modules.models.service.configuration_service import ConfigurationServic
 from app.modules.models.service.model_operation_service import ModelOperationService
 from app.modules.models.service.model_service import ModelService
 from app.modules.models.service.proxy_service import ModelProxyService
+from app.modules.models.service.reference_analysis_service import ReferenceAnalysisService
 from app.modules.models.service.startup_service import StartupModelService
 from app.modules.models.service.tool_binding_service import ToolModelBindingService
 from app.modules.navigation.controller.routes import router as navigation_router
 from app.modules.navigation.dao.repository import SqlNavigationRepository
+from app.modules.navigation.service.catalogs import product_catalogs
 from app.modules.navigation.service.navigation import NavigationService
 from app.modules.resources.controller.router import router as resources_router
 from app.modules.resources.dao.repository import SqlResourceRepository
@@ -79,6 +82,7 @@ from app.modules.resources.service.resources import ResourceService
 from app.modules.runtime.controller.router import router as runtime_router
 from app.modules.runtime.service.factory import create_runtime
 from app.modules.runtime.service.runtime import RuntimeService
+from app.modules.skills.controller.office_controller import router as office_deliverable_router
 from app.modules.skills.controller.run_controller import router as skill_run_router
 from app.modules.skills.controller.skill_controller import router as skill_router
 from app.modules.skills.dao.repository import SqlRunRepository
@@ -86,6 +90,16 @@ from app.modules.skills.service.agent_execution_service import AgentExecutionSer
 from app.modules.skills.service.evidence import EvidenceService
 from app.modules.skills.service.management_service import SkillManagementService
 from app.modules.skills.service.runs import SkillRunService
+from app.modules.studio.controller.director_context_controller import (
+    router as director_context_router,
+)
+from app.modules.studio.controller.preparation_controller import router as studio_preparation_router
+from app.modules.studio.controller.production_controller import router as studio_production_router
+from app.modules.studio.controller.studio_controller import router as studio_router
+from app.modules.studio.service.director_context_service import DirectorContextService
+from app.modules.studio.service.media_jobs import MediaJobs
+from app.modules.studio.service.studio_agent import StudioAgent
+from app.modules.studio.service.studio_service import StudioService
 from app.workers.processes import ProcessWorkers
 from toolkits.office.examples import prepare as prepare_examples
 from toolkits.office.multimodal import MultimodalService
@@ -120,6 +134,10 @@ class Services:
     skill_management: SkillManagementService
     model_proxy: ModelProxyService
     office_previews: PreviewService
+    studio: StudioService
+    studio_agent: StudioAgent
+    media_jobs: MediaJobs
+    director_context: DirectorContextService
     agent_execution: AgentExecutionService | None = None
     runtime: RuntimeService | None = None
 
@@ -146,10 +164,15 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     )
     navigation = NavigationService(
         SqlNavigationRepository(database),
-        resource_catalog["modules"],
+        product_catalogs(resource_catalog),
         resource_catalog["icons"],
-        resource_catalog["items"],
         identity.role_choices,
+        identity.product_role_ids,
+        json.loads(
+            (Path(__file__).parents[1] / "resources/navigation-upgrade.json").read_text(
+                encoding="utf-8"
+            )
+        ),
     )
     validator = JsonSchemaValidator()
     cipher = CredentialCipher(settings.encryption_key.get_secret_value())
@@ -196,9 +219,20 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     )
     system.allowed_origins = tuple(settings.allowed_origins)
     accounts = AccountFlows(SqlAccountRepository(database), identity, system, security)
-    models = ModelService(database, cipher, settings.provider_allowed_origins, identity.audit)
+    models = ModelService(
+        database,
+        cipher,
+        settings.provider_allowed_origins,
+        identity.audit,
+        product_roles=identity.product_role_ids,
+    )
     model_configurations = ConfigurationService(
-        database, cipher, models.transport, identity.role_exists, identity.audit
+        database,
+        cipher,
+        models.transport,
+        identity.role_exists,
+        identity.audit,
+        product_roles=identity.product_role_ids,
     )
     resources.tool_binding_resolver = ToolModelBindingService(model_configurations).freeze
     files = FileService(database, settings.data_dir, cipher)
@@ -269,6 +303,28 @@ def create_app(settings: Settings | None = None) -> FastAPI:
         settings.office_executable,
         settings.office_native_manifest or bundled_manifest(settings.repository_root),
     )
+    studio = StudioService(database, files)
+    resource_dir = Path(__file__).parents[1] / "resources"
+    studio_manifest = json.loads(
+        (resource_dir / "extensions/builtin-studio.json").read_text("utf-8")
+    )
+    studio_package = json.loads((resource_dir / "studio-package.json").read_text("utf-8"))
+    text_manifest = json.loads(
+        (resource_dir / "extensions/builtin-text-edit.json").read_text("utf-8")
+    )
+    text_package = json.loads((resource_dir / "text-edit-package.json").read_text("utf-8"))
+    for resource in text_package["resources"]:
+        if "implementation" in resource:
+            resource["implementation"]["version"] = text_manifest["version"]
+    for resource in studio_package["resources"]:
+        if "implementation" in resource:
+            resource["implementation"]["version"] = studio_manifest["version"]
+    media_jobs = MediaJobs(
+        studio, model_configurations, identity, cipher, settings.data_dir / "studio/media"
+    )
+    studio_agent = StudioAgent(
+        studio, conversations, resources, studio_package, media_jobs, text_package
+    )
     services = Services(
         identity,
         AccountManagement(identity_repository, security),
@@ -290,6 +346,15 @@ def create_app(settings: Settings | None = None) -> FastAPI:
         SkillManagementService(resources, agents.assets, extensions),
         ModelProxyService(models, identity, devices),
         office_previews,
+        studio,
+        studio_agent,
+        media_jobs,
+        DirectorContextService(
+            studio,
+            ReferenceAnalysisService(
+                model_configurations, ModelOperationService(database, cipher), identity
+            ),
+        ),
     )
 
     def current_runtime() -> RuntimeService:
@@ -332,7 +397,9 @@ def create_app(settings: Settings | None = None) -> FastAPI:
         ),
         office_sources,
     )
-    extensions.executor = office.execute
+    extensions.register_builtin(extensions.builtin, office.execute)
+    extensions.register_builtin(studio_manifest, studio_agent.execute)
+    extensions.register_builtin(text_manifest, studio_agent.execute)
     catalog = CompatibilityCatalog(settings.compatibility_path)
     closing = False
 
@@ -346,6 +413,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
         nonlocal closing
         try:
             await database.ready()
+            await require_current_schema(database)
             await redis.ping()
             services.runtime = await create_runtime(
                 settings, database, identity, services.model_proxy, agent_execution.callback
@@ -365,10 +433,12 @@ def create_app(settings: Settings | None = None) -> FastAPI:
             await devices.operations.initialize()
             await knowledge.initialize(settings.embedding_default)
             await skills.recover()
+            media_jobs.start()
             yield
         finally:
             closing = True
             try:
+                await media_jobs.close()
                 await devices.close()
                 await devices.operations.close()
                 if services.runtime is not None:
@@ -517,6 +587,10 @@ def create_app(settings: Settings | None = None) -> FastAPI:
         )
 
     for router in (
+        studio_router,
+        director_context_router,
+        studio_preparation_router,
+        studio_production_router,
         identity_router,
         oauth_router,
         navigation_router,
@@ -532,6 +606,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
         extension_router,
         skill_router,
         skill_run_router,
+        office_deliverable_router,
         proxy_router,
         conversation_router,
         attachment_router,

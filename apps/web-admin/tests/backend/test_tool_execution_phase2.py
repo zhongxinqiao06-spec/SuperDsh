@@ -74,6 +74,23 @@ async def test_action_requires_exact_confirmation_and_replays_receipt(
     assert invoke.await_count == 1
 
 
+async def test_external_draft_declaration_does_not_bypass_confirmation(
+    platform: tuple[FastAPI, AsyncClient],
+) -> None:
+    """只有当前平台注册的受限建议工具能免去草稿确认，外部声明不能改变权限。"""
+    application, account, binding, _, tool, execution = await prepared(platform)
+    tool = {
+        **tool,
+        "descriptor": {"mode": "draft"},
+        "implementation": {"sourceId": "untrusted", "toolId": "suggest"},
+    }
+    invoke = AsyncMock(return_value={"structuredContent": {"completed": True}})
+    application.state.services.extensions.execute = invoke
+    plan = await execution.invoke(account, binding, tool, "external-draft", {"input": "first"}, {})
+    assert "confirmation" in plan
+    assert invoke.await_count == 0
+
+
 async def test_concurrent_confirmation_and_unknown_results_never_repeat(
     platform: tuple[FastAPI, AsyncClient],
 ) -> None:

@@ -1,5 +1,6 @@
+import { useCurrentProduct } from '@/composables/console/use-current-product'
 import { onScopeDispose, ref, watch } from 'vue'
-import { knowledgeApi } from '@/api/knowledge/knowledge-api'
+import { createKnowledgeApi } from '@/api/knowledge/knowledge-api'
 import { useAssetLibrary } from '@/composables/agents/use-asset-library'
 import { useMutation } from '@/composables/use-mutation'
 import { useAuthStore } from '@/store/modules/auth-store'
@@ -9,6 +10,8 @@ import type { KnowledgeBase } from '@/types/knowledge/knowledge'
 
 /** 知识库文件独立用例：CAS 关联成功后重建索引；移出不删除原文件，失败保留可重试状态。 */
 export function useKnowledgeFiles(reload: () => Promise<void>) {
+  const product = useCurrentProduct().value
+  const knowledgeApi = createKnowledgeApi(product)
   const auth = useAuthStore(),
     target = ref<KnowledgeBase | null>(null),
     mutation = useMutation(),

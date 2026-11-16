@@ -4,8 +4,18 @@ from dataclasses import dataclass, field
 from datetime import datetime
 
 from app.infrastructure.errors import DomainError
+from app.modules.identity.entity.bo.product_roles import (
+    PRODUCT_GRANTS,
+    Product,
+    ProductArea,
+    product_grant,
+)
 
 PERMISSIONS = {
+    "studio.projects.read": "查看自己的娱乐作品",
+    "studio.projects.write": "编辑自己的娱乐作品",
+    "studio.assets.read": "查看自己的创作素材",
+    "studio.assets.write": "管理自己的创作素材版本",
     "devices.read": "查看自己的设备",
     "devices.manage": "管理自己的设备",
     "sessions.read": "读取自己的会话",
@@ -29,9 +39,11 @@ PERMISSIONS = {
     "audit.read": "查看管理审计",
     "agents.manage": "管理智能体资源",
     "extensions.manage": "安装扩展与管理MCP",
+    "products.office": "进入星桥办公",
+    "products.entertainment": "进入星桥娱乐",
     "storage.manage": "管理存储配置",
+    **PRODUCT_GRANTS,
 }
-MEMBER_PERMISSIONS = tuple(PERMISSIONS)[:11]
 
 
 @dataclass
@@ -61,6 +73,21 @@ class Account:
             raise DomainError(403, "password change required")
         if self.disabled or self.deleted_at or permission not in self.permissions:
             raise DomainError(403, f"permission required: {permission}")
+
+    def can_manage_product(self, product: Product, area: ProductArea) -> bool:
+        """展示与领域授权共享判断；两项权限均须属于目标产品。"""
+        return (
+            not self.reset_required
+            and not self.disabled
+            and self.deleted_at is None
+            and "products." + product in self.permissions
+            and product_grant(product, area) in self.permissions
+        )
+
+    def require_product_management(self, product: Product, area: ProductArea) -> None:
+        """同时校验产品使用权和该产品的具体管理操作，显式拒绝串权。"""
+        self.require("products." + product)
+        self.require(product_grant(product, area))
 
 
 @dataclass

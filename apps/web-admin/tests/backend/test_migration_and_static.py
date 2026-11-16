@@ -19,6 +19,16 @@ from app.infrastructure.errors import DomainError
 async def test_unknown_database_is_not_auto_stamped(platform: tuple[FastAPI, AsyncClient]) -> None:
     application, _ = platform
     async with application.state.database.engine.begin() as connection:
+        previous_roles = list(
+            (await connection.scalars(text("select id from roles order by id"))).all()
+        )
+        assert set(previous_roles) == {
+            "admin",
+            "member",
+            "office_admin",
+            "entertainment_admin",
+            "entertainment_creator",
+        }
         await connection.execute(text("DROP TABLE alembic_version"))
     process = await asyncio.create_subprocess_exec(
         sys.executable,
@@ -36,7 +46,10 @@ async def test_unknown_database_is_not_auto_stamped(platform: tuple[FastAPI, Asy
     assert process.returncode != 0
     assert "RuntimeError" in output.decode(errors="replace")
     async with application.state.database.engine.connect() as connection:
-        assert await connection.scalar(text("select count(*) from roles")) == 2
+        assert (
+            list((await connection.scalars(text("select id from roles order by id"))).all())
+            == previous_roles
+        )
 
 
 async def test_expired_bootstrap_remains_expired(platform: tuple[FastAPI, AsyncClient]) -> None:

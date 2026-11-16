@@ -78,12 +78,14 @@ export interface ResourceBase {
   updatedAt: string
 }
 export interface ToolResource extends ResourceBase {
+  product?: 'office' | 'entertainment' | 'shared'
   implementation: ImplementationRef
   settings: Record<string, unknown>
   descriptor?: ToolDescriptor
   configuredSecrets?: string[]
 }
 export interface ToolDraft {
+  product?: 'office' | 'entertainment' | 'shared'
   name: string
   description: string
   enabled: boolean

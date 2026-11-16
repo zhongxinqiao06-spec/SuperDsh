@@ -7,6 +7,8 @@ from typing import cast
 from app.infrastructure.errors import DomainError
 from app.modules.models.entity.vo.model_vo import CapabilityBinding
 from app.modules.models.service.capabilities import validate_parameters
+from app.modules.models.service.reference_protocol import vision_answer as vision_answer
+from app.modules.models.service.reference_protocol import vision_request
 from toolkits.office.contracts import InputFile, record, text
 from toolkits.office.images import image_data
 
@@ -75,90 +77,9 @@ def request_body(
             body["image"] = encoded[0] if len(encoded) == 1 else encoded
         endpoint = "/images/generations"
     elif binding.capability == "vision.analyze":
-        if not encoded:
-            raise DomainError(422, "视觉理解至少需要一张已授权图片")
-        if adapter in {"volcengine-ark", "openai-responses"}:
-            endpoint = "/responses"
-            body = {
-                "model": model,
-                "store": False,
-                "max_output_tokens": parameters.get("maxTokens", 4096),
-                "input": [
-                    {
-                        "role": "user",
-                        "content": [
-                            {"type": "input_text", "text": prompt},
-                            *[{"type": "input_image", "image_url": value} for value in encoded],
-                        ],
-                    }
-                ],
-            }
-            if adapter == "volcengine-ark" and parameters.get("thinking") in {
-                "enabled",
-                "disabled",
-            }:
-                body["thinking"] = {"type": parameters["thinking"]}
-        elif adapter == "openai-completions":
-            endpoint = "/chat/completions"
-            body = {
-                "model": model,
-                "max_tokens": parameters.get("maxTokens", 4096),
-                "messages": [
-                    {
-                        "role": "user",
-                        "content": [
-                            {"type": "text", "text": prompt},
-                            *[
-                                {"type": "image_url", "image_url": {"url": value}}
-                                for value in encoded
-                            ],
-                        ],
-                    }
-                ],
-            }
-        else:
-            raise DomainError(422, "当前连接不支持视觉理解")
+        endpoint, body = vision_request(adapter, model, parameters, prompt, encoded)
     else:
         raise DomainError(422, "此工具不支持所选模型能力")
     if len(json.dumps(body, ensure_ascii=False).encode()) > 32 * 1024 * 1024:
         raise DomainError(413, "模型输入超过处理上限")
     return endpoint, body
-
-
-def vision_answer(value: dict[str, object]) -> str:
-    """只有供应商正常结束的可见正文才算完成，推理文本不能冒充回答。"""
-    choices = value.get("choices")
-    first = choices[0] if isinstance(choices, list) and choices else {}
-    first = first if isinstance(first, dict) else {}
-    if value.get("status") == "incomplete" or first.get("finish_reason") == "length":
-        raise DomainError(
-            502,
-            "视觉分析达到输出上限或未完整结束，请调整配置后重新确认；未重试收费调用",
-            "vision_response_incomplete",
-        )
-    if value.get("status") in {"failed", "cancelled"} or value.get("error"):
-        raise DomainError(502, "视觉供应商未完成分析；未自动重试收费调用")
-    output = value.get("output")
-    answer = ""
-    if isinstance(output, list):
-        texts: list[str] = []
-        for item in output:
-            if not isinstance(item, dict) or item.get("type") != "message":
-                continue
-            content = item.get("content")
-            if isinstance(content, list):
-                texts.extend(
-                    str(part["text"])
-                    for part in content
-                    if isinstance(part, dict)
-                    and part.get("type") == "output_text"
-                    and isinstance(part.get("text"), str)
-                )
-        answer = "\n".join(texts)
-    else:
-        message = first.get("message")
-        if isinstance(message, dict) and isinstance(message.get("content"), str):
-            answer = message["content"]
-    if not answer.strip() or len(answer) > 512 * 1024:
-        raise DomainError(502, "视觉服务未返回有效正文或正文过大")
-    return answer

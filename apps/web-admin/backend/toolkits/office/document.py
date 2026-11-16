@@ -107,7 +107,12 @@ def create_document(
     normal.element.get_or_add_rPr().get_or_add_rFonts().set(qn("w:eastAsia"), font)
     for level in range(1, 4):
         style = document.styles[f"Heading {level}"]
-        style.font.name = font
+        # 标题模板的主题字体优先于显式字体。清除主题并绑定中西文字体，保证渲染后的中文标题仍按原序可检索。
+        heading_fonts = style.element.get_or_add_rPr().get_or_add_rFonts()
+        for theme_attribute in ("asciiTheme", "hAnsiTheme", "eastAsiaTheme", "cstheme", "csTheme"):
+            heading_fonts.attrib.pop(qn("w:" + theme_attribute), None)
+        for script in ("ascii", "hAnsi", "eastAsia", "cs"):
+            heading_fonts.set(qn("w:" + script), font)
         style.font.color.rgb = RGBColor.from_string(str(brand["accentColor"]))
         style.font.size = Pt((16, 13.5, 12)[level - 1])
         style.font.bold = True

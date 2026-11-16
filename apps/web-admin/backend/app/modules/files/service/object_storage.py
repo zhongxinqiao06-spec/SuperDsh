@@ -3,6 +3,8 @@
 import asyncio
 import hashlib
 import hmac
+import shutil
+from collections.abc import AsyncIterator
 from datetime import UTC, datetime
 from pathlib import Path
 from urllib.parse import quote, urlsplit
@@ -10,6 +12,7 @@ from urllib.parse import quote, urlsplit
 import httpx
 
 from app.infrastructure.errors import DomainError
+from app.modules.files.service.staged_content import StagedContent
 
 
 class ObjectStorage:
@@ -30,8 +33,9 @@ class ObjectStorage:
         self,
         method: str,
         key: str,
-        content: bytes = b"",
+        content: bytes | StagedContent = b"",
         media_type: str = "application/octet-stream",
+        span: tuple[int, int] | None = None,
     ) -> httpx.Response:
         endpoint = urlsplit(str(self.configuration.get("endpoint", "")))
         if (
@@ -57,10 +61,16 @@ class ObjectStorage:
         now = datetime.now(UTC)
         stamp, date = now.strftime("%Y%m%dT%H%M%SZ"), now.strftime("%Y%m%d")
         region = str(self.configuration.get("region", "us-east-1"))
-        body_hash = hashlib.sha256(content).hexdigest()
+        body_hash = (
+            content.digest
+            if isinstance(content, StagedContent)
+            else hashlib.sha256(content).hexdigest()
+        )
         headers = {"host": host, "x-amz-date": stamp, "x-amz-content-sha256": body_hash}
         if self.credentials.get("sessionToken"):
             headers["x-amz-security-token"] = str(self.credentials["sessionToken"])
+        if span:
+            headers["range"] = f"bytes={span[0]}-{span[1]}"
         names = sorted(headers)
         signed = ";".join(names)
         canonical = "\n".join(
@@ -89,9 +99,23 @@ class ObjectStorage:
             async with httpx.AsyncClient(
                 timeout=httpx.Timeout(45, connect=8), follow_redirects=False
             ) as client:
-                response = await client.request(
-                    method, f"{endpoint.scheme}://{host}{path}", content=content, headers=headers
-                )
+                if isinstance(content, StagedContent):
+                    headers["content-length"] = str(content.size)
+                async with client.stream(
+                    method,
+                    f"{endpoint.scheme}://{host}{path}",
+                    content=content.chunks() if isinstance(content, StagedContent) else content,
+                    headers=headers,
+                ) as response:
+                    if span and response.status_code != 206:
+                        raise DomainError(503, "对象存储未按范围返回内容")
+                    if (
+                        span
+                        and response.headers.get("content-range", "").split("/")[0]
+                        != f"bytes {span[0]}-{span[1]}"
+                    ):
+                        raise DomainError(503, "对象存储返回了不同的字节范围")
+                    await response.aread()
             if response.status_code == 404:
                 raise DomainError(404, "file not found")
             if not 200 <= response.status_code < 300:
@@ -100,14 +124,38 @@ class ObjectStorage:
         except httpx.HTTPError as error:
             raise DomainError(503, "文件存储连接失败或超时") from error
 
-    async def write(self, key: str, data: bytes, media_type: str) -> None:
+    async def write(self, key: str, data: bytes | StagedContent, media_type: str) -> None:
         """外部 I/O 不占数据库事务；调用方负责未提交对象的回收。"""
         if self.configuration.get("backend") == "s3":
             await self._request("PUT", key, data, media_type)
         else:
             path = self._path(key)
             await asyncio.to_thread(path.parent.mkdir, parents=True, exist_ok=True)
-            await asyncio.to_thread(path.write_bytes, data)
+            if isinstance(data, StagedContent):
+                await asyncio.to_thread(shutil.copyfile, data.path, path)
+            else:
+                await asyncio.to_thread(path.write_bytes, data)
+
+    async def chunks(self, key: str, start: int, end: int) -> AsyncIterator[bytes]:
+        """本地文件直接定位，远端只请求所需区间；读取长度与响应范围一致。"""
+        block = 1024 * 1024
+        if self.configuration.get("backend") == "s3":
+            while start <= end:
+                stop = min(end, start + block - 1)
+                response = await self._request("GET", key, span=(start, stop))
+                if len(response.content) != stop - start + 1:
+                    raise DomainError(502, "对象存储返回内容不完整")
+                yield response.content
+                start = stop + 1
+        else:
+            with self._path(key).open("rb") as source:
+                source.seek(start)
+                while start <= end:
+                    chunk = await asyncio.to_thread(source.read, min(block, end - start + 1))
+                    if not chunk:
+                        raise DomainError(500, "媒体文件内容不完整")
+                    yield chunk
+                    start += len(chunk)
 
     async def read(self, key: str) -> bytes:
         """读取前的所有者权限由文件用例校验。"""

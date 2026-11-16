@@ -90,6 +90,8 @@ class SkillReference(InputModel):
 class SkillInput(InputModel):
     """文本编辑保留未提交的引用和程序；明确 null 才清空草稿。"""
 
+    product: Literal["office", "entertainment", "shared"] = "office"
+
     name: str = Field(min_length=1, max_length=100)
     description: str = Field(default="", max_length=1000)
     enabled: bool = True

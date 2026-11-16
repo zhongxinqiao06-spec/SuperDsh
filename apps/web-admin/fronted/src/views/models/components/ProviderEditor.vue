@@ -88,8 +88,8 @@ function addModel(): void {
 </script>
 
 <template>
-  <div v-if="creating" class="stack">
-    <label
+  <div v-if="creating" class="form-stack">
+    <label class="field"
       >供应商<el-select
         :model-value="preset ?? 'deepseek'"
         @update:model-value="emit('update:preset', $event)"
@@ -103,14 +103,14 @@ function addModel(): void {
     >
   </div>
   <div class="provider-editor-fields">
-    <label
+    <label class="field"
       >供应商名称<el-input
         :model-value="draft.name"
         maxlength="100"
         required
         @update:model-value="patch({ name: $event })"
     /></label>
-    <label
+    <label class="field"
       >协议<el-select
         :model-value="draft.protocol"
         @update:model-value="patch({ protocol: $event })"
@@ -122,7 +122,7 @@ function addModel(): void {
           value="anthropic-messages"
           label="Anthropic Messages" /></el-select
     ></label>
-    <label
+    <label class="field"
       >API 地址<el-input
         :model-value="draft.baseUrl"
         type="url"
@@ -130,7 +130,7 @@ function addModel(): void {
         placeholder="供应商提供的完整 Base URL"
         @update:model-value="patch({ baseUrl: $event })"
     /></label>
-    <label
+    <label class="field"
       >API Key<el-input
         :model-value="draft.apiKey"
         type="password"
@@ -142,7 +142,7 @@ function addModel(): void {
         @update:model-value="patch({ apiKey: $event })"
     /></label>
   </div>
-  <div class="provider-editor-options">
+  <div class="toolbar">
     <el-checkbox
       v-if="keyConfigured"
       :model-value="draft.clearApiKey"
@@ -171,20 +171,20 @@ function addModel(): void {
     class="provider-model-fields"
   >
     <legend>模型 {{ index + 1 }}</legend>
-    <label
+    <label class="field"
       >模型 ID<el-input
         :model-value="model.modelId"
         maxlength="200"
         required
         @update:model-value="patchModel(index, { modelId: $event })"
     /></label>
-    <label
+    <label class="field"
       >显示名称<el-input
         :model-value="model.name"
         maxlength="200"
         @update:model-value="patchModel(index, { name: $event })"
     /></label>
-    <label
+    <label class="field"
       >上下文 Token<el-input-number
         :model-value="model.contextWindow"
         :min="1"
@@ -192,7 +192,7 @@ function addModel(): void {
           patchModel(index, { contextWindow: $event ?? null })
         "
     /></label>
-    <label
+    <label class="field"
       >最大输出 Token<el-input-number
         :model-value="model.maxTokens"
         :min="1"
@@ -229,20 +229,8 @@ function addModel(): void {
 .provider-model-fields {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 16px;
+  gap: var(--field-gap);
   min-width: 0;
-}
-.provider-editor-fields label,
-.provider-model-fields label {
-  display: flex;
-  flex-direction: column;
-  gap: 6px;
-  min-width: 0;
-}
-.provider-editor-options {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 12px;
 }
 .provider-model-fields {
   padding: 12px;

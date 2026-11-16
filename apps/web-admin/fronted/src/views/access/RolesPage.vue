@@ -138,17 +138,20 @@ const { tr } = usePreferences()
       :close-on-click-modal="false"
       @update:model-value="vm.deleting.value = null"
     >
-      <p>
-        {{ tr('确认删除角色', 'Delete role') }}「{{
-          vm.deleting.value?.name
-        }}」？
-      </p>
-      <el-alert
-        v-if="vm.mutation.error.value"
-        :title="vm.mutation.error.value"
-        type="error"
-        :closable="false"
-      /><template #footer>
+      <div class="stack">
+        <p>
+          {{ tr('确认删除角色', 'Delete role') }}「{{
+            vm.deleting.value?.name
+          }}」？
+        </p>
+        <el-alert
+          v-if="vm.mutation.error.value"
+          :title="vm.mutation.error.value"
+          type="error"
+          :closable="false"
+        />
+      </div>
+      <template #footer>
         <el-button
           :disabled="vm.mutation.busy.value"
           @click="vm.deleting.value = null"

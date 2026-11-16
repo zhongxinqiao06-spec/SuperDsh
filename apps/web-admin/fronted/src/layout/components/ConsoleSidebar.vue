@@ -1,12 +1,18 @@
 <script setup lang="ts">
 import { computed } from 'vue'
 import AppIcon from '@/components/base/AppIcon.vue'
+import StarbridgeMark from '@/components/base/StarbridgeMark.vue'
 import ResourceStatus from '@/components/feedback/ResourceStatus.vue'
 import { usePreferences } from '@/store/modules/preferences'
-import type { NavigationDisplayItem } from '@/types/console/navigation'
+import type { NavigationDisplayItem, Product } from '@/types/console/navigation'
 
 /** 桌面侧栏和移动抽屉共用菜单展示；授权、请求与路由解析由布局用例提供。 */
 const props = defineProps<{
+  brand: string
+  home: string
+  product?: Product
+  menuPath: string
+  accountPath: string
   items: readonly NavigationDisplayItem[]
   expanded: string | null
   loading: boolean
@@ -29,10 +35,24 @@ const roots = computed(() => props.items.filter((item) => !item.parentId))
 <template>
   <div class="console-sidebar-content">
     <div class="sidebar-brand">
-      <router-link to="/overview" @click="$emit('navigate')">
-        {{ preferences.tr('星桥智能平台', 'Starbridge') }}
+      <router-link
+        :to="home"
+        class="console-brand"
+        :aria-label="brand"
+        @click="$emit('navigate')"
+      >
+        <span class="console-brand-mark"><StarbridgeMark /></span>
+        <span
+          >{{ brand
+          }}<small aria-hidden="true">{{
+            product === 'office'
+              ? 'STARBRIDGE OFFICE'
+              : product === 'entertainment'
+                ? 'STARBRIDGE STUDIO'
+                : 'STARBRIDGE'
+          }}</small></span
+        >
       </router-link>
-      <p>{{ preferences.tr('统一管理平台', 'Management console') }}</p>
     </div>
     <nav
       class="console-navigation"
@@ -52,7 +72,7 @@ const roots = computed(() => props.items.filter((item) => !item.parentId))
             @click="$emit('toggleGroup', item.id)"
           >
             <AppIcon :name="item.icon" />
-            <span class="nav-label">{{ item.title }}</span>
+            <span class="nav-label" :title="item.title">{{ item.title }}</span>
             <AppIcon
               name="chevron-down"
               :size="14"
@@ -73,7 +93,9 @@ const roots = computed(() => props.items.filter((item) => !item.parentId))
               @click="$emit('navigate')"
             >
               <AppIcon :name="child.icon" />
-              <span>{{ child.title }}</span>
+              <span class="nav-label" :title="child.title">{{
+                child.title
+              }}</span>
             </router-link>
           </div>
         </div>
@@ -86,21 +108,21 @@ const roots = computed(() => props.items.filter((item) => !item.parentId))
           @click="$emit('navigate')"
         >
           <AppIcon :name="item.icon" />
-          <span>{{ item.title }}</span>
+          <span class="nav-label" :title="item.title">{{ item.title }}</span>
         </router-link>
       </template>
       <router-link
         v-if="fallback"
         class="nav-fallback"
-        to="/overview"
+        :to="home"
         @click="$emit('navigate')"
-        >{{ preferences.tr('总览', 'Overview') }}</router-link
+        >{{ preferences.tr('返回首页', 'Home') }}</router-link
       >
     </nav>
     <div class="sidebar-footer">
       <router-link
         v-if="canManageMenus"
-        to="/access/menus"
+        :to="menuPath"
         class="menu-recovery"
         @click="$emit('navigate')"
       >
@@ -108,9 +130,14 @@ const roots = computed(() => props.items.filter((item) => !item.parentId))
         {{ preferences.tr('菜单管理与恢复', 'Manage / restore navigation') }}
       </router-link>
       <div class="account-row">
-        <router-link to="/account/profile" @click="$emit('navigate')">
-          <strong>{{ displayName }}</strong>
-          <small>{{ roles }}</small>
+        <router-link :to="accountPath" @click="$emit('navigate')">
+          <span class="account-monogram" aria-hidden="true">{{
+            Array.from(displayName)[0]
+          }}</span>
+          <span
+            ><strong>{{ displayName }}</strong
+            ><small>{{ roles }}</small></span
+          >
         </router-link>
         <button
           type="button"

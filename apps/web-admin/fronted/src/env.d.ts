@@ -5,3 +5,5 @@ declare const __WEB_ADMIN_BUILD__: {
   builtAt: string
   engine: { version: string; source: string }
 }
+/** 官网图表与公开的 CSV 下载采用同一份源文件。 */
+declare const __PUBLIC_SALES_EXAMPLE__: string

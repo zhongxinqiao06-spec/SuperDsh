@@ -184,7 +184,12 @@ export function useWorkspaceFiles(
         const url = new URL(location.href)
         url.pathname = '/'
         url.search = ''
-        url.hash = `/preview?token=${encodeURIComponent(value.previewToken)}`
+        url.hash =
+          '/preview?' +
+          new URLSearchParams({
+            previewToken: value.previewToken,
+            name: entry.name,
+          }).toString()
         if (popup) popup.location.replace(url.toString())
         else throw new Error('浏览器阻止了预览窗口，请允许此站点打开新窗口')
       } catch (cause) {

@@ -8,13 +8,13 @@ from uuid import uuid4
 
 from app.infrastructure.errors import DomainError
 from app.modules.identity.entity.bo.models import (
-    MEMBER_PERMISSIONS,
     PERMISSIONS,
     Account,
     LoginSession,
     Role,
     User,
 )
+from app.modules.identity.entity.bo.product_roles import ROLE_TITLES, Product, builtin_grants
 from app.modules.identity.entity.bo.validation import account_username, login_identifier
 from app.modules.identity.entity.bo.validation import display_name as validated_display_name
 from app.modules.identity.service.ports import (
@@ -64,6 +64,16 @@ async def resolve_account(tx: IdentityTransaction, user: User, session_id: str =
     )
 
 
+async def current_actor(tx: IdentityTransaction, actor: Account, permission: str) -> Account:
+    """写事务内重新读取授权，防止请求鉴权之后发生撤权。"""
+    user = await tx.user(actor.user_id)
+    if not user or user.auth_version != actor.auth_version:
+        raise DomainError(401, "login session expired or revoked")
+    current = await resolve_account(tx, user, actor.session_id)
+    current.require(permission)
+    return current
+
+
 class IdentityService:
     """身份公开用例，管理页面访问不会启动执行引擎。"""
 
@@ -84,12 +94,11 @@ class IdentityService:
         async with self.repository.transaction() as tx:
             await tx.lock()
             existing = {role.id for role in await tx.roles()}
-            for role_id, grants in (
-                ("admin", list(PERMISSIONS)),
-                ("member", list(MEMBER_PERMISSIONS)),
-            ):
+            for role_id, grants in builtin_grants(PERMISSIONS).items():
                 if role_id not in existing:
-                    await tx.save_role(Role(role_id, role_id, "", grants, builtin=True))
+                    await tx.save_role(
+                        Role(role_id, ROLE_TITLES[role_id], "", grants, builtin=True)
+                    )
 
     async def audit(
         self, actor: str | None, action: str, target: str, detail: dict[str, object]
@@ -138,11 +147,65 @@ class IdentityService:
             await tx.audit(user.id, "account.bootstrap", user.id, {"source": "configuration"})
             return await resolve_account(tx, user)
 
-    async def role_choices(self, account: Account) -> list[dict[str, str]]:
-        """菜单配置只读取角色标识/名称，不跨模块暴露身份表。"""
-        account.require("menus.read" if "menus.read" in account.permissions else "menus.manage")
+    async def product_role_ids(self, account: Account, product: Product) -> tuple[str, ...]:
+        """同一账号切换产品时只匹配本产品角色，平台角色覆盖其显式拥有的产品。"""
+        account.require("products." + product)
         async with self.repository.transaction() as tx:
-            return [{"id": role.id, "name": role.name} for role in await tx.roles()]
+            roles = await tx.roles()
+        return tuple(
+            role.id
+            for role in roles
+            if role.id in account.roles and "products." + product in role.permissions
+        )
+
+    async def _menu_roles(self, account: Account, product: Product | None) -> list[Role]:
+        """全局菜单管理沿用既有权限，产品菜单管理只枚举拥有本产品授权的角色。"""
+        global_grant = next(
+            (key for key in ("menus.read", "menus.manage") if key in account.permissions), None
+        )
+        if global_grant:
+            account.require(global_grant)
+        elif product is not None:
+            account.require_product_management(product, "menus")
+        else:
+            account.require("menus.read")
+        async with self.repository.transaction() as tx:
+            roles = await tx.roles()
+        if global_grant:
+            return roles
+        return [
+            role
+            for role in roles
+            if role.id != "admin" and f"products.{product}" in role.permissions
+        ]
+
+    async def role_choices(
+        self, account: Account, product: Product | None = None
+    ) -> list[dict[str, str]]:
+        """菜单配置只获得可编排角色的公开标识与名称。"""
+        return [
+            {"id": role.id, "name": role.name} for role in await self._menu_roles(account, product)
+        ]
+
+    async def menu_role_permissions(
+        self, account: Account, product: Product, role_id: str
+    ) -> list[str]:
+        """预览使用持久化角色的真实权限，普通菜单管理员不能模拟超管。"""
+        roles = await self._menu_roles(account, product)
+        role = next((r for r in roles if r.id == role_id), None)
+        if role is None or (role.id == "admin" and "admin" not in account.roles):
+            raise DomainError(404, "role not available for this product")
+        if f"products.{product}" not in role.permissions:
+            # 平台菜单管理员可查看所有角色，未开通目标产品时预览应当为空。
+            return []
+        # 不向本产品的预览上下文附加该角色在另一端的管理授权。
+        return [
+            permission
+            for permission in role.permissions
+            if not permission.startswith("products.")
+            or permission == f"products.{product}"
+            or permission.startswith(f"products.{product}.")
+        ]
 
     async def bootstrap(
         self,

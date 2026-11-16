@@ -1,0 +1,367 @@
+{
+  "id": "starbridge.studio",
+  "name": "星桥创作工具",
+  "version": "1.0.1",
+  "description": "按作品授权的分镜和素材编辑",
+  "license": "MIT",
+  "runtime": "python",
+  "entrypoint": "app/modules/studio/service/studio_agent.py",
+  "tools": [
+    {
+      "id": "studio_read",
+      "name": "读取作品",
+      "description": "获取当前会话绑定的作品、素材、分镜与候选，按镜头的稳定 ID 编辑。",
+      "mode": "read",
+      "inputSchema": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {},
+        "required": []
+      },
+      "permissions": ["products.entertainment", "sessions.run"]
+    },
+    {
+      "id": "studio_asset",
+      "name": "创建版本素材",
+      "description": "在当前项目创建角色、场景或道具。保留返回的版本 ID，用于分镜引用。",
+      "mode": "action",
+      "inputSchema": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "kind": {
+            "type": "string",
+            "enum": ["character", "scene", "prop"]
+          },
+          "name": {
+            "type": "string"
+          },
+          "description": {
+            "type": "string"
+          },
+          "voice": {
+            "type": "string"
+          }
+        },
+        "required": ["kind", "name"]
+      },
+      "permissions": ["products.entertainment", "sessions.run"]
+    },
+    {
+      "id": "studio_propose",
+      "name": "提交分镜方案",
+      "description": "读取工程后提交待审剧本、场次与分镜草案，不直接修改工程；用户在方案对比中逐字段采用。sceneId 引用场次稳定 ID，scene 填可读地点，未确认音色留空；原文模式保留已有剧本和对白。",
+      "mode": "draft",
+      "inputSchema": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "revision": {
+            "type": "integer",
+            "minimum": 1,
+            "description": "studio_read 返回的当前工程修订；过期先重新读取。"
+          },
+          "shots": {
+            "type": "array",
+            "maxItems": 200,
+            "items": {
+              "type": "object",
+              "additionalProperties": false,
+              "properties": {
+                "id": {
+                  "type": "string",
+                  "maxLength": 100,
+                  "description": "镜头稳定 ID。编辑既有镜头时原样沿用；新增镜头使用唯一字母数字、下划线或连字符标识。",
+                  "minLength": 1
+                },
+                "action": {
+                  "type": "string",
+                  "maxLength": 12000,
+                  "description": "画面动作、人物表现和生成要求，不以场次或素材 ID 代替描述。"
+                },
+                "sceneId": {
+                  "type": ["string", "null"],
+                  "maxLength": 100,
+                  "description": "所属故事场次的稳定 ID，引用本次或已读取 document.scenes 中的 id；这不是角色/场景素材版本 ID。有对应场次时必须填写。",
+                  "minLength": 1
+                },
+                "scene": {
+                  "type": "string",
+                  "maxLength": 240,
+                  "description": "可读的拍摄地点或环境，例如“海南海边·日景”。不能填场次 UUID；场次关联用 sceneId。"
+                },
+                "camera": {
+                  "type": "string",
+                  "maxLength": 240,
+                  "description": "景别与镜头描述，例如远景、近景。"
+                },
+                "framing": {
+                  "type": "string",
+                  "maxLength": 240,
+                  "description": "画面构图说明。"
+                },
+                "movement": {
+                  "type": "string",
+                  "maxLength": 240,
+                  "description": "运镜说明。"
+                },
+                "duration": {
+                  "type": "integer",
+                  "minimum": 1000,
+                  "maximum": 120000,
+                  "description": "目标时长，单位毫秒；5 秒填写 5000，默认 5000。"
+                },
+                "references": {
+                  "type": "array",
+                  "maxItems": 64,
+                  "items": {
+                    "type": "string",
+                    "maxLength": 100,
+                    "description": "角色、场景或道具等已授权素材版本 ID。",
+                    "minLength": 1
+                  },
+                  "description": "沿用作品已关联的素材版本；不要把场次 ID 放入素材引用。"
+                },
+                "lines": {
+                  "type": "array",
+                  "maxItems": 64,
+                  "items": {
+                    "type": "object",
+                    "additionalProperties": false,
+                    "properties": {
+                      "id": {
+                        "type": "string",
+                        "maxLength": 100,
+                        "description": "台词稳定 ID。修改既有台词时沿用读取结果；新增时使用唯一字母数字、下划线或连字符标识。",
+                        "minLength": 1
+                      },
+                      "role": {
+                        "type": "string",
+                        "maxLength": 100,
+                        "description": "说话角色的 character 素材版本 ID，必须使用作品已关联或工具返回的版本 ID，不填角色名字、场次 ID 或字符串“旁白”。",
+                        "minLength": 1
+                      },
+                      "text": {
+                        "type": "string",
+                        "maxLength": 12000,
+                        "description": "本句台词或旁白；原文模式遵守原稿保护。"
+                      },
+                      "voice": {
+                        "type": "string",
+                        "maxLength": 240,
+                        "description": "仅复用已试听并确认的音色 ID；尚未确认时省略或填写空字符串，不编造音色名称或 ID。"
+                      },
+                      "subtitle": {
+                        "type": ["string", "null"],
+                        "maxLength": 12000,
+                        "description": "独立字幕文案；省略或 null 时沿用台词，修改字幕不改配音。"
+                      },
+                      "subtitleStart": {
+                        "type": ["integer", "null"],
+                        "minimum": 0,
+                        "maximum": 3600000,
+                        "description": "字幕开始时间，单位毫秒，相对本镜头；省略或 null 时沿用配音开始时间。"
+                      },
+                      "start": {
+                        "type": "integer",
+                        "minimum": 0,
+                        "maximum": 3600000,
+                        "description": "配音开始时间，单位毫秒，相对本镜头，默认 0。"
+                      },
+                      "end": {
+                        "type": ["integer", "null"],
+                        "minimum": 0,
+                        "maximum": 3600000,
+                        "description": "字幕结束时间，单位毫秒，相对本镜头，须晚于字幕开始；未确定时省略或 null。"
+                      },
+                      "audio": {
+                        "type": ["string", "null"],
+                        "maxLength": 100,
+                        "description": "已采用且属于本句的 speech 任务 ID；沿用读取结果，不编造；未生成时省略或 null。",
+                        "minLength": 1
+                      },
+                      "volume": {
+                        "type": "number",
+                        "minimum": 0,
+                        "maximum": 2,
+                        "description": "本句配音音量，默认 1。"
+                      }
+                    },
+                    "required": ["role", "text"],
+                    "description": "一句角色台词或旁白；保留既有台词 ID、音色、音频及手工排时。"
+                  },
+                  "description": "按播放顺序填写逐句台词或旁白；无配音镜头可为空数组。"
+                },
+                "candidate": {
+                  "type": ["string", "null"],
+                  "maxLength": 100,
+                  "description": "属于本镜头且已采用的视频候选任务 ID；保持已有选择，未生成时省略或 null。",
+                  "minLength": 1
+                },
+                "trimStart": {
+                  "type": "integer",
+                  "minimum": 0,
+                  "maximum": 3600000,
+                  "description": "手工裁剪入点，单位毫秒；已有镜头保留读取值，新增默认 0。"
+                },
+                "trimEnd": {
+                  "type": ["integer", "null"],
+                  "minimum": 0,
+                  "maximum": 3600000,
+                  "description": "手工裁剪出点，单位毫秒，须大于 trimStart 且不超过 duration；未裁剪时省略或 null。"
+                }
+              },
+              "required": ["action"],
+              "description": "完整镜头草案。已有镜头须保留稳定身份与用户没有要求改动的字段。"
+            },
+            "description": "完整分镜数组；保留未请求修改的现有镜头与稳定身份。"
+          },
+          "script": {
+            "type": "string",
+            "maxLength": 100000,
+            "description": "建议剧本全文；省略时保留当前正文，原文模式不得替换已有原稿。"
+          },
+          "scenes": {
+            "type": "array",
+            "maxItems": 200,
+            "items": {
+              "type": "object",
+              "additionalProperties": false,
+              "properties": {
+                "id": {
+                  "type": "string",
+                  "maxLength": 100,
+                  "description": "场次稳定 ID，供 shots[].sceneId 引用；沿用现有场次 ID，新增场次使用唯一标识。",
+                  "minLength": 1
+                },
+                "title": {
+                  "type": "string",
+                  "maxLength": 240,
+                  "description": "人能读懂的场次标题，例如“椰林出发”。"
+                },
+                "synopsis": {
+                  "type": "string",
+                  "maxLength": 12000,
+                  "description": "本场故事摘要。"
+                },
+                "scriptRange": {
+                  "type": ["object", "null"],
+                  "additionalProperties": false,
+                  "properties": {
+                    "start": {
+                      "type": "integer",
+                      "minimum": 0,
+                      "maximum": 100000,
+                      "description": "原稿 Unicode 字符起始偏移，包含此字符；不是毫秒或时间码。"
+                    },
+                    "end": {
+                      "type": "integer",
+                      "minimum": 1,
+                      "maximum": 100000,
+                      "description": "原稿 Unicode 字符结束偏移，不包含此字符；须大于 start 且不超过剧本长度。"
+                    }
+                  },
+                  "required": ["start", "end"],
+                  "description": "剧本文字范围对象，不接受“0:00-0:05”等字符串；无法精确定位时省略或 null。"
+                }
+              },
+              "required": ["title"],
+              "description": "故事场次，与角色/场景素材不同；镜头通过 sceneId 关联该场次。"
+            },
+            "description": "完整场次数组；省略时保留原场次。每个镜头的 sceneId 应指向此处或保留场次的 id。"
+          }
+        },
+        "required": ["revision", "shots"],
+        "description": "保存待审建议；成功只表示草案已提交，必须由用户采用后才进入作品。"
+      },
+      "permissions": ["products.entertainment", "sessions.run"]
+    },
+    {
+      "id": "studio_edit",
+      "name": "修改指定镜头",
+      "description": "仅更新指定镜头提供的字段，保留其余编辑、角色素材、候选和台词。付费生成由用户确认。",
+      "mode": "action",
+      "inputSchema": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "revision": {
+            "type": "integer"
+          },
+          "shotId": {
+            "type": "string"
+          },
+          "action": {
+            "type": "string"
+          },
+          "scene": {
+            "type": "string",
+            "description": "可读地点或环境；不填场次 UUID，场次关联使用 sceneId。"
+          },
+          "movement": {
+            "type": "string"
+          },
+          "camera": {
+            "type": "string"
+          },
+          "framing": {
+            "type": "string"
+          },
+          "references": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "trimStart": {
+            "type": "integer"
+          },
+          "trimEnd": {
+            "type": "integer"
+          },
+          "sceneId": {
+            "type": ["string", "null"],
+            "maxLength": 100,
+            "description": "所属故事场次稳定 ID，引用 studio_read 的 document.scenes[].id；仅调整场次关联时填写，未要求变更则省略。",
+            "minLength": 1
+          }
+        },
+        "required": ["revision", "shotId"]
+      },
+      "permissions": ["products.entertainment", "sessions.run"]
+    },
+    {
+      "id": "studio_generate",
+      "name": "生成镜头与配音",
+      "description": "准备并提交用户确认的镜头、台词或导出任务。用作品修订和稳定标识定位，执行返回任务号，可继续对话。",
+      "mode": "action",
+      "supportsPreparation": true,
+      "permissions": ["products.entertainment", "models.use", "sessions.run"],
+      "inputSchema": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "revision": {
+            "type": "integer"
+          },
+          "shots": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "lines": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "export": {
+            "type": "boolean"
+          }
+        },
+        "required": ["revision"]
+      }
+    }
+  ]
+}

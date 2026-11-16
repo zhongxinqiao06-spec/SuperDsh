@@ -32,7 +32,15 @@ export default defineConfig(() => {
     plugins: [vue()],
     cacheDir: resolve(validation, 'vite-cache'),
     resolve: { alias: { '@': resolve(directory, 'src') } },
-    define: { __WEB_ADMIN_BUILD__: JSON.stringify(buildInfo) },
+    define: {
+      __WEB_ADMIN_BUILD__: JSON.stringify(buildInfo),
+      __PUBLIC_SALES_EXAMPLE__: JSON.stringify(
+        readFileSync(
+          resolve(directory, 'public/images/website/sales-example.csv'),
+          'utf8',
+        ),
+      ),
+    },
     server: {
       host: 'localhost',
       port: Number(process.env.WEB_ADMIN_FRONTED_PORT ?? 5175),

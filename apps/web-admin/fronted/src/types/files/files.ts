@@ -25,5 +25,6 @@ export interface FileFilter {
   pageSize: number
   search: string
   deleted: boolean
+  source?: string
   category: string
 }

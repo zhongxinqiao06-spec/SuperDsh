@@ -237,45 +237,47 @@ const { tr } = usePreferences()
       :close-on-click-modal="false"
       @update:model-value="vm.confirmation.value = null"
     >
-      <p>
-        {{
-          tr(
-            '确认对以下账号执行此操作？',
-            'Confirm this action on the account?',
-          )
-        }}
-        <strong>{{ vm.confirmation.value?.user.displayName }}</strong>
-      </p>
-      <p v-if="vm.confirmation.value?.action === 'delete'">
-        {{
-          tr(
-            '账号将停用并撤销登录；数据保留，可以恢复。',
-            'The account is deactivated and sign-ins revoked. Data is retained and can be restored.',
-          )
-        }}
-      </p>
-      <p v-else-if="vm.confirmation.value?.action === 'restore'">
-        {{
-          tr(
-            '恢复账号不会恢复已经撤销的登录。',
-            'Restoring an account does not restore revoked sign-ins.',
-          )
-        }}
-      </p>
-      <p v-else-if="vm.confirmation.value?.action === 'reset'">
-        {{
-          tr(
-            '请用户在登录页用自己的恢复码重置密码。管理员无法设置他人的新密码。',
-            'The user must reset their password with their own recovery code on the sign-in page. Administrators cannot set another account’s password.',
-          )
-        }}
-      </p>
-      <el-alert
-        v-if="vm.mutation.error.value"
-        :title="vm.mutation.error.value"
-        type="error"
-        :closable="false"
-      />
+      <div class="stack">
+        <p>
+          {{
+            tr(
+              '确认对以下账号执行此操作？',
+              'Confirm this action on the account?',
+            )
+          }}
+          <strong>{{ vm.confirmation.value?.user.displayName }}</strong>
+        </p>
+        <p v-if="vm.confirmation.value?.action === 'delete'">
+          {{
+            tr(
+              '账号将停用并撤销登录；数据保留，可以恢复。',
+              'The account is deactivated and sign-ins revoked. Data is retained and can be restored.',
+            )
+          }}
+        </p>
+        <p v-else-if="vm.confirmation.value?.action === 'restore'">
+          {{
+            tr(
+              '恢复账号不会恢复已经撤销的登录。',
+              'Restoring an account does not restore revoked sign-ins.',
+            )
+          }}
+        </p>
+        <p v-else-if="vm.confirmation.value?.action === 'reset'">
+          {{
+            tr(
+              '请用户在登录页用自己的恢复码重置密码。管理员无法设置他人的新密码。',
+              'The user must reset their password with their own recovery code on the sign-in page. Administrators cannot set another account’s password.',
+            )
+          }}
+        </p>
+        <el-alert
+          v-if="vm.mutation.error.value"
+          :title="vm.mutation.error.value"
+          type="error"
+          :closable="false"
+        />
+      </div>
       <template #footer>
         <el-button
           :disabled="vm.mutation.busy.value"

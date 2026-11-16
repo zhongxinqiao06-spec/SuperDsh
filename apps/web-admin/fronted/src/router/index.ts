@@ -5,10 +5,23 @@ import {
 } from 'vue-router'
 import { useAuthStore } from '@/store/modules/auth-store'
 import { consoleModules } from '@/utils/console/modules'
+import { productHome, productOf } from '@/utils/studio/products'
 import { canonicalPath } from '@/utils/console/routes'
-import { authContinuation } from '@/utils/auth/native-oauth'
+import { signedInDestination } from '@/utils/auth/native-oauth'
+import { workspacePreviewContinuation } from '@/utils/file-preview/preview-location'
 
 const pages: Record<string, RouteRecordRaw['component']> = {
+  'office.history': () => import('@/views/workbench/HistoryPage.vue'),
+  'office.devices': () => import('@/views/devices/MyDevicesPage.vue'),
+  'product.members': () => import('@/views/products/ProductMembersPage.vue'),
+  'product.defaults': () => import('@/views/products/ProductDefaultsPage.vue'),
+  'platform.extensions': () => import('@/views/tools/ExtensionsPage.vue'),
+  'studio.projects': () => import('@/views/studio/StudioHome.vue'),
+  'studio.library': () => import('@/views/studio/StudioLibraryPage.vue'),
+  'studio.characters': () => import('@/views/studio/StudioLibraryPage.vue'),
+  'studio.environments': () => import('@/views/studio/StudioLibraryPage.vue'),
+  'studio.deliveries': () => import('@/views/studio/StudioTasksPage.vue'),
+  'studio.tasks': () => import('@/views/studio/StudioTasksPage.vue'),
   overview: () => import('@/views/console/OverviewPage.vue'),
   'access.users': () => import('@/views/access/UsersPage.vue'),
   'access.roles': () => import('@/views/access/RolesPage.vue'),
@@ -42,6 +55,8 @@ function modulePage(
   return page
 }
 
+// Hash history 构建时会写入空首页，先收取物理入口中的 OAuth 回调和原生深链。
+normalizeInitialLocation()
 /** 页面路由保留产品模块与旧Hash入口，模块不导入服务端实现。 */
 export const router = createRouter({
   history: createWebHashHistory(),
@@ -84,18 +99,40 @@ export const router = createRouter({
       meta: { public: true },
     })),
     {
+      path: '/products',
+      component: () => import('@/views/products/ProductHome.vue'),
+    },
+    {
       path: '/console',
       component: () => import('@/layout/ConsoleLayout.vue'),
+      meta: { console: true },
       children: [
+        {
+          path: '/office',
+          component: () => import('@/views/products/OfficeHome.vue'),
+          meta: { product: 'office', landing: true },
+        },
+        {
+          path: '/entertainment/:project',
+          component: () => import('@/views/studio/StudioEditor.vue'),
+          meta: {
+            product: 'entertainment',
+            moduleId: 'studio.projects',
+            projectEditor: true,
+          },
+        },
         ...consoleModules.map((module) => ({
           path: module.path,
           component: modulePage(module.id),
-          meta: { moduleId: module.id },
+          meta: {
+            moduleId: module.id,
+            product: module.product,
+          },
         })),
         {
           path: '/workspace/:pathMatch(.*)*',
           component: () => import('@/views/workbench/WorkbenchPage.vue'),
-          meta: { moduleId: 'workbench' },
+          meta: { moduleId: 'workbench', product: 'office' },
         },
       ],
     },
@@ -107,27 +144,59 @@ export const router = createRouter({
   ],
 })
 
-router.beforeEach(async (to) => {
+router.beforeEach(async (to, from) => {
   const auth = useAuthStore()
+  const protectedPreview =
+    to.path === '/preview' ? workspacePreviewContinuation(to.query) : null
   if (
     !to.meta.public ||
+    protectedPreview ||
     ['/login', '/bootstrap', '/register'].includes(to.path)
   )
     await auth.hydrate()
   const canonical = canonicalPath(to.path, auth.session?.permissions)
   if (canonical && canonical !== to.path)
     return { path: canonical, query: to.query, replace: true }
-  if (!to.meta.public && !auth.authenticated)
-    return { path: '/login', query: { returnTo: to.path } }
+  if ((!to.meta.public || protectedPreview) && !auth.authenticated)
+    return {
+      path: '/login',
+      query: { returnTo: protectedPreview ?? to.fullPath },
+    }
+  const home = productHome(auth.session?.permissions)
+  if (
+    protectedPreview &&
+    (!auth.can('products.office') || !auth.can('files.read'))
+  )
+    return home
+  if (to.path === '/products' && home !== '/products') return home
+  if (
+    typeof to.meta.product === 'string' &&
+    !auth.can('products.' + to.meta.product)
+  )
+    return home
+  // 公共模块共用原路径，显式带上娱乐上下文，让刷新、复制链接和浏览器回退得到同一套菜单。
+  if (to.meta.console && !to.meta.product) {
+    const declared = productOf(to.query.product)
+    if (declared && !auth.can('products.' + declared)) return home
+    const inherited =
+      productOf(from.meta.product) ?? productOf(from.query.product)
+    if (
+      !declared &&
+      auth.can('products.entertainment') &&
+      (inherited === 'entertainment' || !auth.can('products.office'))
+    ) {
+      return {
+        path: to.path,
+        query: { ...to.query, product: 'entertainment' },
+        replace: true,
+      }
+    }
+  }
   if (
     auth.authenticated &&
     ['/login', '/bootstrap', '/register'].includes(to.path)
   ) {
-    return typeof to.query.returnTo === 'string'
-      ? (authContinuation(to.query.returnTo) ??
-          canonicalPath(to.query.returnTo, auth.session?.permissions) ??
-          '/overview')
-      : '/overview'
+    return signedInDestination(to.query.returnTo, auth.session?.permissions)
   }
   return true
 })
@@ -135,6 +204,10 @@ router.beforeEach(async (to) => {
 /** 静态托管下兼容原物理入口；URL参数随Hash迁入，不提交到其他来源。 */
 export function normalizeInitialLocation(): void {
   if (!window.location.hash && window.location.pathname !== '/') {
-    window.location.hash = `${window.location.pathname}${window.location.search}`
+    window.history.replaceState(
+      window.history.state,
+      '',
+      `/#${window.location.pathname}${window.location.search}`,
+    )
   }
 }

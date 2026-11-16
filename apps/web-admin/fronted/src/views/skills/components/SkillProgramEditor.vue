@@ -64,7 +64,7 @@ function schema(stage: SkillStage, event: Event) {
 }
 </script>
 <template>
-  <fieldset class="skill-program-editor stack">
+  <fieldset class="skill-program-editor form-stack">
     <legend>{{ tr('自动匹配与阶段配置', 'Matching and stages') }}</legend>
     <p class="muted">
       {{
@@ -234,7 +234,6 @@ function schema(stage: SkillStage, event: Event) {
 </template>
 <style scoped>
 .skill-program-editor {
-  gap: 12px;
   border: 1px solid var(--el-border-color);
   border-radius: 12px;
   padding: 16px;
@@ -242,11 +241,6 @@ function schema(stage: SkillStage, event: Event) {
 .skill-program-editor > .muted {
   margin: 0;
   font-size: 12px;
-}
-.skill-program-editor > .field {
-  display: flex;
-  flex-direction: column;
-  gap: 8px;
 }
 .skill-program-editor > .field :deep(.el-textarea__inner) {
   height: 64px;

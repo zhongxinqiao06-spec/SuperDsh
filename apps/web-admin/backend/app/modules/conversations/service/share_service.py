@@ -125,7 +125,7 @@ class ShareService:
             row = await dao.share(identifier)
         if not row or row.revoked_at:
             raise DomainError(404, "share not found")
-        await self._active_owner(row.owner_id)
+        await self._active_owner(row.owner_id, row.session_id)
         return {
             "share": {"id": row.id, "createdAt": row.created_at.isoformat()},
             "session": row.snapshot.get("session"),
@@ -137,10 +137,15 @@ class ShareService:
             "serverTime": datetime.now(UTC).isoformat(),
         }
 
-    async def _active_owner(self, owner: str) -> None:
-        """分享是公开读取能力，原账号被禁用或删除后同样应立即撤销。"""
+    async def _active_owner(self, owner: str, session_id: str) -> None:
+        """公开授权随来源账号及其产品访问权生效，不向访客暴露撤销原因。"""
         try:
-            await self.conversations.devices.identity.get_account(owner)
+            account = await self.conversations.devices.identity.get_account(owner)
+            async with self.conversations.repository.transaction() as dao:
+                session = await dao.session(session_id)
+                if not session or session.owner_id != owner:
+                    raise DomainError(404, "share not found")
+                account.require("products." + str(session.source.get("product", "office")))
         except DomainError as error:
             raise DomainError(404, "share not found") from error
 
@@ -151,6 +156,10 @@ class ShareService:
             row = await dao.share(identifier)
             if not row or row.owner_id != account.user_id:
                 raise DomainError(404, "share not found")
+            session = await dao.session(row.session_id)
+            if not session or session.owner_id != account.user_id:
+                raise DomainError(404, "share not found")
+            account.require("products." + str(session.source.get("product", "office")))
             row.revoked_at = datetime.now(UTC)
             await dao.save(row)
         return {"revoked": True}
@@ -161,5 +170,5 @@ class ShareService:
         allowed = record(row.snapshot).get("fileIds") if row else None
         if not row or row.revoked_at or not isinstance(allowed, list) or file_id not in allowed:
             raise DomainError(404, "file not found")
-        await self._active_owner(row.owner_id)
+        await self._active_owner(row.owner_id, row.session_id)
         return await self.conversations.files.read_owned_asset(row.owner_id, file_id)

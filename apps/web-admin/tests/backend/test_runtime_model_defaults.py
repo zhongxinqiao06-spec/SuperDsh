@@ -67,14 +67,20 @@ def runtime(tmp_path: Path) -> RuntimeFixture:
             "title": "另一模型",
             "selectionId": "another-provider",
             "enabled": True,
-            "metadata": {"provider": f"superdsh-{SCOPE}-platform-provider", "model": "chat"},
+            "metadata": {
+                "provider": f"superdsh-{SCOPE}-platform-provider",
+                "model": "chat",
+            },
         },
         {
             "id": SELECTION,
             "title": "默认模型",
             "selectionId": SELECTION,
             "enabled": True,
-            "metadata": {"provider": f"superdsh-{SCOPE}-personal-provider", "model": "chat"},
+            "metadata": {
+                "provider": f"superdsh-{SCOPE}-personal-provider",
+                "model": "chat",
+            },
         },
     ]
 
@@ -134,7 +140,10 @@ def runtime(tmp_path: Path) -> RuntimeFixture:
         "clientMessageId": "synthetic-message",
         "content": "synthetic-content",
         "agentPreset": "explicit-agent",
-        "selections": {"permission": "explicit-permission", "agentPreset": "explicit-agent"},
+        "selections": {
+            "permission": "explicit-permission",
+            "agentPreset": "explicit-agent",
+        },
     }
     return RuntimeFixture(
         runner,
@@ -150,7 +159,8 @@ def runtime(tmp_path: Path) -> RuntimeFixture:
 
 
 @pytest.mark.parametrize(
-    "method", ["session.createAndStart", "session.startTurn", "session.updateSelections"]
+    "method",
+    ["session.createAndStart", "session.startTurn", "session.updateSelections"],
 )
 @pytest.mark.parametrize("case", ["native", "foreign", "revoked", "disabled"])
 async def test_unconfigured_selection_rejected_before_execution(
@@ -201,7 +211,9 @@ async def test_sent_turn_replay_does_not_revalidate_changed_catalog(
     runtime.bridge.request.assert_not_awaited()
 
 
-async def test_default_never_picks_explicit_reasoning_variant(runtime: RuntimeFixture) -> None:
+async def test_default_never_picks_explicit_reasoning_variant(
+    runtime: RuntimeFixture,
+) -> None:
     variant = copy.deepcopy(cast(Fields, runtime.runtime_models[1]))
     variant["selectionId"] = "opaque-explicit-reasoning"
     cast(Fields, variant["metadata"])["reasoningEffort"] = "high"
@@ -230,6 +242,53 @@ async def test_new_session_uses_authorized_default_without_mutating_request(
     assert runtime.params == original
     assert submitted["agentPreset"] == "explicit-agent"
     runtime.store.settle.assert_awaited_once()
+
+
+async def test_studio_uses_own_default_without_leaking_product_to_engine(
+    runtime: RuntimeFixture,
+) -> None:
+    """作品首次发言不采用办公默认模型，内部产品标识不进入 DSH 协议。"""
+    configuration = runtime.models.catalog.return_value
+    configuration["productDefaults"] = {"entertainment": configuration["platformDefault"]}
+    params = {**runtime.params, "_starbridgeProduct": "entertainment"}
+    await runtime.runner.call(OWNER, "session.createAndStart", params)
+    method, command = runtime.bridge.request.await_args.args
+    assert method == "session.createAndStart"
+    assert command["selections"]["model"] == "another-provider"
+    assert "_starbridgeProduct" not in command
+    assert params["_starbridgeProduct"] == "entertainment"
+
+
+@pytest.mark.parametrize(
+    "method", ["session.createAndStart", "session.startTurn", "session.updateSelections"]
+)
+async def test_explicit_studio_model_rechecks_authorized_product_roles(
+    runtime: RuntimeFixture, method: str
+) -> None:
+    """不能把办公目录取得的模型标识提交到娱乐会话的创建、继续或模式更新。"""
+    full = runtime.models.catalog.return_value
+
+    async def catalog(owner: str, product: str) -> Fields:
+        assert owner == OWNER and product == "entertainment"
+        return {
+            **full,
+            "providers": [
+                entry for entry in full["providers"] if entry["providerId"] == "platform-provider"
+            ],
+        }
+
+    runtime.models.catalog.side_effect = catalog
+    with pytest.raises(RuntimeFailure, match="所选模型未配置或已停用"):
+        await runtime.runner.call(
+            OWNER,
+            method,
+            {
+                **runtime.params,
+                "_starbridgeProduct": "entertainment",
+                "selections": {"model": SELECTION},
+            },
+        )
+    runtime.store.reserve.assert_not_awaited()
 
 
 async def test_general_chat_uses_engine_default_without_business_binding(
@@ -276,7 +335,9 @@ async def test_engine_default_rejection_happens_before_submission(
     )
 
 
-async def test_general_chat_replay_never_resolves_new_mode(runtime: RuntimeFixture) -> None:
+async def test_general_chat_replay_never_resolves_new_mode(
+    runtime: RuntimeFixture,
+) -> None:
     """完成收据优先于变化后的模式配置，不把重试变成第二次创建。"""
     runtime.params.pop("agentPreset")
     runtime.store.replay.return_value = (True, {"original": True})
@@ -310,7 +371,9 @@ async def test_existing_session_keeps_its_model(runtime: RuntimeFixture) -> None
     assert runtime.bridge.request.await_args.args[1]["selections"] == runtime.params["selections"]
 
 
-async def test_all_defaults_follow_current_configuration(runtime: RuntimeFixture) -> None:
+async def test_all_defaults_follow_current_configuration(
+    runtime: RuntimeFixture,
+) -> None:
     """通用对话无需手动选择；权限默认来自配置，不能取第一项或硬编码权限名。"""
     runtime.params.pop("agentPreset")
     runtime.params["selections"] = {}
@@ -374,12 +437,19 @@ async def test_permission_default_failure_does_not_submit(
     )
 
 
-async def test_catalog_defaults_survive_browser_mapping(runtime: RuntimeFixture) -> None:
+async def test_catalog_defaults_survive_browser_mapping(
+    runtime: RuntimeFixture,
+) -> None:
     """浏览器看到的默认项与首次提交解析一致，标记不污染原引擎目录。"""
     original = copy.deepcopy(runtime.runtime_permissions)
     for kind, method, key, selected in [
         ("model", "catalog.listModels", "models", SELECTION),
-        ("permission", "catalog.listPermissions", "permissions", "opaque-default-permission"),
+        (
+            "permission",
+            "catalog.listPermissions",
+            "permissions",
+            "opaque-default-permission",
+        ),
     ]:
         native = await runtime.runner.call(OWNER, method, {})
         mapped = RuntimeDeviceService.bridge_catalog(kind, native)
@@ -398,7 +468,9 @@ async def test_no_default_rejects_before_submission(runtime: RuntimeFixture) -> 
     runtime.store.reserve.assert_not_awaited()
 
 
-async def test_platform_default_handles_absent_selections(runtime: RuntimeFixture) -> None:
+async def test_platform_default_handles_absent_selections(
+    runtime: RuntimeFixture,
+) -> None:
     runtime.params.pop("selections")
     runtime.models.catalog.return_value["default"] = {
         "providerId": "platform-provider",
@@ -434,7 +506,9 @@ async def test_unavailable_default_never_falls_back_or_reserves(
     ]
 
 
-async def test_invalid_configured_default_fails_before_bridge(runtime: RuntimeFixture) -> None:
+async def test_invalid_configured_default_fails_before_bridge(
+    runtime: RuntimeFixture,
+) -> None:
     runtime.models.catalog.return_value["scope"] = "invalid"
     with pytest.raises(RuntimeFailure) as error:
         await runtime.runner.call(OWNER, "session.createAndStart", runtime.params)
@@ -443,7 +517,9 @@ async def test_invalid_configured_default_fails_before_bridge(runtime: RuntimeFi
     runtime.bridge.request.assert_not_awaited()
 
 
-async def test_completed_replay_ignores_later_default_changes(runtime: RuntimeFixture) -> None:
+async def test_completed_replay_ignores_later_default_changes(
+    runtime: RuntimeFixture,
+) -> None:
     """动态目录不可影响已完成请求的收据和摘要。"""
     runtime.store.replay.return_value = (True, {"original": True})
     assert await runtime.runner.call(OWNER, "session.createAndStart", runtime.params) == {
@@ -477,7 +553,9 @@ async def test_catalog_timeout_or_cancellation_never_claims_submission(
     runtime.store.settle.assert_not_awaited()
 
 
-async def test_reservation_still_arbitrates_concurrent_creation(runtime: RuntimeFixture) -> None:
+async def test_reservation_still_arbitrates_concurrent_creation(
+    runtime: RuntimeFixture,
+) -> None:
     """预读与解析之后仍使用原子占位，别的请求先完成时只返回原收据。"""
     runtime.store.reserve.return_value = (False, {"concurrent": True})
     assert await runtime.runner.call(OWNER, "session.createAndStart", runtime.params) == {

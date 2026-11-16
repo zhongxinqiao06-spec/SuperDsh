@@ -11,11 +11,11 @@ from pathlib import Path
 from uuid import UUID
 
 from sqlalchemy import text
-from tooling.model_probe_cleanup import EXTERNAL_STATE_GUARDS, cleanup_probe_user
 
 from app.infrastructure.configuration import Settings
 from app.infrastructure.database import Database
 from main import load_development_environment
+from tooling.model_probe_cleanup import EXTERNAL_STATE_GUARDS, cleanup_probe_user
 
 
 async def cleanup(directory: Path, finalize: bool) -> None:

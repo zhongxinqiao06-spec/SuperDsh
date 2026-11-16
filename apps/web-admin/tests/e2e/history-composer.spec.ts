@@ -108,8 +108,7 @@ for (const theme of ['light', 'dark']) {
     await page.getByLabel('用户名或邮箱').fill('admin')
     await page.getByLabel('密码', { exact: true }).fill('Synthetic-password!')
     await page.getByRole('button', { name: '登录 ↵', exact: true }).click()
-    await expect(page.locator('[data-console-shell]')).toBeVisible()
-    await page.goto('/#/workspace')
+    await page.getByRole('link', { name: /办公工作台/ }).click()
     for (const session of sessions) {
       await page.setViewportSize({ width: 1440, height: 1000 })
       const sidebarToggle = page.getByRole('button', {

@@ -22,6 +22,12 @@ export interface ArtifactView {
   deliverable?: boolean
   renderedQuality?: { status?: string }
 }
+/** 首页成果绑定真实文件与所属会话；展示元数据不能代替下载授权。 */
+export interface OfficeDeliverable extends ArtifactView {
+  sessionId: string
+  sessionTitle: string
+  createdAt: string | null
+}
 export interface ArtifactPreview {
   name: string
   mediaType: string
@@ -31,6 +37,11 @@ export interface ArtifactPreview {
 const path = (session: string) => `/sessions/${encodeURIComponent(session)}`
 
 export const resultApi = {
+  recentOffice: (signal?: AbortSignal) =>
+    request<{ items: OfficeDeliverable[] }>('/office/recent-deliverables', {
+      query: { limit: 4 },
+      signal,
+    }),
   runs: (session: string, signal?: AbortSignal) =>
     request<{ items: SkillRunView[] }>(`${path(session)}/skill-runs`, {
       signal,

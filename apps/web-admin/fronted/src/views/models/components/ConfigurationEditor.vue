@@ -53,13 +53,13 @@ function patch(value: Partial<ConfigurationDraft>): void {
 </script>
 
 <template>
-  <label
+  <label class="field"
     >配置名称<el-input
       :model-value="draft.name"
       maxlength="100"
       @update:model-value="patch({ name: $event })"
   /></label>
-  <label
+  <label class="field"
     >供应商连接<el-select
       :model-value="draft.connectionId"
       :disabled="editing"
@@ -72,7 +72,7 @@ function patch(value: Partial<ConfigurationDraft>): void {
           connection.name + (connection.enabled ? '' : '（停用）')
         " /></el-select
   ></label>
-  <label
+  <label class="field"
     >能力<el-select
       :model-value="draft.capability"
       :disabled="editing"
@@ -86,13 +86,13 @@ function patch(value: Partial<ConfigurationDraft>): void {
         :label="capability.name + (capability.available ? '' : '（尚未开放）')"
         :disabled="!capability.available" /></el-select
   ></label>
-  <label
+  <label class="field"
     >模型 ID<el-input
       :model-value="draft.modelId"
       maxlength="200"
       @update:model-value="patch({ modelId: $event })"
   /></label>
-  <label v-for="[key, schema] in parameters" :key="key"
+  <label v-for="[key, schema] in parameters" :key="key" class="field"
     >{{ schema.title ?? key }}
     <el-input-number
       v-if="schema.type === 'integer'"
@@ -121,7 +121,7 @@ function patch(value: Partial<ConfigurationDraft>): void {
       "
     />
   </label>
-  <label
+  <label class="field"
     >可用角色（不选表示所有角色）<el-select
       :model-value="draft.roleIds"
       multiple

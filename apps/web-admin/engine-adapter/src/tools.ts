@@ -47,8 +47,24 @@ export function installTools(
         settle(message) {
           clearTimeout(timer)
           execution.signal.removeEventListener('abort', abort)
-          if (message.error) reject(new Error('工具执行失败'))
-          else resolve(fields(message.result))
+          if (message.error) {
+            const failure =
+              typeof message.error === 'object' && !Array.isArray(message.error)
+                ? fields(message.error)
+                : {}
+            // 只透传 Python 明确发布的有界参数提示，不把任意服务端异常送入模型上下文。
+            const safe =
+              failure.status === 422 &&
+              (failure.code === 'tool_arguments_invalid' ||
+                failure.code === 'studio_tool_arguments_invalid') &&
+              typeof failure.detail === 'string' &&
+              failure.detail.trim()
+            reject(
+              new Error(
+                safe ? String(failure.detail).slice(0, 1000) : '工具执行失败',
+              ),
+            )
+          } else resolve(fields(message.result))
         },
       })
       send({

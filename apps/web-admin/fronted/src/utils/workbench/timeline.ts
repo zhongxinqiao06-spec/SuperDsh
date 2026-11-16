@@ -57,18 +57,61 @@ export function objectValue(value: unknown): Record<string, unknown> {
     : {}
 }
 
-/** 提取不同来源消息块的正文，保留工具结果可折叠检查。 */
-export function messageText(item: TimelineItem): string {
-  if (typeof item.content === 'string') return item.content
-  const content = objectValue(item.content)
-  if (typeof content.text === 'string') return content.text
+function isReasoning(value: Record<string, unknown>): boolean {
+  return ['reasoning', 'thought', 'thinking'].some(
+    (kind) => value.kind === kind || value.type === kind,
+  )
+}
+
+function messageBlocks(
+  content: Record<string, unknown>,
+): Record<string, unknown>[] {
   const blocks = Array.isArray(content.parts)
     ? content.parts
     : Array.isArray(content.blocks)
       ? content.blocks
       : []
-  return blocks
-    .map((block) => objectValue(block).text)
+  return blocks.map(objectValue)
+}
+
+/** 只提取面向用户的正文；思考块通过独立折叠区展示，不能冒充正式回复。 */
+export function messageText(item: TimelineItem): string {
+  if (isReasoning(item)) return ''
+  if (typeof item.content === 'string') return item.content
+  const content = objectValue(item.content)
+  if (isReasoning(content)) return ''
+  if (typeof content.text === 'string') return content.text
+  return messageBlocks(content)
+    .filter((block) => !isReasoning(block))
+    .map((block) => block.text)
+    .filter((text): text is string => typeof text === 'string')
+    .join('\n')
+}
+
+/** 兼容固定 DSH 的 system/reasoning 条目与混合消息块，默认不展开过程文字。 */
+export function messageReasoning(item: TimelineItem): string {
+  const content = objectValue(item.content)
+  if (isReasoning(item) || isReasoning(content)) {
+    const summaries = Array.isArray(content.summaries)
+      ? content.summaries.map(objectValue).map((summary) => summary.text)
+      : []
+    return (
+      summaries
+        .filter((text): text is string => typeof text === 'string')
+        .join('\n') ||
+      (typeof item.content === 'string'
+        ? item.content
+        : typeof content.rawText === 'string'
+          ? content.rawText
+          : typeof content.text === 'string'
+            ? content.text
+            : '')
+    )
+  }
+  if (typeof content.reasoning === 'string') return content.reasoning
+  return messageBlocks(content)
+    .filter(isReasoning)
+    .map((block) => block.text)
     .filter((text): text is string => typeof text === 'string')
     .join('\n')
 }

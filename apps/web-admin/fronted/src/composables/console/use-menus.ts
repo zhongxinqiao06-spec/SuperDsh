@@ -4,12 +4,22 @@ import { useResource } from '@/composables/use-resource'
 import { useMutation } from '@/composables/use-mutation'
 import { useAuthStore } from '@/store/modules/auth-store'
 import { navigationApi } from '@/api/console/navigation-api'
-import type { MenuNode } from '@/types/console/navigation'
+import type { MenuNode, Product } from '@/types/console/navigation'
+import { useRoute } from 'vue-router'
+import { productOf } from '@/utils/studio/products'
 
 /** 菜单编辑保留服务端版本；冲突时不丢本地草稿或自动覆盖。 */
 export function useMenus() {
   const auth = useAuthStore()
-  const resource = useResource(navigationApi.menus)
+  const route = useRoute()
+  const product = ref<Product>(productOf(route.query.product) ?? 'office')
+  const globalAccess = computed(
+    () => auth.can('menus.read') || auth.can('menus.manage'),
+  )
+  const previewOpen = ref(false)
+  const resource = useResource((signal) =>
+    navigationApi.menus(product.value, signal),
+  )
   const mutation = useMutation()
   const items = ref<MenuNode[]>([]),
     version = ref(0),
@@ -40,7 +50,28 @@ export function useMenus() {
   watch([query, pageSize], () => {
     page.value = 1
   })
-  const canEdit = computed(() => auth.can('menus.manage'))
+  const canEdit = computed(
+    () =>
+      auth.can('menus.manage') ||
+      auth.can('products.' + product.value + '.menus.manage'),
+  )
+  function editable(item: MenuNode): boolean {
+    const ids = resource.data.value?.editableIds
+    return canEdit.value && (!ids || ids.includes(item.id))
+  }
+  // 切换编辑对象时清除旧版本与筛选，避免用办公的配置覆盖娱乐菜单。
+  watch(product, () => {
+    items.value = []
+    version.value = 0
+    editing.value = null
+    deletingGroup.value = null
+    resetOpen.value = false
+    previewOpen.value = false
+    query.value = ''
+    page.value = 1
+    mutation.error.value = ''
+    void resource.reload()
+  })
   watch(resource.data, (value) => {
     if (value) {
       items.value = structuredClone(value.items)
@@ -65,14 +96,18 @@ export function useMenus() {
     if (index < 0) next.push(structuredClone(toRaw(value)))
     else next[index] = structuredClone(toRaw(value))
     // 弹窗保存即提交版本条件，冲突时保留编辑器，不用第二次全表提交才能生效。
-    if (await mutation.run(() => navigationApi.save(version.value, next))) {
+    if (
+      await mutation.run(() =>
+        navigationApi.save(product.value, version.value, next),
+      )
+    ) {
       await resource.reload()
       window.dispatchEvent(new Event('starbridge:navigation-changed'))
     }
   }
   function addGroup(): void {
     editing.value = {
-      id: createUuid(),
+      id: 'group-' + createUuid(),
       kind: 'group',
       moduleId: null,
       parentId: null,
@@ -92,7 +127,11 @@ export function useMenus() {
       .map((item) =>
         item.parentId === group.id ? { ...item, parentId: null } : item,
       )
-    if (await mutation.run(() => navigationApi.save(version.value, next))) {
+    if (
+      await mutation.run(() =>
+        navigationApi.save(product.value, version.value, next),
+      )
+    ) {
       deletingGroup.value = null
       await resource.reload()
       window.dispatchEvent(new Event('starbridge:navigation-changed'))
@@ -100,20 +139,30 @@ export function useMenus() {
   }
   async function save(): Promise<void> {
     if (
-      await mutation.run(() => navigationApi.save(version.value, items.value))
+      await mutation.run(() =>
+        navigationApi.save(product.value, version.value, items.value),
+      )
     ) {
       await resource.reload()
       window.dispatchEvent(new Event('starbridge:navigation-changed'))
     }
   }
   async function reset(): Promise<void> {
-    if (await mutation.run(() => navigationApi.reset(version.value))) {
+    if (
+      await mutation.run(() =>
+        navigationApi.reset(product.value, version.value),
+      )
+    ) {
       resetOpen.value = false
       await resource.reload()
       window.dispatchEvent(new Event('starbridge:navigation-changed'))
     }
   }
   return {
+    product,
+    globalAccess,
+    previewOpen,
+    editable,
     resource,
     mutation,
     items,

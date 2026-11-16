@@ -48,8 +48,8 @@ function displayed(key: string, schema: RuntimeSchema): unknown {
 }
 </script>
 <template>
-  <div class="runtime-fields">
-    <label v-for="[key, field] in fields" :key="key" class="runtime-field"
+  <div class="runtime-fields form-stack">
+    <label v-for="[key, field] in fields" :key="key" class="runtime-field field"
       ><span
         >{{ field.title || key }}
         <b v-if="schema.required?.includes(key)">*</b></span
@@ -134,14 +134,6 @@ function displayed(key: string, schema: RuntimeSchema): unknown {
   </div>
 </template>
 <style scoped>
-.runtime-fields {
-  display: grid;
-  gap: 16px;
-}
-.runtime-field {
-  display: grid;
-  gap: 6px;
-}
 .runtime-field > .runtime-fields {
   padding-left: 14px;
   border-left: 2px solid var(--el-border-color);

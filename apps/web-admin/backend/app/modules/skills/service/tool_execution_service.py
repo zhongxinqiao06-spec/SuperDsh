@@ -102,6 +102,10 @@ class ToolExecutionService:
             or isinstance(read_actions, list)
             and arguments.get("action") in read_actions
         )
+        # 受限建议工具只提交待审内容，最终写入仍由产品采用接口授权；不让用户重复确认草稿。
+        draft_only = descriptor.get("mode") == "draft" and self.extensions.is_builtin_draft(
+            object_value(tool.get("implementation"))
+        )
         run = await self.controls.active(account, binding)
         if run:
             stage = stages(run.program)[run.stage_index]
@@ -147,7 +151,7 @@ class ToolExecutionService:
                 updated_at=now,
             )
             await dao.save(row)
-        if read_only:
+        if read_only or draft_only:
             return await self._execute(account, binding, tool, row, run, "inspect")
         try:
             if descriptor.get("supportsPreparation") is True:

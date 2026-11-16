@@ -1,0 +1,75 @@
+.starbridge-public .office-resources {
+  color: var(--ink);
+  background: var(--paper);
+}
+.starbridge-public
+  .office-resources
+  :is(.website-section, .website-capabilities) {
+  padding: clamp(30px, 5vw, 68px)
+    max(calc((100% - 1296px) / 2), calc((100% - var(--page)) / 2));
+  border-top: 1px solid var(--public-border);
+  background: transparent;
+  color: inherit;
+}
+.starbridge-public
+  .office-resources
+  :is(.eyebrow, .website-capabilities .eyebrow) {
+  color: var(--blue);
+  margin-bottom: 13px;
+  font: 550 11px var(--mono);
+  letter-spacing: 0.1em;
+}
+.starbridge-public .office-resources h2 {
+  font-family: var(--serif);
+  font-weight: 650;
+  font-size: clamp(23px, 3vw, 38px);
+  margin-bottom: 16px;
+}
+.starbridge-public .office-resources :is(.website-demo, .website-architecture) {
+  background: var(--public-card);
+  border: 1px solid var(--public-border);
+  border-radius: var(--radius-control);
+}
+.starbridge-public
+  .office-resources
+  :is(.website-architecture span, .website-slide) {
+  background: var(--public-muted);
+  border-radius: var(--radius-control);
+}
+.starbridge-public .office-resources .website-tabs button {
+  border: 1px solid var(--public-border);
+  border-radius: var(--radius-control);
+}
+.starbridge-public
+  .office-resources
+  .website-tabs
+  button:is([aria-selected='true'], [aria-pressed='true']),
+.starbridge-public .office-resources .website-cta,
+.starbridge-public .office-resources .website-sales-bars i {
+  background: var(--blue);
+  color: white;
+  border-radius: var(--radius-control);
+}
+.starbridge-public .office-resources .website-faq {
+  border-color: var(--public-border);
+}
+.starbridge-public
+  .office-resources
+  :is(.website-demo p, .muted, .capabilities-grid p) {
+  color: var(--public-subtle);
+}
+.starbridge-public .office-resources :is(.website-demo a, .website-scenario a) {
+  color: var(--blue);
+  text-decoration: underline;
+  text-underline-offset: 3px;
+}
+.starbridge-public
+  .office-resources
+  .website-section
+  :is(.website-cta, button) {
+  margin-block: 5px;
+}
+.starbridge-public .office-resources .website-cta {
+  display: inline-flex;
+  margin-top: 15px;
+}

@@ -1,0 +1,118 @@
+.starbridge-public.product-website,
+.starbridge-public.product-launch {
+  min-height: 100dvh;
+}
+.starbridge-public .masthead {
+  position: sticky;
+  top: 0;
+  z-index: 12;
+}
+.starbridge-public main [id] {
+  scroll-margin-top: 82px;
+}
+.starbridge-public .public-actions,
+.starbridge-public .site-footer > div {
+  display: flex;
+  gap: 16px;
+  align-items: center;
+  justify-content: flex-end;
+}
+.starbridge-public .public-actions {
+  justify-self: end;
+}
+.starbridge-public .site-utilities {
+  position: relative;
+}
+.starbridge-public .utility-button,
+.starbridge-public .utility-menu button {
+  background: transparent;
+  border: 0;
+  color: inherit;
+  font: inherit;
+  cursor: pointer;
+}
+.starbridge-public .utility-button {
+  display: grid;
+  place-items: center;
+  width: 34px;
+  height: 34px;
+}
+.starbridge-public .utility-menu {
+  position: absolute;
+  right: 0;
+  top: calc(100% + 8px);
+  width: max-content;
+  min-width: 145px;
+  display: grid;
+  padding: 6px;
+  border: 1px solid var(--public-border);
+  background: var(--public-card);
+  color: var(--public-text);
+  text-align: left;
+  box-shadow: 0 5px 20px #0002;
+  border-radius: var(--radius-control);
+}
+.starbridge-public .utility-menu > * {
+  padding: 8px 12px;
+  text-align: start;
+  font-size: 14px;
+}
+.starbridge-public .utility-menu > :is(a, button):hover {
+  background: var(--public-accent);
+}
+.starbridge-public .utility-menu > button {
+  border-top: 1px solid var(--public-border);
+}
+.starbridge-public[data-product='office'] .utility-menu {
+  background: var(--paper);
+  color: var(--ink);
+  border-color: var(--public-border);
+}
+.starbridge-public[data-product='office'] .utility-menu > :is(a, button):hover {
+  background: var(--public-accent);
+}
+.starbridge-public .launch-back,
+.starbridge-public .mast-cta {
+  white-space: nowrap;
+}
+.starbridge-public .diagonal-arrow {
+  transform: rotate(-45deg);
+}
+.starbridge-public .down-arrow {
+  transform: rotate(180deg);
+}
+.starbridge-public .brand b,
+.starbridge-public .report-stat {
+  min-width: 0;
+}
+.starbridge-public.product-launch {
+  background: var(--paper);
+  color: var(--ink);
+}
+.starbridge-public .site-footer > div > a {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  font-size: 13px;
+}
+.starbridge-public :is(button, a):focus-visible {
+  outline: 2px solid currentColor;
+  outline-offset: 3px;
+}
+.starbridge-public :is(main, section)[tabindex='-1']:focus {
+  outline: none;
+}
+/* 品牌母版自带 1em 默认尺寸，页眉与预览分别使用各自的光学校正尺寸。 */
+.starbridge-public .brand .brand-mark {
+  width: 31px;
+  height: 31px;
+}
+.starbridge-public .skip:focus {
+  z-index: 14;
+}
+@media (max-width: 720px) {
+  .starbridge-public .brand .brand-mark {
+    width: 25px;
+    height: 25px;
+  }
+}

@@ -6,17 +6,20 @@ async function login(page: Page) {
   await page.getByLabel('用户名或邮箱').fill('admin')
   await page.getByLabel('密码', { exact: true }).fill('Synthetic-password!')
   await page.getByRole('button', { name: '登录 ↵', exact: true }).click()
+  await page.getByRole('link', { name: /管理后台/ }).click()
   await expect(page.locator('[data-console-shell]')).toBeVisible()
 }
 
 test('官网进入登录，后台用户CRUD失败保稿，不准备DSH', async ({ page }) => {
   const state = await installFoundationFixture(page)
   await page.goto('/')
-  await expect(page.getByRole('heading', { level: 1 })).toContainText('AI 能力')
+  await expect(page.getByRole('heading', { level: 1 })).toContainText(
+    '做成短片',
+  )
   await login(page)
   await page
     .getByRole('navigation')
-    .getByRole('link', { name: '用户管理' })
+    .getByRole('link', { name: '账号与角色' })
     .click()
   await expect(page.getByRole('cell', { name: /合成成员/ })).toBeVisible()
   await page.getByRole('button', { name: '创建用户', exact: true }).click()
@@ -35,13 +38,21 @@ test('官网进入登录，后台用户CRUD失败保稿，不准备DSH', async (
   await editor.getByRole('button', { name: '保存', exact: true }).click()
   await expect(editor.getByText('用户已被修改，请重新加载')).toBeVisible()
   await expect(editor.getByLabel('显示名称')).toHaveValue('冲突草稿保留')
+  // 首页输入栏可读取就绪状态，浏览首页、管理用户都不能创建引擎或任务。
   expect(
-    state.requests.filter((entry) => entry.includes('server-agent')),
+    state.requests.filter(
+      (entry) =>
+        entry.startsWith('POST ') &&
+        /server-agent|\/sessions(?:$|\/)/.test(entry),
+    ),
   ).toEqual([])
 })
 
 test('角色权限阻止直接路由挂载，未知入口显示404', async ({ page }) => {
-  const state = await installFoundationFixture(page, ['users.read'])
+  const state = await installFoundationFixture(page, [
+    'users.read',
+    'settings.manage',
+  ])
   await login(page)
   await page.goto('/#/access/roles')
   await expect(page.getByText('403', { exact: true })).toBeVisible()
@@ -55,7 +66,7 @@ test('菜单409保留草稿，重新加载可恢复服务端最新配置', async
   await login(page)
   await page.goto('/#/access/menus')
   await page
-    .getByRole('row', { name: /总览 一级页面/ })
+    .getByRole('row', { name: /平台总览 一级页面/ })
     .getByRole('button', { name: '编辑' })
     .click()
   const editor = page.getByRole('dialog')
@@ -69,7 +80,7 @@ test('菜单409保留草稿，重新加载可恢复服务端最新配置', async
   await editor.getByRole('button', { name: '取消', exact: true }).click()
   await page.getByRole('button', { name: '重新加载最新配置' }).click()
   await expect(
-    page.getByRole('cell', { name: '总览', exact: true }),
+    page.getByRole('cell', { name: '平台总览', exact: true }),
   ).toBeVisible()
 })
 
@@ -78,17 +89,17 @@ test('工作台按需准备一次、切模块保草稿、退出清理账号状�
   await login(page)
   await page
     .getByRole('navigation')
-    .getByRole('link', { name: 'Agent 工作台' })
+    .getByRole('link', { name: '智能对话' })
     .click()
   await expect(page.getByRole('status')).toContainText('已就绪')
   await page.getByLabel('任务草稿').fill('跨模块保留的草稿')
   await page
     .getByRole('navigation')
-    .getByRole('link', { name: '总览', exact: true })
+    .getByRole('link', { name: '平台总览', exact: true })
     .click()
   await page
     .getByRole('navigation')
-    .getByRole('link', { name: 'Agent 工作台' })
+    .getByRole('link', { name: '智能对话' })
     .click()
   await expect(page.getByLabel('任务草稿')).toHaveValue('跨模块保留的草稿')
   expect(
@@ -99,7 +110,7 @@ test('工作台按需准备一次、切模块保草稿、退出清理账号状�
   await login(page)
   await page
     .getByRole('navigation')
-    .getByRole('link', { name: 'Agent 工作台' })
+    .getByRole('link', { name: '智能对话' })
     .click()
   await expect(page.getByLabel('任务草稿')).toHaveValue('')
 })
@@ -110,7 +121,7 @@ test('语言主题保存，窄屏导航切换后关闭且内容不横向溢出',
   await installFoundationFixture(page)
   await login(page)
   await page.goto('/#/account/appearance')
-  await page.getByRole('combobox').press('Enter')
+  await page.getByRole('combobox', { name: '语言', exact: true }).press('Enter')
   await page.getByRole('option', { name: 'English', exact: true }).click()
   await expect(
     page.getByRole('heading', { name: 'Appearance and language', exact: true }),

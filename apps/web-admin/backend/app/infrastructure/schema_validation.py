@@ -44,3 +44,19 @@ class JsonSchemaValidator:
         except (ValidationError, Unresolvable, RecursionError) as error:
             # 不回显 value，writeOnly 配置校验失败时也不能泄漏凭据。
             raise DomainError(422, "value does not match configured schema") from error
+
+    def validate_tool_arguments(self, value: object, schema: dict[str, object]) -> None:
+        """工具参数仅报告字段路径与规则名，供模型纠正；不返回输入、配置值或验证器原文。"""
+        self.check_schema(schema)
+        try:
+            Draft202012Validator(schema).validate(value)
+        except ValidationError as error:
+            path = ".".join(str(part)[:80] for part in list(error.absolute_path)[:8]) or "$"
+            rule = str(error.validator)[:40]
+            raise DomainError(
+                422,
+                f"工具参数字段 {path} 不符合 {rule} 规则，请按照工具字段说明修正后提交。",
+                "tool_arguments_invalid",
+            ) from None
+        except (Unresolvable, RecursionError) as error:
+            raise DomainError(422, "value does not match configured schema") from error

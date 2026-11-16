@@ -7,7 +7,9 @@ import OAuthFinalize from '@/views/auth/components/OAuthFinalize.vue'
 import { ref } from 'vue'
 import { useRoute } from 'vue-router'
 import AppIcon from '@/components/base/AppIcon.vue'
-/** 认证入口保留原品牌和字段顺序，不在登录时准备执行引擎。 */
+import PublicBrand from '@/views/website/components/PublicBrand.vue'
+import '@/assets/styles/product-website.css'
+/** 两个产品共用中性认证入口，注册和登录续接均交给原身份流程。 */
 const vm = useLoginForm()
 const preferences = usePreferences()
 const recovering = ref(false),
@@ -18,20 +20,20 @@ const callbackValue = (key: string) =>
 </script>
 
 <template>
-  <main class="auth-page">
-    <a class="auth-brand" href="#/"
-      ><img src="/icon.svg" alt="" width="30" height="30" />星桥智能平台</a
-    >
-    <div class="auth-tools">
-      <el-button
-        text
-        @click="
-          preferences.locale = preferences.locale === 'zh-CN' ? 'en' : 'zh-CN'
-        "
-      >
-        {{ preferences.locale === 'zh-CN' ? 'English' : '中文' }}
-      </el-button>
-    </div>
+  <main class="auth-page product-auth">
+    <header class="starbridge-public auth-mast">
+      <div class="mast-inner">
+        <PublicBrand />
+        <el-button
+          text
+          @click="
+            preferences.locale = preferences.locale === 'zh-CN' ? 'en' : 'zh-CN'
+          "
+        >
+          {{ preferences.locale === 'zh-CN' ? 'English' : '中文' }}
+        </el-button>
+      </div>
+    </header>
     <section class="auth-card">
       <header>
         <h1>
@@ -40,7 +42,7 @@ const callbackValue = (key: string) =>
               ? preferences.tr('创建账号', 'Create account')
               : preferences.tr('登录', 'Sign in to')
           }}
-          星桥智能平台
+          {{ preferences.tr('星桥智能平台', 'Starbridge') }}
         </h1>
       </header>
       <ResourceStatus
@@ -165,7 +167,12 @@ const callbackValue = (key: string) =>
             !vm.initializationPending.value &&
             vm.resource.data.value.registrationOpen
           "
-          :to="vm.register.value ? '/login' : '/register'"
+          :to="{
+            path: vm.register.value ? '/login' : '/register',
+            query: route.query.returnTo
+              ? { returnTo: route.query.returnTo }
+              : {},
+          }"
           >{{
             vm.register.value
               ? preferences.tr(
@@ -206,8 +213,59 @@ const callbackValue = (key: string) =>
       "
     />
     <footer>
-      Starbridge ·
-      {{ preferences.tr('企业自己的 AI 工作平台', 'Your team’s AI workspace') }}
+      <router-link to="/">{{
+        preferences.tr('返回官网', 'Back to website')
+      }}</router-link>
     </footer>
   </main>
 </template>
+
+<style scoped>
+.product-auth {
+  --auth-paper: #f6f4ed;
+  --auth-card: #fffefa;
+  --auth-ink: #202720;
+  --auth-line: #ccd1c7;
+  color: var(--auth-ink);
+  background: var(--auth-paper);
+}
+:global(.dark) .product-auth {
+  --auth-paper: #1c201f;
+  --auth-card: #272b28;
+  --auth-ink: #eaece3;
+  --auth-line: #434a45;
+}
+.auth-mast {
+  position: absolute;
+  inset: 0 0 auto;
+  background: var(--auth-paper);
+  color: var(--auth-ink);
+  border-bottom: 1px solid var(--auth-line);
+}
+.auth-mast .mast-inner {
+  display: flex;
+  justify-content: space-between;
+}
+.product-auth .auth-card {
+  width: 450px;
+  padding: clamp(22px, 4vw, 46px);
+  background: var(--auth-card);
+  border: 1px solid var(--auth-line);
+  border-top: 3px solid var(--auth-ink);
+  border-radius: 4px;
+}
+.product-auth .auth-card header {
+  text-align: left;
+}
+.product-auth .auth-card h1 {
+  margin: 0;
+  color: var(--auth-ink);
+  font-size: clamp(23px, 3vw, 30px);
+}
+.product-auth .wide-button {
+  border-radius: 4px;
+}
+.product-auth footer a {
+  color: var(--auth-ink);
+}
+</style>

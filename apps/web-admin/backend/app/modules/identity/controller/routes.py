@@ -8,6 +8,7 @@ from fastapi import APIRouter, Body, Depends, Query, Request, Response
 from app.api.dependencies import current_account, require_permission
 from app.infrastructure.errors import DomainError
 from app.infrastructure.query_parameters import query_integer
+from app.modules.identity.controller.product_members import router as product_members_router
 from app.modules.identity.entity.bo.models import PERMISSIONS, Account
 from app.modules.identity.entity.vo.dto import (
     LoginInput,
@@ -25,6 +26,7 @@ from app.modules.identity.service.identity import IdentityService, Login
 from app.modules.identity.service.management import AccountManagement
 
 router = APIRouter()
+router.include_router(product_members_router)
 AccountDep = Annotated[Account, Depends(current_account)]
 
 

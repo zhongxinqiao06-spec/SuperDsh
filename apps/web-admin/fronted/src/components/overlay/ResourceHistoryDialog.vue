@@ -1,7 +1,8 @@
 <script setup lang="ts">
+import { useCurrentProduct } from '@/composables/console/use-current-product'
 import { ref, watch } from 'vue'
-import { toolsApi } from '@/api/tools/tools-api'
-import { skillsApi } from '@/api/skills/skills-api'
+import { createToolsApi } from '@/api/tools/tools-api'
+import { createSkillsApi } from '@/api/skills/skills-api'
 import { useResource } from '@/composables/use-resource'
 import { useMutation } from '@/composables/use-mutation'
 import { usePreferences } from '@/store/modules/preferences'
@@ -15,6 +16,9 @@ const props = defineProps<{
   }>(),
   emit = defineEmits<{ close: []; changed: [] }>(),
   { tr } = usePreferences()
+const product = useCurrentProduct().value
+const toolsApi = createToolsApi(product)
+const skillsApi = createSkillsApi(product)
 const page = ref(1),
   pending = ref<number | null>(null),
   mutation = useMutation()
@@ -45,6 +49,7 @@ async function restore() {
 <template>
   <el-dialog
     :model-value="true"
+    body-class="stack"
     :title="`${resource.name} · ${tr('版本历史', 'Version history')}`"
     width="min(760px,94vw)"
     @update:model-value="emit('close')"

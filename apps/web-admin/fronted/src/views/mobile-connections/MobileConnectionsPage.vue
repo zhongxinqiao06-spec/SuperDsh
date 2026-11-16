@@ -1,4 +1,6 @@
 <script setup lang="ts">
+import { computed, inject } from 'vue'
+import { consoleMenuKey } from '@/layout/console-navigation'
 import RowActions from '@/components/management/RowActions.vue'
 import ManagementList from '@/components/management/ManagementList.vue'
 import PageHeader from '@/components/layout/PageHeader.vue'
@@ -11,6 +13,11 @@ import SettingsCard from '@/components/settings/SettingsCard.vue'
 const vm = useMobileConnections(),
   preferences = usePreferences(),
   { tr } = preferences
+// 手机记录默认在账号安全内；只有已有侧栏单项时才提供本机显隐开关。
+const menu = inject(consoleMenuKey)
+const hasSidebarEntry = computed(() =>
+  menu?.value.some((item) => item.moduleId === 'account.mobile'),
+)
 </script>
 <template>
   <section class="page paged-page settings-page">
@@ -29,6 +36,7 @@ const vm = useMobileConnections(),
       >
 
       <el-button
+        v-if="hasSidebarEntry"
         text
         @click="preferences.mobileSidebar = !preferences.mobileSidebar"
         >{{

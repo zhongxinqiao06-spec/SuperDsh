@@ -3,7 +3,7 @@
 from collections.abc import AsyncIterator
 from contextlib import asynccontextmanager
 
-from sqlalchemy import Integer, delete, func, select, tuple_
+from sqlalchemy import Integer, delete, func, or_, select, tuple_
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.infrastructure.database import Database, lock_transaction
@@ -42,12 +42,18 @@ class ConversationDao:
     async def session(self, identifier: str) -> SessionRow | None:
         return await self.db.get(SessionRow, identifier)
 
-    async def sessions(self, owner: str | None = None) -> list[SessionRow]:
+    async def sessions(
+        self, owner: str | None = None, *, product: str | None = None
+    ) -> list[SessionRow]:
         query = select(SessionRow).where(
             SessionRow.source["historyDeletedAt"].as_string().is_(None)
         )
         if owner:
             query = query.where(SessionRow.owner_id == owner)
+        if product:
+            query = query.where(
+                func.coalesce(SessionRow.source["product"].as_string(), "office") == product
+            )
         return list(
             await self.db.scalars(
                 query.order_by(
@@ -59,6 +65,40 @@ class ConversationDao:
                 )
             )
         )
+
+    async def native_aliases(self, owner: str, connector: str, identifier: str) -> list[SessionRow]:
+        """原生引擎和导入入口均可使用外部身份；别名同样继承真实会话的产品归属。"""
+        return list(
+            await self.db.scalars(
+                select(SessionRow).where(
+                    or_(
+                        SessionRow.id == identifier,
+                        (SessionRow.owner_id == owner)
+                        & (SessionRow.connector_id == connector)
+                        & (SessionRow.external_session_id == identifier),
+                    )
+                )
+            )
+        )
+
+    async def office_event_scope(self, owner: str, connector: str) -> set[str] | None:
+        """原始投影会保留已删除会话的事实，诊断过滤须包含墓碑和引擎别名。"""
+        source_product = func.coalesce(SessionRow.source["product"].as_string(), "office")
+        native = (SessionRow.owner_id == owner, SessionRow.connector_id == connector)
+        hidden = await self.db.scalar(
+            select(SessionRow.id).where(*native, source_product != "office").limit(1)
+        )
+        if not hidden:
+            return None
+        rows = await self.db.execute(
+            select(SessionRow.id, SessionRow.external_session_id, source_product).where(*native)
+        )
+        allowed: set[str] = set()
+        excluded: set[str] = set()
+        for session_id, external, product in rows:
+            target = allowed if product == "office" else excluded
+            target.update(key for key in (session_id, external) if isinstance(key, str) and key)
+        return allowed - excluded
 
     async def creation(self, owner: str, key: str) -> SessionRow | None:
         return await self.db.scalar(
@@ -73,11 +113,13 @@ class ConversationDao:
         cursor: SessionCursor | None,
         limit: int | None,
         inventory: bool,
+        products: tuple[str, ...] = ("office", "entertainment"),
     ) -> list[SessionRow]:
         """数据库按完整键集翻页；撤销设备从授权源集合剔除，不在分页后过滤。"""
         query = select(SessionRow).where(
             SessionRow.owner_id == owner,
             SessionRow.connector_id.in_(connectors),
+            func.coalesce(SessionRow.source["product"].as_string(), "office").in_(products),
             SessionRow.source["historyDeletedAt"].as_string().is_(None),
         )
         if not inventory:

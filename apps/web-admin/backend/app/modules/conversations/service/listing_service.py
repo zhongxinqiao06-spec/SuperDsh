@@ -23,10 +23,14 @@ class SessionListingService:
         self, account: Account, filters: dict[str, str], inventory: bool = False
     ) -> dict[str, object]:
         account.require("sessions.read")
+        selected_filters = {} if inventory else filters
+        product = selected_filters.get("product", "office")
+        if product not in {"office", "entertainment"}:
+            raise DomainError(422, "unknown product")
+        account.require("products." + product)
         await self.conversations.projection.sync(account)
         sources = await self.conversations.devices.conversation_sources(account)
         # 旧inventory入口忽略查询串；规范分页入口仍支持前端的项目/设备及搜索筛选。
-        selected_filters = {} if inventory else filters
         limit = None if inventory else query_integer(filters.get("limit"), 100, 1, 100)
         cursor = (
             SessionCursor.decode(filters["cursor"])
@@ -40,7 +44,13 @@ class SessionListingService:
                 if not project or project.owner_id != account.user_id:
                     raise DomainError(404, "project not found")
             rows = await dao.session_page(
-                account.user_id, list(sources), selected_filters, cursor, limit, inventory
+                account.user_id,
+                list(sources),
+                selected_filters,
+                cursor,
+                limit,
+                inventory,
+                (product,),
             )
         page = rows if limit is None else rows[:limit]
         more = limit is not None and len(rows) > limit

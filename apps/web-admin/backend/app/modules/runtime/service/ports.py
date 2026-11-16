@@ -5,6 +5,7 @@ from __future__ import annotations
 from collections.abc import AsyncIterator, Awaitable, Callable
 from typing import Protocol
 
+from app.modules.identity.entity.bo.product_roles import Product
 from app.modules.runtime.entity.bo.values import Fields, Json
 
 
@@ -43,7 +44,7 @@ class ProjectionStore(ProjectionSink, Protocol):
 class ModelProvider(Protocol):
     """受限模型网关；供应商密钥永不进入 Host 的环境变量。"""
 
-    async def catalog(self, owner: str) -> Fields: ...
+    async def catalog(self, owner: str, product: Product | None = None) -> Fields: ...
     def stream(self, owner: str, path: str, body: Fields) -> AsyncIterator[bytes]: ...
 
 

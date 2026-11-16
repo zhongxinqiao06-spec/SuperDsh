@@ -1,3 +1,7 @@
+/** 共享控制台可以承载的产品，公共管理模块无需指定归属。 */
+export type Product = 'office' | 'entertainment'
+export type ProductAction = 'members' | 'menus' | 'resources' | 'models'
+
 /** 导航配置与业务权限分离，隐藏菜单不撤销模块访问权。 */
 export interface MenuNode {
   id: string
@@ -30,6 +34,8 @@ export interface ConsoleModule {
   englishTitle: string
   icon: string
   permissions: readonly string[]
+  product?: Product
+  productAction?: ProductAction
   implemented: boolean
 }
 
@@ -39,6 +45,7 @@ export interface NavigationResponse {
   items: MenuNode[]
 }
 export interface MenusResponse extends NavigationResponse {
+  editableIds?: string[]
   modules: {
     id: string
     route: string

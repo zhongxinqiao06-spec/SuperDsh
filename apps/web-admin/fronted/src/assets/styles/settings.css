@@ -1,9 +1,9 @@
 /* 账号与服务保留摘要卡片结构，外观使用公共主题尺度。 */
 .settings-page {
-  gap: 16px;
+  gap: var(--layout-gap);
 }
 .settings-page > .page-heading {
-  margin-bottom: 4px;
+  margin-bottom: 0;
 }
 .settings-page > .page-heading h1 {
   margin-bottom: 0;
@@ -18,8 +18,9 @@
   display: flex;
   align-items: center;
   justify-content: space-between;
-  gap: 16px;
-  padding: 20px 24px;
+  flex-wrap: wrap;
+  gap: var(--field-gap);
+  padding: var(--layout-gap) var(--panel-padding);
 }
 .settings-card-header h2 {
   margin: 0;
@@ -38,8 +39,8 @@
   display: flex;
   align-items: center;
   justify-content: space-between;
-  gap: 16px;
-  padding: 16px 24px;
+  gap: var(--field-gap);
+  padding: var(--field-gap) var(--panel-padding);
   font-size: 14px;
 }
 .settings-row + .settings-row {
@@ -64,8 +65,8 @@
 .settings-details > div {
   display: grid;
   grid-template-columns: 128px minmax(0, 1fr);
-  gap: 16px;
-  padding: 16px 24px;
+  gap: var(--field-gap);
+  padding: var(--field-gap) var(--panel-padding);
 }
 .settings-details > div + div {
   border-top: 1px solid var(--border);
@@ -128,12 +129,12 @@
 .security-signins {
   display: flex;
   flex-direction: column;
-  gap: 16px;
-  padding: 20px 24px;
+  gap: var(--field-gap);
+  padding: var(--layout-gap) var(--panel-padding);
   overflow-x: auto;
 }
 .service-page {
-  gap: 24px;
+  gap: var(--layout-gap);
 }
 .service-page > .page-heading {
   margin-bottom: 0;
@@ -146,23 +147,11 @@
   border-radius: var(--radius-card);
   box-shadow: var(--shadow-card);
 }
-.service-page .settings-card-header {
-  padding: 20px;
-}
 .service-page .settings-card-header h2 {
   font-weight: 500;
 }
 .service-page .settings-card-content {
   border-top: 0;
-}
-.service-page .settings-details > div {
-  padding: 12px 20px;
-}
-.service-page .settings-row {
-  padding: 4px 20px;
-}
-.service-page .settings-row:last-child {
-  padding-bottom: 20px;
 }
 .service-page .settings-row + .settings-row {
   border-top: 0;
@@ -177,9 +166,6 @@
   height: 20px;
   min-height: 20px;
   padding: 0 4px;
-}
-.service-page .settings-details > div:last-child {
-  padding-bottom: 32px;
 }
 @media (max-width: 640px) {
   .settings-card-header,

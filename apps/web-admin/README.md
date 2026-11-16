@@ -1,12 +1,16 @@
 # Web Admin
 
+官网 `/#/` 和 `/#/website` 默认展示星桥娱乐，办公展示可直接分享 `/#/?product=office`。官网、选择页和两套工作台均由正式 Vue 路由提供。星桥办公和星桥娱乐共用此 Web 部署。办公入口为 `/#/office`，娱乐作品入口为 `/#/entertainment`，拥有两种产品权限的账号可在 `/#/products` 切换。两套产品的配置、测试范围与创作流程见[双产品实施记录](../../docs/plans/starbridge-office-entertainment.md)。
+
+登录后，只有一个产品资格的账号直接进入对应工作台，双产品账号可在页头右侧切换。办公用户和娱乐创作者看到工作台和个人中心。产品管理员另有“能力管理”和“产品管理”，可配置本产品的发布能力、默认模型、成员和菜单。超管可在两端进入“平台管理”，维护公共账号、供应商和平台配置。各角色的完整菜单和验收记录见[双产品角色与菜单规划](../../docs/plans/starbridge-product-roles-and-menus.md)。
+
 新管理端采用 Vue3 + TypeScript 和 Python FastAPI，保持旧 `apps/admin` 独立可用。工程约束见 [AGENTS.md](AGENTS.md)，基础能力和业务迁移进度分别见[计划一](../../docs/plans/web-admin-01-foundation.md)、[计划二](../../docs/plans/web-admin-02-function-and-interaction.md)；完整差异验收见[计划三](../../docs/plans/web-admin-03-parity-validation.md)。所有管理模块均装配独立页面，缺失页面会在启动时明确失败。
 
 ## 目录与责任
 
 - `fronted/src`：按若依 Vue3 风格组织；`views/<domain>` 放页面，`api/<domain>` 放接口，`composables/<domain>` 放用例，`types/<domain>` 与 `utils/<domain>` 放类型和纯方法。`components` 放通用组件，页面专属组件归对应 `views/<domain>/components`。
 - `fronted/src/router`、`layout`、`store`、`assets/styles`：分别负责路由、公共布局、共享状态与样式。入口为 `main.ts`、`App.vue`；请求封装为 `utils/request.ts`，共享状态为 `store/modules`，不再使用 `app`、`features` 目录。
-- 视觉以原管理端为基准，若依仅约束代码分层：`tokens.css` 统一颜色/字体/圆角，`base.css` 负责基础排版，`element.css` 适配通用控件，`console.css`、`management.css`、`dashboard.css`、`workbench.css` 按展示领域组织。共享 `AppIcon` 使用带来源与许可的本地图标；新前端不从旧包加载运行资源。
+- 视觉以[星桥双产品样册](../../docs/plans/starbridge-web-design/README.md)为准，若依约束代码分层。`tokens.css` 统一颜色/字体/圆角，`base.css` 负责基础排版，`element.css` 适配通用控件，`console.css`、`management.css`、`dashboard.css`、`workbench.css` 按展示领域组织。共享 `AppIcon` 使用带来源与许可的本地图标；新前端不从旧包加载运行资源。
 - `backend/app/modules`：按领域组织 `controller → service → dao`，`entity/do` 为数据库实体，`entity/vo` 为请求和响应模型。后端业务源码仅使用 Python。
 - `engine-adapter/src`：固定 DSH 必要的 TypeScript 插件注册及传输，不承载平台业务；编译到被 Git 忽略的 `dist`，Python 仅启动已构建产物。
 - `contracts`：生产协议；`deployment/compatibility-routes.json` 是旧入口映射的唯一来源，新前端使用无版本路径。
@@ -118,7 +122,7 @@ Office 文档生成与预览需要 LibreOffice 和文档所用字体。Windows �
 
 文件中声明的记录以文件为准，页面修改同一记录后会在下次启动重新应用文件值；未声明的个人模型和其他平台记录不受影响。修改后重启后端生效，重复启动不新增记录或无意义修订。已有连接被引用后不能直接换地址/协议，已有模型配置不能改变连接/能力；换连接时使用新的稳定 ID。
 
-供应商连接由聊天和多模态配置共享，可通过页面右上角“供应商连接”查看；`capability: "chat"` 的配置显示在“聊天模型”，视觉理解、图片生成等配置显示在“多模态模型”。只有聊天配置时，多模态列表为空不表示连接或密钥未保存；需按实际模型及接入点支持的能力新增配置，不能仅凭供应商名称自动开通能力。
+供应商连接由聊天和多模态配置共享，可通过模型工具栏的“供应商连接”查看；`capability: "chat"` 的配置显示在“聊天模型”，视觉理解、图片生成等配置显示在“多模态模型”。只有聊天配置时，多模态列表为空不表示连接或密钥未保存；需按实际模型及接入点支持的能力新增配置，不能仅凭供应商名称自动开通能力。
 
 火山 Agent Plan 的本机启动配置已补充以下两项，复用已有火山连接与密钥，聊天默认仍为原 DeepSeek 配置：
 
@@ -192,9 +196,19 @@ corepack yarn web-admin:up
 
 ## 自测与证据
 
+娱乐创作准备现在按“剧本确认 → 角色造型/音色候选 → 字段级方案对比 → 分镜预演 → 试做一镜”操作。生成先预检，明确确认才提交；采用候选后保存为本片的新素材版本。更新时须正常重启后端以执行迁移，前端开发命令保持不变。页面与接口、数据表和验证边界见[准备阶段交付记录](../../docs/plans/starbridge-studio-preparation-delivery.md)。
+
 ```powershell
 corepack yarn web-admin:check
 corepack yarn web-admin:parity
+```
+
+双产品界面可从仓库根目录运行专项验收。以下命令分别验证五种角色登录、娱乐分镜采用及换回、设备文件深链，以及办公首页上传资料、生成 Word、预览 PDF 和下载。测试会创建临时 PostgreSQL、Redis 和独立用户目录，结束后自动回收；办公验收使用受控的本地模型以及真实 DSH 和 Office 渲染器。
+
+```powershell
+node apps/web-admin/tests/tooling/browser.ts product-roles-live.spec.ts studio-live.spec.ts device-file-preview-live.spec.ts
+node apps/web-admin/tests/tooling/browser.ts studio-preparation-live.spec.ts studio-foundation-live.spec.ts studio.spec.ts
+node apps/web-admin/tests/tooling/office-delivery.ts
 ```
 
 `check` 核对旧包指纹、目录/语言/版本边界、若依分层、前后端类型和测试；创建本轮专属数据库与 Redis，执行真实 DSH、命令生命周期、Office 容器渲染和浏览器闭环，结束时删除本轮容器、账号、会话与 Home。清理前只归档经过脱敏的白名单报告到 `check-report-*`，清理或证据归档失败同样返回非零。测试源码及审查过的静态契约基线保留在 `tests`，不属于用户运行数据；不把受控模型称为外部模型验证。

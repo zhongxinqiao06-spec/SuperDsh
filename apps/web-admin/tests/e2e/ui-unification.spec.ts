@@ -2,6 +2,8 @@ import { expect, test, type Locator, type Page } from '@playwright/test'
 import { installResourceFixture } from '../parity/resource-fixture'
 import { installParityFixture } from '../parity/ui-fixture'
 import { consoleModules } from '../../fronted/src/utils/console/modules'
+import { captureDesign } from './design-capture'
+import { expectControlAppearance } from './control-appearance'
 import type {
   AgentDefinition,
   AgentDraft,
@@ -96,7 +98,10 @@ for (const theme of ['light', 'dark']) {
       name: '工作要求',
       exact: true,
     })
-    expect((await instructions.boundingBox())!.height).toBeGreaterThan(160)
+    // 切换页签后输入框需完成 Element Plus 的自动测高和弹窗动画。
+    await expect
+      .poll(async () => (await instructions.boundingBox())?.height ?? 0)
+      .toBeGreaterThan(160)
     await page.screenshot({
       path: info.outputPath(`agent-instructions-${theme}.png`),
       animations: 'disabled',
@@ -239,24 +244,43 @@ for (const theme of ['light', 'dark']) {
   test(`全站视觉边界 ${theme}：管理路由、四档宽度与单一页面标题`, async ({
     page,
   }, info) => {
-    test.setTimeout(120_000)
+    test.setTimeout(240_000)
     await page.addInitScript(
       (value) => localStorage.setItem('starbridge.theme', value),
       theme,
     )
-    const state = await installParityFixture(page)
+    const state = await installParityFixture(page, { bothProducts: true })
     const errors: string[] = []
     page.on('pageerror', (error) => errors.push(error.message))
     await page.routeWebSocket('**/api/**', () => {})
     const headings: Record<string, string> = {
       overview: '看板',
+      'access.users': '用户管理',
+      'access.menus': '菜单管理',
+      agents: '智能体列表',
+      skills: '技能管理',
+      tools: '工具管理',
+      models: '聊天模型',
+      'system.storage': '文件存储',
+      'system.audit': '审计日志',
+      'account.security': '账号安全与登录记录',
+      'account.mobile': '手机登录会话',
       'account.profile': '个人资料',
       'account.appearance': '外观与语言',
       'system.service': '服务',
     }
-    for (const module of consoleModules) {
-      await page.goto(`/#${module.path}`)
+    const screens = consoleModules.flatMap((module) =>
+      (module.product ? [module.product] : ['office', 'entertainment']).map(
+        (product) => ({ module, product }),
+      ),
+    )
+    for (const { module, product } of screens) {
+      await page.goto(`/#${module.path}?product=${product}`)
       await expect(page.locator('.console-content')).toBeVisible()
+      await expect(page.locator('html')).toHaveAttribute(
+        'data-console-product',
+        product,
+      )
       if (module.id !== 'workbench') {
         await expect(page.locator('.console-content h1')).toHaveText(
           headings[module.id] ?? module.title,
@@ -277,17 +301,25 @@ for (const theme of ['light', 'dark']) {
           )
           .toBe(true)
         const content = page.locator('.console-content')
+        await expectControlAppearance(content)
         expect(
           await content.evaluate(
             (element) => element.scrollWidth <= element.clientWidth + 1,
           ),
           `${module.path} at ${width}px`,
         ).toBe(true)
-        if (width === 1440 || width === 390)
+        if (width === 1440 || width === 390) {
           await page.screenshot({
-            path: info.outputPath(`${module.id}-${theme}-${width}.png`),
+            path: info.outputPath(
+              `${module.id}-${product}-${theme}-${width}.png`,
+            ),
             animations: 'disabled',
           })
+          await captureDesign(
+            page,
+            `${module.id}-${product}-${theme}-${width}.png`,
+          )
+        }
       }
     }
     expect(errors).toEqual([])

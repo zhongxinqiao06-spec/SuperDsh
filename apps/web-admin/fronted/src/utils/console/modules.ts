@@ -1,20 +1,133 @@
-import type { ConsoleModule, MenuNode } from '@/types/console/navigation'
+import type {
+  ConsoleModule,
+  MenuNode,
+  Product,
+} from '@/types/console/navigation'
 
 /** 产品模块ID沿用冻结目录，业务页面在路由装配时逐一验证。 */
 export const consoleModules: readonly ConsoleModule[] = [
   {
+    id: 'studio.deliveries',
+    path: '/entertainment/deliveries',
+    title: '成片交付',
+    englishTitle: 'Deliveries',
+    icon: 'folder',
+    product: 'entertainment',
+    permissions: ['studio.projects.read'],
+    implemented: true,
+  },
+  {
+    id: 'studio.environments',
+    path: '/entertainment/environments',
+    title: '场景与道具',
+    englishTitle: 'Environments',
+    icon: 'book-open',
+    product: 'entertainment',
+    permissions: ['studio.assets.read'],
+    implemented: true,
+  },
+  {
+    id: 'studio.characters',
+    path: '/entertainment/characters',
+    title: '角色库',
+    englishTitle: 'Characters',
+    icon: 'users',
+    product: 'entertainment',
+    permissions: ['studio.assets.read'],
+    implemented: true,
+  },
+  {
+    id: 'office.history',
+    path: '/workspace/history',
+    title: '历史会话',
+    englishTitle: 'Conversation history',
+    icon: 'history',
+    product: 'office',
+    permissions: ['sessions.read'],
+    implemented: true,
+  },
+  {
+    id: 'office.devices',
+    path: '/workspace/devices',
+    title: '我的设备',
+    englishTitle: 'My devices',
+    icon: 'monitor',
+    product: 'office',
+    permissions: ['devices.read'],
+    implemented: true,
+  },
+  {
+    id: 'product.members',
+    path: '/product/members',
+    title: '产品成员',
+    englishTitle: 'Product members',
+    icon: 'users',
+    productAction: 'members',
+    permissions: [],
+    implemented: true,
+  },
+  {
+    id: 'product.defaults',
+    path: '/product/defaults',
+    title: '默认模型',
+    englishTitle: 'Default models',
+    icon: 'key',
+    productAction: 'models',
+    permissions: [],
+    implemented: true,
+  },
+  {
+    id: 'platform.extensions',
+    path: '/system/extensions',
+    title: '扩展管理',
+    englishTitle: 'Extensions',
+    icon: 'wrench',
+    permissions: ['extensions.manage'],
+    implemented: true,
+  },
+  {
+    id: 'studio.projects',
+    path: '/entertainment',
+    title: '我的作品',
+    englishTitle: 'Projects',
+    icon: 'folder',
+    product: 'entertainment',
+    permissions: ['studio.projects.read'],
+    implemented: true,
+  },
+  {
+    id: 'studio.library',
+    path: '/entertainment/library',
+    title: '媒体素材',
+    englishTitle: 'Asset library',
+    icon: 'book-open',
+    product: 'entertainment',
+    permissions: ['studio.assets.read'],
+    implemented: true,
+  },
+  {
+    id: 'studio.tasks',
+    path: '/entertainment/tasks',
+    title: '制作任务',
+    englishTitle: 'Production tasks',
+    icon: 'history',
+    product: 'entertainment',
+    permissions: ['studio.projects.read'],
+    implemented: true,
+  },
+  {
     id: 'overview',
     path: '/overview',
-    title: '总览',
+    title: '平台总览',
     englishTitle: 'Overview',
     icon: 'gauge',
-    permissions: [],
+    permissions: ['settings.manage'],
     implemented: true,
   },
   {
     id: 'access.users',
     path: '/access/users',
-    title: '用户管理',
+    title: '账号与角色',
     englishTitle: 'Users',
     icon: 'users',
     permissions: ['users.read'],
@@ -31,8 +144,9 @@ export const consoleModules: readonly ConsoleModule[] = [
   },
   {
     id: 'access.menus',
+    productAction: 'menus',
     path: '/access/menus',
-    title: '菜单管理',
+    title: '菜单配置',
     englishTitle: 'Navigation menus',
     icon: 'menu',
     permissions: ['menus.read', 'menus.manage'],
@@ -40,8 +154,9 @@ export const consoleModules: readonly ConsoleModule[] = [
   },
   {
     id: 'agents',
+    productAction: 'resources',
     path: '/agents',
-    title: '智能体列表',
+    title: '智能体',
     englishTitle: 'Agents',
     icon: 'bot',
     permissions: ['agents.manage'],
@@ -49,6 +164,7 @@ export const consoleModules: readonly ConsoleModule[] = [
   },
   {
     id: 'knowledge',
+    productAction: 'resources',
     path: '/knowledge',
     title: '知识库',
     englishTitle: 'Knowledge bases',
@@ -58,8 +174,9 @@ export const consoleModules: readonly ConsoleModule[] = [
   },
   {
     id: 'skills',
+    productAction: 'resources',
     path: '/skills',
-    title: '技能管理',
+    title: '技能',
     englishTitle: 'Skills',
     icon: 'sparkles',
     permissions: ['agents.manage'],
@@ -67,8 +184,9 @@ export const consoleModules: readonly ConsoleModule[] = [
   },
   {
     id: 'tools',
+    productAction: 'resources',
     path: '/tools',
-    title: '工具管理',
+    title: '工具',
     englishTitle: 'Tools',
     icon: 'wrench',
     permissions: ['agents.manage'],
@@ -77,7 +195,7 @@ export const consoleModules: readonly ConsoleModule[] = [
   {
     id: 'models',
     path: '/models',
-    title: '聊天模型',
+    title: '供应商与模型',
     englishTitle: 'Platform models',
     icon: 'key',
     permissions: ['models.manage'],
@@ -95,7 +213,7 @@ export const consoleModules: readonly ConsoleModule[] = [
   {
     id: 'system.storage',
     path: '/system/storage',
-    title: '文件存储',
+    title: '存储与服务',
     englishTitle: 'File storage',
     icon: 'folder',
     permissions: ['storage.manage'],
@@ -103,6 +221,7 @@ export const consoleModules: readonly ConsoleModule[] = [
   },
   {
     id: 'account.files',
+    product: 'office',
     path: '/account/files',
     title: '我的文件',
     englishTitle: 'My files',
@@ -121,8 +240,9 @@ export const consoleModules: readonly ConsoleModule[] = [
   },
   {
     id: 'workbench',
+    product: 'office',
     path: '/workspace',
-    title: 'Agent 工作台',
+    title: '智能对话',
     englishTitle: 'Agent workspace',
     icon: 'bot',
     permissions: ['sessions.read', 'sessions.run', 'devices.read'],
@@ -131,7 +251,7 @@ export const consoleModules: readonly ConsoleModule[] = [
   {
     id: 'system.service',
     path: '/system/service',
-    title: '服务配置',
+    title: '服务设置',
     englishTitle: 'Service configuration',
     icon: 'settings',
     permissions: ['settings.manage'],
@@ -140,7 +260,7 @@ export const consoleModules: readonly ConsoleModule[] = [
   {
     id: 'system.audit',
     path: '/system/audit',
-    title: '审计日志',
+    title: '平台审计',
     englishTitle: 'Audit log',
     icon: 'history',
     permissions: ['audit.read'],
@@ -158,7 +278,7 @@ export const consoleModules: readonly ConsoleModule[] = [
   {
     id: 'account.security',
     path: '/account/security',
-    title: '账号安全与登录记录',
+    title: '账号安全',
     englishTitle: 'Security and sign-ins',
     icon: 'shield',
     permissions: [],
@@ -185,7 +305,7 @@ export const consoleModules: readonly ConsoleModule[] = [
   {
     id: 'account.mobile',
     path: '/account/mobile',
-    title: '手机登录会话',
+    title: '手机登录记录',
     englishTitle: 'Mobile sign-ins',
     icon: 'smartphone',
     permissions: [],
@@ -197,7 +317,28 @@ export const consoleModules: readonly ConsoleModule[] = [
 export function canOpenModule(
   module: ConsoleModule,
   permissions: readonly string[],
+  product?: Product,
 ): boolean {
+  if (
+    module.product &&
+    ((product && product !== module.product) ||
+      !permissions.includes('products.' + module.product))
+  )
+    return false
+  if (module.productAction) {
+    return (
+      module.permissions.some((permission) =>
+        permissions.includes(permission),
+      ) ||
+      Boolean(
+        product &&
+        permissions.includes('products.' + product) &&
+        permissions.includes(
+          'products.' + product + '.' + module.productAction + '.manage',
+        ),
+      )
+    )
+  }
   return (
     module.permissions.length === 0 ||
     module.permissions.some((item) => permissions.includes(item))
@@ -209,10 +350,13 @@ export function visibleNavigation(
   items: MenuNode[],
   permissions: readonly string[],
   roles: readonly string[],
+  product?: Product,
 ): MenuNode[] {
   const allowed = (item: MenuNode) =>
-    item.visible &&
-    (!item.roleIds.length || item.roleIds.some((role) => roles.includes(role)))
+    roles.includes('admin') ||
+    (item.visible &&
+      (!item.roleIds.length ||
+        item.roleIds.some((role) => roles.includes(role))))
   const groups = items.filter((item) => item.kind === 'group' && allowed(item))
   const pages = items.filter((item) => {
     const module = consoleModules.find((value) => value.id === item.moduleId)
@@ -220,7 +364,7 @@ export function visibleNavigation(
       item.kind === 'page' &&
       allowed(item) &&
       module &&
-      canOpenModule(module, permissions) &&
+      canOpenModule(module, permissions, product) &&
       (!item.parentId || groups.some((group) => group.id === item.parentId))
     )
   })

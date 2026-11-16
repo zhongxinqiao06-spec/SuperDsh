@@ -10,6 +10,7 @@ from app.infrastructure.errors import DomainError
 from app.modules.conversations.entity.bo.creation import creation_fingerprint, creation_key
 from app.modules.conversations.entity.do.models import SessionRow
 from app.modules.conversations.entity.vo.import_dto import ImportSessionInput
+from app.modules.conversations.service.native_diagnostics import require_office_alias
 from app.modules.conversations.service.target_service import SessionTargetService
 from app.modules.identity.entity.bo.models import Account
 
@@ -25,6 +26,7 @@ class SessionImportService:
 
     async def create(self, account: Account, value: ImportSessionInput) -> dict[str, object]:
         account.require("sessions.run")
+        account.require("products.office")
         devices = self.conversations.devices
         connector = await devices.own(account, value.connectorId, "sessions.run")
         project = await SessionTargetService(self.conversations.repository, devices).resolve(
@@ -34,6 +36,7 @@ class SessionImportService:
         key = creation_key(account.user_id, connector.id, operation) if operation else None
         fingerprint = creation_fingerprint("import", value.model_dump())
         async with self.conversations.repository.transaction() as dao:
+            await require_office_alias(dao, account.user_id, connector.id, value.externalSessionId)
             await dao.lock("create:" + account.user_id + ":" + operation)
             # 与项目删除共用锁，目标校验后被删除时不得写入悬空的projectId。
             await dao.lock(value.projectId)

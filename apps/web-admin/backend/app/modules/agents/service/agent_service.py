@@ -12,6 +12,7 @@ from app.modules.agents.service.readiness import check_readiness
 from app.modules.files.service.file_service import FileService
 from app.modules.identity.entity.bo.models import Account
 from app.modules.models.service.model_service import Audit
+from app.modules.resources.entity.bo.product_scope import resource_product
 from app.modules.resources.service.resources import ResourceService
 
 
@@ -66,6 +67,7 @@ class AgentService:
             cast(List[str], definition.get("knowledgeAssetIds", []))
             + cast(List[str], definition.get("templateAssetIds", []))
         )
+        associated: dict[str, dict[str, object]] = {}
         for identifier in cast(List[str], definition.get("knowledgeBaseIds", [])):
             base = next(
                 (
@@ -77,7 +79,8 @@ class AgentService:
             )
             if base is None:
                 raise DomainError(422, "绑定的知识库不存在或已停用")
-            identifiers.update(cast(List[str], base.get("assetIds", [])))
+            for entry in await self.assets.resource_assets(account, "knowledge", identifier):
+                associated[str(entry["id"])] = entry
         for identifier in cast(List[str], definition.get("skillIds", [])):
             skill = next(
                 (
@@ -88,10 +91,13 @@ class AgentService:
                 None,
             )
             if skill:
-                identifiers.update(cast(List[str], skill.get("templateAssetIds", [])))
+                for entry in await self.assets.resource_assets(account, "skill", identifier):
+                    associated[str(entry["id"])] = entry
         selected = [
             await self.assets.get(account, identifier) for identifier in sorted(identifiers)
         ]
+        associated.update({str(entry["id"]): entry for entry in selected})
+        selected = list(associated.values())
         knowledge_ids = cast(List[str], definition.get("knowledgeAssetIds", []))
         template_ids = cast(List[str], definition.get("templateAssetIds", []))
         if any(
@@ -110,6 +116,8 @@ class AgentService:
         if identifier and body.version is None:
             raise DomainError(422, "更新智能体必须提供当前版本")
         definition = body.model_dump(exclude_none=True)
+        if "product" not in body.model_fields_set and (product := resource_product(account)):
+            definition["product"] = product
         catalog, assets = await self._validate(account, definition)
         readiness = check_readiness(definition, catalog, assets)
         if body.published and not readiness["ready"]:
@@ -139,6 +147,14 @@ class AgentService:
     async def initialize(self, account: Account, copy_latest: bool = False) -> dict[str, object]:
         """默认声明仅首次导入，不覆盖用户已修改或删除的配置。"""
         account.require("agents.manage")
+        if resource_product(account) == "entertainment":
+            if copy_latest:
+                raise DomainError(422, "该产品没有可复制的办公资源包")
+            return {
+                "agents": await self.resources.catalog(account, "agent"),
+                "knowledgeBases": [],
+                "assets": [],
+            }
         if self.examples is None:
             raise DomainError(503, "示例资源包尚未装配")
         return await self.examples.initialize(account, copy_latest)

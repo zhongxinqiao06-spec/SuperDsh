@@ -97,7 +97,7 @@ describe('管理员配置初始化后的认证入口', () => {
     )
     expect(mocks.register).not.toHaveBeenCalled()
     expect(mocks.accept).toHaveBeenCalledWith(identity)
-    expect(mocks.replace).toHaveBeenCalledWith('/overview')
+    expect(mocks.replace).toHaveBeenCalledWith('/account/profile')
   })
 
   it.each(['/login', '/register', '/bootstrap'])(

@@ -53,12 +53,13 @@ class ProjectService:
             )
 
     async def listing(self, account: Account) -> dict[str, object]:
+        account.require("products.office")
         account.require("projects.read")
         sources = await self.devices.conversation_sources(account, "projects.read")
         async with self.repository.transaction() as dao:
             projects, sessions = (
                 await dao.projects(account.user_id),
-                await dao.sessions(account.user_id),
+                await dao.sessions(account.user_id, product="office"),
             )
         return {
             "projects": [
@@ -68,6 +69,7 @@ class ProjectService:
         }
 
     async def create(self, account: Account, value: ProjectInput) -> dict[str, object]:
+        account.require("products.office")
         account.require("projects.manage")
         connector = await self.devices.own(account, value.connectorId, "projects.manage")
         path = required_text(value.workspacePath, "workspacePath").strip()
@@ -88,7 +90,9 @@ class ProjectService:
                     or workspace_key(managed.workspace_path, connector.device_os) != key
                 ):
                     raise DomainError(403, "server Agent workspace is managed by the platform")
-                return self.created_view(managed, await dao.sessions(account.user_id))
+                return self.created_view(
+                    managed, await dao.sessions(account.user_id, product="office")
+                )
             existing = next(
                 (
                     row
@@ -99,7 +103,9 @@ class ProjectService:
                 None,
             )
             if existing:
-                return self.created_view(existing, await dao.sessions(account.user_id))
+                return self.created_view(
+                    existing, await dao.sessions(account.user_id, product="office")
+                )
             row = ProjectRow(
                 id="proj_" + uuid4().hex,
                 owner_id=account.user_id,
@@ -126,6 +132,7 @@ class ProjectService:
     async def update(
         self, account: Account, identifier: str, value: dict[str, object], remove: bool = False
     ) -> dict[str, object]:
+        account.require("products.office")
         account.require("projects.manage")
         if set(value) - {"name", "pinned"}:
             raise DomainError(422, "unsupported project changes")
@@ -134,7 +141,7 @@ class ProjectService:
             row = await dao.project(identifier)
             if not row or row.owner_id != account.user_id:
                 raise DomainError(404, "project not found")
-            sessions = await dao.sessions(account.user_id)
+            sessions = await dao.sessions(account.user_id, product="office")
             if remove:
                 if identifier == self.devices.native_ids(account.user_id)[1]:
                     raise DomainError(409, "server Agent workspace is managed by the platform")

@@ -190,7 +190,7 @@ export async function exerciseResourceScenario(
     await page.getByRole('button', { name: '下一页', exact: true }).click()
     await expect(page.locator('tbody tr')).toHaveCount(3)
     await expect(
-      page.getByRole('cell', { name: '合成文件13.txt', exact: true }),
+      page.getByRole('cell', { name: /^合成文件13\.txt(?:\s|$)/ }),
     ).toBeVisible()
     await capture('second-page')
     await page
@@ -198,7 +198,7 @@ export async function exerciseResourceScenario(
       .fill('合成文件13')
     await expect(page.locator('tbody tr')).toHaveCount(1)
     await expect(
-      page.getByRole('cell', { name: '合成文件13.txt', exact: true }),
+      page.getByRole('cell', { name: /^合成文件13\.txt(?:\s|$)/ }),
     ).toBeVisible()
     await expect(
       page.getByRole('button', { name: '下一页', exact: true }),
@@ -228,7 +228,7 @@ export async function exerciseResourceScenario(
     page.getByText('文件读取权限已撤销', { exact: true }),
   ).toBeVisible()
   await expect(
-    page.getByRole('cell', { name: '合成文件01.txt', exact: true }),
+    page.getByRole('cell', { name: /^合成文件01\.txt(?:\s|$)/ }),
   ).toHaveCount(0)
   await expect(
     page.getByRole('button', { name: '上传文件', exact: true }),

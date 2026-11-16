@@ -12,11 +12,12 @@ import sys
 import uuid
 from pathlib import Path
 
+from app.infrastructure.errors import DomainError
 from app.modules.runtime.service.ports import ToolCall
 
 from .diagnostics import safe_startup_diagnostic
 from .process_tree import WindowsProcessTree
-from .protocol import FRAME_LIMIT, Fields, RuntimeFailure, fields
+from .protocol import FRAME_LIMIT, Fields, Json, RuntimeFailure, fields
 
 ENV_ALLOWLIST = {
     "PATH",
@@ -211,6 +212,16 @@ class HarnessProcess:
             )
             result = await asyncio.wait_for(self.tool_call(self.owner, message), timeout)
             await self.send({"type": "tool-result", "id": identifier, "result": result})
+        except DomainError as error:
+            # 仅允许不含输入值的参数错误进入模型上下文，其他业务/凭据/基础设施错误仍隐藏。
+            safe_error: Json = True
+            if error.status == 422 and error.code in {
+                "tool_arguments_invalid",
+                "studio_tool_arguments_invalid",
+            }:
+                safe_error = {"status": 422, "code": error.code, "detail": error.detail[:1000]}
+            with contextlib.suppress(ConnectionError, RuntimeFailure):
+                await self.send({"type": "tool-result", "id": identifier, "error": safe_error})
         except (Exception, asyncio.CancelledError):
             with contextlib.suppress(ConnectionError, RuntimeFailure):
                 await self.send({"type": "tool-result", "id": identifier, "error": True})

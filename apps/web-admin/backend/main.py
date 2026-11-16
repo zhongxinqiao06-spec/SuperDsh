@@ -94,7 +94,11 @@ def main() -> None:
             reload=not args.no_reload,
             reload_dirs=[
                 str(path)
-                for path in (BACKEND_ROOT / "app", BACKEND_ROOT / "toolkits")
+                for path in (
+                    BACKEND_ROOT / "app",
+                    BACKEND_ROOT / "toolkits",
+                    BACKEND_ROOT / "migrations",
+                )
                 if path.is_dir()
             ]
             if not args.no_reload

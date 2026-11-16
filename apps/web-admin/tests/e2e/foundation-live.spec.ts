@@ -1,4 +1,6 @@
 import { expect, test } from '@playwright/test'
+import { createPasswordVerifier } from '../../fronted/src/utils/auth/password-verifier'
+import { loginIsolatedAccount } from './live-auth'
 
 test('真实新平台：配置初始化后登录、刷新、用户与角色菜单闭环', async ({
   page,
@@ -23,13 +25,14 @@ test('真实新平台：配置初始化后登录、刷新、用户与角色菜�
   await page.getByLabel('用户名或邮箱').fill(username)
   await page.getByLabel('密码', { exact: true }).fill(password)
   await page.getByRole('button', { name: '登录 ↵', exact: true }).click()
+  await page.getByRole('link', { name: /星桥办公/ }).click()
+  await page.getByRole('link', { name: /管理后台/ }).click()
   await expect(
     page.getByRole('heading', { name: '看板', exact: true }),
   ).toBeVisible()
+  const sidebar = page.getByRole('navigation', { name: '平台导航' })
   await expect(
-    page
-      .getByRole('navigation')
-      .getByRole('link', { name: '总览', exact: true }),
+    sidebar.getByRole('link', { name: '平台总览', exact: true }),
   ).toBeVisible()
   await page.screenshot({ path: testInfo.outputPath('live-console.png') })
   const roleName = `验收角色-${Date.now()}`
@@ -118,7 +121,7 @@ test('真实新平台：配置初始化后登录、刷新、用户与角色菜�
   ).toBeVisible()
   const builtinRole = page
     .locator('.role-card')
-    .filter({ has: page.getByText('内置', { exact: true }) })
+    .filter({ has: page.getByText('内置 · 只读', { exact: true }) })
     .first()
   await expect(builtinRole).toBeVisible()
   await builtinRole
@@ -127,7 +130,7 @@ test('真实新平台：配置初始化后登录、刷新、用户与角色菜�
   await expect(
     roleEditor.getByRole('button', { name: '保存', exact: true }),
   ).toHaveCount(0)
-  await roleEditor.getByRole('button', { name: '取消', exact: true }).click()
+  await roleEditor.getByRole('button', { name: '关闭', exact: true }).click()
   await roleRow.getByRole('button', { name: '删除', exact: true }).click()
   await page
     .getByRole('dialog')
@@ -135,12 +138,10 @@ test('真实新平台：配置初始化后登录、刷新、用户与角色菜�
     .click()
   await expect(roleRow).toHaveCount(0)
   await page.goto('/#/access/menus')
-  await expect(
-    page.getByRole('cell', { name: '总览', exact: true }),
-  ).toBeVisible()
+  await page.getByRole('textbox', { name: '搜索菜单' }).fill('平台总览')
   await page
     .getByRole('row')
-    .filter({ has: page.getByRole('cell', { name: '总览', exact: true }) })
+    .filter({ has: page.getByRole('cell', { name: /平台总览$/ }) })
     .getByRole('button', { name: '编辑', exact: true })
     .click()
   await page
@@ -151,10 +152,13 @@ test('真实新平台：配置初始化后登录、刷新、用户与角色菜�
     .getByRole('dialog')
     .getByRole('button', { name: '保存', exact: true })
     .click()
+  const platformGroup = sidebar.getByRole('button', {
+    name: '平台管理',
+    exact: true,
+  })
+  await platformGroup.click()
   await expect(
-    page
-      .getByRole('navigation')
-      .getByRole('link', { name: '验收总览', exact: true }),
+    sidebar.getByRole('link', { name: '验收总览', exact: true }),
   ).toBeVisible()
   await expect(
     page.getByRole('button', { name: '新增分组', exact: true }),
@@ -164,14 +168,18 @@ test('真实新平台：配置初始化后登录、刷新、用户与角色菜�
     .getByRole('dialog')
     .getByRole('button', { name: '确认恢复', exact: true })
     .click()
+  await expect(page.getByRole('cell', { name: /平台总览$/ })).toBeVisible()
+  if ((await platformGroup.getAttribute('aria-expanded')) !== 'true')
+    await platformGroup.click()
   await expect(
-    page
-      .getByRole('navigation')
-      .getByRole('link', { name: '总览', exact: true }),
+    sidebar.getByRole('link', { name: '平台总览', exact: true }),
   ).toBeVisible()
-  const secondLogin = await request.post(`${base}/api/auth/login`, {
-    data: { identifier: username, password, clientType: 'desktop' },
-  })
+  const secondLogin = await loginIsolatedAccount(
+    request,
+    username,
+    password,
+    'desktop',
+  )
   expect(secondLogin.ok()).toBeTruthy()
   await page.goto('/#/account/security')
   await expect(page.getByRole('cell', { name: /当前/ })).toBeVisible()
@@ -203,6 +211,11 @@ test('真实新平台：配置初始化后登录、刷新、用户与角色菜�
   await page.getByLabel('用户名或邮箱').fill(username)
   await page.getByLabel('密码', { exact: true }).fill(changedPassword)
   await page.getByRole('button', { name: '登录 ↵', exact: true }).click()
+  // 改密后的登录恢复原安全页深链，再显式进入产品选择。
+  await expect(page).toHaveURL(/#\/account\/security$/)
+  await page.getByRole('link', { name: '切换产品' }).click()
+  await page.getByRole('link', { name: /星桥办公/ }).click()
+  await page.getByRole('link', { name: /管理后台/ }).click()
   await expect(
     page.getByRole('heading', { name: '看板', exact: true }),
   ).toBeVisible()
@@ -215,4 +228,21 @@ test('真实新平台：配置初始化后登录、刷新、用户与角色菜�
   await expect(
     page.getByRole('heading', { name: '登录 星桥智能平台' }),
   ).toBeVisible()
+  // 验证改密后将隔离管理员恢复为初始凭据，后续产品回归可以独立运行。
+  const signedIn = await loginIsolatedAccount(
+    request,
+    username,
+    changedPassword,
+  )
+  expect(signedIn.ok()).toBeTruthy()
+  const { accessToken } = await signedIn.json()
+  const original = await createPasswordVerifier(password)
+  const restored = await request.post(`${base}/api/auth/change-password`, {
+    headers: { authorization: 'Bearer ' + accessToken },
+    data: {
+      newPasswordVerifier: original.passwordVerifier,
+      newPasswordSalt: original.passwordSalt,
+    },
+  })
+  expect(restored.status()).toBe(204)
 })

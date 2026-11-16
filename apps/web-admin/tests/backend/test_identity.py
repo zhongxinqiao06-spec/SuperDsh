@@ -135,7 +135,9 @@ async def test_legacy_cookie_menu_cas_and_revocation(
         )
     ).status_code == 403
     menu = (await client.get("/api/admin/menus")).json()
-    assert len(menu["modules"]) == 21 and menu["roles"]
+    assert {"access.users", "access.roles", "access.menus", "product.members"} <= {
+        module["id"] for module in menu["modules"]
+    } and menu["roles"]
     body = {"version": menu["version"], "items": menu["items"]}
     results = await asyncio.gather(
         client.put("/api/admin/menus", json=body),

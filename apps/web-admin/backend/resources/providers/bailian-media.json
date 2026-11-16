@@ -1,0 +1,5 @@
+{
+  "video": "/api/v1/services/aigc/video-generation/video-synthesis",
+  "tasks": "/api/v1/tasks",
+  "speech": "/api/v1/services/audio/tts/SpeechSynthesizer"
+}

@@ -45,7 +45,7 @@ COPY apps/web-admin/deployment/prepare-fonts.py /tmp/prepare-fonts.py
 RUN /usr/bin/python3 /tmp/prepare-fonts.py /usr/share/fonts/opentype/noto /opt/office-fonts && cp /usr/share/doc/fonts-noto-cjk/copyright /opt/office-fonts/LICENSE
 
 FROM ${PYTHON_IMAGE} AS runtime
-RUN apt-get update && apt-get install -y --no-install-recommends ca-certificates git curl openssh-client procps fontconfig fonts-dejavu-core fonts-liberation libreoffice-writer libreoffice-calc libreoffice-impress && rm -rf /var/lib/apt/lists/* && useradd --create-home --uid 1000 webadmin
+RUN apt-get update && apt-get install -y --no-install-recommends ca-certificates git curl openssh-client procps ffmpeg fontconfig fonts-dejavu-core fonts-liberation libreoffice-writer libreoffice-calc libreoffice-impress && rm -rf /var/lib/apt/lists/* && useradd --create-home --uid 1000 webadmin
 COPY --from=office-fonts /opt/office-fonts /usr/local/share/fonts/superdsh-cjk
 RUN fc-cache -f
 WORKDIR /app

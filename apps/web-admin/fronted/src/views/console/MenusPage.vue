@@ -4,6 +4,7 @@ import ManagementList from '@/components/management/ManagementList.vue'
 import PageHeader from '@/components/layout/PageHeader.vue'
 import DataTable from '@/components/management/DataTable.vue'
 import { useMenus } from '@/composables/console/use-menus'
+import MenuRolePreview from './components/MenuRolePreview.vue'
 import { usePreferences } from '@/store/modules/preferences'
 import ResourceStatus from '@/components/feedback/ResourceStatus.vue'
 import ManagementDialog from '@/components/overlay/ManagementDialog.vue'
@@ -16,7 +17,19 @@ const { tr } = usePreferences()
 <template>
   <section class="page paged-page management-page">
     <PageHeader :title="tr('菜单管理', 'Navigation menus')" />
-    <div v-if="vm.canEdit.value" class="toolbar toolbar-panel">
+    <div class="toolbar toolbar-panel">
+      <el-radio-group
+        v-model="vm.product.value"
+        aria-label="菜单所属产品"
+        :disabled="!vm.globalAccess.value || vm.mutation.busy.value"
+      >
+        <el-radio-button value="office">{{
+          tr('星桥办公', 'Starbridge Office')
+        }}</el-radio-button>
+        <el-radio-button value="entertainment">{{
+          tr('星桥娱乐', 'Starbridge Studio')
+        }}</el-radio-button>
+      </el-radio-group>
       <el-input
         v-model="vm.query.value"
         :placeholder="tr('搜索菜单名称或功能标识', 'Search navigation')"
@@ -26,9 +39,23 @@ const { tr } = usePreferences()
       <el-button @click="vm.resource.reload">{{
         tr('刷新', 'Refresh')
       }}</el-button>
-      <el-button type="primary" @click="vm.addGroup">
+      <el-button
+        v-if="vm.resource.data.value?.roles?.length"
+        @click="vm.previewOpen.value = true"
+        >{{ tr('角色预览', 'Preview role') }}</el-button
+      >
+      <el-button
+        v-if="vm.canEdit.value"
+        :disabled="vm.resource.loading.value || !!vm.resource.error.value"
+        type="primary"
+        @click="vm.addGroup"
+      >
         {{ tr('新增分组', 'Add group') }} </el-button
-      ><el-button @click="vm.resetOpen.value = true">
+      ><el-button
+        v-if="vm.canEdit.value"
+        :disabled="vm.resource.loading.value || !!vm.resource.error.value"
+        @click="vm.resetOpen.value = true"
+      >
         {{ tr('恢复默认', 'Restore defaults') }} </el-button
       ><el-button v-if="vm.mutation.error.value" @click="vm.resource.reload">
         {{ tr('重新加载最新配置', 'Reload latest configuration') }}
@@ -99,11 +126,11 @@ const { tr } = usePreferences()
             <td :data-label="tr('排序', 'Order')">{{ item.order }}</td>
             <td>
               <RowActions :busy="vm.mutation.busy.value">
-                <el-button v-if="vm.canEdit.value" link @click="vm.edit(item)">
+                <el-button v-if="vm.editable(item)" link @click="vm.edit(item)">
                   {{ tr('编辑', 'Edit') }}
                 </el-button>
                 <el-button
-                  v-if="vm.canEdit.value && item.kind === 'group'"
+                  v-if="vm.editable(item) && item.kind === 'group'"
                   link
                   type="danger"
                   @click="vm.deletingGroup.value = item"
@@ -135,6 +162,12 @@ const { tr } = usePreferences()
       </template>
     </ManagementList>
 
+    <MenuRolePreview
+      v-if="vm.previewOpen.value"
+      :product="vm.product.value"
+      :roles="vm.resource.data.value?.roles ?? []"
+      @close="vm.previewOpen.value = false"
+    />
     <ManagementDialog
       :model-value="vm.editing.value !== null"
       :title="tr('编辑菜单项', 'Edit navigation item')"
@@ -221,8 +254,12 @@ const { tr } = usePreferences()
       <p>
         {{
           tr(
-            '确认覆盖当前菜单配置？尚未保存的修改将被丢弃。',
-            'Replace the current navigation and discard unsaved edits?',
+            vm.product.value === 'office'
+              ? '确认恢复星桥办公的默认菜单布局？'
+              : '确认恢复星桥娱乐的默认菜单布局？',
+            vm.product.value === 'office'
+              ? 'Restore the default Office menu layout?'
+              : 'Restore the default Studio menu layout?',
           )
         }}
       </p>

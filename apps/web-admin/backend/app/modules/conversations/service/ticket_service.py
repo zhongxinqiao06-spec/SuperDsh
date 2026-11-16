@@ -25,6 +25,7 @@ class TicketService:
     ) -> dict[str, object]:
         """保存加密访问凭据以便长连接重新验证原登录会话。"""
         if scope == {"dashboard": True}:
+            account.require("products.office")
             account.require("devices.read")
         elif set(scope) == {"sessionId"} and isinstance(scope["sessionId"], str):
             account.require("sessions.read")
@@ -32,6 +33,7 @@ class TicketService:
                 row = await dao.session(scope["sessionId"])
                 if not row or row.owner_id != account.user_id or row.source.get("historyDeletedAt"):
                     raise DomainError(404, "session not found")
+                account.require("products." + str(row.source.get("product", "office")))
         else:
             raise DomainError(422, "invalid socket scope")
         ticket = secrets.token_urlsafe(32)
@@ -77,4 +79,6 @@ class TicketService:
         if account.user_id != owner:
             raise DomainError(401, "invalid ticket owner")
         account.require("devices.read" if scope == {"dashboard": True} else "sessions.read")
+        if scope == {"dashboard": True}:
+            account.require("products.office")
         return account, token, client_id

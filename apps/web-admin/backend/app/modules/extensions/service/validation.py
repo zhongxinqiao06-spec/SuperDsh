@@ -97,7 +97,7 @@ def tool_descriptor(value: object) -> dict[str, object]:
     for key, limit in (("name", 100), ("description", 4000)):
         if not isinstance(value.get(key), str) or not 1 <= len(str(value[key]).strip()) <= limit:
             raise DomainError(422, "工具名称或说明无效")
-    if value.get("mode") not in {"read", "action", "office"}:
+    if value.get("mode") not in {"read", "action", "office", "draft"}:
         raise DomainError(422, "工具执行方式无效")
     if "supportsPreparation" in value and not isinstance(value["supportsPreparation"], bool):
         raise DomainError(422, "工具准备能力必须为布尔值")

@@ -1,5 +1,7 @@
 """扩展安装、MCP授权与工具配置的严格请求边界。"""
 
+from typing import Literal
+
 from pydantic import Field
 
 from app.modules.identity.entity.vo.dto import InputModel
@@ -16,6 +18,8 @@ class ImplementationRef(InputModel):
 
 class ToolInput(InputModel):
     """工具配置可独立启停，writeOnly凭据只在服务端合并和加密。"""
+
+    product: Literal["office", "entertainment", "shared"] = "office"
 
     name: str = Field(min_length=1, max_length=100)
     description: str = Field(default="", max_length=1000)

@@ -11,6 +11,25 @@ export type IconNode = readonly [
 ]
 
 export const lucideIcons = {
+  'arrow-left-right': [
+    ['path', { d: 'm16 3 5 5-5 5M21 8H3m5 13-5-5 5-5M3 16h18' }],
+  ],
+  download: [
+    [
+      'path',
+      { d: 'M12 15V3m-5 7 5 5 5-5M3 15v4a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-4' },
+    ],
+  ],
+  sun: [
+    ['circle', { cx: 12, cy: 12, r: 4 }],
+    [
+      'path',
+      {
+        d: 'M12 2v2m0 16v2M2 12h2m16 0h2M4.93 4.93l1.42 1.42m11.3 11.3 1.42 1.42M4.93 19.07l1.42-1.42m11.3-11.3 1.42-1.42',
+      },
+    ],
+  ],
+  moon: [['path', { d: 'M20.98 13A9 9 0 0 1 11 3.02 9 9 0 1 0 20.98 13Z' }]],
   server: [
     ['rect', { x: 2, y: 3, width: 20, height: 8, rx: 2 }],
     ['rect', { x: 2, y: 13, width: 20, height: 8, rx: 2 }],

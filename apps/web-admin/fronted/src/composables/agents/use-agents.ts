@@ -1,6 +1,7 @@
+import { useCurrentProduct } from '@/composables/console/use-current-product'
 import { computed, reactive, ref, watch } from 'vue'
 import { useRouter } from 'vue-router'
-import { agentsApi } from '@/api/agents/agents-api'
+import { createAgentsApi } from '@/api/agents/agents-api'
 import { loadPreparedAgentResources } from '@/store/modules/agent-resources'
 import { stageAgentTrial } from '@/api/workbench/trial'
 import { useResource } from '@/composables/use-resource'
@@ -16,24 +17,32 @@ import type {
 
 /** 智能体列表、发布、检查、资源选择与试用草稿的响应式用例。 */
 export function useAgents() {
+  const product = useCurrentProduct().value
+  const agentsApi = createAgentsApi(product)
   const auth = useAuthStore(),
     router = useRouter(),
     mutation = useMutation()
-  const allowed = computed(() => auth.can('agents.manage')),
+  const allowed = computed(
+      () =>
+        auth.can('agents.manage') ||
+        auth.can(`products.${product}.resources.manage`),
+    ),
     page = ref(1),
     pageSize = ref(10),
     query = ref(''),
     search = ref('')
   const resource = useResource((signal) =>
     allowed.value
-      ? loadPreparedAgentResources(signal, () =>
+      ? loadPreparedAgentResources(product, signal, () =>
           agentsApi.list(page.value, pageSize.value, search.value, signal),
         )
       : Promise.resolve({ items: [], total: 0, page: 1, pageSize: 12 }),
   )
   const catalog = useResource((signal) =>
     allowed.value
-      ? loadPreparedAgentResources(signal, () => agentsApi.catalog(signal))
+      ? loadPreparedAgentResources(product, signal, () =>
+          agentsApi.catalog(signal),
+        )
       : Promise.resolve({
           assets: [],
           knowledgeBases: [],
@@ -80,7 +89,11 @@ export function useAgents() {
     editing.value = value
     delete draft.version
     delete draft.skillPolicy
-    Object.assign(draft, agentDraft(value === 'new' ? undefined : value))
+    Object.assign(
+      draft,
+      agentDraft(value === 'new' ? undefined : value),
+      value === 'new' ? { product } : {},
+    )
     originalDraft.value = JSON.stringify(draft)
     mutation.error.value = ''
   }
@@ -140,7 +153,8 @@ export function useAgents() {
       await resource.reload()
   }
   async function trial(agent: AgentDefinition): Promise<void> {
-    if (!agent.published || !auth.can('sessions.run')) return
+    if (product !== 'office' || !agent.published || !auth.can('sessions.run'))
+      return
     stageAgentTrial(agent.id, agent.recommendedPrompts?.[0])
     await router.push('/workspace')
   }
@@ -150,6 +164,7 @@ export function useAgents() {
       await reload()
   }
   return {
+    product,
     dirty,
     updateDraft,
     auth,

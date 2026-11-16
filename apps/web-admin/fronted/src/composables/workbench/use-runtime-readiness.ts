@@ -16,6 +16,10 @@ export function useRuntimeReadiness(
 ) {
   const stalled = ref(false)
   let timer: ReturnType<typeof setTimeout> | null = null
+  let completion: Promise<boolean> | null = null
+  let resolveReady: ((ready: boolean) => void) | undefined
+  let firstCheck: Promise<void> | undefined
+  let deadlineTimer: ReturnType<typeof setTimeout> | undefined
   let cycle = 0,
     failures = 0,
     deadline = 0,
@@ -30,6 +34,21 @@ export function useRuntimeReadiness(
     current === cycle &&
     identity === sessionController.generation
 
+  function finish(ready: boolean): void {
+    cycle++
+    cancelTimer()
+    clearTimeout(deadlineTimer)
+    const settled = resolveReady
+    completion = null
+    firstCheck = undefined
+    resolveReady = undefined
+    settled?.(ready)
+  }
+  function expire(): void {
+    stalled.value = true
+    runtime.error = '服务端 Agent 准备超过预期时间，请刷新状态查看结果。'
+    finish(false)
+  }
   function schedule(current: number, identity: number, delay: number): void {
     cancelTimer()
     timer = setTimeout(() => {
@@ -46,8 +65,7 @@ export function useRuntimeReadiness(
       if (runtime.agent?.status === 'starting') {
         failures = 0
         if (Date.now() >= deadline) {
-          stalled.value = true
-          runtime.error = '服务端 Agent 准备超过预期时间，请刷新状态查看结果。'
+          expire()
         } else {
           runtime.error = ''
           schedule(current, identity, 1200)
@@ -63,6 +81,7 @@ export function useRuntimeReadiness(
         runtime.agent?.status === 'error'
           ? '服务端 Agent 准备失败，请重新准备；仍失败时检查后端运行诊断。'
           : ''
+      finish(runtime.agent?.status === 'running')
     } catch (cause) {
       if (!valid(current, identity)) return
       failures++
@@ -76,34 +95,64 @@ export function useRuntimeReadiness(
       } else {
         stalled.value = true
         runtime.error = `${errorMessage(cause)}；暂时无法确认运行状态，请点击“刷新状态”重试。`
+        finish(false)
       }
     }
   }
 
-  /** 显式操作重新核对状态；已有 starting/running 实例不会再次发起启动。 */
-  async function prepare(force = false): Promise<void> {
-    cancelTimer()
+  /** 同一准备周期共用第一次查询和最终结果，重复点击不会重设三分钟期限。 */
+  function begin(force: boolean) {
+    if (completion && firstCheck)
+      return { first: firstCheck, ready: completion }
+    if (disposed || signal.aborted)
+      return { first: Promise.resolve(), ready: Promise.resolve(false) }
     const current = ++cycle,
       identity = sessionController.generation
     failures = 0
     stalled.value = false
-    deadline = Date.now() + 180_000
-    await runtime.prepare(force)
-    await check(current, identity)
+    const timeout = 180_000
+    deadline = Date.now() + timeout
+    deadlineTimer = setTimeout(expire, timeout)
+    const ready = new Promise<boolean>((resolve) => {
+      resolveReady = resolve
+    })
+    completion = ready
+    const first = Promise.resolve().then(async () => {
+      if (!valid(current, identity)) return
+      try {
+        await runtime.prepare(force)
+        await check(current, identity)
+      } catch (cause) {
+        if (!valid(current, identity)) return
+        stalled.value = true
+        runtime.error = errorMessage(cause)
+        finish(false)
+      }
+    })
+    firstCheck = first
+    return { first, ready }
   }
+  function prepare(force = false) {
+    return begin(force).first
+  }
+  function prepareForSubmission() {
+    return begin(false).ready
+  }
+  const cancel = () => finish(false)
+  signal.addEventListener('abort', cancel, { once: true })
 
   let identity = sessionController.generation
   const unsubscribe = sessionController.subscribe(() => {
     if (identity === sessionController.generation) return
     identity = sessionController.generation
-    cycle++
-    cancelTimer()
+    finish(false)
     stalled.value = false
   })
   onScopeDispose(() => {
     disposed = true
-    cancelTimer()
+    signal.removeEventListener('abort', cancel)
+    finish(false)
     unsubscribe()
   })
-  return { prepare, stalled }
+  return { prepare, prepareForSubmission, stalled }
 }

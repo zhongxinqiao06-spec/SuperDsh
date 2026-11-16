@@ -7,6 +7,7 @@ export interface InputQuestion {
   detail: string
   multiple: boolean
   allowCustom: boolean
+  approveOptionId?: string
   options: { id: string; label: string; description: string }[]
 }
 export interface InputForm {
@@ -54,6 +55,14 @@ export function inputForm(notice: RuntimeNotice): InputForm | null {
         detail: String(value.detail ?? ''),
         multiple: value.multiple === true,
         allowCustom: value.allowCustom !== false,
+        ...(objectValue(value.intent).kind === 'plan-review' &&
+        typeof objectValue(value.intent).approveOptionId === 'string'
+          ? {
+              approveOptionId: String(
+                objectValue(value.intent).approveOptionId,
+              ),
+            }
+          : {}),
         options: options.map((option) => ({
           id: String(option.id),
           label: String(option.label),

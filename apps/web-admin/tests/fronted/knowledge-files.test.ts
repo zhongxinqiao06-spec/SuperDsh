@@ -5,6 +5,9 @@ import { useKnowledgeFiles } from '@/composables/knowledge/use-knowledge-files'
 import type { AgentAsset } from '@/types/agents/agents'
 import type { KnowledgeBase } from '@/types/knowledge/knowledge'
 
+vi.mock('@/composables/console/use-current-product', () => ({
+  useCurrentProduct: () => ({ value: 'office' }),
+}))
 const mocks = vi.hoisted(() => ({
   generation: 0,
   save: vi.fn(),
@@ -26,10 +29,10 @@ vi.mock('@/store/modules/auth-store', () => ({
   }),
 }))
 vi.mock('@/api/knowledge/knowledge-api', () => ({
-  knowledgeApi: { save: mocks.save, index: mocks.index },
+  createKnowledgeApi: () => ({ save: mocks.save, index: mocks.index }),
 }))
 vi.mock('@/api/agents/agents-api', () => ({
-  agentsApi: { upload: mocks.upload },
+  createAgentsApi: () => ({ upload: mocks.upload }),
 }))
 vi.mock('@/utils/agents/agent-drafts', () => ({
   assetBase64: async () => 'c3ludGhldGlj',

@@ -5,6 +5,7 @@ from typing import Annotated
 from fastapi import APIRouter, Depends, Query, Request
 
 from app.api.dependencies import current_account
+from app.api.product_resources import ResourceAccount
 from app.infrastructure.errors import DomainError
 from app.modules.extensions.entity.vo.extensions import (
     InstallInput,
@@ -71,10 +72,16 @@ async def check(
     return await service(request).check(account, identifier, body.version)
 
 
+@router.get("/admin/tools/sources")
+async def tool_sources(request: Request, account: ResourceAccount) -> dict[str, object]:
+    """产品工具只列出可用实现描述，不开放来源配置、端点或安装权限。"""
+    return {"items": await service(request).tool_sources(account)}
+
+
 @router.get("/admin/tools")
 async def tools(
     request: Request,
-    account: AccountDep,
+    account: ResourceAccount,
     page: int = Query(1, ge=1),
     pageSize: int = Query(10, ge=1, le=100),
     search: str = Query("", max_length=100),
@@ -84,7 +91,9 @@ async def tools(
 
 
 @router.post("/admin/tools", status_code=201)
-async def create_tool(body: ToolInput, request: Request, account: AccountDep) -> dict[str, object]:
+async def create_tool(
+    body: ToolInput, request: Request, account: ResourceAccount
+) -> dict[str, object]:
     """创建绑定固定实现和加密配置的工具。"""
     return {
         "tool": await request.app.state.services.resources.save(
@@ -95,7 +104,7 @@ async def create_tool(body: ToolInput, request: Request, account: AccountDep) ->
 
 @router.put("/admin/tools/{identifier}")
 async def save_tool(
-    identifier: str, body: ToolInput, request: Request, account: AccountDep
+    identifier: str, body: ToolInput, request: Request, account: ResourceAccount
 ) -> dict[str, object]:
     """只更新指定版本，冲突由资源服务统一处理。"""
     if body.version is None:
@@ -108,7 +117,7 @@ async def save_tool(
 
 
 @router.delete("/admin/tools/{identifier}", status_code=204)
-async def delete_tool(identifier: str, request: Request, account: AccountDep) -> None:
+async def delete_tool(identifier: str, request: Request, account: ResourceAccount) -> None:
     """仍被技能或智能体使用的工具不能删除。"""
     await request.app.state.services.resources.delete(account, "tool", identifier)
 
@@ -117,7 +126,7 @@ async def delete_tool(identifier: str, request: Request, account: AccountDep) ->
 async def versions(
     identifier: str,
     request: Request,
-    account: AccountDep,
+    account: ResourceAccount,
     page: int = Query(1, ge=1),
     pageSize: int = Query(10, ge=1, le=100),
 ) -> dict[str, object]:
@@ -133,7 +142,7 @@ async def versions(
 
 @router.post("/admin/tools/{identifier}/restore")
 async def restore(
-    identifier: str, body: ResourceVersionInput, request: Request, account: AccountDep
+    identifier: str, body: ResourceVersionInput, request: Request, account: ResourceAccount
 ) -> dict[str, object]:
     """还原历史配置追加新版本并保留历史密文。"""
     if body.sourceVersion is None:

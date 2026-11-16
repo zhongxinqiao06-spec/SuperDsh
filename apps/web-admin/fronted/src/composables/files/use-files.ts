@@ -19,6 +19,7 @@ export function useFiles() {
       search: '',
       deleted: false,
       category: '',
+      source: '',
     }),
     query = ref('')
   const resource = useResource((signal) => filesApi.list({ ...filter }, signal))
@@ -73,6 +74,16 @@ export function useFiles() {
     }
     downloadTimers.clear()
   }
+  watch(
+    () => auth.can('files.read'),
+    (allowed) => {
+      if (!allowed) {
+        stop()
+        closePreview()
+      }
+    },
+    { flush: 'sync' },
+  )
   watch(() => auth.generation, clear)
   onScopeDispose(() => {
     alive = false
@@ -85,6 +96,7 @@ export function useFiles() {
       filter.search,
       filter.deleted,
       filter.category,
+      filter.source,
     ],
     () => {
       void resource.reload()

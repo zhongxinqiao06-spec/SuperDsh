@@ -97,6 +97,10 @@ defineExpose({ focusIssue })
           title="定义智能体的用途"
           description="清楚说明帮助谁、解决什么问题，以及期望得到的结果。"
         >
+          <p class="muted">
+            所属产品 ·
+            {{ draft.product === 'entertainment' ? '星桥娱乐' : '星桥办公' }}
+          </p>
           <label class="field" data-field="name"
             >名称
             <el-input

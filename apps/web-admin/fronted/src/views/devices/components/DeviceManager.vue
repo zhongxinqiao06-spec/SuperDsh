@@ -4,11 +4,16 @@ import { watch } from 'vue'
 import { useDeviceManager } from '@/composables/devices/use-device-manager'
 import { runtimeStatus } from '@/utils/devices/runtime-config'
 import ResourceStatus from '@/components/feedback/ResourceStatus.vue'
+import PageHeader from '@/components/layout/PageHeader.vue'
 import ManagementDialog from '@/components/overlay/ManagementDialog.vue'
 import RuntimeFields from './RuntimeFields.vue'
 /** 工作台可嵌入的本人设备管理组件；不复用平台运维的跨用户目录。 */
 const emit = defineEmits<{ changed: [] }>()
-const props = defineProps<{ initialDeviceId?: string; pairOnOpen?: boolean }>()
+const props = defineProps<{
+  initialDeviceId?: string
+  pairOnOpen?: boolean
+  standalone?: boolean
+}>()
 const vm = useDeviceManager(() => emit('changed'))
 watch(
   () => [props.initialDeviceId, vm.resource.data.value] as const,
@@ -23,9 +28,10 @@ watch(
 if (props.pairOnOpen && vm.auth.can('devices.manage')) vm.openPairing()
 </script>
 <template>
-  <section class="device-manager">
-    <div class="toolbar">
-      <h2>我的设备</h2>
+  <section class="device-manager stack">
+    <PageHeader v-if="standalone" title="我的设备" />
+    <div class="toolbar" :class="{ 'toolbar-panel': standalone }">
+      <h2 v-if="!standalone">我的设备</h2>
       <el-button @click="vm.reload">刷新</el-button
       ><el-button
         v-if="vm.auth.can('devices.manage')"
@@ -44,23 +50,40 @@ if (props.pairOnOpen && vm.auth.can('devices.manage')) vm.openPairing()
       type="error"
       :closable="false"
     />
+    <p
+      v-if="vm.resource.data.value && !vm.resource.data.value.connectors.length"
+      class="muted"
+    >
+      暂无已绑定设备
+    </p>
     <ul class="devices">
       <li
         v-for="device in vm.resource.data.value?.connectors ?? []"
         :key="device.id"
       >
-        <div>
-          <strong>{{ device.name }}</strong
+        <div class="office-device-title">
+          <span
+            class="office-device-indicator"
+            :data-online="device.status === 'online'"
+          ></span
+          ><strong>{{ device.name }}</strong
           ><small
             >{{ device.status === 'online' ? '在线' : '离线' }} ·
             {{ device.deviceOs || device.connectorKind }}</small
           >
         </div>
         <div class="toolbar">
-          <el-button link @click="vm.selected.value = device"
+          <el-button
+            link
+            :aria-expanded="vm.selected.value?.id === device.id"
+            @click="
+              vm.selected.value =
+                vm.selected.value?.id === device.id ? null : device
+            "
             >运行实例</el-button
           ><template
             v-if="
+              (!standalone || vm.selected.value?.id === device.id) &&
               vm.auth.can('devices.manage') &&
               device.executorKind !== 'server-agent'
             "
@@ -161,17 +184,17 @@ if (props.pairOnOpen && vm.auth.can('devices.manage')) vm.openPairing()
         在桌面端或 Connector
         中生成配对码，再填写下方信息完成连接。配对码过期后请在设备端重新生成。
       </p>
-      <label
+      <label class="field"
         >设备名称<el-input
           v-model="vm.deviceDraft.name"
           maxlength="255" /></label
-      ><label
+      ><label class="field"
         >配对码<el-input
           v-model="vm.pairingCode.value"
           maxlength="6"
           inputmode="numeric"
           autocomplete="one-time-code" /></label
-      ><label
+      ><label class="field"
         >设备类型<el-select
           v-model="vm.deviceDraft.connectorKind"
           @change="vm.deviceDraft.executorKind = vm.deviceDraft.connectorKind"
@@ -196,7 +219,7 @@ if (props.pairOnOpen && vm.auth.can('devices.manage')) vm.openPairing()
       @update:model-value="vm.editing.value = null"
       @submit="vm.saveRuntime"
       ><template v-if="vm.editing.value === 'new'"
-        ><label
+        ><label class="field"
           >运行类型<el-select v-model="vm.draft.runtimeType"
             ><el-option
               v-for="type in vm.runtimes.data.value?.runtimeTypes ?? []"
@@ -204,7 +227,7 @@ if (props.pairOnOpen && vm.auth.can('devices.manage')) vm.openPairing()
               :value="type.runtimeType"
               :label="type.displayName"
               :disabled="type.available === false" /></el-select></label
-        ><label
+        ><label class="field"
           >实例名称<el-input v-model="vm.draft.name" maxlength="128" /></label
       ></template>
       <p v-if="vm.descriptor.value?.description">
@@ -242,17 +265,20 @@ if (props.pairOnOpen && vm.auth.can('devices.manage')) vm.openPairing()
       title="重置设备凭据"
       width="min(480px, 94vw)"
       @update:model-value="vm.revoking.value = null"
-      ><p>
-        重置
-        {{ vm.revoking.value?.name }}
-        的平台凭据并断开连接，设备记录保留。请用新凭据重新连接，设备本地任务不会因此被终止。
-      </p>
-      <el-alert
-        v-if="vm.mutation.error.value"
-        :title="vm.mutation.error.value"
-        type="error"
-        :closable="false"
-      /><template #footer
+      ><div class="stack">
+        <p>
+          重置
+          {{ vm.revoking.value?.name }}
+          的平台凭据并断开连接，设备记录保留。请用新凭据重新连接，设备本地任务不会因此被终止。
+        </p>
+        <el-alert
+          v-if="vm.mutation.error.value"
+          :title="vm.mutation.error.value"
+          type="error"
+          :closable="false"
+        />
+      </div>
+      <template #footer
         ><el-button @click="vm.revoking.value = null">取消</el-button
         ><el-button
           type="danger"
@@ -268,16 +294,18 @@ if (props.pairOnOpen && vm.auth.can('devices.manage')) vm.openPairing()
       width="min(560px, 94vw)"
       @update:model-value="vm.credential.value = null"
     >
-      <p>凭据只在当前窗口展示，请更新设备连接配置。关闭后不会保留。</p>
-      <el-input
-        :model-value="vm.credential.value?.connectorToken"
-        readonly
-        aria-label="新的设备凭据"
-        autocomplete="off"
-      />
-      <p v-if="vm.credentialNotice.value" role="status">
-        {{ vm.credentialNotice.value }}
-      </p>
+      <div class="stack">
+        <p>凭据只在当前窗口展示，请更新设备连接配置。关闭后不会保留。</p>
+        <el-input
+          :model-value="vm.credential.value?.connectorToken"
+          readonly
+          aria-label="新的设备凭据"
+          autocomplete="off"
+        />
+        <p v-if="vm.credentialNotice.value" role="status">
+          {{ vm.credentialNotice.value }}
+        </p>
+      </div>
       <template #footer
         ><el-button @click="vm.copyCredential">复制凭据</el-button
         ><el-button type="primary" @click="vm.credential.value = null"
@@ -291,16 +319,18 @@ if (props.pairOnOpen && vm.auth.can('devices.manage')) vm.openPairing()
       width="min(480px, 94vw)"
       @update:model-value="vm.deleting.value = null"
     >
-      <p>
-        删除
-        {{ vm.deleting.value?.name }} 的设备记录？需要重新配对才能再次连接。
-      </p>
-      <el-alert
-        v-if="vm.mutation.error.value"
-        :title="vm.mutation.error.value"
-        type="error"
-        :closable="false"
-      />
+      <div class="stack">
+        <p>
+          删除
+          {{ vm.deleting.value?.name }} 的设备记录？需要重新配对才能再次连接。
+        </p>
+        <el-alert
+          v-if="vm.mutation.error.value"
+          :title="vm.mutation.error.value"
+          type="error"
+          :closable="false"
+        />
+      </div>
       <template #footer
         ><el-button
           :disabled="vm.mutation.busy.value"
@@ -319,16 +349,20 @@ if (props.pairOnOpen && vm.auth.can('devices.manage')) vm.openPairing()
       title="清除运行配置"
       width="min(480px, 94vw)"
       @update:model-value="vm.clearing.value = null"
-      ><p>
-        停止
-        {{ vm.clearing.value?.name }} 并移除保存的实例配置？其他实例保持原状态。
-      </p>
-      <el-alert
-        v-if="vm.mutation.error.value"
-        :title="vm.mutation.error.value"
-        type="error"
-        :closable="false"
-      /><template #footer
+      ><div class="stack">
+        <p>
+          停止
+          {{ vm.clearing.value?.name }}
+          并移除保存的实例配置？其他实例保持原状态。
+        </p>
+        <el-alert
+          v-if="vm.mutation.error.value"
+          :title="vm.mutation.error.value"
+          type="error"
+          :closable="false"
+        />
+      </div>
+      <template #footer
         ><el-button @click="vm.clearing.value = null">取消</el-button
         ><el-button
           type="danger"
@@ -341,10 +375,6 @@ if (props.pairOnOpen && vm.auth.can('devices.manage')) vm.openPairing()
   </section>
 </template>
 <style scoped>
-.device-manager {
-  display: grid;
-  gap: 16px;
-}
 .devices {
   list-style: none;
   padding: 0;
@@ -365,5 +395,23 @@ small {
 }
 .runtime-card p {
   color: var(--el-color-danger);
+}
+.office-device-title {
+  display: grid;
+  grid-template-columns: auto 1fr;
+  gap: 4px 8px;
+  align-items: center;
+}
+.office-device-title small {
+  grid-column: 2;
+}
+.office-device-indicator {
+  height: 8px;
+  width: 8px;
+  background: var(--muted-foreground);
+  border-radius: 50%;
+}
+.office-device-indicator[data-online='true'] {
+  background: var(--success, var(--el-color-success));
 }
 </style>

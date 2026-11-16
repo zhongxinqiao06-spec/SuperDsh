@@ -9,29 +9,29 @@ function patch(value: Partial<ConnectionDraft>): void {
 }
 </script>
 <template>
-  <label
+  <label class="field"
     >连接名称<el-input
       :model-value="draft.name"
       maxlength="100"
       @update:model-value="patch({ name: $event })"
   /></label>
-  <label
+  <label class="field"
     >服务地址<el-input
       :model-value="draft.endpoint"
       placeholder="https://对象存储服务地址"
       @update:model-value="patch({ endpoint: $event })"
   /></label>
-  <label
+  <label class="field"
     >存储桶<el-input
       :model-value="draft.bucket"
       @update:model-value="patch({ bucket: $event })"
   /></label>
   <div class="form-grid">
-    <label
+    <label class="field"
       >区域<el-input
         :model-value="draft.region"
         @update:model-value="patch({ region: $event })" /></label
-    ><label
+    ><label class="field"
       >对象前缀<el-input
         :model-value="draft.prefix"
         @update:model-value="patch({ prefix: $event })"
@@ -47,13 +47,13 @@ function patch(value: Partial<ConnectionDraft>): void {
     >启用连接</el-checkbox
   >
   <p v-if="existing" class="muted">访问密钥与秘密密钥都留空时保留原有凭据。</p>
-  <label
+  <label class="field"
     >访问密钥<el-input
       :model-value="draft.accessKeyId"
       autocomplete="off"
       @update:model-value="patch({ accessKeyId: $event })"
   /></label>
-  <label
+  <label class="field"
     >秘密密钥<el-input
       :model-value="draft.secretAccessKey"
       type="password"
@@ -61,7 +61,7 @@ function patch(value: Partial<ConnectionDraft>): void {
       autocomplete="new-password"
       @update:model-value="patch({ secretAccessKey: $event })"
   /></label>
-  <label
+  <label class="field"
     >会话令牌（可选）<el-input
       :model-value="draft.sessionToken"
       type="password"
@@ -73,8 +73,8 @@ function patch(value: Partial<ConnectionDraft>): void {
 <style scoped>
 .form-grid {
   display: grid;
-  grid-template-columns: 1fr 1fr;
-  gap: 12px;
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 220px), 1fr));
+  gap: var(--field-gap);
 }
 .muted {
   color: var(--el-text-color-secondary);

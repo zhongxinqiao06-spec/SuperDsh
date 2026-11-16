@@ -1,0 +1,9 @@
+{
+  "aspectWidth": 9,
+  "aspectHeight": 16,
+  "targetDurationMs": 60000,
+  "language": "zh-CN",
+  "fpsNumerator": 25,
+  "fpsDenominator": 1,
+  "audioSampleRate": 48000
+}

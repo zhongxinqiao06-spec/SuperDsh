@@ -1,0 +1,306 @@
+@media (max-width: 1000px) {
+  :where(.starbridge-public) .office-hero {
+    gap: 30px;
+    padding: 40px 0;
+  }
+  :where(.starbridge-public) .film-inner {
+    gap: 24px;
+  }
+  :where(.starbridge-public) .film-copy h1 {
+    font-size: clamp(56px, 7.5vw, 72px);
+  }
+  :where(.starbridge-public) .case-steps {
+    gap: 20px;
+  }
+  :where(.starbridge-public) .choice-copy {
+    padding: 20px;
+  }
+  :where(.starbridge-public) .launch-main {
+    width: var(--page);
+  }
+}
+@media (max-width: 720px) {
+  .starbridge-public {
+    --page: calc(100% - 36px);
+  }
+  :where(.starbridge-public) .mast-inner {
+    display: flex;
+    min-height: 60px;
+    gap: 12px;
+    flex-wrap: wrap;
+    justify-content: space-between;
+  }
+  :where(.starbridge-public) .brand > span {
+    display: none;
+  }
+  :where(.starbridge-public) .brand-mark {
+    width: 35px;
+    height: 35px;
+  }
+  :where(.starbridge-public) .brand b {
+    font-size: 20px;
+  }
+  :where(.starbridge-public) .brand {
+    gap: 4px;
+  }
+  :where(.starbridge-public) .product-nav {
+    height: 60px;
+    gap: 17px;
+  }
+  :where(.starbridge-public) .product-nav a {
+    font-size: 12px;
+    padding-top: 0;
+  }
+  :where(.starbridge-public) .product-nav a[aria-current]:after {
+    bottom: 9px;
+  }
+  :where(.starbridge-public) .mast-cta,
+  :where(.starbridge-public) .launch-back {
+    font-size: 12px;
+    gap: 5px;
+  }
+  :where(.starbridge-public) .film-inner {
+    grid-template-columns: 1fr;
+    min-height: 0;
+    padding-block: 27px 23px;
+    gap: 24px;
+  }
+  :where(.starbridge-public) .film-copy {
+    padding: 0;
+    max-width: 100%;
+  }
+  :where(.starbridge-public) .film-copy h1 {
+    font-size: clamp(46px, 11vw, 70px);
+    margin: 12px 0;
+    line-height: 1.12;
+  }
+  :where(.starbridge-public) .film-lede,
+  :where(.starbridge-public) .office-lede {
+    font-size: 14px;
+    line-height: 1.75;
+  }
+  :where(.starbridge-public) .wide-break {
+    display: none;
+  }
+  :where(.starbridge-public) .product-caption,
+  :where(.starbridge-public) .office-caption {
+    font-size: 10px;
+    letter-spacing: 0.11em;
+  }
+  :where(.starbridge-public) .film-actions,
+  :where(.starbridge-public) .office-actions {
+    gap: 19px;
+    margin-top: 21px;
+  }
+  :where(.starbridge-public) .button {
+    font-size: 13px;
+    min-height: 44px;
+    padding-inline: 15px;
+    gap: 13px;
+  }
+  :where(.starbridge-public) .secondary-link,
+  :where(.starbridge-public) .text-link {
+    font-size: 12px;
+  }
+  :where(.starbridge-public) .preview-view {
+    margin: 0 10px;
+    aspect-ratio: 2.75;
+  }
+  :where(.starbridge-public) .studio-preview-head {
+    padding: 9px 12px;
+  }
+  :where(.starbridge-public) .preview-meta {
+    padding: 6px 12px 8px;
+  }
+  :where(.starbridge-public) .preview-sequence {
+    padding: 7px 11px 10px;
+  }
+  :where(.starbridge-public) .shot-selector button {
+    gap: 5px;
+    padding-inline: 6px;
+    min-height: 27px;
+  }
+  :where(.starbridge-public) .film-case {
+    padding: 27px 0 30px;
+  }
+  :where(.starbridge-public) .section-head h2,
+  :where(.starbridge-public) .office-case-heading h2 {
+    font-size: 24px;
+  }
+  :where(.starbridge-public) .case-steps {
+    grid-template-columns: 1fr;
+    gap: 14px;
+    margin-top: 19px;
+  }
+  :where(.starbridge-public) .case-steps article {
+    padding: 13px 0 0 40px;
+  }
+  :where(.starbridge-public) .process-icon {
+    top: 15px;
+    width: 24px;
+    height: 24px;
+  }
+  :where(.starbridge-public) .case-steps h3 {
+    font-size: 16px;
+  }
+  :where(.starbridge-public) .case-steps p {
+    margin-top: 2px;
+  }
+  :where(.starbridge-public) .site-footer {
+    padding: 17px 0;
+    font-size: 12px;
+  }
+  :where(.starbridge-public) .office-hero {
+    grid-template-columns: 1fr;
+    gap: 23px;
+    padding: 32px 0 26px;
+  }
+  :where(.starbridge-public) .office-copy {
+    padding: 0;
+  }
+  :where(.starbridge-public) .office-copy h1 {
+    font-size: clamp(39px, 8.9vw, 54px);
+    margin: 15px 0 12px;
+    line-height: 1.25;
+  }
+  :where(.starbridge-public) .office-preview {
+    padding: 0 12px 11px;
+  }
+  :where(.starbridge-public) .report-sheet {
+    padding: 10px 13px 12px;
+  }
+  :where(.starbridge-public) .office-preview-bar {
+    height: 30px;
+  }
+  :where(.starbridge-public) .report-sheet h2 {
+    font-size: 21px;
+    margin: 9px 0;
+  }
+  :where(.starbridge-public) .report-main img {
+    height: 80px;
+  }
+  :where(.starbridge-public) .report-stat strong {
+    font-size: 36px;
+  }
+  :where(.starbridge-public) .report-trend {
+    gap: 4px;
+    margin-top: 7px;
+  }
+  :where(.starbridge-public) .office-case {
+    padding: 20px 0 32px;
+  }
+  :where(.starbridge-public) .office-case td,
+  :where(.starbridge-public) .office-case th {
+    font-size: 12px;
+    padding: 6px 4px;
+  }
+  :where(.starbridge-public) .office-case thead th {
+    font-size: 11px;
+  }
+  :where(.starbridge-public) .office-case table {
+    margin-top: 16px;
+  }
+  :where(.starbridge-public) .office-case-heading .text-link {
+    font-size: 11px;
+    gap: 4px;
+  }
+  :where(.starbridge-public) .launch-main {
+    padding: 28px 0 34px;
+  }
+  :where(.starbridge-public) .launch-heading {
+    margin-bottom: 20px;
+  }
+  :where(.starbridge-public) .launch-heading h1 {
+    font-size: 32px;
+  }
+  :where(.starbridge-public) .launch-heading p {
+    font-size: 13px;
+    margin-top: 8px;
+  }
+  :where(.starbridge-public) .workspace-choices {
+    grid-template-columns: 1fr;
+    gap: 16px;
+  }
+  :where(.starbridge-public) .choice-image {
+    height: clamp(122px, 32vw, 200px);
+  }
+  :where(.starbridge-public) .choice-copy {
+    padding: 15px 18px;
+  }
+  :where(.starbridge-public) .choice-copy h2 {
+    font-size: 26px;
+    margin-top: 4px;
+  }
+  :where(.starbridge-public) .choice-copy p {
+    font-size: 13px;
+    margin: 6px 0 12px;
+  }
+  :where(.starbridge-public) .choice-action {
+    padding-top: 10px;
+    font-size: 13px;
+  }
+  :where(.starbridge-public) .choice-sub {
+    font-size: 9px;
+  }
+}
+@media (max-width: 370px) {
+  :where(.starbridge-public) .mast-inner {
+    gap: 5px;
+  }
+  :where(.starbridge-public) .product-nav {
+    gap: 11px;
+  }
+  :where(.starbridge-public) .section-head h2 {
+    font-size: 21px;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  :where(.starbridge-public) *,
+  :where(.starbridge-public) *::before,
+  :where(.starbridge-public) *::after {
+    scroll-behavior: auto !important;
+    transition: none !important;
+  }
+}
+@media (max-width: 720px) {
+  .starbridge-public .public-actions,
+  .starbridge-public .site-footer > div {
+    gap: 5px;
+  }
+  .starbridge-public .utility-button {
+    width: 28px;
+  }
+  .starbridge-public main [id] {
+    scroll-margin-top: 65px;
+  }
+  .starbridge-public .office-resources .website-demo-number {
+    font-size: clamp(23px, 6vw, 33px);
+  }
+  .starbridge-public .office-resources .capabilities-grid {
+    grid-template-columns: 1fr;
+  }
+  .starbridge-public .office-resources .website-architecture span {
+    padding: 9px;
+    min-width: 0;
+  }
+  .starbridge-public .office-resources .website-architecture div {
+    flex-wrap: wrap;
+  }
+  .starbridge-public .office-resources .website-demo {
+    min-width: 0;
+  }
+  .starbridge-public .office-resources .website-sales-bars {
+    gap: 12px;
+  }
+  .starbridge-public .site-footer > div {
+    flex-wrap: wrap;
+    gap: 12px;
+  }
+  :lang(en) .starbridge-public .brand b {
+    font-size: 14px;
+  }
+  :lang(en) .starbridge-public .brand-mark {
+    width: 28px;
+    height: 28px;
+  }
+}

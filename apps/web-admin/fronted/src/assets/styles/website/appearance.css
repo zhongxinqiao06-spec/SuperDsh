@@ -1,0 +1,20 @@
+/* 明暗颜色由公共语义令牌提供，公开页面不再维护与控制台冲突的第二份深色皮肤。 */
+.starbridge-public .button-blue,
+.starbridge-public
+  .office-resources
+  :is(
+    .website-cta,
+    .website-tabs button[aria-selected='true'],
+    .website-tabs button[aria-pressed='true']
+  ) {
+  color: var(--primary-foreground);
+}
+.starbridge-public .choice-film {
+  border: 1px solid var(--public-border);
+}
+.starbridge-public .choice-film:hover {
+  border-color: var(--entertainment-primary);
+}
+.starbridge-public .choice-office:hover {
+  border-color: var(--office-primary);
+}

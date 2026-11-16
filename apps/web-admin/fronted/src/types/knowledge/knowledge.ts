@@ -2,6 +2,7 @@ import type { SelectableResource } from '@/types/agents/agents'
 
 /** 知识库只保存资料引用，索引状态属于具体文件与模型代际。 */
 export interface KnowledgeDraft {
+  product?: 'office' | 'entertainment' | 'shared'
   name: string
   description: string
   assetIds: string[]
@@ -9,6 +10,7 @@ export interface KnowledgeDraft {
   version?: number
 }
 export interface KnowledgeBase extends SelectableResource {
+  product?: KnowledgeDraft['product']
   assetIds: string[]
   createdAt: string
   updatedAt: string

@@ -6,7 +6,8 @@ from dataclasses import asdict
 from datetime import UTC, datetime
 from uuid import uuid4
 
-from sqlalchemy import or_, select, update
+from sqlalchemy import String, cast, func, or_, select, update
+from sqlalchemy.dialects.postgresql import ARRAY
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.infrastructure.database import Database, lock_transaction
@@ -31,6 +32,25 @@ class SqlIdentityTransaction:
     async def users(self) -> list[User]:
         rows = await self.db.scalars(select(UserRow).order_by(UserRow.created_at, UserRow.id))
         return [user_entity(row) for row in rows]
+
+    async def product_members(
+        self, role_ids: list[str], search: str, offset: int, size: int
+    ) -> tuple[list[User], int]:
+        """分页和计数共用同一产品成员条件，先按角色过滤再搜索，不加载全平台账号。"""
+        matching = UserRow.roles.has_any(cast(role_ids, ARRAY(String())))
+        query = select(UserRow).where(matching, UserRow.deleted_at.is_(None))
+        if search:
+            query = query.where(
+                or_(
+                    UserRow.username.icontains(search, autoescape=True),
+                    UserRow.display_name.icontains(search, autoescape=True),
+                )
+            )
+        count = await self.db.scalar(select(func.count()).select_from(query.subquery()))
+        rows = await self.db.scalars(
+            query.order_by(UserRow.username, UserRow.id).offset(offset).limit(size)
+        )
+        return [user_entity(row) for row in rows], int(count or 0)
 
     async def user(self, user_id: str) -> User | None:
         row = await self.db.get(UserRow, user_id)

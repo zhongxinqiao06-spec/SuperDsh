@@ -122,7 +122,15 @@ const states = {
             </td>
             <td data-label="最近更新">{{ dateTimeLabel(base.updatedAt) }}</td>
             <td>
+              <small
+                v-if="
+                  base.product === 'shared' && !vm.auth.can('agents.manage')
+                "
+                class="muted"
+                >共享 · 可引用</small
+              >
               <RowActions
+                v-else
                 :busy="vm.mutation.busy.value || vm.indexMutation.busy.value"
               >
                 <el-button link @click="vm.edit(base)">编辑</el-button>
@@ -156,7 +164,7 @@ const states = {
           </tr>
         </tbody>
       </DataTable>
-      <section v-if="vm.selected.value" class="knowledge-panel">
+      <section v-if="vm.selected.value" class="knowledge-panel stack">
         <div class="page-heading">
           <div>
             <h2>{{ vm.selected.value.name }} · 检索测试</h2>
@@ -281,6 +289,25 @@ const states = {
     >
       <div class="stack">
         <label class="field"
+          >适用范围
+          <el-select
+            v-model="vm.draft.product"
+            :disabled="
+              !vm.auth.can('agents.manage') || vm.editing.value !== 'new'
+            "
+          >
+            <el-option
+              :value="vm.product"
+              :label="vm.product === 'office' ? '星桥办公' : '星桥娱乐'"
+            />
+            <el-option
+              v-if="vm.auth.can('agents.manage')"
+              value="shared"
+              label="两端共享"
+            />
+          </el-select>
+        </label>
+        <label class="field"
           >名称<el-input
             v-model="vm.draft.name"
             maxlength="80"
@@ -325,62 +352,64 @@ const states = {
       "
       @update:model-value="files.close"
     >
-      <p class="muted">
-        上传的资料将自动加入当前知识库；移出只解除关联，原文件和已有会话不受影响。
-      </p>
-      <div class="toolbar">
-        <span class="toolbar-spacer" /><el-button
-          :loading="files.indexing.busy.value"
-          :disabled="
-            files.mutation.busy.value || files.assets.mutation.busy.value
+      <div class="stack">
+        <p class="muted">
+          上传的资料将自动加入当前知识库；移出只解除关联，原文件和已有会话不受影响。
+        </p>
+        <div class="toolbar">
+          <span class="toolbar-spacer" /><el-button
+            :loading="files.indexing.busy.value"
+            :disabled="
+              files.mutation.busy.value || files.assets.mutation.busy.value
+            "
+            @click="files.reindex"
+            >重建索引</el-button
+          >
+        </div>
+        <ResourceStatus
+          :loading="vm.catalog.loading.value"
+          :error="
+            files.mutation.error.value ||
+            files.indexing.error.value ||
+            vm.catalog.error.value
           "
-          @click="files.reindex"
-          >重建索引</el-button
-        >
+          @retry="vm.catalog.reload"
+        />
+        <p v-if="files.notice.value" role="status" class="muted">
+          {{ files.notice.value }}
+        </p>
+        <AssetLibrary
+          v-if="files.target.value"
+          :assets="
+            (vm.catalog.data.value?.assets ?? []).filter((asset) =>
+              files.target.value?.assetIds.includes(asset.id),
+            )
+          "
+          :busy="
+            files.assets.mutation.busy.value ||
+            files.mutation.busy.value ||
+            files.indexing.busy.value ||
+            vm.catalog.loading.value
+          "
+          :error="files.assets.mutation.error.value"
+          :uploading="files.assets.uploading.value"
+          :kind="files.assets.kind.value"
+          :filename="files.assets.file.value?.name ?? ''"
+          :name="files.assets.name.value"
+          :preview="files.assets.preview.value"
+          :preview-url="files.assets.previewUrl.value"
+          removable
+          @update:uploading="files.assets.uploading.value = $event"
+          @update:kind="files.assets.kind.value = $event"
+          @update:name="files.assets.name.value = $event"
+          @choose="files.assets.choose"
+          @upload="files.assets.upload"
+          @preview="files.assets.showPreview"
+          @download="files.assets.download"
+          @remove="files.remove"
+          @close-preview="files.assets.clearPreview"
+        />
       </div>
-      <ResourceStatus
-        :loading="vm.catalog.loading.value"
-        :error="
-          files.mutation.error.value ||
-          files.indexing.error.value ||
-          vm.catalog.error.value
-        "
-        @retry="vm.catalog.reload"
-      />
-      <p v-if="files.notice.value" role="status" class="muted">
-        {{ files.notice.value }}
-      </p>
-      <AssetLibrary
-        v-if="files.target.value"
-        :assets="
-          (vm.catalog.data.value?.assets ?? []).filter((asset) =>
-            files.target.value?.assetIds.includes(asset.id),
-          )
-        "
-        :busy="
-          files.assets.mutation.busy.value ||
-          files.mutation.busy.value ||
-          files.indexing.busy.value ||
-          vm.catalog.loading.value
-        "
-        :error="files.assets.mutation.error.value"
-        :uploading="files.assets.uploading.value"
-        :kind="files.assets.kind.value"
-        :filename="files.assets.file.value?.name ?? ''"
-        :name="files.assets.name.value"
-        :preview="files.assets.preview.value"
-        :preview-url="files.assets.previewUrl.value"
-        removable
-        @update:uploading="files.assets.uploading.value = $event"
-        @update:kind="files.assets.kind.value = $event"
-        @update:name="files.assets.name.value = $event"
-        @choose="files.assets.choose"
-        @upload="files.assets.upload"
-        @preview="files.assets.showPreview"
-        @download="files.assets.download"
-        @remove="files.remove"
-        @close-preview="files.assets.clearPreview"
-      />
     </el-dialog>
     <ManagementDialog
       :model-value="vm.embeddingOpen.value"
@@ -401,54 +430,60 @@ const states = {
       :title="(vm.historyTarget.value?.name ?? '') + ' · 配置历史'"
       width="min(720px, 94vw)"
       @update:model-value="vm.historyTarget.value = null"
-      ><ResourceStatus
-        :loading="vm.history.loading.value"
-        :error="vm.history.error.value"
-        @retry="vm.history.reload" />
-      <ul class="history-list">
-        <li
-          v-for="version in vm.history.data.value?.items ?? []"
-          :key="version.version"
-        >
-          <div>
-            <strong>版本 {{ version.version }} · {{ version.name }}</strong>
-            <p>{{ version.description }}</p>
-            <small
-              >{{ version.assetIds.length }} 份资料 ·
-              {{ version.updatedAt }}</small
-            >
-          </div>
-          <el-button
-            :disabled="
-              version.version === vm.history.data.value?.currentVersion
-            "
-            @click="vm.restoring.value = version"
-            >恢复此版本</el-button
+      ><div class="stack">
+        <ResourceStatus
+          :loading="vm.history.loading.value"
+          :error="vm.history.error.value"
+          @retry="vm.history.reload"
+        />
+        <ul class="history-list">
+          <li
+            v-for="version in vm.history.data.value?.items ?? []"
+            :key="version.version"
           >
-        </li>
-      </ul>
-      <ManagementPagination
-        v-model:current-page="vm.historyPage.value"
-        v-model:page-size="vm.historySize.value"
-        :total="vm.history.data.value?.total ?? 0"
-        :page-sizes="[10, 20, 50]"
-    /></el-dialog>
+            <div>
+              <strong>版本 {{ version.version }} · {{ version.name }}</strong>
+              <p>{{ version.description }}</p>
+              <small
+                >{{ version.assetIds.length }} 份资料 ·
+                {{ version.updatedAt }}</small
+              >
+            </div>
+            <el-button
+              :disabled="
+                version.version === vm.history.data.value?.currentVersion
+              "
+              @click="vm.restoring.value = version"
+              >恢复此版本</el-button
+            >
+          </li>
+        </ul>
+        <ManagementPagination
+          v-model:current-page="vm.historyPage.value"
+          v-model:page-size="vm.historySize.value"
+          :total="vm.history.data.value?.total ?? 0"
+          :page-sizes="[10, 20, 50]"
+        /></div
+    ></el-dialog>
     <el-dialog
       :model-value="Boolean(vm.restoring.value)"
       title="确认恢复配置"
       width="min(480px, 94vw)"
       @update:model-value="vm.restoring.value = null"
-      ><p>
-        恢复版本
-        {{ vm.restoring.value?.version }}
-        的资料绑定和配置？将新增一个版本，保留全部历史。
-      </p>
-      <el-alert
-        v-if="vm.mutation.error.value"
-        type="error"
-        :title="vm.mutation.error.value"
-        :closable="false"
-      /><template #footer
+      ><div class="stack">
+        <p>
+          恢复版本
+          {{ vm.restoring.value?.version }}
+          的资料绑定和配置？将新增一个版本，保留全部历史。
+        </p>
+        <el-alert
+          v-if="vm.mutation.error.value"
+          type="error"
+          :title="vm.mutation.error.value"
+          :closable="false"
+        />
+      </div>
+      <template #footer
         ><el-button
           :disabled="vm.mutation.busy.value"
           @click="vm.restoring.value = null"
@@ -489,13 +524,13 @@ const states = {
 <style scoped>
 .knowledge-panel {
   border: 1px solid var(--el-border-color);
-  padding: 16px;
+  padding: var(--panel-padding);
   margin-block: 0;
   border-radius: 14px;
 }
 .source-card {
   padding: 18px;
-  margin-block: 12px;
+  margin-block: 0;
   background: var(--el-fill-color-light);
   border-radius: 10px;
   overflow-wrap: anywhere;

@@ -35,12 +35,23 @@ class FileDao:
         row = await self.session.get(FileEntryRow, identifier)
         return row if row and row.owner_id == owner else None
 
-    async def entries(self, owner: str) -> list[FileEntryRow]:
+    async def entries(self, owner: str, source: str = "") -> list[FileEntryRow]:
+        """文件来源依据真实成果引用，筛选先于分页；多个会话引用同一文件不会重复计数。"""
+        statement = select(FileEntryRow).where(FileEntryRow.owner_id == owner)
+        if source:
+            generated = (
+                select(FileReferenceRow.file_id)
+                .where(
+                    FileReferenceRow.file_id == FileEntryRow.id,
+                    FileReferenceRow.owner_id == owner,
+                    FileReferenceRow.kind == "artifact",
+                )
+                .exists()
+            )
+            statement = statement.where(generated if source == "artifact" else ~generated)
         return list(
             await self.session.scalars(
-                select(FileEntryRow)
-                .where(FileEntryRow.owner_id == owner)
-                .order_by(FileEntryRow.created_at.desc(), FileEntryRow.id)
+                statement.order_by(FileEntryRow.created_at.desc(), FileEntryRow.id)
             )
         )
 

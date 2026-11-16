@@ -94,7 +94,7 @@ async def test_project_client_matches_actual_old_store(
     path = str(case["path"])
     try:
         result = await service.create(
-            Account("owner", "owner", (), ("projects.manage",), 1),
+            Account("owner", "owner", (), ("products.office", "projects.manage"), 1),
             ProjectInput(
                 connectorId="connector",
                 name="合成项目",

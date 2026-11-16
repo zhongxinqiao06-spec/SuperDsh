@@ -357,7 +357,9 @@ class FileTransferService:
                 if transfer.local:
                     path = self.devices.files.resolve(account.user_id, transfer.path)
                     with path.open("rb") as stream:
-                        content = await asyncio.to_thread(stream.read, self.maximum + 1)
+                        # 按已校验的文件大小分配缓冲区，多读一字节以识别传输期间的增长。
+                        size = int(str(transfer.metadata["size"]))
+                        content = await asyncio.to_thread(stream.read, size + 1)
                 else:
                     if not transfer.ready.is_set() and not transfer.uploading:
                         await self.devices.call(

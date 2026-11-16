@@ -26,6 +26,7 @@ from app.modules.extensions.service.mcp_client import McpClient, schema_digest
 from app.modules.extensions.service.process import entrypoint, run_process, runtime_command
 from app.modules.extensions.service.validation import decode_archive, digest, manifest_definition
 from app.modules.identity.entity.bo.models import Account
+from app.modules.resources.entity.bo.product_scope import resource_product
 from app.modules.resources.service.ports import ResourceCipher
 
 Audit = Callable[[str, str, str, dict[str, object]], Awaitable[None]]
@@ -50,36 +51,51 @@ class ExtensionService:
         self.database, self.cipher, self.audit = database, cipher, audit
         self.builtin = manifest_definition(json.loads(builtin_manifest.read_text("utf-8")))
         self.builtin_digest = digest(self.builtin["tools"])
+        self.builtins = {str(self.builtin["id"]): self.builtin}
+        self.executors: dict[str, BuiltinExecutor] = {}
         self.mcp = McpClient(allowed_origins)
         self.installer = ExtensionInstaller(directory / "packages", self.mcp)
         self.work_root = directory / "calls"
         self.executor: BuiltinExecutor | None = None
         self.validator = JsonSchemaValidator()
 
+    def register_builtin(self, manifest: dict[str, object], executor: BuiltinExecutor) -> None:
+        """按独立来源注册实现，每个实现包自行维护冻结清单和校验摘要。"""
+        definition = manifest_definition(manifest)
+        source = str(definition["id"])
+        if source in self.executors:
+            raise RuntimeError("内置工具来源重复注册")
+        self.builtins[source] = definition
+        self.executors[source] = executor
+
     async def list(self, account: Account) -> List[dict[str, object]]:
-        """编辑者能选择实现，但只有安装权限可以安装或重新授权可执行代码。"""
-        account.require("agents.manage")
+        """平台扩展目录包含维护诊断，仅授权给扩展管理员。"""
+        account.require("extensions.manage")
+        return await self._sources()
+
+    async def _sources(self) -> List[dict[str, object]]:
         result: List[dict[str, object]] = [
             {
-                "id": self.builtin["id"],
-                "name": self.builtin["name"],
+                "id": manifest["id"],
+                "name": manifest["name"],
                 "kind": "builtin",
                 "enabled": True,
                 "revision": 1,
-                "activeVersion": self.builtin["version"],
+                "activeVersion": manifest["version"],
                 "status": "ready",
                 "credentialConfigured": False,
-                "tools": copy.deepcopy(self.builtin["tools"]),
+                "tools": copy.deepcopy(manifest["tools"]),
                 "versions": [
                     {
-                        "version": self.builtin["version"],
-                        "digest": self.builtin_digest,
+                        "version": manifest["version"],
+                        "digest": digest(manifest["tools"]),
                         "createdAt": "",
                     }
                 ],
                 "createdAt": "",
                 "updatedAt": "",
             }
+            for manifest in self.builtins.values()
         ]
         async with self.database.sessions.begin() as session:
             for source in await ExtensionDao.sources(session):
@@ -143,7 +159,7 @@ class ExtensionService:
         endpoint: str | None = None,
         token: str | None = None,
     ) -> None:
-        if identifier == self.builtin["id"]:
+        if identifier in self.builtins:
             raise DomainError(409, "不能覆盖内置扩展")
         async with self.database.sessions.begin() as session:
             await lock_transaction(session, "extension:" + identifier)
@@ -277,16 +293,56 @@ class ExtensionService:
                 raise DomainError(404, "扩展来源或版本不存在")
             return source, installed
 
+    async def tool_sources(self, account: Account) -> List[dict[str, object]]:
+        """产品管理只暴露可授权的实现和版本，平台地址、诊断和凭据状态不下发。"""
+        product = resource_product(account)
+        result = []
+        account.require("agents.manage")
+        for source in await self._sources():
+            if not source["enabled"] or source["status"] != "ready":
+                continue
+            tools = source.get("tools")
+            if not isinstance(tools, list):
+                continue
+            visible = [
+                tool
+                for tool in tools
+                if isinstance(tool, dict)
+                and all(
+                    permission in account.permissions
+                    and (
+                        product is None
+                        or not permission.startswith("products.")
+                        or permission == "products." + product
+                    )
+                    for permission in tool.get("permissions", [])
+                )
+            ]
+            if visible or source.get("skills"):
+                result.append(
+                    {
+                        **{
+                            key: value
+                            for key, value in source.items()
+                            if key not in {"diagnostic", "endpoint", "credentialConfigured"}
+                        },
+                        "tools": visible,
+                    }
+                )
+        return result
+
     async def bind(self, account: Account, reference: dict[str, object]) -> dict[str, object]:
         """解析不可变工具实现，不返回安装路径和来源凭据。"""
         if "agents.manage" not in account.permissions:
             account.require("sessions.run")
         else:
             account.require("agents.manage")
-        if reference.get("sourceId") == self.builtin["id"]:
-            if reference.get("version") != self.builtin["version"]:
-                raise DomainError(409, "内置工具版本不可用")
-            manifest, checksum = self.builtin, self.builtin_digest
+        if manifest := self.builtins.get(str(reference.get("sourceId"))):
+            if reference.get("version") != manifest["version"]:
+                raise DomainError(
+                    409, "内置工具版本已更新，请更新助手工具后重试", "tool_implementation_changed"
+                )
+            checksum = digest(manifest["tools"])
         else:
             source, installed = await self._stored(
                 str(reference.get("sourceId", "")), str(reference.get("version", ""))
@@ -297,7 +353,9 @@ class ExtensionService:
                 raise DomainError(409, "扩展来源需要重新检查并授权")
             manifest, checksum = installed.manifest, installed.digest
         if reference.get("digest") and reference["digest"] != checksum:
-            raise DomainError(409, "工具实现内容已改变，请绑定新版本")
+            raise DomainError(
+                409, "工具实现内容已改变，请更新助手工具后重试", "tool_implementation_changed"
+            )
         tools = manifest.get("tools", [])
         tool = (
             next(
@@ -436,6 +494,21 @@ class ExtensionService:
                     archive.write(path, relative)
         return output.getvalue()
 
+    def is_builtin_draft(self, reference: dict[str, object]) -> bool:
+        """仅平台注册的建议工具可延后至结果采用时确认；第三方自报 draft 不享有该能力。"""
+        manifest = self.builtins.get(str(reference.get("sourceId")))
+        if not manifest or manifest.get("version") != reference.get("version"):
+            return False
+        tools = manifest.get("tools")
+        if not isinstance(tools, list):
+            return False
+        return any(
+            isinstance(tool, dict)
+            and tool.get("id") == reference.get("toolId")
+            and tool.get("mode") == "draft"
+            for tool in tools
+        )
+
     async def execute(
         self,
         account: Account,
@@ -454,13 +527,14 @@ class ExtensionService:
             account.require(str(permission))
         schema = tool["inputSchema"]
         assert isinstance(schema, dict)
-        self.validator.validate(arguments, schema)
-        if reference["sourceId"] == self.builtin["id"]:
-            if self.executor is None:
+        self.validator.validate_tool_arguments(arguments, schema)
+        if str(reference["sourceId"]) in self.builtins:
+            executor = self.executors.get(str(reference["sourceId"]))
+            if executor is None and reference["sourceId"] == self.builtin["id"]:
+                executor = self.executor
+            if executor is None:
                 raise DomainError(503, "内置工具实现尚未装配")
-            result = await self.executor(
-                account, str(reference["toolId"]), arguments, settings, context
-            )
+            result = await executor(account, str(reference["toolId"]), arguments, settings, context)
         else:
             source, installed = await self._stored(
                 str(reference["sourceId"]), str(reference["version"])

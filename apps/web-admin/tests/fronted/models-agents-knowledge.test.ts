@@ -18,7 +18,7 @@ import type { AgentDefinition } from '@/types/agents/agents'
 
 const mocks = vi.hoisted(() => ({
   generation: 0,
-  route: { meta: { moduleId: 'account.models' } },
+  route: { query: {}, meta: { moduleId: 'account.models' } },
   saveProvider: vi.fn(),
   saveConnection: vi.fn(),
   saveConfiguration: vi.fn(),
@@ -70,11 +70,12 @@ vi.mock('@/api/models/models-api', () => ({
   },
 }))
 vi.mock('@/api/agents/agents-api', () => ({
-  agentsApi: {
+  createAgentsApi: () => ({
+    initialize: async () => undefined,
     list: mocks.agentList,
     catalog: mocks.agentCatalog,
     save: mocks.saveAgent,
-  },
+  }),
 }))
 vi.mock('@/api/workbench/trial', () => ({ stageAgentTrial: mocks.stage }))
 

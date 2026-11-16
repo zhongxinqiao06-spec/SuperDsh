@@ -1,7 +1,12 @@
 <script setup lang="ts">
 import MarkdownContent from '@/components/MarkdownContent.vue'
 import AppIcon from '@/components/base/AppIcon.vue'
-import { messageText, objectValue } from '@/utils/workbench/timeline'
+import {
+  messageReasoning,
+  messageText,
+  objectValue,
+} from '@/utils/workbench/timeline'
+import ReasoningDetails from './ReasoningDetails.vue'
 import type { TimelineItem } from '@/types/workbench/models'
 
 /** 纯展示时间线；工具结果按结构折叠，活动 HTML 不会执行。 */
@@ -49,15 +54,29 @@ function attachments(item: TimelineItem): Record<string, unknown>[] {
           item.createdAt
         }}</small>
       </header>
+      <ReasoningDetails
+        v-if="messageReasoning(item)"
+        :text="messageReasoning(item)"
+      />
       <MarkdownContent v-if="messageText(item)" :content="messageText(item)" />
       <el-button
-        v-if="canShare && label(item) === 'Agent' && !item.pending"
+        v-if="
+          canShare &&
+          label(item) === 'Agent' &&
+          !item.pending &&
+          messageText(item)
+        "
         text
         aria-label="分享此回复"
         @click="$emit('share', item.id)"
         ><AppIcon name="share-2" />分享此回复</el-button
       >
-      <details v-if="item.type.includes('tool') || !messageText(item)">
+      <details
+        v-if="
+          item.type.includes('tool') ||
+          (!messageText(item) && !messageReasoning(item))
+        "
+      >
         <summary>
           <AppIcon
             :name="item.type.includes('tool') ? 'terminal' : 'file-text'"

@@ -1,4 +1,6 @@
 <script setup lang="ts">
+import AppIcon from '@/components/base/AppIcon.vue'
+import DateTime from '@/components/base/DateTime.vue'
 import ManagementList from '@/components/management/ManagementList.vue'
 import RowActions from '@/components/management/RowActions.vue'
 import PageHeader from '@/components/layout/PageHeader.vue'
@@ -37,7 +39,36 @@ const vm = useFiles()
         placeholder="搜索文件名"
         aria-label="搜索文件名"
         clearable
-      /><el-button @click="vm.toggleTrash">{{
+      /><el-select
+        v-model="vm.filter.category"
+        aria-label="文件类型"
+        placeholder="全部类型"
+        clearable
+      >
+        <el-option
+          v-for="[value, label] in [
+            ['document', '文档'],
+            ['image', '图片'],
+            ['audio', '音频'],
+            ['video', '视频'],
+            ['other', '其他'],
+          ]"
+          :key="value"
+          :value="value"
+          :label="label"
+        />
+      </el-select>
+      <el-select
+        v-model="vm.filter.source"
+        clearable
+        placeholder="全部来源"
+        aria-label="文件来源"
+      >
+        <el-option label="个人文件" value="personal" /><el-option
+          label="会话成果"
+          value="artifact"
+        /> </el-select
+      ><el-button @click="vm.toggleTrash">{{
         vm.filter.deleted ? '返回文件' : '回收站'
       }}</el-button
       ><el-button
@@ -63,7 +94,21 @@ const vm = useFiles()
             :key="item.id"
           >
             <td class="file-name-cell">
-              <strong>{{ item.name }}</strong>
+              <span class="office-file-title"
+                ><AppIcon name="file-text" /><strong>{{
+                  item.name
+                }}</strong></span
+              >
+              <small
+                >{{
+                  item.references?.some(
+                    (reference) => reference.kind === 'artifact',
+                  )
+                    ? '会话成果'
+                    : '个人文件'
+                }}
+                · <DateTime :value="item.createdAt"
+              /></small>
             </td>
             <td data-label="类型 / 大小">
               <span :title="item.mediaType">{{
@@ -168,27 +213,31 @@ const vm = useFiles()
       width="min(560px, 94vw)"
       :close-on-click-modal="false"
       @closed="vm.stop"
-      ><p>
-        中断后重新选择同一文件可继续上传。完成大小、类型和哈希校验后文件才会可用。
-      </p>
-      <input
-        type="file"
-        aria-label="选择上传文件"
-        :disabled="vm.transfer.busy.value"
-        @change="vm.choose"
-      />
-      <p v-if="vm.selected.value">
-        {{ vm.selected.value.name }} · {{ fileSize(vm.selected.value.size) }}
-      </p>
-      <el-progress
-        v-if="vm.transfer.busy.value || vm.progress.value"
-        :percentage="vm.progress.value"
-      /><el-alert
-        v-if="vm.transfer.error.value"
-        :title="vm.transfer.error.value"
-        type="error"
-        :closable="false"
-      /><template #footer
+      ><div class="stack">
+        <p>
+          中断后重新选择同一文件可继续上传。完成大小、类型和哈希校验后文件才会可用。
+        </p>
+        <input
+          class="native-control"
+          type="file"
+          aria-label="选择上传文件"
+          :disabled="vm.transfer.busy.value"
+          @change="vm.choose"
+        />
+        <p v-if="vm.selected.value">
+          {{ vm.selected.value.name }} · {{ fileSize(vm.selected.value.size) }}
+        </p>
+        <el-progress
+          v-if="vm.transfer.busy.value || vm.progress.value"
+          :percentage="vm.progress.value"
+        /><el-alert
+          v-if="vm.transfer.error.value"
+          :title="vm.transfer.error.value"
+          type="error"
+          :closable="false"
+        />
+      </div>
+      <template #footer
         ><el-button v-if="vm.transfer.busy.value" @click="vm.stop"
           >暂停上传</el-button
         ><el-button v-else @click="vm.uploadOpen.value = false">取消</el-button
@@ -206,71 +255,78 @@ const vm = useFiles()
       title="文件版本"
       width="min(760px, 94vw)"
       @update:model-value="vm.versionTarget.value = null"
-      ><ResourceStatus
-        :loading="vm.versions.loading.value"
-        :error="vm.versions.error.value"
-        @retry="vm.versions.reload"
-      />
-      <ul class="version-list">
-        <li v-for="item in vm.versions.data.value?.items ?? []" :key="item.id">
-          <div>
-            <strong>{{ item.name }} · 版本 {{ item.version }}</strong
-            ><small
-              >{{ item.createdAt }} · {{ fileSize(item.size) }} ·
-              {{ item.deletedAt ? '已回收' : '可用' }}</small
-            >
-          </div>
-          <el-button
-            :disabled="Boolean(item.deletedAt) || vm.transfer.busy.value"
-            @click="vm.download(item)"
-            >下载</el-button
+      ><div class="stack">
+        <ResourceStatus
+          :loading="vm.versions.loading.value"
+          :error="vm.versions.error.value"
+          @retry="vm.versions.reload"
+        />
+        <ul class="version-list">
+          <li
+            v-for="item in vm.versions.data.value?.items ?? []"
+            :key="item.id"
           >
-        </li>
-      </ul></el-dialog
+            <div>
+              <strong>{{ item.name }} · 版本 {{ item.version }}</strong
+              ><small
+                >{{ item.createdAt }} · {{ fileSize(item.size) }} ·
+                {{ item.deletedAt ? '已回收' : '可用' }}</small
+              >
+            </div>
+            <el-button
+              :disabled="Boolean(item.deletedAt) || vm.transfer.busy.value"
+              @click="vm.download(item)"
+              >下载</el-button
+            >
+          </li>
+        </ul>
+      </div></el-dialog
     >
     <el-dialog
       :model-value="Boolean(vm.preview.value)"
       :title="vm.preview.value?.name"
       width="min(1000px, 94vw)"
       @update:model-value="vm.closePreview"
-      ><ResourceStatus
-        :loading="vm.transfer.busy.value"
-        :error="vm.transfer.error.value"
-      /><template v-if="vm.previewUrl.value"
-        ><img
-          v-if="vm.previewType.value === 'image'"
-          class="file-preview"
-          :src="vm.previewUrl.value"
-          :alt="vm.preview.value?.name"
-        /><video
-          v-else-if="vm.previewType.value === 'video'"
-          class="file-preview"
-          :src="vm.previewUrl.value"
-          controls
-        /><audio
-          v-else-if="vm.previewType.value === 'audio'"
-          :src="vm.previewUrl.value"
-          controls
-        />
-        <pre v-else-if="vm.previewType.value === 'text'">{{
-          vm.previewText.value
-        }}</pre>
-        <iframe
-          v-else-if="vm.previewType.value === 'pdf'"
-          class="pdf-preview"
-          :src="vm.previewUrl.value"
-          title="PDF 预览"
-          sandbox="allow-same-origin"
-        />
-        <p
-          v-if="
-            vm.previewType.value === 'text' &&
-            (vm.preview.value?.size ?? 0) > 1048576
-          "
+      ><div class="stack">
+        <ResourceStatus
+          :loading="vm.transfer.busy.value"
+          :error="vm.transfer.error.value"
+        /><template v-if="vm.previewUrl.value"
+          ><img
+            v-if="vm.previewType.value === 'image'"
+            class="file-preview"
+            :src="vm.previewUrl.value"
+            :alt="vm.preview.value?.name"
+          /><video
+            v-else-if="vm.previewType.value === 'video'"
+            class="file-preview"
+            :src="vm.previewUrl.value"
+            controls
+          /><audio
+            v-else-if="vm.previewType.value === 'audio'"
+            :src="vm.previewUrl.value"
+            controls
+          />
+          <pre v-else-if="vm.previewType.value === 'text'">{{
+            vm.previewText.value
+          }}</pre>
+          <iframe
+            v-else-if="vm.previewType.value === 'pdf'"
+            class="pdf-preview"
+            :src="vm.previewUrl.value"
+            title="PDF 预览"
+            sandbox="allow-same-origin"
+          />
+          <p
+            v-if="
+              vm.previewType.value === 'text' &&
+              (vm.preview.value?.size ?? 0) > 1048576
+            "
+          >
+            预览只展示前 1 MiB，请下载查看全文。
+          </p></template
         >
-          预览只展示前 1 MiB，请下载查看全文。
-        </p></template
-      ></el-dialog
+      </div></el-dialog
     >
     <ManagementDialog
       :model-value="Boolean(vm.migrating.value)"
@@ -326,5 +382,28 @@ pre {
   overflow-wrap: anywhere;
   max-height: 65vh;
   overflow: auto;
+}
+</style>
+
+<style scoped>
+.office-file-title {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.office-file-title svg {
+  color: var(--brand-ink);
+}
+.office-file-title + small {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+.office-file-title + small .date-time {
+  display: inline-flex;
+  gap: 4px;
+}
+.file-search-toolbar .el-select {
+  width: 130px;
 }
 </style>

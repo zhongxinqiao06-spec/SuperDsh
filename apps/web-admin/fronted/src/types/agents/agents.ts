@@ -26,6 +26,7 @@ export interface SelectableResource {
   program?: object
 }
 export interface AgentDraft {
+  product?: 'office' | 'entertainment'
   name: string
   description: string
   instructions: string

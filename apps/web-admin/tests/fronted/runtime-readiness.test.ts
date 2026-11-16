@@ -85,6 +85,33 @@ describe('服务端 Agent 准备状态恢复', () => {
     expect(vi.getTimerCount()).toBe(0)
   })
 
+  it('首次发送复用正在准备的周期，超过一分钟仍等待，最后只启动一次', async () => {
+    const { runtime, readiness } = setup()
+    await readiness.prepare(true)
+    const first = readiness.prepareForSubmission(),
+      second = readiness.prepareForSubmission()
+    expect(first).toBe(second)
+    await vi.advanceTimersByTimeAsync(75_000)
+    runtime.agent = agent('running')
+    await vi.advanceTimersByTimeAsync(1200)
+    await expect(first).resolves.toBe(true)
+    expect(runtime.prepare).toHaveBeenCalledTimes(1)
+    expect(vi.getTimerCount()).toBe(0)
+  })
+
+  it('慢启动的截止时间不因再次发送或显式刷新延长', async () => {
+    const { runtime, readiness } = setup()
+    const wait = readiness.prepareForSubmission()
+    await vi.advanceTimersByTimeAsync(100_000)
+    await readiness.prepare(true)
+    const again = readiness.prepareForSubmission()
+    await vi.advanceTimersByTimeAsync(80_000)
+    await expect(wait).resolves.toBe(false)
+    await expect(again).resolves.toBe(false)
+    expect(runtime.prepare).toHaveBeenCalledTimes(1)
+    expect(vi.getTimerCount()).toBe(0)
+  })
+
   it('就绪后的目录读取失败也能恢复，不再次创建运行实例', async () => {
     const { runtime, ready, readiness } = setup()
     runtime.agent = agent('running')

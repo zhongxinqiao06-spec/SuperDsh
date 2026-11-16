@@ -8,6 +8,7 @@ from app.infrastructure.database import Database
 from app.infrastructure.errors import DomainError
 from app.infrastructure.runtime_ownership import PostgresOwnershipProvider
 from app.integrations.dsh.protocol import Fields, Json
+from app.modules.identity.entity.bo.product_roles import Product
 from app.modules.identity.service.identity import IdentityService
 from app.modules.runtime.service.ports import ModelProvider, ToolCall
 from app.modules.runtime.service.projection import SqlProjectionStore
@@ -19,7 +20,7 @@ from .supervisor import RuntimeSupervisor
 class UnconfiguredModels:
     """未配置模型时保留真实历史同步能力，执行请求明确失败而不造回答。"""
 
-    async def catalog(self, owner: str) -> Fields:
+    async def catalog(self, owner: str, product: Product | None = None) -> Fields:
         """没有模型配置，目录如实为空；完整模型配置由业务迁移阶段注入。"""
         return {"scope": None, "providers": []}
 

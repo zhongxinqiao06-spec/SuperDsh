@@ -16,6 +16,7 @@ from app.modules.conversations.service.batch_service import SessionBatchService
 from app.modules.conversations.service.import_service import SessionImportService
 from app.modules.conversations.service.lifecycle_service import SessionLifecycleService
 from app.modules.conversations.service.listing_service import SessionListingService
+from app.modules.conversations.service.native_diagnostics import NativeDiagnostics
 from app.modules.conversations.service.project_service import ProjectService
 from app.modules.conversations.service.projection_service import ProjectionService
 from app.modules.conversations.service.query_service import ConversationQueryService
@@ -39,6 +40,7 @@ class ConversationService:
         self.projection = ProjectionService(self.repository, devices)
         self.queries = ConversationQueryService(self)
         self.lists = SessionListingService(self)
+        self.native_diagnostics = NativeDiagnostics(self.repository)
         self.batch = SessionBatchService(self)
         self.lifecycle = SessionLifecycleService(self)
         self.projects = ProjectService(self.repository, devices)
@@ -72,6 +74,7 @@ class ConversationService:
             row = await dao.session(identifier)
         if not row or row.owner_id != account.user_id or row.source.get("historyDeletedAt"):
             raise DomainError(404, "session not found")
+        account.require("products." + str(row.source.get("product", "office")))
         return row
 
     async def get_session(self, account: Account, identifier: str) -> dict[str, object]:
@@ -152,9 +155,15 @@ class ConversationService:
         return await self.lists.listing(account, filters, inventory)
 
     async def create(
-        self, account: Account, value: CreateSessionInput, start: bool = True
+        self,
+        account: Account,
+        value: CreateSessionInput,
+        start: bool = True,
+        *,
+        product: str = "office",
     ) -> dict[str, object]:
         account.require("sessions.run")
+        account.require("products." + product)
         connector = await self.devices.own(account, value.connectorId, "sessions.run")
         if start:
             # 发送前先验证实际目标；内部合成事实准备不暴露为绕过校验的HTTP入口。
@@ -171,6 +180,9 @@ class ConversationService:
             if connector.executor_kind != "server-agent" or not self.agent_resolver:
                 raise DomainError(409, "agent binding unavailable for this connector")
             binding = await self.agent_resolver(account, value.agentDefinitionId)
+            definition = binding.get("definition")
+            if isinstance(definition, dict) and definition.get("product", "office") != product:
+                raise DomainError(403, "该智能体未发布到当前产品")
             binding = {**binding, "bindingVersion": 1}
         cwd = (
             str(self.devices.workspace(account.user_id))
@@ -187,6 +199,8 @@ class ConversationService:
                 if legacy and legacy.connector_id == value.connectorId:
                     prior = legacy
             if prior:
+                if prior.source.get("product", "office") != product:
+                    raise DomainError(409, "clientMessageId 已用于另一个产品的会话")
                 if prior.source.get("historyDeletedAt"):
                     raise DomainError(409, "原会话已删除，请新建会话", "session_deleted")
                 if prior.connector_id != value.connectorId or prior.runtime_id != value.runtimeId:
@@ -240,7 +254,15 @@ class ConversationService:
                     last_read_seq=0,
                     latest_turn_end_seq=0,
                     state={},
-                    source={"creationFingerprint": fingerprint},
+                    source={
+                        "creationFingerprint": fingerprint,
+                        "product": product,
+                        **(
+                            {"deferredStart": True}
+                            if not start and product == "entertainment"
+                            else {}
+                        ),
+                    },
                     agent_binding=binding,
                     created_at=now,
                     updated_at=now,
@@ -416,6 +438,11 @@ class ConversationService:
         if not self.agent_resolver:
             raise DomainError(503, "agent binding unavailable")
         binding = await self.agent_resolver(account, agent_id)
+        definition = binding.get("definition")
+        if isinstance(definition, dict) and definition.get("product", "office") != row.source.get(
+            "product", "office"
+        ):
+            raise DomainError(403, "该智能体未发布到当前产品")
         async with self.repository.transaction() as dao:
             await dao.lock(identifier)
             current = await dao.session(identifier)

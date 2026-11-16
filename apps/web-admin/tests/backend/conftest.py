@@ -30,6 +30,7 @@ def platform_settings() -> dict[str, object]:
 @pytest.fixture
 async def platform_configuration(
     platform_settings: dict[str, object],
+    request: pytest.FixtureRequest,
 ) -> AsyncIterator[Settings]:
     """缺少环境直接失败；绝不连接产品默认库或以 skip 假绿。"""
     source = make_url(os.environ["WEB_ADMIN_TEST_DATABASE_URL"])
@@ -40,26 +41,8 @@ async def platform_configuration(
     control_engine = create_async_engine(source, isolation_level="AUTOCOMMIT")
     control = await control_engine.connect()
     await control.exec_driver_sql(f'CREATE DATABASE "{database_name}"')
-    environment = {
-        **os.environ,
-        "WEB_ADMIN_DATABASE_URL": database_url,
-        "PYTHONDONTWRITEBYTECODE": "1",
-    }
     try:
-        process = await asyncio.create_subprocess_exec(
-            sys.executable,
-            "-m",
-            "alembic",
-            "-c",
-            str(ROOT / "apps/web-admin/backend/alembic.ini"),
-            "upgrade",
-            "head",
-            env=environment,
-            stdout=asyncio.subprocess.PIPE,
-            stderr=asyncio.subprocess.STDOUT,
-        )
-        output, _ = await process.communicate()
-        assert process.returncode == 0, output.decode(errors="replace")
+        await upgrade_database(database_url, getattr(request, "param", "head"))
         settings = Settings(
             database_url=database_url,
             redis_url=os.environ["WEB_ADMIN_TEST_REDIS_URL"],
@@ -81,6 +64,30 @@ async def platform_configuration(
         await control.exec_driver_sql(f'DROP DATABASE IF EXISTS "{database_name}" WITH (FORCE)')
         await control.close()
         await control_engine.dispose()
+
+
+async def upgrade_database(database_url: str, revision: str = "head") -> None:
+    """按生产 Alembic 入口升级本用例的库，历史修订可先装载存量数据再升级。"""
+    process = await asyncio.create_subprocess_exec(
+        sys.executable,
+        "-m",
+        "alembic",
+        "-c",
+        str(ROOT / "apps/web-admin/backend/alembic.ini"),
+        "upgrade",
+        revision,
+        env={
+            **os.environ,
+            "WEB_ADMIN_DATABASE_URL": database_url,
+            "PYTHONDONTWRITEBYTECODE": "1",
+            "PYTHONIOENCODING": "utf-8",
+        },
+        stdout=asyncio.subprocess.PIPE,
+        stderr=asyncio.subprocess.STDOUT,
+    )
+    output, _ = await process.communicate()
+    if process.returncode != 0:
+        raise RuntimeError(output.decode("utf-8", errors="replace"))
 
 
 @pytest.fixture

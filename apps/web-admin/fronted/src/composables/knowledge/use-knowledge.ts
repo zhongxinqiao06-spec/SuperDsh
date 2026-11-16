@@ -1,6 +1,7 @@
+import { useCurrentProduct } from '@/composables/console/use-current-product'
 import { computed, reactive, ref, watch } from 'vue'
-import { knowledgeApi } from '@/api/knowledge/knowledge-api'
-import { agentsApi } from '@/api/agents/agents-api'
+import { createKnowledgeApi } from '@/api/knowledge/knowledge-api'
+import { createAgentsApi } from '@/api/agents/agents-api'
 import { loadPreparedAgentResources } from '@/store/modules/agent-resources'
 import { useResource } from '@/composables/use-resource'
 import { useMutation } from '@/composables/use-mutation'
@@ -17,25 +18,34 @@ import type {
 
 /** 知识库用例维护选择代际；慢索引完成后不能覆盖已切换资料的结果。 */
 export function useKnowledge() {
+  const product = useCurrentProduct().value
+  const knowledgeApi = createKnowledgeApi(product)
+  const agentsApi = createAgentsApi(product)
   const auth = useAuthStore(),
     mutation = useMutation(),
     indexMutation = useMutation(),
     embeddingMutation = useMutation()
-  const allowed = computed(() => auth.can('agents.manage')),
+  const allowed = computed(
+      () =>
+        auth.can('agents.manage') ||
+        auth.can(`products.${product}.resources.manage`),
+    ),
     page = ref(1),
     pageSize = ref(10),
     query = ref(''),
     search = ref('')
   const resource = useResource((signal) =>
     allowed.value
-      ? loadPreparedAgentResources(signal, () =>
+      ? loadPreparedAgentResources(product, signal, () =>
           knowledgeApi.list(page.value, pageSize.value, search.value, signal),
         )
       : Promise.resolve({ items: [], total: 0, page: 1, pageSize: 12 }),
   )
   const catalog = useResource((signal) =>
     allowed.value
-      ? loadPreparedAgentResources(signal, () => agentsApi.catalog(signal))
+      ? loadPreparedAgentResources(product, signal, () =>
+          agentsApi.catalog(signal),
+        )
       : Promise.resolve({
           assets: [],
           knowledgeBases: [],
@@ -119,7 +129,11 @@ export function useKnowledge() {
   function edit(value: KnowledgeBase | 'new'): void {
     editing.value = value
     delete draft.version
-    Object.assign(draft, knowledgeDraft(value === 'new' ? undefined : value))
+    Object.assign(
+      draft,
+      { product },
+      knowledgeDraft(value === 'new' ? undefined : value),
+    )
     mutation.error.value = ''
   }
   async function save(): Promise<void> {
@@ -226,6 +240,7 @@ export function useKnowledge() {
       await health.reload()
   }
   return {
+    product,
     updateEmbedding,
     auth,
     allowed,

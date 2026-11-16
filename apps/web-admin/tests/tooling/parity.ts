@@ -234,9 +234,7 @@ export async function runParity(reportOnly = false): Promise<number> {
       {
         cwd: backendRoot,
         env: pythonEnvironment({
-          PYTHONPATH: [backendRoot, resolve(appRoot, 'tests/tooling')].join(
-            delimiter,
-          ),
+          PYTHONPATH: [backendRoot, resolve(appRoot, 'tests')].join(delimiter),
           PYTHONDONTWRITEBYTECODE: '1',
           PYTHONIOENCODING: 'utf-8',
           WEB_ADMIN_DATA_DIR: resolve(directory, 'runtime'),

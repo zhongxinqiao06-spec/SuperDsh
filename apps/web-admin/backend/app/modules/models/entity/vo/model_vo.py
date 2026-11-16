@@ -17,6 +17,7 @@ Capability = Literal[
     "chat",
     "image.generate",
     "vision.analyze",
+    "web.search",
     "speech.transcribe",
     "speech.synthesize",
     "video.generate",
@@ -130,6 +131,12 @@ class ConfigurationInput(ModelInput):
     enabled: bool = True
     parameters: dict[str, object] = Field(default_factory=dict)
     roleIds: list[str] = Field(default_factory=list, max_length=100)
+
+
+class ProductDefaultInput(ModelInput):
+    """空值表示该产品恢复使用平台默认设置。"""
+
+    configurationId: str | None = Field(default=None, min_length=1, max_length=100)
 
 
 class CapabilityDefaultInput(ModelInput):

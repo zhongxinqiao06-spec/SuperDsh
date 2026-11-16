@@ -21,6 +21,7 @@ async def diagnose() -> None:
     from app.integrations.dsh.process import HarnessProcess
     from app.integrations.dsh.protocol import Fields, Json, fields
     from app.integrations.dsh.sync import ProjectionSync
+    from app.modules.identity.entity.bo.product_roles import Product
     from fixtures.dsh_models import ControlledModels
 
     directory = await asyncio.to_thread(Path(os.environ["WEB_ADMIN_VALIDATION_DIR"]).resolve)
@@ -36,7 +37,7 @@ async def diagnose() -> None:
         class PublicCatalog(ControlledModels):
             """仅读取预先导出的无凭据公开目录；生成仍由本地受控模型拦截。"""
 
-            async def catalog(self, owner: str) -> Fields:
+            async def catalog(self, owner: str, product: Product | None = None) -> Fields:
                 return fields(
                     json.loads(await asyncio.to_thread(public_catalog.read_text, "utf-8"))
                 )

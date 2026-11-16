@@ -31,6 +31,7 @@ export interface SkillReference {
   sha256: string
 }
 export interface SkillDraft {
+  product?: 'office' | 'entertainment' | 'shared'
   name: string
   description: string
   enabled: boolean

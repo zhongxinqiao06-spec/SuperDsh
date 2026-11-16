@@ -1,7 +1,8 @@
 <script setup lang="ts">
-import { useId } from 'vue'
+import { ref, useId, watch } from 'vue'
 import { ElMessageBox } from 'element-plus'
 import { usePreferences } from '@/store/modules/preferences'
+import { useProductEditorGuard } from '@/composables/console/use-product-editor-guard'
 /** 统一提交弹窗：正文独立滚动，提交失败保留草稿；脏状态由领域用例提供。 */
 const props = defineProps<{
   modelValue: boolean
@@ -20,6 +21,20 @@ const emit = defineEmits<{
 }>()
 const preferences = usePreferences()
 const formId = `management-form-${useId()}`
+const form = ref<HTMLFormElement>()
+const changed = ref(false)
+watch(
+  () => props.modelValue,
+  () => {
+    changed.value = false
+  },
+)
+const confirmingNavigation = useProductEditorGuard({
+  open: () => props.modelValue,
+  busy: () => !!props.busy,
+  dirty: () => !props.readonly && (props.dirty || changed.value),
+  save: () => form.value?.requestSubmit(),
+})
 async function requestClose(done: () => void): Promise<void> {
   if (props.busy) return
   if (props.dirty) {
@@ -55,12 +70,19 @@ function submit(): void {
     class="management-dialog"
     :width="width ?? 'min(672px, calc(100vw - 32px))'"
     :close-on-click-modal="false"
-    :close-on-press-escape="!busy"
+    :close-on-press-escape="!busy && !confirmingNavigation"
     :show-close="!busy"
     :before-close="requestClose"
     @update:model-value="$emit('update:modelValue', $event)"
   >
-    <form :id="formId" class="stack" @submit.prevent="submit">
+    <form
+      :id="formId"
+      ref="form"
+      class="stack"
+      @submit.prevent="submit"
+      @input="changed = true"
+      @change="changed = true"
+    >
       <slot />
     </form>
     <template #footer>

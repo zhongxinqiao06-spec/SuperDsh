@@ -10,13 +10,13 @@ function patch(value: Partial<ConnectionDraft>): void {
 </script>
 
 <template>
-  <label
+  <label class="field"
     >连接名称<el-input
       :model-value="draft.name"
       maxlength="100"
       @update:model-value="patch({ name: $event })"
   /></label>
-  <label
+  <label class="field"
     >适配器<el-select
       :model-value="draft.adapter"
       @update:model-value="patch({ adapter: $event })"
@@ -32,19 +32,19 @@ function patch(value: Partial<ConnectionDraft>): void {
         value="volcengine-speech"
         label="火山语音（能力尚未开放）" /></el-select
   ></label>
-  <label
+  <label class="field"
     >API 地址<el-input
       :model-value="draft.baseUrl"
       placeholder="供应商提供的完整 Base URL"
       @update:model-value="patch({ baseUrl: $event })"
   /></label>
-  <label
+  <label class="field"
     >区域（可选）<el-input
       :model-value="draft.region"
       maxlength="100"
       @update:model-value="patch({ region: $event })"
   /></label>
-  <label
+  <label class="field"
     >API Key<el-input
       :model-value="draft.apiKey"
       type="password"

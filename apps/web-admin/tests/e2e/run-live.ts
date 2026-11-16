@@ -34,6 +34,22 @@ export async function runLiveBrowser(
   input: NodeJS.ProcessEnv,
   specifications: readonly string[] = [
     'foundation-live.spec.ts',
+    'studio-live.spec.ts',
+    'studio.spec.ts',
+    'studio-script.spec.ts',
+    'studio-controls.spec.ts',
+    'native-controls.spec.ts',
+    'product-navigation.spec.ts',
+    'website-products.spec.ts',
+    'product-appearance.spec.ts',
+    'office-home.spec.ts',
+    'model-selection-flow.spec.ts',
+    'history-composer.spec.ts',
+    'list-layout.spec.ts',
+    'ui-unification.spec.ts',
+    'ui-overlays.spec.ts',
+    'session-lifecycle.spec.ts',
+    'product-roles-live.spec.ts',
     'foundation-shell.spec.ts',
     'device-file-preview-live.spec.ts',
     'phase-two-management-live.spec.ts',
@@ -90,7 +106,9 @@ export async function runLiveBrowser(
     pythonExecutable(),
     [
       '-m',
-      'app.launcher',
+      specifications.includes('studio-production-live.spec.ts')
+        ? 'fixtures.studio_application'
+        : 'app.launcher',
       '--host',
       '127.0.0.1',
       '--port',

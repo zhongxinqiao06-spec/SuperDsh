@@ -5,10 +5,9 @@ import { useMutation } from '@/composables/use-mutation'
 import { authApi } from '@/api/auth/auth-api'
 import { sessionController } from '@/store/session-controller'
 import { useAuthStore } from '@/store/modules/auth-store'
-import { canonicalPath } from '@/utils/console/routes'
 import type { AuthResponse } from '@/types/auth/auth'
 import { accountApi } from '@/api/account/account-api'
-import { authContinuation } from '@/utils/auth/native-oauth'
+import { signedInDestination } from '@/utils/auth/native-oauth'
 
 /** 登录与开放注册表单；管理员由服务端配置初始化，失败保留输入。 */
 export function useLoginForm() {
@@ -81,12 +80,8 @@ export function useLoginForm() {
       sessionController.accept(response)
       form.password = ''
       form.confirm = ''
-      const target =
-        typeof route.query.returnTo === 'string'
-          ? canonicalPath(route.query.returnTo, auth.session?.permissions)
-          : null
       await router.replace(
-        authContinuation(route.query.returnTo) ?? target ?? '/overview',
+        signedInDestination(route.query.returnTo, auth.session?.permissions),
       )
     }
   }
@@ -95,7 +90,10 @@ export function useLoginForm() {
   }
   async function oauth() {
     await mutation.run(async () => {
-      const value = await authApi.oauthStart(`${location.origin}/login`)
+      const callback = new URL('/login', location.origin)
+      if (typeof route.query.returnTo === 'string')
+        callback.searchParams.set('returnTo', route.query.returnTo)
+      const value = await authApi.oauthStart(callback.href)
       location.assign(value.authorizeUrl)
     })
   }

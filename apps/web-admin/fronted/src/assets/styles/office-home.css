@@ -1,0 +1,279 @@
+/* 办公工作区以任务与真实交付为中心，和娱乐共用文字、控件与间距尺度。 */
+.office-home {
+  width: 100%;
+  min-height: 100%;
+  padding: var(--space-8) var(--page-gutter) 40px;
+  background: var(--canvas);
+  color: var(--foreground);
+}
+.office-home-grid {
+  display: grid;
+  max-width: 1360px;
+  margin: 0 auto;
+  align-items: start;
+  grid-template-columns: minmax(0, 1.6fr) minmax(260px, 1fr);
+  gap: 32px;
+}
+.office-intro,
+.office-feature,
+.office-recent {
+  min-width: 0;
+}
+.office-intro h1 {
+  margin: 0 0 10px;
+  font: 600 28px/1.4 var(--font-sans);
+  letter-spacing: -0.035em;
+}
+.office-lead {
+  margin: 0 0 24px;
+  font-size: 15px;
+  color: var(--muted-foreground);
+}
+.office-home .composer {
+  width: 100%;
+  border-radius: var(--radius-card);
+  background: var(--card);
+  box-shadow: none;
+  border-color: var(--border);
+}
+.office-home .composer:focus-within {
+  border-color: var(--ring);
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--ring) 12%, transparent);
+}
+.office-home .composer-send-home {
+  width: auto;
+  height: var(--control-height);
+  min-width: 100px;
+  padding: 0 12px;
+  border-radius: var(--radius-control);
+}
+.composer-send-home > span {
+  gap: 8px;
+}
+.office-shortcuts {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px 20px;
+  margin-top: 16px;
+}
+.office-shortcuts a,
+.office-section-heading a {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  color: var(--brand-ink);
+  font-size: 13px;
+  text-decoration: none;
+}
+.office-shortcuts a:hover,
+.office-section-heading a:hover {
+  text-decoration: underline;
+}
+.office-feature {
+  grid-column: 2;
+  grid-row: 1 / 3;
+  align-self: start;
+  display: grid;
+  gap: 16px;
+  background: transparent;
+}
+.office-feature-head,
+.office-feature-foot,
+.office-section-heading {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+.office-feature-head,
+.office-section-heading {
+  padding: 0 0 16px;
+  border-bottom: 1px solid var(--border);
+}
+.office-feature-head h2,
+.office-section-heading h2 {
+  font-size: 18px;
+  font-weight: 600;
+  margin: 0;
+}
+.office-feature-head > span {
+  font: 12px var(--font-mono);
+  color: var(--muted-foreground);
+}
+/* 没有获授权的缩略图时展示文件摘要，不伪造文档正文、图表或内容封面。 */
+.office-cover-stage,
+.office-empty-cover {
+  background: var(--card);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-card);
+  color: var(--foreground);
+}
+.office-cover-stage {
+  width: 100%;
+  min-height: 280px;
+  padding: 32px;
+  display: grid;
+  place-items: center;
+  cursor: pointer;
+  text-align: center;
+}
+.office-cover-stage:hover {
+  border-color: var(--brand-ink);
+}
+.office-file-summary {
+  display: grid;
+  justify-items: center;
+  gap: 16px;
+  min-width: 0;
+}
+.office-file-summary svg {
+  color: var(--brand-ink);
+}
+.office-file-summary strong {
+  font-size: 20px;
+  font-weight: 550;
+  line-height: 1.6;
+  overflow-wrap: anywhere;
+}
+.office-file-summary > :is(small, span) {
+  color: var(--muted-foreground);
+  font-size: 13px;
+}
+.office-feature-foot > div {
+  display: grid;
+  gap: 6px;
+  min-width: 0;
+}
+.office-feature-foot strong {
+  font-size: 14px;
+  font-weight: 550;
+  overflow-wrap: anywhere;
+}
+.office-feature-foot small {
+  color: var(--muted-foreground);
+  font-size: 12px;
+}
+.office-feature .date-time {
+  display: inline-flex;
+  flex-direction: row;
+  gap: 4px;
+}
+.office-deliverable-actions {
+  display: flex;
+  gap: var(--control-gap);
+}
+.office-deliverable-actions .el-button {
+  flex: 1;
+  margin: 0;
+}
+.office-deliverable-actions .el-button > span {
+  gap: 8px;
+}
+.office-feature select {
+  width: 100%;
+}
+.office-empty-cover {
+  display: grid;
+  place-content: center;
+  justify-items: center;
+  gap: 12px;
+  padding: 32px 24px;
+  min-height: 260px;
+  text-align: center;
+}
+.office-empty-cover svg {
+  color: var(--muted-foreground);
+}
+.office-empty-cover span,
+.office-empty {
+  font-size: 14px;
+  color: var(--muted-foreground);
+}
+.office-recent {
+  grid-column: 1;
+}
+.office-empty {
+  padding-block: 24px;
+}
+.office-session-row {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto auto auto;
+  align-items: center;
+  gap: 12px;
+  padding: 18px 0;
+  border-bottom: 1px solid var(--border);
+  color: inherit;
+  text-decoration: none;
+}
+a.office-session-row:hover {
+  color: var(--brand-ink);
+}
+.office-session-row strong {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: 14px;
+  font-weight: 550;
+}
+.office-session-icon {
+  display: grid;
+  place-items: center;
+  width: 28px;
+  height: 32px;
+  color: var(--muted-foreground);
+}
+.office-session-row small,
+.office-session-row time {
+  color: var(--muted-foreground);
+  font-size: 12px;
+}
+.office-home-grid:not(:has(.office-feature)) {
+  grid-template-columns: minmax(0, 1fr);
+  max-width: 960px;
+}
+@media (max-width: 1100px) {
+  .office-home-grid {
+    gap: 24px;
+    grid-template-columns: minmax(0, 1fr);
+  }
+  .office-feature {
+    grid-column: 1;
+    grid-row: auto;
+  }
+  .office-recent {
+    grid-row: 2;
+  }
+  .office-cover-stage,
+  .office-empty-cover {
+    min-height: 180px;
+  }
+}
+@media (max-width: 767px) {
+  .office-home {
+    padding: 24px 16px;
+  }
+  .office-intro h1 {
+    font-size: 24px;
+  }
+  .office-session-row {
+    gap: 8px;
+  }
+  .office-session-row small {
+    grid-column: 2;
+    grid-row: 2;
+  }
+  .office-session-row > .app-icon {
+    grid-column: 4;
+    grid-row: 1;
+  }
+  .office-session-row {
+    grid-template-columns: auto minmax(0, 1fr) auto auto;
+  }
+  .office-home .composer-send-home {
+    min-width: 44px;
+    padding: 0 10px;
+  }
+  .office-home .composer-send-home > span > span {
+    display: none;
+  }
+}

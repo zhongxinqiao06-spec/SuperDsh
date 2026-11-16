@@ -1,5 +1,6 @@
+import { useCurrentProduct } from '@/composables/console/use-current-product'
 import { onScopeDispose, ref, watch } from 'vue'
-import { agentsApi } from '@/api/agents/agents-api'
+import { createAgentsApi } from '@/api/agents/agents-api'
 import { useMutation } from '@/composables/use-mutation'
 import { assetBase64 } from '@/utils/agents/agent-drafts'
 import { useAuthStore } from '@/store/modules/auth-store'
@@ -10,6 +11,8 @@ export function useAssetLibrary(
   reload: () => Promise<void>,
   onUploaded?: (asset: AgentAsset) => Promise<void>,
 ) {
+  const product = useCurrentProduct().value
+  const agentsApi = createAgentsApi(product)
   const auth = useAuthStore(),
     mutation = useMutation(),
     uploading = ref(false),

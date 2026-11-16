@@ -1,0 +1,127 @@
+:where(.starbridge-public) .launch-header .mast-inner {
+  display: flex;
+  justify-content: space-between;
+}
+:where(.starbridge-public) .launch-back {
+  color: var(--public-subtle);
+}
+:where(.starbridge-public) .launch-main {
+  width: min(1112px, calc(100% - 100px));
+  margin: 0 auto;
+  padding: clamp(48px, 6.6vh, 76px) 0 50px;
+}
+:where(.starbridge-public) .launch-heading {
+  margin: 0 0 32px;
+}
+:where(.starbridge-public) .launch-heading h1 {
+  font-size: clamp(36px, 3.5vw, 51px);
+  letter-spacing: -0.03em;
+  font-weight: 690;
+  line-height: 1.2;
+}
+:where(.starbridge-public) .launch-heading p {
+  font-size: 15px;
+  color: var(--public-subtle);
+  margin-top: 11px;
+}
+:where(.starbridge-public) .workspace-choices {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 24px;
+}
+:where(.starbridge-public) .choice {
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  isolation: isolate;
+  overflow: hidden;
+  border-radius: var(--radius-card);
+  transition:
+    transform 0.18s,
+    box-shadow 0.18s;
+}
+:where(.starbridge-public) .choice:hover {
+  transform: translateY(-3px);
+  box-shadow: 0 12px 28px #15212620;
+}
+:where(.starbridge-public) .choice-film {
+  background: var(--public-card);
+  color: var(--public-text);
+}
+:where(.starbridge-public) .choice-office {
+  color: var(--public-text);
+  background: var(--public-card);
+  border: 1px solid var(--public-border);
+}
+:where(.starbridge-public) .choice-image {
+  height: clamp(185px, 21.5vw, 290px);
+  position: relative;
+  overflow: hidden;
+}
+:where(.starbridge-public) .choice-image img {
+  width: 100%;
+  height: 100%;
+  display: block;
+  object-fit: cover;
+  transition: transform 0.35s;
+}
+:where(.starbridge-public) .choice:hover .choice-image img {
+  transform: scale(1.025);
+}
+:where(.starbridge-public) .choice-film .choice-image img {
+  object-position: 62% 53%;
+}
+:where(.starbridge-public) .choice-office .choice-image img {
+  object-position: 50% 45%;
+}
+:where(.starbridge-public) .choice-copy {
+  padding: 24px 27px 26px;
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+}
+:where(.starbridge-public) .choice-sub {
+  font-size: 10px;
+  letter-spacing: 0.13em;
+}
+:where(.starbridge-public) .choice-film .choice-sub,
+:where(.starbridge-public) .choice-film .choice-action {
+  color: var(--entertainment-ink);
+}
+:where(.starbridge-public) .choice-office .choice-sub,
+:where(.starbridge-public) .choice-office .choice-action {
+  color: var(--blue);
+}
+:where(.starbridge-public) .choice-copy h2 {
+  font-size: 34px;
+  line-height: 1.25;
+  letter-spacing: -0.03em;
+  font-weight: 670;
+  margin-top: 8px;
+}
+:where(.starbridge-public) .choice-office h2 {
+  font-family: var(--serif);
+}
+:where(.starbridge-public) .choice-copy p {
+  font-size: 14px;
+  line-height: 1.7;
+  margin: 9px 0 23px;
+}
+:where(.starbridge-public) .choice-film p {
+  color: var(--public-subtle);
+}
+:where(.starbridge-public) .choice-office p {
+  color: var(--public-subtle);
+}
+:where(.starbridge-public) .choice-action {
+  width: 100%;
+  border-top: 1px solid var(--public-border);
+  padding-top: 16px;
+  margin-top: auto;
+  justify-content: space-between;
+  font-size: 14px;
+  font-weight: 650;
+}
+:where(.starbridge-public) .choice-office .choice-action {
+  border-color: var(--public-border);
+}

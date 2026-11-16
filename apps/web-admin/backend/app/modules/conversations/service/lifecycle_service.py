@@ -64,6 +64,7 @@ class SessionLifecycleService:
             prior = await dao.session(identifier)
             if not prior or prior.owner_id != account.user_id:
                 raise DomainError(404, "session not found")
+            account.require("products." + str(prior.source.get("product", "office")))
             if prior.source.get("historyDeletedAt"):
                 return {"deleted": True}
         # 运行节点在线时必须复核，不能相信侧栏旧状态。明确不存在允许清理失败的创建记录。

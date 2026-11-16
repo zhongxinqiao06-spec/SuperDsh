@@ -118,27 +118,30 @@ const vm = useDeviceInventory()
       :title="vm.selected.value?.blockedAt ? '恢复设备连接' : '阻断设备连接'"
       width="min(560px, 94vw)"
       @update:model-value="vm.selected.value = null"
-      ><p>
-        {{ vm.selected.value?.name }} ·
-        {{ vm.selected.value?.username || vm.selected.value?.userId }}
-      </p>
-      <p>
-        {{
-          vm.selected.value?.blockedAt
-            ? '恢复后，此设备可重新连接平台。'
-            : '阻断会立即断开平台连接，并阻止自动重连；设备上的本地任务不会被终止。'
-        }}
-      </p>
-      <label v-if="!vm.selected.value?.blockedAt"
-        >阻断原因（可选）<el-input
-          v-model="vm.reason.value"
-          maxlength="500" /></label
-      ><el-alert
-        v-if="vm.mutation.error.value"
-        :title="vm.mutation.error.value"
-        type="error"
-        :closable="false"
-      /><template #footer
+      ><div class="stack">
+        <p>
+          {{ vm.selected.value?.name }} ·
+          {{ vm.selected.value?.username || vm.selected.value?.userId }}
+        </p>
+        <p>
+          {{
+            vm.selected.value?.blockedAt
+              ? '恢复后，此设备可重新连接平台。'
+              : '阻断会立即断开平台连接，并阻止自动重连；设备上的本地任务不会被终止。'
+          }}
+        </p>
+        <label v-if="!vm.selected.value?.blockedAt" class="field"
+          >阻断原因（可选）<el-input
+            v-model="vm.reason.value"
+            maxlength="500" /></label
+        ><el-alert
+          v-if="vm.mutation.error.value"
+          :title="vm.mutation.error.value"
+          type="error"
+          :closable="false"
+        />
+      </div>
+      <template #footer
         ><el-button
           :disabled="vm.mutation.busy.value"
           @click="vm.selected.value = null"

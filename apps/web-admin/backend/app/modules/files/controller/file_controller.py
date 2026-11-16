@@ -1,15 +1,14 @@
 """文件 HTTP 协议层，只转换输入输出并调用文件服务。"""
 
-from typing import Annotated, cast
+from typing import Annotated, Literal, cast
 from urllib.parse import quote
 
 from fastapi import APIRouter, Depends, Query, Request
-from starlette.responses import Response
+from starlette.responses import Response, StreamingResponse
 
 from app.api.dependencies import current_account
 from app.infrastructure.errors import DomainError
 from app.modules.files.entity.vo.file_dto import ConnectionInput, SettingsInput, UploadInput
-from app.modules.files.service.content import byte_range
 from app.modules.files.service.file_service import FileService
 from app.modules.identity.entity.bo.models import Account
 
@@ -30,6 +29,7 @@ async def listing(
     pageSize: Annotated[int, Query(ge=1, le=100)] = 10,
     search: str = "",
     category: str = "",
+    source: Literal["", "personal", "artifact"] = "",
     deleted: bool = False,
     q: str | None = None,
     trash: bool | None = None,
@@ -41,6 +41,7 @@ async def listing(
             "pageSize": pageSize,
             "search": q if q is not None else search,
             "category": category,
+            "source": source,
             "deleted": trash if trash is not None else deleted,
         },
     )
@@ -88,8 +89,8 @@ async def entry(file_id: str, request: Request, account: AccountDep) -> dict[str
 async def content(
     file_id: str, request: Request, account: AccountDep, inline: bool = False
 ) -> Response:
-    data, info = await service(request).read(account, file_id)
-    span = byte_range(request.headers.get("range"), len(data))
+    data, info, span = await service(request).stream(account, file_id, request.headers.get("range"))
+    size = int(str(info["size"]))
     media = str(info["mediaType"])
     safe_inline = inline and (
         media.startswith(
@@ -107,9 +108,11 @@ async def content(
         "Content-Security-Policy": "sandbox; default-src 'none'; frame-ancestors 'self'",
     }
     if span:
-        headers["Content-Range"] = f"bytes {span[0]}-{span[1]}/{len(data)}"
-        data = data[span[0] : span[1] + 1]
-    return Response(data, status_code=206 if span else 200, media_type=media, headers=headers)
+        headers["Content-Range"] = f"bytes {span[0]}-{span[1]}/{size}"
+    headers["Content-Length"] = str(span[1] - span[0] + 1 if span else size)
+    return StreamingResponse(
+        data, status_code=206 if span else 200, media_type=media, headers=headers
+    )
 
 
 @router.get("/files/{file_id}/versions")

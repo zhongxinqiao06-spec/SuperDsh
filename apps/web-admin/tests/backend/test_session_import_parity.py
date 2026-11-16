@@ -132,7 +132,7 @@ async def test_import_matches_actual_old_handler(
     for body in cast(list[dict[str, object]], case["bodies"]):
         try:
             result = await service.create(
-                Account("owner", "owner", (), ("sessions.run",), 1),
+                Account("owner", "owner", (), ("sessions.run", "products.office"), 1),
                 ImportSessionInput.model_validate(body),
             )
             observed.append(

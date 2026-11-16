@@ -22,6 +22,7 @@ import {
 } from '@/utils/workbench/session-access'
 import { useSessionStream } from '@/composables/workbench/use-session-stream'
 import { useRuntimeSelections } from '@/composables/workbench/use-runtime-selections'
+import { useSessionActions } from './use-session-actions'
 import { useSessionLifecycle } from '@/composables/workbench/use-session-lifecycle'
 import { useRuntimeReadiness } from '@/composables/workbench/use-runtime-readiness'
 import type {
@@ -31,12 +32,11 @@ import type {
   WorkspaceConnector,
   WorkspaceProject,
   WorkspaceSession,
-  SessionAction,
 } from '@/types/workbench/models'
 import type { AgentDefinition } from '@/types/agents/agents'
 
 /** 工作台用例负责草稿、请求代际和订阅；展示组件只传入用户操作。 */
-export function useWorkbench() {
+export function useWorkbench(view: 'workspace' | 'home' = 'workspace') {
   const route = useRoute(),
     router = useRouter()
   const drafts = useDraftStore()
@@ -104,15 +104,16 @@ export function useWorkbench() {
     abort.signal,
   )
   const lifecycle = useSessionLifecycle({
+    sessions,
+    fresh,
+    canRemove: () => auth.can('sessions.run'),
+    removeDraft: drafts.remove,
     selected,
     snapshot,
-    sessions,
     signal: abort.signal,
     run,
     refresh: refreshSnapshot,
     reload,
-    fresh,
-    removeDraft: drafts.remove,
     report: (message) => {
       error.value = message
     },
@@ -151,9 +152,10 @@ export function useWorkbench() {
         auth.can('projects.read')
           ? conversationApi.projects(abort.signal)
           : Promise.resolve({ projects: [] }),
-        auth.can('sessions.read')
+        view === 'workspace' && auth.can('sessions.read')
           ? conversationApi.sessions(
               {
+                product: 'office',
                 q: search.value || undefined,
                 archived: String(archived.value),
               },
@@ -212,6 +214,7 @@ export function useWorkbench() {
     await run(async () => {
       const result = await conversationApi.sessions(
         {
+          product: 'office',
           q: search.value || undefined,
           archived: String(archived.value),
           cursor,
@@ -322,7 +325,51 @@ export function useWorkbench() {
       project.value = runtime.agent.projectId ?? ''
     }
   }
+  // 首页浏览仅查询状态。用户首次发送并选中服务端设备时，复用监督器的准备和默认配置。
+  const preparingSubmission = ref(false)
+  function serverAgentReady() {
+    return runtime.agent?.status === 'running'
+  }
   async function send(): Promise<void> {
+    if (
+      !auth.can('sessions.run') ||
+      !auth.can('models.use') ||
+      preparingSubmission.value ||
+      sending.value
+    )
+      return
+    const identity = sessionController.generation
+    if (
+      view === 'home' &&
+      (draft.value.text.trim() || draft.value.files.length) &&
+      (!draft.value.deviceId ||
+        draft.value.deviceId === runtime.agent?.connectorId ||
+        devices.value.find((device) => device.id === draft.value.deviceId)
+          ?.executorKind === 'server-agent') &&
+      !serverAgentReady()
+    ) {
+      preparingSubmission.value = true
+      try {
+        const ready = await runtimeReadiness.prepareForSubmission()
+        if (abort.signal.aborted || identity !== sessionController.generation)
+          return
+        if (!ready || !serverAgentReady()) {
+          error.value =
+            runtime.error ||
+            '服务端 Agent 尚未就绪，草稿已保留。请检查设备状态再重试。'
+          return
+        }
+        chooseProject()
+      } catch (cause) {
+        if (!abort.signal.aborted) error.value = errorMessage(cause)
+        return
+      } finally {
+        preparingSubmission.value = false
+      }
+    }
+    await submitDraft()
+  }
+  async function submitDraft(): Promise<void> {
     if (
       sending.value ||
       !canComposeSession(snapshot.value?.session) ||
@@ -443,6 +490,16 @@ export function useWorkbench() {
         current.submission = undefined
       // 接受后即使页面已离开也结算当前账号草稿；重新进入不会生成新的操作 ID 重发。
       if (abort.signal.aborted) return
+      if (view === 'home' && !id) {
+        Object.assign(drafts.draft(createdId), {
+          deviceId: current.deviceId,
+          modelId: displayedModel,
+          permissionId: displayedPermission,
+        })
+        // 跳转前已结算草稿，由目标页面独占订阅与快照装配。
+        await router.push(`/workspace/session/${encodeURIComponent(createdId)}`)
+        return
+      }
       await reload()
       if (selected.value === id) {
         if (id) {
@@ -467,47 +524,17 @@ export function useWorkbench() {
     pending.value = null
     uploadProgress.value = 0
   }
-  // 侧栏中的同一记录可能同时出现在多个分组，所有入口共享提交锁。
-  const editingSession = ref(false)
-  async function updateSession(
-    row: WorkspaceSession,
-    action: SessionAction,
-  ): Promise<void> {
-    if (editingSession.value || !auth.can('sessions.run')) return
-    const identity = sessionController.generation
-    editingSession.value = true
-    try {
-      if (action === 'delete') return await lifecycle.remove(row)
-      await run(async () => {
-        const changes =
-          action === 'rename'
-            ? {
-                title: (
-                  await ElMessageBox.prompt('输入会话标题', '重命名', {
-                    inputValue: row.title,
-                  })
-                ).value,
-              }
-            : action === 'pin'
-              ? { pinned: !row.pinned }
-              : { archived: !row.archived }
-        // 重命名对话框等待输入期间，账号和写权限都可能发生变化。
-        if (
-          identity !== sessionController.generation ||
-          abort.signal.aborted ||
-          !auth.can('sessions.run')
-        )
-          return
-        await conversationApi.update(row.id, changes)
-        if (identity !== sessionController.generation || abort.signal.aborted)
-          return
-        if (selected.value === row.id) await refreshSnapshot()
-        await reload()
-      })
-    } finally {
-      editingSession.value = false
-    }
-  }
+  const { editingSession, updateSession } = useSessionActions({
+    signal: abort.signal,
+    refresh: async (row) => {
+      if (selected.value === row.id) await refreshSnapshot()
+      await reload()
+    },
+    remove: lifecycle.remove,
+    report: (message) => {
+      error.value = message
+    },
+  })
   async function older(): Promise<void> {
     // nextSeq 是事件恢复位置，历史翻页必须使用已显示首条消息的稳定顺序。
     const before = snapshot.value?.timeline.items[0]?.orderSeq,
@@ -600,6 +627,7 @@ export function useWorkbench() {
   watch(
     () => route.path,
     (path) => {
+      if (view === 'home') return
       const session = /^\/workspace\/session\/([^/]+)$/.exec(path)?.[1]
       if (session && decodeURIComponent(session) !== selected.value)
         void select(decodeURIComponent(session))
@@ -637,7 +665,7 @@ export function useWorkbench() {
       busy.value = true
       try {
         archived.value = route.path === '/workspace/archived'
-        const trial = consumeAgentTrial()
+        const trial = view === 'workspace' ? consumeAgentTrial() : null
         if (trial) {
           draftKey.value = `agent-trial:${createUuid()}`
           agentId.value = trial.agentId
@@ -647,11 +675,16 @@ export function useWorkbench() {
         await Promise.all([
           reload(),
           auth.can('sessions.run')
-            ? runtimeReadiness.prepare()
+            ? view === 'home'
+              ? runtime.refresh(abort.signal)
+              : runtimeReadiness.prepare()
             : Promise.resolve(),
         ])
         const session = /^\/workspace\/session\/([^/]+)$/.exec(route.path)?.[1]
-        if (session) await select(decodeURIComponent(session))
+        if (abort.signal.aborted) return
+        if (session && view === 'workspace')
+          await select(decodeURIComponent(session))
+        else chooseProject()
       } finally {
         busy.value = false
       }
@@ -682,7 +715,7 @@ export function useWorkbench() {
     draft,
     agentId,
     busy,
-    sending,
+    sending: computed(() => preparingSubmission.value || sending.value),
     responding,
     error,
     uploadProgress,

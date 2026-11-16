@@ -7,6 +7,8 @@ export interface PlanRecord {
   state: string
   summary: string
   document: Record<string, unknown>
+  sessionId?: string
+  tool?: string
 }
 export interface SourceRecord {
   id: string
@@ -23,6 +25,11 @@ export interface AnswerVerification {
 }
 const path = (session: string) => `/sessions/${encodeURIComponent(session)}`
 export const recordApi = {
+  plan: (session: string, id: string, signal?: AbortSignal) =>
+    request<{ plan: PlanRecord }>(
+      `${path(session)}/plans/${encodeURIComponent(id)}`,
+      { signal },
+    ),
   plans: (session: string, signal?: AbortSignal) =>
     request<{ items: PlanRecord[] }>(`${path(session)}/plans`, { signal }),
   revise: (

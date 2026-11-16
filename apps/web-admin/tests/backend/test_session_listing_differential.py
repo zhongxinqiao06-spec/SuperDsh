@@ -13,17 +13,23 @@ import pytest
 
 from app.infrastructure.errors import DomainError
 from app.modules.conversations.dao.conversation_dao import ConversationDao
-from app.modules.conversations.entity.bo.session_cursor import SessionCursor, cursor_time
+from app.modules.conversations.entity.bo.session_cursor import (
+    SessionCursor,
+    cursor_time,
+)
 from app.modules.conversations.entity.do.models import SessionRow
 from app.modules.conversations.service.conversation_service import ConversationService
 from app.modules.conversations.service.listing_service import SessionListingService
 from app.modules.identity.entity.bo.models import Account
 
 ROOT = Path(__file__).resolve().parents[4]
-ACCOUNT = Account("owner", "owner", (), ("sessions.read",), 1)
+ACCOUNT = Account("owner", "owner", (), ("sessions.read", "products.office"), 1)
 CASES: list[dict[str, object]] = [
     {"endpoint": "sessions", "query": {}},
-    {"endpoint": "inventory", "query": {"archived": "false", "limit": "1", "cursor": "invalid"}},
+    {
+        "endpoint": "inventory",
+        "query": {"archived": "false", "limit": "1", "cursor": "invalid"},
+    },
     {"endpoint": "sessions", "query": {"archived": "true"}},
     {"endpoint": "project", "query": {"limit": "2"}},
     {"endpoint": "sessions", "query": {"limit": "10"}, "anchor": 9},
@@ -112,11 +118,13 @@ async def test_list_matches_old_handlers(
         cursor: SessionCursor | None,
         limit: int | None,
         inventory: bool,
+        products: tuple[str, ...],
     ) -> list[SessionRow]:
         visible = [
             row
             for row in rows
             if row.connector_id in connectors
+            and row.source.get("product", "office") in products
             and (inventory or row.archived == (filters.get("archived") == "true"))
         ]
         if cursor:
@@ -144,7 +152,10 @@ async def test_list_matches_old_handlers(
     try:
         result = await SessionListingService(service).listing(
             ACCOUNT,
-            {**query, **({"projectId": "project"} if case["endpoint"] == "project" else {})},
+            {
+                **query,
+                **({"projectId": "project"} if case["endpoint"] == "project" else {}),
+            },
             case["endpoint"] == "inventory",
         )
         sessions = cast(list[dict[str, object]], result["sessions"])

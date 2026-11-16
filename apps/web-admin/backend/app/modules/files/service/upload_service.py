@@ -1,7 +1,6 @@
 """有界分片上传：持久断点、摘要验证、幂等完成与中断清理。"""
 
 import asyncio
-import hashlib
 from collections.abc import Awaitable, Callable
 from datetime import UTC, datetime, timedelta
 from pathlib import Path
@@ -12,11 +11,12 @@ from app.infrastructure.errors import DomainError
 from app.modules.files.dao.file_dao import FileRepository
 from app.modules.files.entity.do.models import FileUploadRow
 from app.modules.files.entity.vo.file_dto import UploadInput
+from app.modules.files.service.staged_content import StagedContent
 from app.modules.files.service.storage_service import StorageService
 from app.modules.identity.entity.bo.models import Account
 
 Publish = Callable[
-    [Account, str, bytes, str, str | None, str | None, str], Awaitable[dict[str, object]]
+    [Account, str, StagedContent, str, str | None, str | None, str], Awaitable[dict[str, object]]
 ]
 PART_SIZE = 8 * 1024 * 1024
 
@@ -172,11 +172,11 @@ class UploadService:
             row.state = "completing"
             await dao.save(row)
             paths = [self.root / str(row.parts[str(number)]) for number in range(1, count + 1)]
+        staging = self.root / (identifier + "-" + uuid4().hex + ".assembling")
         try:
-            buffers = [await asyncio.to_thread(path.read_bytes) for path in paths]
-            content = b"".join(buffers)
-            if len(content) != row.size or hashlib.sha256(content).hexdigest() != row.sha256:
-                raise DomainError(422, "文件大小或 SHA-256 校验失败")
+            content = await asyncio.to_thread(
+                StagedContent.assemble, staging, paths, row.size, row.sha256
+            )
             published = await self.publish(
                 account,
                 row.name,
@@ -203,6 +203,8 @@ class UploadService:
                     current.state = "receiving"
                     await dao.save(current)
             raise
+        finally:
+            await asyncio.to_thread(staging.unlink, missing_ok=True)
 
     async def cancel(self, account: Account, identifier: str) -> dict[str, object]:
         account.require("files.write")

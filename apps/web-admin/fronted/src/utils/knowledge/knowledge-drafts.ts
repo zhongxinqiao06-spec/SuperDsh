@@ -9,6 +9,7 @@ import type {
 /** 编辑只带写字段和当前版本，取消不会改变列表资源。 */
 export function knowledgeDraft(value?: KnowledgeBase): KnowledgeDraft {
   return {
+    ...(value?.product ? { product: value.product } : {}),
     name: value?.name ?? '',
     description: value?.description ?? '',
     enabled: value?.enabled ?? true,

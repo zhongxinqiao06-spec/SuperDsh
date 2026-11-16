@@ -3,10 +3,10 @@
   min-width: 0;
   max-width: 1440px;
   margin: 0 auto;
-  padding: var(--space-6);
+  padding: var(--space-8) var(--page-gutter);
   display: flex;
   flex-direction: column;
-  gap: 24px;
+  gap: var(--layout-gap);
 }
 .page-heading {
   display: flex;
@@ -17,8 +17,8 @@
 }
 .page-heading h1,
 .page > h1 {
-  font-size: 24px;
-  font-weight: 650;
+  font-size: var(--page-title-size);
+  font-weight: 600;
   letter-spacing: -0.6px;
   margin-bottom: 8px;
 }
@@ -31,11 +31,12 @@
   background: var(--card);
   border: 1px solid var(--border);
   border-radius: var(--radius-card);
-  padding: 24px;
+  padding: var(--panel-padding);
   box-shadow: var(--shadow-card);
 }
 .panel h2 {
-  font-size: 18px;
+  font-size: var(--font-size-section);
+  line-height: var(--line-height-section);
   font-weight: 600;
 }
 .panel > .el-button {
@@ -75,8 +76,9 @@
 }
 .toolbar {
   display: flex;
+  min-width: 0;
   align-items: center;
-  gap: 10px;
+  gap: var(--control-gap);
   flex-wrap: wrap;
 }
 .toolbar .el-input {
@@ -93,13 +95,13 @@
   border-collapse: collapse;
   width: 100%;
   white-space: nowrap;
-  font-size: 13px;
+  font-size: 14px;
 }
 .data-table th {
   color: var(--muted-foreground);
   font-weight: 500;
   text-align: left;
-  background: var(--muted);
+  background: var(--canvas);
 }
 .data-table th,
 .data-table td {
@@ -125,25 +127,50 @@
 .data-table .el-button + .el-button {
   margin-left: 9px;
 }
-.stack {
+.stack,
+.form-stack {
   display: flex;
+  min-width: 0;
   flex-direction: column;
-  gap: 20px;
+  gap: var(--layout-gap);
+}
+.form-stack,
+form.stack {
+  gap: var(--field-gap);
+}
+/* 容器统一承担间距，避免段落默认 margin 与 gap 相加。 */
+:is(.stack, .form-stack) > :is(p, h2, h3, dl, ul, ol) {
+  margin-block: 0;
+}
+:is(.stack, .form-stack) > .el-button {
+  align-self: flex-start;
+  margin: 0;
 }
 .field {
   display: flex;
+  min-width: 0;
   flex-direction: column;
-  gap: 8px;
+  gap: var(--label-gap);
   font-size: 13px;
 }
 .field > small {
   color: var(--muted-foreground);
 }
+/* 字节上限等长数值需要容纳完整内容；不改变时间线工具栏的紧凑输入。 */
+.field > .el-input-number {
+  width: min(240px, 100%);
+}
 .dialog-actions {
   display: flex;
+  flex-wrap: wrap;
+  align-items: center;
   justify-content: flex-end;
-  gap: 8px;
-  margin-top: 8px;
+  gap: var(--control-gap);
+  margin: 0;
+}
+/* 使用 gap 的按钮行不再叠加组件库的相邻按钮 margin，换行也保持一致。 */
+:is(.toolbar, .dialog-actions) > .el-button {
+  margin: 0;
 }
 .resource-loading {
   padding: 10px 0;
@@ -158,6 +185,7 @@
   gap: 8px;
 }
 .permission-list {
+  min-width: 0;
   border: 1px solid var(--border);
   padding: 12px;
   max-height: 300px;
@@ -169,9 +197,20 @@
   flex-direction: column;
 }
 .permission-list .el-checkbox {
+  min-width: 0;
   height: auto;
   min-height: 36px;
   margin: 0;
+}
+.permission-list .el-checkbox__input {
+  flex-shrink: 0;
+}
+.permission-list .el-checkbox__label {
+  min-width: 0;
+  white-space: normal;
+  overflow-wrap: anywhere;
+  line-height: 1.5;
+  padding-block: var(--space-2);
 }
 .permission-list small {
   font-size: 11px;
@@ -223,8 +262,12 @@
   top: 22px;
 }
 .auth-card {
-  width: 384px;
+  width: 420px;
   max-width: 100%;
+  padding: 32px;
+  background: var(--card);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-panel);
 }
 .auth-card header {
   text-align: center;
@@ -249,7 +292,7 @@
   font-weight: 500;
 }
 .auth-card .el-input__inner {
-  font-family: var(--font-mono);
+  font-family: var(--font-sans);
 }
 .wide-button {
   width: 100%;
@@ -277,9 +320,11 @@
   line-height: 1.9;
 }
 @media (max-width: 760px) {
+  :root {
+    --panel-padding: var(--space-4);
+  }
   .page {
     padding: 16px;
-    gap: 20px;
   }
   .page-heading {
     align-items: flex-start;
@@ -294,14 +339,11 @@
   .quick-links {
     grid-template-columns: 1fr;
   }
-  .panel {
-    padding: 20px;
-  }
   .auth-brand {
     left: 20px;
   }
-  .toolbar {
-    gap: 8px;
+  .auth-card {
+    padding: 24px;
   }
   .toolbar .el-input {
     flex: 1;

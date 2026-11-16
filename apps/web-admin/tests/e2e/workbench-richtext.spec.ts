@@ -168,7 +168,7 @@ test('工作台等待审批可中断，方案冲突保稿，来源和诊断草�
   await page.getByLabel('密码', { exact: true }).fill('Synthetic-password!')
   await page.getByRole('button', { name: '登录 ↵', exact: true }).click()
   await expect(
-    page.getByRole('heading', { name: '总览', exact: true }),
+    page.getByRole('heading', { name: /今天，想完成什么/ }),
   ).toBeVisible()
   await page.goto('/#/workspace/session/s')
   await expect(

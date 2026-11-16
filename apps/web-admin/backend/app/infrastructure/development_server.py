@@ -2,6 +2,7 @@
 
 import sys
 from functools import partial
+from pathlib import Path
 from socket import socket
 
 import uvicorn
@@ -9,6 +10,13 @@ from uvicorn.supervisors import ChangeReload
 
 
 def _serve_worker(config: uvicorn.Config, sockets: list[socket] | None = None) -> None:
+    # 每代 worker 启动前执行迁移；仅父进程迁移会使热重载后的代码访问尚不存在的新表。
+    from app.infrastructure.configuration import Settings
+    from app.infrastructure.development_migrations import migrate_development_database
+
+    migrate_development_database(
+        Path(__file__).resolve().parents[2] / "alembic.ini", Settings().database_url
+    )
     # Windows 的空列表表示不继承父监听句柄；None 让当前 worker 自行绑定端口。
     # 同一句柄一旦属于上一代 IOCP，下一代 Proactor 重新注册便会产生 WinError 87。
     uvicorn.Server(config).run(sockets=sockets or None)

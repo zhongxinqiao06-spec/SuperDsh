@@ -16,6 +16,7 @@ from app.integrations.dsh.process import HarnessProcess
 from app.integrations.dsh.process_identity import machine_identity, process_is_alive
 from app.integrations.dsh.protocol import Fields, Json, RuntimeFailure, fields
 from app.integrations.dsh.sync import ProjectionSync
+from app.modules.identity.entity.bo.product_roles import Product
 from app.modules.runtime.service.agent_selection_service import AgentSelectionService
 from app.modules.runtime.service.model_selection_service import ModelSelectionService
 from app.modules.runtime.service.permission_selection_service import PermissionSelectionService
@@ -327,13 +328,20 @@ class RuntimeSupervisor:
             raise RuntimeFailure("runtime_method_unsupported", "不支持的运行时操作", 422)
         if "cwd" in params or "runtimeId" in params and params["runtimeId"] != "dsh":
             raise RuntimeFailure("runtime_path_owned", "运行目录和引擎由平台管理", 422)
+        product: Product = (
+            "entertainment" if params.get("_starbridgeProduct") == "entertainment" else "office"
+        )
         if method == "catalog.listModels":
             catalog = fields(await run.bridge.request(method, params))
-            return await ModelSelectionService(self.models).annotate(owner, catalog)
+            return await ModelSelectionService(self.models).annotate(owner, catalog, product)
         if method == "catalog.listPermissions":
             return await PermissionSelectionService().catalog(run.bridge, run.process)
         if method == "session.updateSelections":
-            await ModelSelectionService(self.models).validate_explicit(owner, params, run.bridge)
+            params = dict(params)
+            params.pop("_starbridgeProduct", None)
+            await ModelSelectionService(self.models).validate_explicit(
+                owner, params, run.bridge, product
+            )
         if method not in {"session.createAndStart", "session.startTurn"}:
             return await run.bridge.request(method, params)
         identifier, session = params.get("clientMessageId"), params.get("sessionId")
@@ -350,7 +358,8 @@ class RuntimeSupervisor:
             ).encode()
         ).hexdigest()
         receipt = hashlib.sha256(f"{session}:{identifier}".encode()).hexdigest()
-        command = params
+        command = dict(params)
+        command.pop("_starbridgeProduct", None)
         # 重试先核对原收据；配置撤销也不能让已完成的发送再次执行或变成新失败。
         completed, prior = await self.store.replay(owner, receipt, digest)
         if completed:
@@ -358,14 +367,19 @@ class RuntimeSupervisor:
         if method == "session.createAndStart":
             # 摘要基于原始请求；默认值变化不能重发已经完成或结果未知的执行。
             command = await ModelSelectionService(self.models).apply_default(
-                owner, params, run.bridge
+                owner,
+                command,
+                run.bridge,
+                product,
             )
             command = await AgentSelectionService().apply_default(command, run.bridge)
             command = await PermissionSelectionService().apply_default(
                 command, run.bridge, run.process
             )
         else:
-            await ModelSelectionService(self.models).validate_explicit(owner, params, run.bridge)
+            await ModelSelectionService(self.models).validate_explicit(
+                owner, command, run.bridge, product
+            )
         created, prior = await self.store.reserve(owner, receipt, digest)
         if not created:
             return prior

@@ -1,0 +1,276 @@
+.studio-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 14rem), 1fr));
+  gap: var(--space-4);
+}
+
+/* 作品工作区沿用控制台的 page、panel、field 与 Element 控件。 */
+.studio-editor {
+  overflow-wrap: anywhere;
+}
+.studio-back,
+.studio-tabs a {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2);
+  text-decoration: none;
+  color: var(--muted-foreground);
+  font-size: 14px;
+  font-weight: 500;
+}
+.studio-back:hover {
+  color: var(--foreground);
+}
+.studio-tabs {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-1);
+  border-bottom: 1px solid var(--border);
+}
+.studio-tabs a {
+  min-height: var(--control-height);
+  padding: 0 var(--space-3);
+  border-bottom: 2px solid transparent;
+}
+.studio-tabs a:hover {
+  background: var(--muted);
+  color: var(--foreground);
+}
+.studio-tabs a[aria-current='page'] {
+  border-color: var(--primary);
+  color: var(--foreground);
+}
+.studio-toolbar,
+.studio-actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--control-gap);
+}
+.studio-toolbar .el-button + .el-button,
+.studio-actions .el-button + .el-button {
+  margin-left: 0;
+}
+.studio-stage,
+.studio-form {
+  display: grid;
+  gap: var(--field-gap);
+}
+.studio-columns {
+  display: grid;
+  grid-template-columns: minmax(14rem, 1fr) minmax(0, 2fr);
+  align-items: start;
+  gap: var(--space-4);
+}
+.studio-script {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+/* 三个制作区域共享同一镜头身份。空间收紧时检查器下移，画面保持可读宽度。 */
+.studio-board {
+  display: grid;
+  grid-template-columns: minmax(125px, 0.65fr) minmax(300px, 2.1fr) minmax(
+      215px,
+      1fr
+    );
+  gap: clamp(8px, 1vw, 16px);
+  align-items: start;
+}
+.studio-rail {
+  max-height: 78vh;
+  overflow: auto;
+}
+.studio-rail .studio-shot {
+  display: grid;
+  gap: 4px;
+  overflow: hidden;
+}
+.studio-rail .studio-frame {
+  object-fit: cover;
+  margin: 0;
+}
+.studio-rail .studio-shot {
+  grid-template-columns: 4rem minmax(0, 1fr);
+  align-items: center;
+  padding: 5px;
+  gap: 7px;
+}
+.studio-rail-image {
+  display: grid;
+  align-items: center;
+  position: relative;
+  overflow: hidden;
+  aspect-ratio: 4/3;
+  border-radius: 4px;
+  background: var(--studio-monitor, #262529);
+}
+.studio-rail-image b {
+  position: absolute;
+  left: 3px;
+  bottom: 2px;
+  color: #fff;
+  background: #121317c9;
+  font:
+    10px ui-monospace,
+    monospace;
+  padding: 1px 3px;
+  border-radius: 3px;
+}
+.studio-rail-label {
+  display: grid;
+  gap: 4px;
+}
+.studio-rail-label strong {
+  font-size: 13px;
+  font-weight: 600;
+}
+.studio-rail-label small {
+  color: var(--muted-foreground);
+  font-size: 11px;
+}
+.studio-board > .studio-panel:last-child {
+  max-height: 82vh;
+  overflow: auto;
+}
+.studio-board > .studio-panel:last-child .studio-grid {
+  grid-template-columns: minmax(0, 1fr);
+}
+@media (max-width: 1190px) {
+  .studio-board {
+    grid-template-columns: minmax(125px, 0.65fr) minmax(0, 2fr);
+  }
+  .studio-board > .studio-panel:last-child {
+    grid-column: 1/-1;
+    max-height: none;
+  }
+  .studio-board > .studio-panel:last-child .studio-grid {
+    grid-template-columns: repeat(auto-fit, minmax(min(100%, 12rem), 1fr));
+  }
+}
+@media (max-width: 700px) {
+  .studio-board {
+    grid-template-columns: minmax(0, 1fr);
+  }
+  .studio-rail {
+    display: grid;
+    grid-auto-columns: 190px;
+    grid-auto-flow: column;
+    grid-template-rows: auto auto;
+    gap: var(--control-gap);
+    overflow-x: auto;
+  }
+  .studio-rail h2 {
+    grid-column: 1/-1;
+    grid-row: 1;
+    white-space: nowrap;
+  }
+  .studio-rail .studio-shot {
+    grid-row: 2;
+    margin: 0;
+  }
+}
+.studio-panel {
+  min-width: 0;
+}
+.studio-panel > :first-child,
+.studio-panel h2,
+.studio-panel h3 {
+  margin-top: 0;
+}
+.studio-panel h2 {
+  margin-bottom: var(--space-4);
+}
+.studio-panel h3 {
+  font-size: 15px;
+  margin-bottom: var(--space-2);
+}
+.studio-panel > :last-child {
+  margin-bottom: 0;
+}
+.studio-panel article,
+.studio-panel fieldset {
+  min-width: 0;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-control);
+  padding: var(--space-3);
+  margin: var(--space-3) 0;
+}
+.studio-panel .field,
+.studio-form .field {
+  min-width: 0;
+  gap: var(--label-gap);
+  margin: 0 0 var(--field-gap);
+}
+.studio-panel .studio-grid .field {
+  margin: 0;
+}
+.studio-panel .studio-grid + .field {
+  margin-top: var(--field-gap);
+}
+/* 字段组由 grid 管间距，取消旧版逐字段 margin，避免两套布局叠加。 */
+.studio-form > :is(.field, fieldset, h2, h3, p),
+.studio-panel .studio-form > .field,
+.studio-panel .form-stack .field,
+.studio-panel.form-stack > :is(h2, h3, p) {
+  margin-block: 0;
+}
+.studio-panel textarea.native-control {
+  width: 100%;
+  min-height: 5rem;
+}
+.studio-meta {
+  color: var(--muted-foreground);
+  font-size: 13px;
+}
+.studio-error {
+  color: var(--destructive);
+}
+.studio-shot {
+  display: block;
+  width: 100%;
+  margin: var(--space-2) 0;
+  padding: var(--space-3);
+  text-align: left;
+  background: var(--card);
+  color: var(--foreground);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-control);
+  cursor: pointer;
+}
+.studio-shot[aria-pressed='true'] {
+  background: var(--muted);
+  border-color: var(--ring);
+}
+.studio-frame {
+  display: block;
+  width: 100%;
+  aspect-ratio: 16/9;
+  object-fit: contain;
+  background: var(--muted);
+  border-radius: var(--radius-control);
+  margin-bottom: var(--space-2);
+}
+.studio-shot .studio-frame {
+  max-height: 8rem;
+}
+.studio-panel video,
+.studio-panel audio {
+  display: block;
+  max-width: 100%;
+  margin-bottom: var(--space-2);
+}
+@media (max-width: 900px) {
+  .studio-columns {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
+@media (max-width: 600px) {
+  .studio-panel {
+    padding: var(--space-4);
+  }
+  .studio-tabs {
+    gap: 0;
+  }
+  .studio-tabs a {
+    padding: 0 var(--space-2);
+  }
+}

@@ -1,4 +1,5 @@
 import { fileURLToPath } from 'node:url'
+import { readFileSync } from 'node:fs'
 import { resolve } from 'node:path'
 import { defineConfig } from 'vitest/config'
 import vue from '@vitejs/plugin-vue'
@@ -14,6 +15,14 @@ const output =
 export default defineConfig({
   plugins: [vue()],
   resolve: { alias: { '@': resolve(application, 'fronted/src') } },
+  define: {
+    __PUBLIC_SALES_EXAMPLE__: JSON.stringify(
+      readFileSync(
+        resolve(application, 'fronted/public/images/website/sales-example.csv'),
+        'utf8',
+      ),
+    ),
+  },
   cacheDir: resolve(output, 'vitest-cache'),
   test: {
     // 单一线程池避免 Windows 子进程加载大依赖时挂起，各测试仍隔离模块与DOM。

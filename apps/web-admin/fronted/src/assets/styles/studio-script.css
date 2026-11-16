@@ -1,0 +1,274 @@
+/* 剧本工作台只定义编排结构，颜色、间距、控件和焦点沿用公共主题。 */
+.script-workspace {
+  display: grid;
+  gap: var(--layout-gap);
+  min-width: 0;
+}
+.script-intro,
+.script-panel-heading,
+.script-brief {
+  display: flex;
+  align-items: center;
+  gap: var(--field-gap);
+  justify-content: space-between;
+  flex-wrap: wrap;
+}
+.script-intro h2 {
+  margin: 0 0 var(--label-gap);
+  font-size: var(--font-size-section);
+  line-height: var(--line-height-section);
+  font-weight: 600;
+}
+.script-intro p,
+.script-brief p {
+  margin: 0;
+  color: var(--muted-foreground);
+  line-height: 1.7;
+}
+.script-intro > div,
+.script-brief > div {
+  min-width: 0;
+}
+.script-brief {
+  padding: var(--field-gap);
+  border-radius: var(--radius);
+  background: var(--muted);
+  align-items: flex-start;
+}
+.script-brief > div {
+  flex: 1;
+}
+.script-brief p {
+  margin-top: var(--label-gap);
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+.script-desk {
+  display: grid;
+  grid-template-columns: minmax(0, 1.55fr) minmax(0, 1fr);
+  gap: var(--layout-gap);
+  align-items: start;
+}
+.script-manuscript,
+.script-scenes {
+  display: grid;
+  gap: var(--field-gap);
+  min-width: 0;
+  padding: var(--panel-padding);
+}
+.script-panel-heading h3,
+.script-scenes p,
+.script-manuscript p {
+  margin: 0;
+}
+.script-panel-heading h3 {
+  font-size: var(--font-size-section);
+  line-height: var(--line-height-section);
+  font-weight: 600;
+}
+.script-panel-heading {
+  min-height: var(--control-height);
+}
+.script-panel-heading > .toolbar {
+  min-width: 0;
+  row-gap: var(--control-gap);
+}
+.script-manuscript > .script-panel-heading {
+  padding-bottom: var(--field-gap);
+  border-bottom: 1px solid var(--border);
+}
+.script-panel-heading .el-button > span,
+.script-selection .el-button > span {
+  gap: var(--control-gap);
+}
+.script-scenes.panel {
+  background: var(--card);
+}
+.script-panel-heading h3 small {
+  color: var(--muted-foreground);
+  margin-inline-start: var(--label-gap);
+  font-weight: 400;
+}
+.script-manuscript .el-textarea__inner {
+  line-height: var(--line-height-script);
+  font-size: var(--font-size-script);
+  padding: var(--field-gap) 2px;
+  background: var(--card);
+  border-color: transparent;
+  box-shadow: none;
+}
+.script-manuscript .el-textarea__inner:focus {
+  border-color: var(--border);
+  box-shadow: none;
+}
+.script-direction,
+.script-scene-detail {
+  padding-top: var(--field-gap);
+  border-top: 1px solid var(--border);
+}
+.script-direction .el-button > span {
+  gap: var(--control-gap);
+}
+.script-reading {
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+  font-size: var(--font-size-script);
+  line-height: var(--line-height-script);
+  padding: var(--field-gap);
+}
+.script-selection {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--control-gap);
+  font-size: var(--font-size-meta);
+  padding: var(--control-gap);
+  background: var(--popover);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-card);
+  box-shadow: var(--shadow-floating);
+}
+.script-scene-empty {
+  padding: var(--panel-padding) 0;
+  display: grid;
+  gap: var(--field-gap);
+  justify-items: start;
+}
+.script-scene-empty p {
+  color: var(--muted-foreground);
+  line-height: 1.8;
+}
+.script-scene-list {
+  display: grid;
+  gap: 2px;
+  max-height: 280px;
+  overflow-y: auto;
+  scrollbar-gutter: stable;
+  overscroll-behavior: contain;
+  padding: 2px;
+}
+.script-scene-list button {
+  display: flex;
+  align-items: center;
+  width: 100%;
+  gap: var(--control-gap);
+  padding: 8px 12px;
+  min-height: 56px;
+  text-align: left;
+  background: transparent;
+  color: var(--foreground);
+  border: 1px solid transparent;
+  border-bottom-color: var(--border);
+  border-radius: var(--radius-control);
+  cursor: pointer;
+}
+.script-scene-list button[aria-current='true'] {
+  border-color: transparent;
+  background: var(--selection-fill);
+  color: var(--selection-ink);
+}
+.script-scene-list button:hover {
+  background: var(--surface-hover);
+}
+.script-scene-list button[aria-current='true']:hover {
+  background: var(--selection-fill);
+}
+.script-scene-list strong {
+  font-weight: 500;
+  font-size: 14px;
+  line-height: 20px;
+}
+.script-scene-list button > span:nth-child(2) {
+  display: grid;
+  gap: 2px;
+  flex: 1;
+  min-width: 0;
+}
+.script-scene-list strong,
+.script-scene-list small {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.script-scene-list small,
+.script-scene-number {
+  color: var(--muted-foreground);
+  font-size: 12px;
+  line-height: 16px;
+}
+.script-scene-number {
+  font-variant-numeric: tabular-nums;
+}
+.script-shot-link.el-button {
+  justify-content: space-between;
+  height: auto;
+  white-space: normal;
+  text-align: left;
+}
+.script-shot-link.el-button > span {
+  white-space: normal;
+  overflow-wrap: anywhere;
+}
+.script-confirm-summary {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--field-gap);
+  padding: var(--field-gap);
+  background: var(--muted);
+  border-radius: var(--radius);
+}
+.script-confirm-copy {
+  white-space: pre-wrap;
+  max-height: 240px;
+  overflow-y: auto;
+  line-height: 1.8;
+}
+.script-next.panel {
+  padding: var(--field-gap) 0;
+  border: 0;
+  border-top: 1px solid var(--border);
+  border-radius: 0;
+  background: transparent;
+  display: grid;
+  gap: var(--field-gap);
+}
+.script-next p {
+  margin: 0;
+}
+@media (max-width: 1100px) {
+  .script-desk {
+    grid-template-columns: minmax(0, 1fr);
+  }
+  .script-scenes.panel {
+    padding: var(--panel-padding);
+  }
+}
+@media (max-width: 600px) {
+  .script-intro,
+  .script-panel-heading {
+    flex-wrap: wrap;
+  }
+  .script-brief {
+    flex-wrap: wrap;
+  }
+  .script-brief > div {
+    flex-basis: calc(100% - 42px);
+  }
+  .script-brief > .el-button {
+    margin: 0;
+    width: 100%;
+  }
+  .script-direction .toolbar > .el-button,
+  .script-selection > .el-button {
+    min-height: 44px;
+    height: auto;
+    max-width: 100%;
+    padding-block: var(--control-gap);
+    white-space: normal;
+  }
+  .script-direction .toolbar > .el-button > span,
+  .script-selection > .el-button > span {
+    white-space: normal;
+    line-height: 1.5;
+  }
+}

@@ -150,7 +150,9 @@ function action(agent: AgentDefinition, key: string): void {
             <td>
               <AgentRowActions
                 :published="agent.published"
-                :can-run="vm.auth.can('sessions.run')"
+                :can-run="
+                  vm.product === 'office' && vm.auth.can('sessions.run')
+                "
                 :busy="vm.mutation.busy.value"
                 @action="action(agent, $event)"
               />
@@ -192,7 +194,9 @@ function action(agent: AgentDefinition, key: string): void {
               <small>版本 {{ agent.version }}</small
               ><AgentRowActions
                 :published="agent.published"
-                :can-run="vm.auth.can('sessions.run')"
+                :can-run="
+                  vm.product === 'office' && vm.auth.can('sessions.run')
+                "
                 :busy="vm.mutation.busy.value"
                 @action="action(agent, $event)"
               />
@@ -258,37 +262,39 @@ function action(agent: AgentDefinition, key: string): void {
       title="智能体发布检查"
       width="min(720px, 94vw)"
       @update:model-value="vm.readiness.value = null"
-      ><el-alert
-        :type="vm.readiness.value?.result.ready ? 'success' : 'error'"
-        :title="
-          vm.readiness.value?.result.ready ? '配置检查通过' : '配置需要修复'
-        "
-        :closable="false"
-      />
-      <ul class="checks">
-        <li
-          v-for="check in vm.readiness.value?.result.checks ?? []"
-          :key="check.id"
-        >
-          <el-tag
-            :type="
-              check.status === 'error'
-                ? 'danger'
-                : check.status === 'warning'
-                  ? 'warning'
-                  : 'success'
-            "
-            >{{
-              check.status === 'pass'
-                ? '通过'
-                : check.status === 'error'
-                  ? '错误'
-                  : '提示'
-            }}</el-tag
+      ><div class="stack">
+        <el-alert
+          :type="vm.readiness.value?.result.ready ? 'success' : 'error'"
+          :title="
+            vm.readiness.value?.result.ready ? '配置检查通过' : '配置需要修复'
+          "
+          :closable="false"
+        />
+        <ul class="checks">
+          <li
+            v-for="check in vm.readiness.value?.result.checks ?? []"
+            :key="check.id"
           >
-          {{ check.message }}
-        </li>
-      </ul></el-dialog
+            <el-tag
+              :type="
+                check.status === 'error'
+                  ? 'danger'
+                  : check.status === 'warning'
+                    ? 'warning'
+                    : 'success'
+              "
+              >{{
+                check.status === 'pass'
+                  ? '通过'
+                  : check.status === 'error'
+                    ? '错误'
+                    : '提示'
+              }}</el-tag
+            >
+            {{ check.message }}
+          </li>
+        </ul>
+      </div></el-dialog
     >
     <el-dialog
       :model-value="Boolean(vm.deleting.value)"

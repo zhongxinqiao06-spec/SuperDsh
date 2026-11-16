@@ -1,0 +1,313 @@
+/* 创作准备沿用公共主题、表单和间距；仅定义步骤、审阅与媒体工作区结构。 */
+.studio-editor .page-heading h1 {
+  font-size: var(--page-title-size);
+}
+.studio-project-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: var(--field-gap);
+}
+.studio-project-actions {
+  min-width: 0;
+  font-size: 13px;
+}
+.studio-project-actions .studio-back {
+  font-size: 13px;
+}
+.cast-card.panel {
+  padding: 0;
+}
+.preparation-steps {
+  display: flex;
+  gap: var(--space-1);
+  overflow-x: auto;
+  padding: var(--space-1);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-card);
+  background: var(--card);
+  box-shadow: var(--shadow-card);
+  scrollbar-width: thin;
+}
+.preparation-steps a {
+  /* 隐藏的辅助状态跟随本项定位，避免窄屏水平滚动时撑开页面。 */
+  position: relative;
+  display: flex;
+  flex: 1 0 auto;
+  align-items: center;
+  gap: var(--control-gap);
+  min-height: 40px;
+  padding: 8px 10px;
+  border: 1px solid transparent;
+  border-radius: var(--radius-control);
+  color: var(--muted-foreground);
+  text-decoration: none;
+  background: transparent;
+  justify-content: center;
+  transition:
+    color var(--transition-ui),
+    background-color var(--transition-ui);
+}
+.preparation-steps a:hover {
+  background: var(--muted);
+  color: var(--foreground);
+}
+.preparation-steps a[aria-current='page'] {
+  background: var(--primary-fill);
+  color: var(--primary-foreground);
+  box-shadow: var(--shadow-button);
+}
+.step-index {
+  font-size: 12px;
+  font-variant-numeric: tabular-nums;
+  opacity: 0.7;
+}
+.preparation-steps strong {
+  display: block;
+  font-size: 13px;
+  white-space: nowrap;
+  font-weight: 500;
+}
+.preparation-review,
+.preparation-proposal,
+.preparation-animatic,
+.preparation-candidate,
+.preparation-empty {
+  padding: var(--panel-padding);
+  display: grid;
+  gap: var(--field-gap);
+}
+.preparation-review h2,
+.preparation-proposal h2,
+.preparation-animatic h2,
+.preparation-candidate h2,
+.cast-card h3 {
+  margin: 0;
+}
+.preparation-review-title {
+  display: grid;
+  gap: var(--label-gap);
+}
+.preparation-review-title p {
+  margin: 0;
+  color: var(--muted-foreground);
+}
+.preparation-check {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--control-gap);
+  padding: 12px;
+  background: var(--muted);
+  border-radius: var(--radius);
+}
+.preparation-check > span:first-child {
+  flex: 1 1 220px;
+}
+.cast-workspace {
+  display: grid;
+  gap: var(--layout-gap);
+}
+.cast-card-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(min(100%, 280px), 1fr));
+  gap: var(--layout-gap);
+}
+.cast-card {
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+}
+.cast-card-body {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  gap: var(--field-gap);
+  padding: var(--panel-padding);
+}
+.cast-card-actions {
+  margin-top: auto;
+  padding-top: var(--control-gap);
+}
+.cast-card-body p {
+  margin: 0;
+}
+.cast-visual {
+  aspect-ratio: 16/10;
+  background: var(--muted);
+  overflow: hidden;
+}
+.cast-visual .studio-media,
+.cast-visual .studio-frame {
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+  margin: 0;
+}
+.cast-placeholder {
+  display: flex;
+  height: 100%;
+  flex-direction: column;
+  justify-content: center;
+  align-items: center;
+  gap: var(--control-gap);
+  padding: 16px;
+  color: var(--muted-foreground);
+}
+.cast-placeholder strong {
+  font-size: 24px;
+  color: var(--foreground);
+}
+.cast-description {
+  min-height: 42px;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+.preparation-candidate-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(min(100%, 220px), 1fr));
+  gap: var(--field-gap);
+}
+.preparation-candidate-grid article {
+  display: grid;
+  gap: var(--control-gap);
+  align-content: start;
+}
+.preparation-candidate-grid img {
+  width: 100%;
+  aspect-ratio: 16/10;
+  object-fit: contain;
+}
+.preparation-plan {
+  display: grid;
+  gap: var(--label-gap);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: var(--panel-padding);
+}
+.preparation-plan p {
+  margin: 0;
+}
+.preparation-prompt {
+  white-space: pre-wrap;
+  max-height: 180px;
+  overflow-y: auto;
+}
+.proposal-change {
+  display: grid;
+  gap: var(--field-gap);
+  border-top: 1px solid var(--border);
+  padding-top: var(--field-gap);
+}
+.proposal-values {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: var(--control-gap);
+  align-items: start;
+}
+.proposal-values > div {
+  min-width: 0;
+  background: var(--surface-hover);
+  padding: var(--space-3);
+  border-radius: var(--radius);
+}
+.proposal-values > div:last-child {
+  background: var(--accent);
+}
+.proposal-values small {
+  color: var(--muted-foreground);
+}
+.proposal-values p {
+  margin: var(--control-gap) 0 0;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+  font-size: var(--font-size-meta);
+  line-height: 1.75;
+}
+.proposal-value > .el-button {
+  margin: var(--control-gap) 0 0;
+  padding-inline: 0;
+}
+.proposal-change .el-checkbox {
+  height: auto;
+  min-height: var(--control-height);
+  margin-right: 0;
+}
+.proposal-change .el-checkbox__label {
+  white-space: normal;
+  overflow-wrap: anywhere;
+  line-height: 1.6;
+}
+.proposal-review-actions {
+  padding-top: var(--field-gap);
+  border-top: 1px solid var(--border);
+}
+.proposal-review-actions > .el-button {
+  height: auto;
+  min-height: var(--control-height);
+  white-space: normal;
+  padding-block: var(--control-gap);
+}
+.sample-workspace {
+  display: grid;
+  grid-template-columns: minmax(260px, 1fr) minmax(0, 2fr);
+  gap: var(--layout-gap);
+  align-items: start;
+}
+.animatic-screen {
+  position: relative;
+  height: min(45vh, 440px);
+  background: var(--studio-monitor, #262529);
+  border-radius: var(--radius);
+  overflow: hidden;
+  color: white;
+}
+.animatic-screen .studio-media,
+.animatic-screen .studio-frame {
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+  margin: 0;
+}
+.animatic-placeholder {
+  display: grid;
+  height: 100%;
+  place-items: center;
+  padding: 24px;
+  font-size: 20px;
+  text-align: center;
+}
+.animatic-captions {
+  position: absolute;
+  bottom: 18px;
+  left: 12px;
+  right: 12px;
+  text-align: center;
+  pointer-events: none;
+}
+.animatic-captions p {
+  display: table;
+  margin: 4px auto;
+  padding: 4px 10px;
+  background: #000b;
+  color: #fff;
+  border-radius: 4px;
+}
+@media (max-width: 767px) {
+  .proposal-values,
+  .sample-workspace {
+    grid-template-columns: minmax(0, 1fr);
+  }
+  .preparation-steps a {
+    flex: 0 0 auto;
+    min-height: 44px;
+  }
+  .preparation-review .el-checkbox {
+    white-space: normal;
+    height: auto;
+  }
+  .cast-card audio {
+    max-width: 100%;
+  }
+}

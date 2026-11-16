@@ -1,4 +1,29 @@
 import type { Page } from '@playwright/test'
+import type {
+  MenuNode,
+  MenusResponse,
+} from '../../fronted/src/types/console/navigation'
+
+type MenuModule = MenusResponse['modules'][number]
+
+function pageItems(modules: MenuModule[]): MenuNode[] {
+  return modules.map((module, order) => ({
+    id: module.id,
+    kind: 'page',
+    moduleId: module.id,
+    parentId: null,
+    title: module.title,
+    icon: module.icon,
+    order,
+    visible: true,
+    roleIds: [],
+  }))
+}
+
+/** 各产品持有独立初始快照；模拟保存和恢复不会跨产品或跨用例修改数据。 */
+function menuCatalog(modules: MenuModule[], defaults = pageItems(modules)) {
+  return { version: 1, modules, defaults, items: structuredClone(defaults) }
+}
 
 /** 合成浏览器契约fixture；不把这些请求替身作为真实后端验收证据。 */
 export async function installFoundationFixture(
@@ -6,9 +31,11 @@ export async function installFoundationFixture(
   permissions?: string[],
 ) {
   const allPermissions = [
+    'products.office',
     'users.read',
     'users.manage',
     'roles.manage',
+    'audit.read',
     'menus.read',
     'menus.manage',
     'devices.manage',
@@ -24,7 +51,11 @@ export async function installFoundationFixture(
     email: null,
     role: 'admin',
     roles: ['admin'],
-    permissions: permissions ?? allPermissions,
+    permissions: permissions
+      ? permissions.some((value) => value.startsWith('products.'))
+        ? permissions
+        : [...permissions, 'products.office']
+      : allPermissions,
     authzVersion: 1,
     accessToken: 'fixture-token',
     tokenType: 'bearer',
@@ -60,17 +91,17 @@ export async function installFoundationFixture(
       revision: 1,
     },
   ]
-  const modules = [
+  const officeModules = [
     {
       id: 'overview',
-      title: '总览',
+      title: '平台总览',
       route: '#/overview',
       icon: 'gauge',
-      permissions: [],
+      permissions: ['settings.manage'],
     },
     {
       id: 'access.users',
-      title: '用户管理',
+      title: '账号与角色',
       route: '#/access/users',
       icon: 'users',
       permissions: ['users.read'],
@@ -87,30 +118,63 @@ export async function installFoundationFixture(
       title: '菜单管理',
       route: '#/access/menus',
       icon: 'menu',
-      permissions: ['menus.read'],
+      permissions: ['menus.read', 'menus.manage'],
     },
     {
       id: 'workbench',
-      title: 'Agent 工作台',
+      title: '智能对话',
       route: '#/workspace',
       icon: 'bot',
       permissions: ['sessions.read'],
     },
   ]
-  let items = modules.map((module, order) => ({
-    id: module.id,
-    kind: 'page',
-    moduleId: module.id,
+  const studioPages: [string, string, string, string][] = [
+    ['studio.projects', '作品项目', '#/entertainment', 'folder'],
+    ['studio.library', '素材库', '#/entertainment/library', 'book-open'],
+    ['studio.tasks', '制作任务', '#/entertainment/tasks', 'history'],
+  ]
+  const studioModules = studioPages.map(([id, title, route, icon]) => ({
+    id,
+    title,
+    route,
+    icon,
+    permissions: ['products.entertainment'],
+  }))
+  const entertainmentModules = [
+    ...studioModules,
+    ...officeModules.filter((item) => item.id !== 'workbench'),
+  ]
+  const accessGroup: MenuNode = {
+    id: 'access',
+    kind: 'group',
+    moduleId: null,
     parentId: null,
-    title: module.title,
-    icon: module.icon,
-    order,
+    title: '用户与权限',
+    icon: 'users',
+    order: studioModules.length,
     visible: true,
     roleIds: [],
-  }))
+  }
+  const entertainmentItems = pageItems(entertainmentModules).map((item) =>
+    item.id.startsWith('access.')
+      ? { ...item, parentId: accessGroup.id }
+      : item,
+  )
+  const menus = {
+    office: menuCatalog(officeModules),
+    entertainment: menuCatalog(entertainmentModules, [
+      accessGroup,
+      ...entertainmentItems,
+    ]),
+  }
   const state = {
     signedIn: false,
-    menuVersion: 1,
+    get menuVersion() {
+      return menus.office.version
+    },
+    set menuVersion(value) {
+      menus.office.version = value
+    },
     userConflict: false,
     agentStatus: 'stopped',
     requests: [] as string[],
@@ -119,7 +183,8 @@ export async function installFoundationFixture(
     (url) => url.pathname.startsWith('/api/'),
     async (route) => {
       const request = route.request(),
-        path = new URL(request.url()).pathname.replace(/^\/api/, '')
+        url = new URL(request.url()),
+        path = url.pathname.replace(/^\/api/, '')
       state.requests.push(`${request.method()} ${path}`)
       const body: Record<string, unknown> = request.postData()
         ? JSON.parse(request.postData()!)
@@ -151,8 +216,106 @@ export async function installFoundationFixture(
       }
       if (!state.signedIn) return json({ detail: '未登录' }, 401)
       if (path === '/auth/me') return json(identity)
-      if (path === '/navigation')
-        return json({ version: state.menuVersion, items })
+      if (
+        path === '/navigation' ||
+        path === '/admin/menus' ||
+        path === '/admin/menus/reset'
+      ) {
+        const scope = url.searchParams.get('product') ?? 'office'
+        if (scope !== 'office' && scope !== 'entertainment')
+          return json({ detail: '产品无效' }, 422)
+        const catalog = menus[scope]
+        const has = (permission: string) =>
+          identity.permissions.includes(permission)
+        if (path === '/navigation') {
+          if (url.searchParams.has('product') && !has('products.' + scope))
+            return json({ detail: '没有产品权限' }, 403)
+          const visible = catalog.items.filter(
+            (item) =>
+              item.visible &&
+              (!item.roleIds.length ||
+                item.roleIds.some((role) => identity.roles.includes(role))),
+          )
+          const pages = visible.filter((item) => {
+            const module = catalog.modules.find(
+              (entry) => entry.id === item.moduleId,
+            )
+            return (
+              module &&
+              (!module.permissions.length || module.permissions.some(has)) &&
+              (module.id !== 'workbench' || has('products.office')) &&
+              (!item.parentId ||
+                visible.some(
+                  (group) =>
+                    group.kind === 'group' && group.id === item.parentId,
+                ))
+            )
+          })
+          return json({
+            version: catalog.version,
+            items: [
+              ...visible.filter(
+                (item) =>
+                  item.kind === 'group' &&
+                  pages.some((page) => page.parentId === item.id),
+              ),
+              ...pages,
+            ],
+          })
+        }
+        if (
+          !has('menus.manage') &&
+          (request.method() !== 'GET' || !has('menus.read'))
+        )
+          return json({ detail: '没有菜单管理权限' }, 403)
+        if (request.method() !== 'GET') {
+          if (body.version !== catalog.version)
+            return json(
+              { detail: '菜单版本冲突，请重新加载', code: 'revision_conflict' },
+              409,
+            )
+          catalog.items = path.endsWith('/reset')
+            ? structuredClone(catalog.defaults)
+            : (body.items as MenuNode[])
+          catalog.version++
+        }
+        return json({
+          version: catalog.version,
+          items: catalog.items,
+          modules: catalog.modules,
+          roles,
+          icons: [
+            'gauge',
+            'users',
+            'shield',
+            'menu',
+            'bot',
+            'folder',
+            'book-open',
+            'history',
+          ],
+        })
+      }
+      if (
+        ['/studio/projects', '/studio/library', '/studio/jobs'].includes(
+          path,
+        ) &&
+        request.method() === 'GET'
+      ) {
+        if (!identity.permissions.includes('products.entertainment'))
+          return json({ detail: '没有娱乐权限' }, 403)
+        if (path === '/studio/projects' && !url.searchParams.has('page'))
+          return json([])
+        return json({
+          items: [],
+          total: 0,
+          page: Number(url.searchParams.get('page') || 1),
+          pageSize: Number(url.searchParams.get('pageSize') || 10),
+        })
+      }
+      if (/^\/studio\/projects\/[^/]+\/preparation$/u.test(path))
+        return json({ revision: 1, stages: [] })
+      if (path === '/announcement') return json({ announcement: null })
       if (path === '/admin/users' && request.method() === 'GET')
         return json({ users, total: users.length, page: 1, pageSize: 25 })
       if (path === '/admin/users' && request.method() === 'POST') {
@@ -185,30 +348,6 @@ export async function installFoundationFixture(
           roles,
           permissions: allPermissions.map((id) => ({ id, label: id })),
         })
-      if (path === '/admin/menus' && request.method() === 'GET')
-        return json({
-          version: state.menuVersion,
-          items,
-          modules,
-          roles,
-          icons: ['gauge', 'users', 'shield', 'menu', 'bot', 'folder'],
-        })
-      if (path === '/admin/menus' && request.method() === 'PUT') {
-        if (body.version !== state.menuVersion)
-          return json(
-            { detail: '菜单版本冲突，请重新加载', code: 'revision_conflict' },
-            409,
-          )
-        items = body.items as typeof items
-        state.menuVersion++
-        return json({
-          version: state.menuVersion,
-          items,
-          modules,
-          roles,
-          icons: ['folder'],
-        })
-      }
       if (path === '/server-agent') {
         if (request.method() === 'POST') state.agentStatus = 'running'
         return json({

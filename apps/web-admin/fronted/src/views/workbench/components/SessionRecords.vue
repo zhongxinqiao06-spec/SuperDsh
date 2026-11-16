@@ -64,28 +64,33 @@ function closeEditor(done: () => void): void {
       width="75%"
       :close-on-click-modal="false"
       :before-close="closeEditor"
-      ><p>保存将重新检查方案并使旧确认失效，需要重新确认才能执行。</p>
-      <el-alert
-        v-if="records.error.value"
-        :title="records.error.value"
-        type="error"
-        :closable="false"
-      /><el-input
-        v-model="records.draft.value"
-        type="textarea"
-        :rows="18"
-        aria-label="结构化方案"
-      /><template #footer
-        ><el-button
-          :disabled="records.saving.value"
-          @click="records.editing.value = null"
-          >取消</el-button
-        ><el-button
-          type="primary"
-          :loading="records.saving.value"
-          @click="records.save"
-          >保存修订</el-button
-        ></template
+      ><div class="stack">
+        <p>保存将重新检查方案并使旧确认失效，需要重新确认才能执行。</p>
+        <el-alert
+          v-if="records.error.value"
+          :title="records.error.value"
+          type="error"
+          :closable="false"
+        /><el-input
+          v-model="records.draft.value"
+          type="textarea"
+          :rows="18"
+          aria-label="结构化方案"
+        />
+      </div>
+      <template #footer>
+        <div class="dialog-actions">
+          <el-button
+            :disabled="records.saving.value"
+            @click="records.editing.value = null"
+            >取消</el-button
+          ><el-button
+            type="primary"
+            :loading="records.saving.value"
+            @click="records.save"
+            >保存修订</el-button
+          >
+        </div></template
       ></el-dialog
     >
     <el-dialog
@@ -94,9 +99,11 @@ function closeEditor(done: () => void): void {
       class="session-record-dialog"
       width="70%"
       @close="records.source.value = null"
-      ><p>{{ records.source.value?.sourceId }}</p>
-      <pre>{{ records.source.value?.content }}</pre>
-      <small>摘要：{{ records.source.value?.sha256 }}</small></el-dialog
+      ><div class="stack">
+        <p>{{ records.source.value?.sourceId }}</p>
+        <pre>{{ records.source.value?.content }}</pre>
+        <small>摘要：{{ records.source.value?.sha256 }}</small>
+      </div></el-dialog
     >
   </section>
 </template>

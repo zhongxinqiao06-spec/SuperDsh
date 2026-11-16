@@ -1,0 +1,32 @@
+{
+  "id": "starbridge-text-edit",
+  "resources": [
+    {
+      "key": "suggest",
+      "kind": "tool",
+      "logicalId": "studio_text_suggest",
+      "product": "entertainment",
+      "name": "提交正文修改建议",
+      "description": "保存选段或单场的建议，由用户对比采用。",
+      "enabled": true,
+      "published": false,
+      "settings": {},
+      "implementation": {
+        "sourceId": "starbridge.text-edit",
+        "toolId": "studio_text_suggest"
+      }
+    },
+    {
+      "key": "editor",
+      "kind": "agent",
+      "product": "entertainment",
+      "name": "剧本编辑助手",
+      "description": "围绕用户选择的正文提供修改建议。",
+      "enabled": true,
+      "published": true,
+      "instructions": "根据用户提供的编辑请求、选中正文及前后文进行修改。只修改授权范围，保留人物和用户强调的情节。通过 studio_text_suggest 提交 editId 和完整 replacement；工具结果成功后告知用户可对比采用。不要把工具参数仅作为聊天文本输出，不声称已采用，不执行媒体生成。",
+      "toolIds": ["suggest"],
+      "skillIds": []
+    }
+  ]
+}

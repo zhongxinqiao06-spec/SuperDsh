@@ -1016,3 +1016,74 @@
 .terminal-tab .row-actions {
   flex-wrap: wrap;
 }
+
+/* 办公对话与真实成果并排；窄屏用同一成果面板，保留消息滚动位置与输入草稿。 */
+.office-conversation-layout {
+  position: relative;
+  display: flex;
+  flex: 1;
+  min-height: 0;
+  min-width: 0;
+}
+.office-conversation-layout > .workbench-conversation {
+  min-width: 0;
+}
+.office-results-pane {
+  width: clamp(228px, 22vw, 355px);
+  flex-shrink: 0;
+  overflow: auto;
+  overscroll-behavior: contain;
+  background: var(--card);
+  border-left: 1px solid var(--border);
+  padding: 16px;
+}
+.office-results-pane > header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  border-bottom: 1px solid var(--border);
+  padding-bottom: 10px;
+}
+.office-results-pane h2 {
+  font: 600 18px var(--font-sans);
+  margin: 0;
+}
+.office-results-empty {
+  color: var(--muted-foreground);
+  font-size: 13px;
+}
+.office-results-pane .session-artifact {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  border: 1px solid var(--border);
+  border-radius: 5px;
+  padding: 10px;
+  margin: 8px 0;
+}
+.office-results-pane .session-artifact-name {
+  flex: 1 1 70%;
+  overflow-wrap: anywhere;
+}
+:root[data-console-product='office'] .workbench-heading h1 {
+  font: 600 clamp(15px, 1.35vw, 20px) var(--font-sans);
+}
+:root[data-console-product='office'] .workbench-toolbar {
+  border-bottom: 1px solid var(--border);
+}
+:root[data-console-product='office'] .composer {
+  border-radius: var(--radius-card);
+}
+:root[data-console-product='office'] .timeline-item {
+  border-radius: 6px;
+}
+@media (max-width: 1100px) {
+  .office-results-pane {
+    position: absolute;
+    z-index: 4;
+    inset: 0 0 0 auto;
+    width: min(360px, 100%);
+    box-shadow: -8px 0 22px
+      color-mix(in srgb, var(--foreground) 12%, transparent);
+  }
+}

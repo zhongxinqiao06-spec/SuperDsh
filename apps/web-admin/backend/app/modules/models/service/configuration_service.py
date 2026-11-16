@@ -8,6 +8,7 @@ from app.infrastructure.crypto import CredentialCipher
 from app.infrastructure.database import Database, lock_transaction
 from app.infrastructure.errors import DomainError
 from app.modules.identity.entity.bo.models import Account
+from app.modules.identity.entity.bo.product_roles import Product
 from app.modules.models.dao.model_dao import ModelDao
 from app.modules.models.entity.do.model_do import (
     ModelCapabilityDefaultRow,
@@ -15,6 +16,7 @@ from app.modules.models.entity.do.model_do import (
     ModelConfigurationVersionRow,
     ModelConnectionRow,
     ModelDefaultRow,
+    ProductModelDefaultRow,
 )
 from app.modules.models.entity.vo.model_vo import (
     CapabilityBinding,
@@ -25,7 +27,7 @@ from app.modules.models.entity.vo.model_vo import (
 from app.modules.models.service.capabilities import CAPABILITIES, validate_parameters
 from app.modules.models.service.catalog_verification import verify_model_catalog
 from app.modules.models.service.model_projection import project_connection
-from app.modules.models.service.model_service import Audit
+from app.modules.models.service.model_service import Audit, ProductRoles
 from app.modules.models.service.provider_transport import ProviderTransport
 
 
@@ -70,9 +72,11 @@ class ConfigurationService:
         transport: ProviderTransport,
         role_exists: Callable[[list[str]], Awaitable[bool]],
         audit: Audit | None = None,
+        *,
+        product_roles: ProductRoles,
     ) -> None:
         self.database, self.cipher, self.transport = database, cipher, transport
-        self.role_exists, self.audit = role_exists, audit
+        self.role_exists, self.audit, self.product_roles = role_exists, audit, product_roles
 
     async def list(self, account: Account) -> dict[str, object]:
         """返回完整管理目录，未配置能力也有明确可用性说明。"""
@@ -151,7 +155,11 @@ class ConfigurationService:
             if connection is None:
                 raise DomainError(422, "模型连接不存在")
             parameters = validate_parameters(
-                connection.adapter, body.capability, body.modelId, body.parameters
+                connection.adapter,
+                body.capability,
+                body.modelId,
+                body.parameters,
+                connection.base_url,
             )
             row = await dao.configuration(identifier)
             if not creating and row is None:
@@ -246,37 +254,122 @@ class ConfigurationService:
                 "revision": row.revision,
             }
 
-    async def catalog(self, account: Account) -> dict[str, object]:
-        """执行目录只暴露账号当前角色可用的能力配置。"""
-        account.require("models.use")
-        async with self.database.sessions() as session:
-            dao = ModelDao(session)
-            enabled = {row.id for row in await dao.connections() if row.enabled and row.credential}
-            configs = [
-                configuration_view(row)
-                for row in await dao.configurations()
-                if row.enabled
-                and row.connection_id in enabled
-                and (not row.role_ids or set(row.role_ids) & set(account.roles))
-            ]
-            identifiers = {item["id"] for item in configs}
-            return {
-                "capabilities": CAPABILITIES,
-                "configurations": configs,
-                "defaults": [
-                    {
+    async def _catalog(
+        self, dao: ModelDao, account: Account, product: Product | None, management: bool = False
+    ) -> dict[str, object]:
+        """所有选择和运行时冻结均从相同的、已过滤角色与连接状态的目录读取。"""
+        roles = set(await self.product_roles(account, product)) if product else set(account.roles)
+        enabled = {row.id for row in await dao.connections() if row.enabled and row.credential}
+        configs = [
+            configuration_view(row)
+            for row in await dao.configurations()
+            if row.enabled
+            and row.connection_id in enabled
+            and (not row.role_ids or set(row.role_ids) & roles)
+        ]
+        identifiers = {item["id"] for item in configs}
+        defaults = {
+            row.capability: {
+                "capability": row.capability,
+                "configurationId": row.configuration_id,
+                "revision": row.revision,
+            }
+            for row in await dao.capability_defaults()
+            if row.configuration_id in identifiers
+        }
+        overrides = {}
+        if product:
+            for row in await dao.product_defaults(product):
+                # 覆盖项失效后显式取消本能力选择，不能静默切换到另一供应商。
+                defaults.pop(row.capability, None)
+                if row.configuration_id in identifiers:
+                    defaults[row.capability] = {
                         "capability": row.capability,
                         "configurationId": row.configuration_id,
-                        "revision": row.revision,
                     }
-                    for row in await dao.capability_defaults()
-                    if row.configuration_id in identifiers
-                ],
-            }
+                    overrides[row.capability] = row.configuration_id
+        result: dict[str, object] = {
+            "capabilities": CAPABILITIES,
+            "configurations": configs,
+            "defaults": list(defaults.values()),
+        }
+        if management:
+            result["overrides"] = overrides
+        return result
 
-    async def resolve(self, account: Account, binding: CapabilityBinding) -> dict[str, object]:
+    async def catalog(self, account: Account, product: Product | None = None) -> dict[str, object]:
+        """执行目录只暴露账号在该产品当前可用的配置。"""
+        account.require("models.use")
+        if product is not None:
+            account.require("products." + product)
+        async with self.database.sessions() as session:
+            return await self._catalog(ModelDao(session), account, product)
+
+    @staticmethod
+    def require_product_models(account: Account, product: Product) -> None:
+        """原有平台模型管理员保留有权进入产品的设置能力。"""
+        if "models.manage" in account.permissions:
+            account.require("models.manage")
+            account.require("products." + product)
+        else:
+            account.require_product_management(product, "models")
+
+    async def product_settings(self, account: Account, product: Product) -> dict[str, object]:
+        self.require_product_models(account, product)
+        async with self.database.sessions() as session:
+            return await self._catalog(ModelDao(session), account, product, management=True)
+
+    async def set_product_default(
+        self, account: Account, product: Product, capability: str, value: str | None
+    ) -> dict[str, object]:
+        """只在已授权的模型目录选择默认配置；与平台连接和配置变更共用同一事务锁。"""
+        self.require_product_models(account, product)
+        if capability not in {str(item["id"]) for item in CAPABILITIES}:
+            raise DomainError(422, "能力不存在")
+        async with self.database.sessions.begin() as session:
+            await lock_transaction(session, "model-configurations")
+            dao = ModelDao(session)
+            if value:
+                roles = set(await self.product_roles(account, product))
+                config = await dao.configuration(value)
+                connection = await dao.connection(config.connection_id) if config else None
+                if (
+                    not config
+                    or not config.enabled
+                    or config.capability != capability
+                    or (config.role_ids and not set(config.role_ids) & roles)
+                    or not connection
+                    or not connection.enabled
+                    or not connection.credential
+                ):
+                    raise DomainError(422, "请选择此能力下已授权且可用的模型配置")
+            previous = await dao.product_default(product, capability)
+            if previous is not None and value is None:
+                await dao.remove(previous)
+            elif previous is not None and value:
+                previous.configuration_id = value
+            elif value:
+                dao.add(
+                    ProductModelDefaultRow(
+                        product=product, capability=capability, configuration_id=value
+                    )
+                )
+        if self.audit:
+            await self.audit(
+                account.user_id,
+                "products.model-default.save",
+                product,
+                {"capability": capability, "configurationId": value},
+            )
+        return {"capability": capability, "configurationId": value}
+
+    async def resolve(
+        self, account: Account, binding: CapabilityBinding, product: Product = "office"
+    ) -> dict[str, object]:
         """冻结修订保留参数，但禁用与撤权立即阻止历史配置继续执行。"""
         account.require("models.use")
+        account.require("products." + product)
+        roles = set(await self.product_roles(account, product))
         async with self.database.sessions() as session:
             dao = ModelDao(session)
             row = await dao.configuration(binding.configurationId)
@@ -293,12 +386,8 @@ class ConfigurationService:
             if (
                 not historical.get("enabled")
                 or historical.get("capability") != binding.capability
-                or (row.role_ids and not set(row.role_ids) & set(account.roles))
-                or (
-                    isinstance(old_roles, list)
-                    and old_roles
-                    and not set(old_roles) & set(account.roles)
-                )
+                or (row.role_ids and not set(row.role_ids) & roles)
+                or (isinstance(old_roles, list) and old_roles and not set(old_roles) & roles)
             ):
                 raise DomainError(403, "当前角色不能执行此模型配置")
             connection = await dao.connection(row.connection_id)

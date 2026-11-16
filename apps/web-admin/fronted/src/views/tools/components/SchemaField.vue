@@ -90,7 +90,7 @@ const properties = computed(() => ({
 }))
 </script>
 <template>
-  <div v-if="depth <= 16" class="schema-field stack">
+  <div v-if="depth <= 16" class="schema-field field">
     <span v-if="field.title || path" class="field-label"
       >{{ field.title || path.split('.').at(-1)
       }}<span
@@ -239,20 +239,17 @@ const properties = computed(() => ({
   />
 </template>
 <style scoped>
-.schema-field {
-  gap: 8px;
-}
 .schema-object {
   border: 1px solid var(--el-border-color);
   border-radius: 8px;
   padding: 14px;
   display: grid;
-  gap: 16px;
+  gap: var(--field-gap);
   min-width: 0;
 }
 .schema-array-item {
   display: flex;
-  gap: 12px;
+  gap: var(--control-gap);
   align-items: start;
 }
 .schema-array-item > .schema-field {

@@ -17,6 +17,7 @@ class KnowledgeInputBase(BaseModel):
 class KnowledgeInput(KnowledgeInputBase):
     """知识库仅绑定可追溯资料身份，不保存任意磁盘路径。"""
 
+    product: Literal["office", "entertainment", "shared"] | None = None
     name: str = Field(min_length=1, max_length=80)
     description: str = Field(default="", max_length=500)
     assetIds: list[str] = Field(default_factory=list, max_length=100)

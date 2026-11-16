@@ -26,7 +26,7 @@ from app.modules.identity.service.management import AccountManagement
 from app.modules.identity.service.ports import IdentityRepository, IdentityTransaction
 from app.modules.models.entity.vo.model_vo import ProviderInput
 from app.modules.models.service.capabilities import CAPABILITIES, validate_parameters
-from app.modules.navigation.entity.bo.navigation import Navigation
+from app.modules.navigation.entity.bo.navigation import MenuCatalog, Navigation, Product
 from app.modules.navigation.service.navigation import NavigationService
 from app.modules.navigation.service.ports import NavigationTransaction
 from app.modules.navigation.service.rules import filter_items, validate_items
@@ -271,7 +271,7 @@ class MemoryNavigation:
         self.value = Navigation(1, items)
 
     @asynccontextmanager
-    async def transaction(self) -> AsyncIterator[NavigationTransaction]:
+    async def transaction(self, product: Product) -> AsyncIterator[NavigationTransaction]:
         yield self
 
     async def lock(self) -> None:
@@ -284,8 +284,12 @@ class MemoryNavigation:
         self.value = navigation
 
 
-async def role_choices(account: Account) -> list[dict[str, str]]:
+async def role_choices(account: Account, product: str) -> list[dict[str, str]]:
     return [{"id": "member", "name": "Member"}, {"id": "admin", "name": "Admin"}]
+
+
+async def product_role_ids(account: Account, product: str) -> tuple[str, ...]:
+    return account.roles
 
 
 async def test_navigation_differential(
@@ -342,7 +346,13 @@ async def test_navigation_differential(
         assert status == case["status"], case["input"]
     for index, case in enumerate(cast(list[dict[str, object]], oracle["editChecks"])):
         repository = MemoryNavigation(deepcopy(defaults))
-        service = NavigationService(repository, modules, icons, defaults, role_choices)
+        service = NavigationService(
+            repository,
+            {"office": MenuCatalog(modules, defaults)},
+            icons,
+            role_choices,
+            product_role_ids,
+        )
         status = 200
         try:
             await service.save(
@@ -533,6 +543,20 @@ async def test_role_http_differential(
                     created = entry["method"] == "POST"
                     # 错误文案语言差异保留原始证据；授权语义以状态码及不发生写入为准。
                     actual_body = response.json() if response.content else None
+                    if entry["id"] == "roles-list":
+                        assert isinstance(actual_body, dict)
+                        # 冻结旧平台权限全集，新增产品入口及产品内管理权限在实库独立验收。
+                        additions = {"products.office", "products.entertainment"} | {
+                            f"products.{product}.{area}.manage"
+                            for product in ("office", "entertainment")
+                            for area in ("members", "menus", "resources", "models")
+                        }
+                        entries = actual_body["permissions"]
+                        assert {p["id"] for p in entries if p["id"] in additions} == additions
+                        actual_body = {
+                            **actual_body,
+                            "permissions": [p for p in entries if p["id"] not in additions],
+                        }
                     actual = {
                         "status": response.status_code,
                         "body": role_observation(actual_body, created)
@@ -570,7 +594,17 @@ def test_model_parameter_and_provider_differential(
     management_oracle: dict[str, object], evidence: list[dict[str, object]]
 ) -> None:
     """不发送模型请求或读取密钥，仅比较真实输入规则、默认值与能力目录。"""
-    assert CAPABILITIES == management_oracle["modelCapabilities"]
+    old = cast(list[dict[str, object]], management_oracle["modelCapabilities"])
+    enabled = {"video.generate": "video", "speech.synthesize": "audio"}
+    assert {c["id"] for c in CAPABILITIES} == {c["id"] for c in old}
+    assert [c for c in CAPABILITIES if c["id"] not in enabled] == [
+        c for c in old if c["id"] not in enabled
+    ]
+    for capability in CAPABILITIES:
+        if str(capability["id"]) in enabled:
+            assert capability["available"] and capability["outputTypes"] == [
+                enabled[str(capability["id"])]
+            ]
     for case in cast(list[dict[str, object]], management_oracle["providers"]):
         entry = cast(dict[str, object], case["input"])
         status = 200

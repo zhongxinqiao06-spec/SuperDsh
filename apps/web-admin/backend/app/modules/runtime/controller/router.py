@@ -7,6 +7,7 @@ from fastapi import APIRouter, Depends, Query, Request
 
 from app.api.dependencies import current_account, require_permission
 from app.infrastructure.errors import DomainError
+from app.modules.conversations.service.conversation_service import ConversationService
 from app.modules.identity.entity.bo.models import Account
 from app.modules.runtime.entity.bo.values import Fields, Json
 from app.modules.runtime.entity.vo.runtime import SessionMessage
@@ -23,9 +24,21 @@ def service(request: Request) -> RuntimeService:
     return cast(RuntimeService, request.app.state.services.runtime)
 
 
+def conversations(request: Request) -> ConversationService:
+    return cast(ConversationService, request.app.state.services.conversations)
+
+
+async def authorize_session(request: Request, account: Account, session_id: str) -> None:
+    """诊断命令可先于投影抵达，但已有身份必须匹配办公资源与当前用户的原生引擎。"""
+    domain = conversations(request)
+    connector, _ = domain.devices.native_ids(account.user_id)
+    await domain.native_diagnostics.authorize(account, connector, session_id)
+
+
 @router.get("/server-agent", response_model=None)
 async def status(request: Request, account: CurrentAccount) -> Fields:
     """查询自身状态没有启动副作用。"""
+    account.require("products.office")
     return {
         "agent": await service(request).view(account.user_id),
         "serverTime": datetime.now(UTC).isoformat(),
@@ -35,6 +48,7 @@ async def status(request: Request, account: CurrentAccount) -> Fields:
 @router.post("/server-agent", response_model=None)
 async def prepare(request: Request, account: ManagerAccount) -> Fields:
     """工作台显式准备入口，未就绪时返回 starting 而非虚假 running。"""
+    account.require("products.office")
     return {
         "agent": await service(request).prepare(account.user_id),
         "serverTime": datetime.now(UTC).isoformat(),
@@ -44,6 +58,7 @@ async def prepare(request: Request, account: ManagerAccount) -> Fields:
 @router.delete("/server-agent", response_model=None)
 async def stop(request: Request, account: ManagerAccount) -> Fields:
     """停止自身实例并等待回收，不能操作其他用户进程。"""
+    account.require("products.office")
     await service(request).stop(account.user_id)
     return {"ok": True}
 
@@ -51,6 +66,7 @@ async def stop(request: Request, account: ManagerAccount) -> Fields:
 @router.get("/runtime/catalogs/{kind}", response_model=None)
 async def catalog(kind: str, request: Request, account: CurrentAccount) -> Json:
     """读取固定引擎的真实选择目录，未配置模型不会合成示例项。"""
+    account.require("products.office")
     methods = {
         "models": "catalog.listModels",
         "permissions": "catalog.listPermissions",
@@ -64,6 +80,7 @@ async def catalog(kind: str, request: Request, account: CurrentAccount) -> Json:
 @router.post("/runtime/sessions", response_model=None)
 async def create(body: SessionMessage, request: Request, account: RunnerAccount) -> Json:
     """同一稳定消息 ID 只提交一次真实 DSH 会话创建。"""
+    await authorize_session(request, account, body.sessionId)
     return await service(request).call(
         account.user_id, "session.createAndStart", cast(Fields, body.model_dump(exclude_none=True))
     )
@@ -76,6 +93,7 @@ async def message(
     """继续当前用户会话；路由和正文身份必须一致。"""
     if session_id != body.sessionId:
         raise DomainError(422, "session identity mismatch")
+    await authorize_session(request, account, session_id)
     return await service(request).call(
         account.user_id, "session.startTurn", cast(Fields, body.model_dump(exclude_none=True))
     )
@@ -84,6 +102,7 @@ async def message(
 @router.post("/runtime/sessions/{session_id}/interrupt", response_model=None)
 async def interrupt(session_id: str, request: Request, account: RunnerAccount) -> Json:
     """逐会话取消，不能用停止整个 Host 冒充会话取消。"""
+    await authorize_session(request, account, session_id)
     return await service(request).call(
         account.user_id, "session.interrupt", {"sessionId": session_id}
     )
@@ -92,6 +111,8 @@ async def interrupt(session_id: str, request: Request, account: RunnerAccount) -
 @router.get("/runtime/sessions/{session_id}", response_model=None)
 async def state(session_id: str, request: Request, account: CurrentAccount) -> Json:
     """读取原生会话状态用于核对未知结果和取消终态。"""
+    account.require("sessions.read")
+    await authorize_session(request, account, session_id)
     return await service(request).call(
         account.user_id, "session.getState", {"sessionId": session_id}
     )
@@ -102,5 +123,11 @@ async def events(
     request: Request, account: CurrentAccount, after: Annotated[int, Query(ge=0)] = 0
 ) -> Fields:
     """按持久游标返回有限页事件；传输接收不等于持久完成。"""
-    values = await service(request).events(account.user_id, after)
+    account.require("products.office")
+    account.require("sessions.read")
+    domain = conversations(request)
+    connector, _ = domain.devices.native_ids(account.user_id)
+    values = await domain.native_diagnostics.office_events(
+        account, connector, await service(request).events(account.user_id, after)
+    )
     return {"events": cast(list[Json], values)}

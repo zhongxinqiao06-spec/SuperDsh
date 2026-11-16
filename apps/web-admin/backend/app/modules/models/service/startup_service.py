@@ -121,7 +121,7 @@ class StartupModelService:
         self, dao: ModelDao, body: StartupConfiguration, connection: ModelConnectionRow
     ) -> bool:
         parameters = validate_parameters(
-            connection.adapter, body.capability, body.modelId, body.parameters
+            connection.adapter, body.capability, body.modelId, body.parameters, connection.base_url
         )
         row = await dao.configuration(body.id)
         if row is not None and (

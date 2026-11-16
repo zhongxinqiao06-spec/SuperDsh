@@ -8,6 +8,7 @@ import json
 from collections.abc import AsyncIterator
 
 from app.integrations.dsh.protocol import Fields, fields
+from app.modules.identity.entity.bo.product_roles import Product
 
 
 class ControlledModels:
@@ -21,7 +22,7 @@ class ControlledModels:
         self.started = asyncio.Event()
         self.received_tools: list[str] = []
 
-    async def catalog(self, owner: str) -> Fields:
+    async def catalog(self, owner: str, product: Product | None = None) -> Fields:
         """仅有无费用合成模型，不读取真实账号或供应商密钥。"""
         return {
             "scope": self.scope,

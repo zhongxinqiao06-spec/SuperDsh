@@ -42,7 +42,7 @@ CASES: list[dict[str, object]] = [
     },
 ]
 ROOT = Path(__file__).resolve().parents[4]
-ACCOUNT = Account("owner", "owner", (), ("sessions.run", "sessions.read"), 1)
+ACCOUNT = Account("owner", "owner", (), ("sessions.run", "sessions.read", "products.office"), 1)
 
 
 @pytest.fixture(scope="module")

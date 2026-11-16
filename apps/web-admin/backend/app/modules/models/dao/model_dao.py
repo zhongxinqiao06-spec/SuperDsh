@@ -11,6 +11,7 @@ from app.modules.models.entity.do.model_do import (
     ModelDefaultRow,
     ModelOperationRow,
     ModelProviderRow,
+    ProductModelDefaultRow,
 )
 
 
@@ -81,6 +82,13 @@ class ModelDao:
     ) -> ModelConfigurationVersionRow | None:
         return await self.session.get(ModelConfigurationVersionRow, (identifier, revision))
 
+    async def product_defaults(self, product: str) -> list[ProductModelDefaultRow]:
+        query = select(ProductModelDefaultRow).where(ProductModelDefaultRow.product == product)
+        return list(await self.session.scalars(query))
+
+    async def product_default(self, product: str, capability: str) -> ProductModelDefaultRow | None:
+        return await self.session.get(ProductModelDefaultRow, (product, capability))
+
     async def capability_defaults(self) -> list[ModelCapabilityDefaultRow]:
         return list((await self.session.scalars(select(ModelCapabilityDefaultRow))).all())
 
@@ -94,6 +102,24 @@ class ModelDao:
             )
         )
 
+    async def completed_operation(
+        self, owner: str, scope: str, configuration: str, revision: int, request_hash: str
+    ) -> ModelOperationRow | None:
+        """仅取同一所有者、业务范围和冻结请求的已完成结果，未知收据不进入复用。"""
+        return await self.session.scalar(
+            select(ModelOperationRow)
+            .where(
+                ModelOperationRow.owner_id == owner,
+                ModelOperationRow.session_id == scope,
+                ModelOperationRow.configuration_id == configuration,
+                ModelOperationRow.configuration_revision == revision,
+                ModelOperationRow.request_hash == request_hash,
+                ModelOperationRow.state == "completed",
+            )
+            .order_by(ModelOperationRow.updated_at.desc(), ModelOperationRow.id)
+            .limit(1)
+        )
+
     def add(
         self,
         value: ModelProviderRow
@@ -102,9 +128,12 @@ class ModelDao:
         | ModelConfigurationRow
         | ModelConfigurationVersionRow
         | ModelCapabilityDefaultRow
+        | ProductModelDefaultRow
         | ModelOperationRow,
     ) -> None:
         self.session.add(value)
 
-    async def remove(self, value: ModelProviderRow | ModelDefaultRow) -> None:
+    async def remove(
+        self, value: ModelProviderRow | ModelDefaultRow | ProductModelDefaultRow
+    ) -> None:
         await self.session.delete(value)

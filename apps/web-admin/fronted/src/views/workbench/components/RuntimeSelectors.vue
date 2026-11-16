@@ -14,16 +14,26 @@ const root = ref<HTMLElement | null>(null)
 const compact = ref(false),
   opened = ref(false)
 let resize: ResizeObserver | null = null
+let frame = 0
 onMounted(() => {
   const composer = root.value?.closest('.composer')
   if (!composer) return
   resize = new ResizeObserver(([entry]) => {
-    compact.value = !!entry && entry.contentRect.width < 600
-    if (!compact.value) opened.value = false
+    const next = !!entry && entry.contentRect.width < 600
+    cancelAnimationFrame(frame)
+    if (next === compact.value) return
+    // 在下一帧切换布局，避免观察器在同一轮测量中反复挂载选项。
+    frame = requestAnimationFrame(() => {
+      compact.value = next
+      if (!next) opened.value = false
+    })
   })
   resize.observe(composer)
 })
-onScopeDispose(() => resize?.disconnect())
+onScopeDispose(() => {
+  cancelAnimationFrame(frame)
+  resize?.disconnect()
+})
 </script>
 
 <template>

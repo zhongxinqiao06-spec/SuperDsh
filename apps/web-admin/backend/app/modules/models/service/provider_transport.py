@@ -11,6 +11,8 @@ import httpx
 
 from app.infrastructure.errors import DomainError
 
+PROXY_DNS_RANGES = (ipaddress.ip_network("198.18.0.0/15"), ipaddress.ip_network("2001:2::/48"))
+
 
 class ProviderTransport:
     """生产请求仅访问解析校验后的地址；测试可注入独立的 HTTP transport。"""
@@ -24,7 +26,7 @@ class ProviderTransport:
         self.transport = transport
 
     async def _target(
-        self, url: str, headers: dict[str, str]
+        self, url: str, headers: dict[str, str], *, allow_proxy_dns: bool = False
     ) -> tuple[httpx.URL, dict[str, str], dict[str, object]]:
         parsed = urlsplit(url)
         if (
@@ -54,7 +56,16 @@ class ProviderTransport:
             values = {str(item[4][0]) for item in addresses}
             if not values or (
                 origin not in self.allowed_origins
-                and any(not ipaddress.ip_address(value).is_global for value in values)
+                and any(
+                    not ipaddress.ip_address(value).is_global
+                    and not (
+                        allow_proxy_dns
+                        and any(
+                            ipaddress.ip_address(value) in subnet for subnet in PROXY_DNS_RANGES
+                        )
+                    )
+                    for value in values
+                )
             ):
                 raise DomainError(403, "供应商地址不在允许访问的范围")
             # URL 改为已经校验的 IP，Host/SNI 保留原站点，避免第二次 DNS 解析改变目标。
@@ -72,13 +83,19 @@ class ProviderTransport:
         body: dict[str, object] | None = None,
         *,
         preserve_status: bool = False,
+        allow_proxy_dns: bool = False,
+        read_timeout: float = 60,
     ) -> AsyncIterator[httpx.Response]:
         """流式响应同样固定DNS和拒绝重定向，取消立即关闭供应商连接。"""
-        requested, headers, extensions = await self._target(url, headers)
+        if not 1 <= read_timeout <= 240:
+            raise DomainError(422, "供应商读取等待时间超出允许范围")
+        requested, headers, extensions = await self._target(
+            url, headers, allow_proxy_dns=allow_proxy_dns
+        )
         try:
             async with httpx.AsyncClient(
                 transport=self.transport,
-                timeout=httpx.Timeout(60, connect=10),
+                timeout=httpx.Timeout(60, connect=10, read=read_timeout),
                 follow_redirects=False,
                 trust_env=False,
             ) as client:
@@ -95,8 +112,14 @@ class ProviderTransport:
                             "供应商拒绝请求，请检查地址、凭据和模型",
                         )
                     yield response
+        except httpx.ReadTimeout as error:
+            raise DomainError(504, "等待供应商响应超时", "provider_read_timeout") from error
+        except httpx.ConnectTimeout as error:
+            raise DomainError(504, "建立供应商网络连接超时", "provider_connect_timeout") from error
+        except httpx.WriteTimeout as error:
+            raise DomainError(504, "向供应商发送请求超时", "provider_write_timeout") from error
         except httpx.TimeoutException as error:
-            raise DomainError(504, "供应商连接超时") from error
+            raise DomainError(504, "等待供应商连接可用超时", "provider_pool_timeout") from error
         except (httpx.HTTPError, ValueError) as error:
             raise DomainError(502, "供应商连接失败") from error
 

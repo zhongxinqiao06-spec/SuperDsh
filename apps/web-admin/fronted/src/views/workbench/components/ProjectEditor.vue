@@ -26,7 +26,7 @@ const emit = defineEmits<{
     @update:model-value="emit('close')"
     @submit="emit('save')"
   >
-    <label
+    <label class="field"
       >设备<el-select
         :model-value="vm.draft.connectorId"
         :disabled="vm.editing.value !== 'new' || vm.mutation.busy.value"
@@ -40,7 +40,7 @@ const emit = defineEmits<{
           :label="device.name"
           :value="device.id" /></el-select
     ></label>
-    <label
+    <label class="field"
       >工作目录
       <div class="toolbar">
         <el-input
@@ -57,7 +57,7 @@ const emit = defineEmits<{
         >
       </div></label
     >
-    <label
+    <label class="field"
       >项目名称<el-input
         :model-value="vm.draft.name"
         :disabled="vm.mutation.busy.value"
@@ -73,45 +73,49 @@ const emit = defineEmits<{
     :close-on-click-modal="false"
     @update:model-value="emit('closeBrowser')"
   >
-    <div class="toolbar">
-      <el-input
-        :model-value="vm.path.value"
-        aria-label="浏览目录路径"
-        @update:model-value="emit('update:path', $event)"
-        @keyup.enter="emit('browse', vm.path.value)"
-      /><el-button @click="emit('browse', vm.path.value)">打开</el-button>
-    </div>
-    <ResourceStatus
-      :loading="vm.browsing.value"
-      :error="vm.browseError.value"
-      @retry="emit('browse', vm.path.value)"
-    />
     <div class="stack">
-      <el-button
-        v-for="directory in vm.directories.value"
-        :key="directory.path"
-        text
-        @click="emit('browse', directory.path)"
-        >{{ directory.name }}</el-button
+      <div class="toolbar">
+        <el-input
+          :model-value="vm.path.value"
+          aria-label="浏览目录路径"
+          @update:model-value="emit('update:path', $event)"
+          @keyup.enter="emit('browse', vm.path.value)"
+        /><el-button @click="emit('browse', vm.path.value)">打开</el-button>
+      </div>
+      <ResourceStatus
+        :loading="vm.browsing.value"
+        :error="vm.browseError.value"
+        @retry="emit('browse', vm.path.value)"
+      />
+      <div v-if="vm.directories.value.length" class="stack">
+        <el-button
+          v-for="directory in vm.directories.value"
+          :key="directory.path"
+          text
+          @click="emit('browse', directory.path)"
+          >{{ directory.name }}</el-button
+        >
+      </div>
+      <p
+        v-if="
+          !vm.browsing.value &&
+          !vm.browseError.value &&
+          !vm.directories.value.length
+        "
       >
+        当前目录下没有子目录。
+      </p>
     </div>
-    <p
-      v-if="
-        !vm.browsing.value &&
-        !vm.browseError.value &&
-        !vm.directories.value.length
-      "
-    >
-      当前目录下没有子目录。
-    </p>
-    <template #footer
-      ><el-button @click="emit('closeBrowser')">取消</el-button
-      ><el-button
-        type="primary"
-        :disabled="!vm.canChooseDirectory.value"
-        @click="emit('chooseDirectory')"
-        >选择此目录</el-button
-      ></template
+    <template #footer>
+      <div class="dialog-actions">
+        <el-button @click="emit('closeBrowser')">取消</el-button
+        ><el-button
+          type="primary"
+          :disabled="!vm.canChooseDirectory.value"
+          @click="emit('chooseDirectory')"
+          >选择此目录</el-button
+        >
+      </div></template
     >
   </el-dialog>
 </template>

@@ -148,14 +148,14 @@ watch(
     @update:model-value="$emit('update:uploading', $event)"
     @submit="$emit('upload')"
   >
-    <label
+    <label class="field"
       >名称<el-input
         :disabled="busy"
         :model-value="name"
         maxlength="200"
         @update:model-value="$emit('update:name', $event)"
     /></label>
-    <label
+    <label class="field"
       >文件用途<el-select
         :disabled="busy"
         :model-value="kind"
@@ -167,8 +167,9 @@ watch(
           label="文档模板（DOCX）" /><el-option
           value="presentation-template"
           label="演示模板（PPTX）" /></el-select></label
-    ><label
+    ><label class="field"
       >文件（最多 4 MiB）<input
+        class="native-control"
         type="file"
         :accept="accept"
         :disabled="busy"
@@ -181,15 +182,22 @@ watch(
     :title="preview?.name ?? '资料预览'"
     width="min(960px, 95vw)"
     @update:model-value="$emit('closePreview')"
-    ><iframe
-      v-if="previewUrl"
-      :src="previewUrl"
-      title="资料 PDF 预览"
-      class="preview-frame" />
-    <pre v-else class="preview-text">{{ preview?.preview }}</pre>
-    <p v-if="busy">正在准备预览…</p>
-    <el-alert v-if="error" type="error" :title="error" :closable="false"
-  /></el-dialog>
+    ><div class="stack">
+      <iframe
+        v-if="previewUrl"
+        :src="previewUrl"
+        title="资料 PDF 预览"
+        class="preview-frame"
+      />
+      <pre v-else class="preview-text">{{ preview?.preview }}</pre>
+      <p v-if="busy">正在准备预览…</p>
+      <el-alert
+        v-if="error"
+        type="error"
+        :title="error"
+        :closable="false"
+      /></div
+  ></el-dialog>
 </template>
 
 <style scoped>

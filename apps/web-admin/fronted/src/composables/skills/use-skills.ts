@@ -1,8 +1,10 @@
+import { useAuthStore } from '@/store/modules/auth-store'
+import { useCurrentProduct } from '@/composables/console/use-current-product'
 import { reactive, ref, watch } from 'vue'
-import { agentsApi } from '@/api/agents/agents-api'
+import { createAgentsApi } from '@/api/agents/agents-api'
 import { loadPreparedAgentResources } from '@/store/modules/agent-resources'
-import { skillsApi } from '@/api/skills/skills-api'
-import { toolsApi } from '@/api/tools/tools-api'
+import { createSkillsApi } from '@/api/skills/skills-api'
+import { createToolsApi } from '@/api/tools/tools-api'
 import { useResource } from '@/composables/use-resource'
 import { useMutation } from '@/composables/use-mutation'
 import { readPackage } from '@/composables/tools/read-package'
@@ -16,6 +18,7 @@ import type {
   SkillResource,
 } from '@/types/skills/skills'
 const blank = (): SkillDraft => ({
+  product: 'office',
   name: '',
   description: '',
   enabled: true,
@@ -26,18 +29,24 @@ const blank = (): SkillDraft => ({
 
 /** 草稿保存与发布分离；导入、匹配预览和回退不会触发Agent执行。 */
 export function useSkills() {
+  const product = useCurrentProduct().value
+  const agentsApi = createAgentsApi(product)
+  const skillsApi = createSkillsApi(product)
+  const toolsApi = createToolsApi(product)
   const page = ref(1),
     pageSize = ref(10),
     search = ref(''),
     query = ref(''),
     mutation = useMutation()
   const resource = useResource((signal) =>
-      loadPreparedAgentResources(signal, () =>
+      loadPreparedAgentResources(product, signal, () =>
         skillsApi.list(page.value, pageSize.value, search.value, signal),
       ),
     ),
     catalog = useResource((signal) =>
-      loadPreparedAgentResources(signal, () => agentsApi.catalog(signal)),
+      loadPreparedAgentResources(product, signal, () =>
+        agentsApi.catalog(signal),
+      ),
     ),
     sources = useResource(toolsApi.sources)
   const editing = ref<SkillResource | 'new' | null>(null),
@@ -91,8 +100,9 @@ export function useSkills() {
     Object.assign(
       draft,
       value === 'new'
-        ? blank()
+        ? { ...blank(), product }
         : {
+            product: value.product ?? 'office',
             name: value.name,
             description: value.description,
             enabled: value.enabled,
@@ -215,6 +225,8 @@ export function useSkills() {
       candidates.value = result
   }
   return {
+    auth: useAuthStore(),
+    product,
     resource,
     catalog,
     sources,

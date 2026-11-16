@@ -4,7 +4,7 @@ import { resolveIcon } from '@/utils/icons'
 
 /** 统一线框图标仅负责展示；操作名称由宿主按钮或链接提供。 */
 const props = withDefaults(defineProps<{ name: string; size?: number }>(), {
-  size: 16,
+  size: 18,
 })
 const nodes = computed(() => resolveIcon(props.name))
 </script>
@@ -35,6 +35,7 @@ const nodes = computed(() => resolveIcon(props.name))
 
 <style scoped>
 .app-icon {
+  stroke-width: var(--icon-stroke, 1.5);
   display: inline-block;
   flex-shrink: 0;
   vertical-align: middle;

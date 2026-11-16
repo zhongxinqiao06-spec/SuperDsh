@@ -3,7 +3,7 @@
 from contextlib import AbstractAsyncContextManager
 from typing import Protocol
 
-from app.modules.navigation.entity.bo.navigation import Navigation
+from app.modules.navigation.entity.bo.navigation import Navigation, Product
 
 
 class NavigationTransaction(Protocol):
@@ -17,4 +17,6 @@ class NavigationTransaction(Protocol):
 class NavigationRepository(Protocol):
     """事务工厂，服务持有其上下文。"""
 
-    def transaction(self) -> AbstractAsyncContextManager[NavigationTransaction]: ...
+    def transaction(
+        self, product: Product
+    ) -> AbstractAsyncContextManager[NavigationTransaction]: ...
