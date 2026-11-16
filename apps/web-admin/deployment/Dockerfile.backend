@@ -10,6 +10,8 @@ ARG BUILD_DOWNLOAD_TIMEOUT=1800
 WORKDIR /app
 ENV ELECTRON_SKIP_BINARY_DOWNLOAD=1 YARN_NETWORK_CONCURRENCY=2 npm_config_jobs=1
 COPY apps/web-admin/deployment/configure-apt.sh /tmp/configure-apt.sh
+# slim Node 镜像可能没有系统 CA；仅用固定 Node 内置根证书引导首次 HTTPS，随后安装系统 CA。
+RUN if [ -n "$APT_MIRROR" ] && [ ! -s /etc/ssl/certs/ca-certificates.crt ]; then node -e 'const fs = require("node:fs"); fs.mkdirSync("/etc/ssl/certs", {recursive: true}); fs.writeFileSync("/etc/ssl/certs/ca-certificates.crt", require("node:tls").rootCertificates.join("\n") + "\n");'; fi
 RUN sh /tmp/configure-apt.sh && timeout --kill-after=30s "${BUILD_DOWNLOAD_TIMEOUT}s" sh -ec 'apt-get update && apt-get install -y --no-install-recommends ca-certificates git python3 make g++ pkg-config' && rm -rf /var/lib/apt/lists/* && corepack enable
 COPY package.json yarn.lock .yarnrc.yml ./
 COPY .yarn/patches/ ./.yarn/patches/
