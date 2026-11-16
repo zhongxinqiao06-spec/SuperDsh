@@ -403,6 +403,14 @@ def write_bundle(
         "tableAllowlist": sorted(ALLOWLIST),
         "rows": {table: len(items) for table, items in clean.items()},
         "files": copied,
+        "dataFiles": [
+            {
+                "path": name,
+                "bytes": (destination / name).stat().st_size,
+                "sha256": hashlib.sha256((destination / name).read_bytes()).hexdigest(),
+            }
+            for name in ("rows.json", "evidence/model-operations.json")
+        ],
         "redactedFields": removed,
         "importRequirements": [
             "先备份目标，再以单作品事务导入；ID冲突必须停止，不能覆盖现有用户或作品。",
