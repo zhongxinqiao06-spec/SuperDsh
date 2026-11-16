@@ -1,0 +1,146 @@
+import assert from 'node:assert/strict'
+import { execFileSync, spawnSync } from 'node:child_process'
+import { mkdir, mkdtemp, readFile, rm, writeFile } from 'node:fs/promises'
+import { delimiter, dirname, resolve } from 'node:path'
+import { test } from 'node:test'
+import { backendRoot, repositoryRoot } from '../../scripts/paths.ts'
+
+/** 在隔离目录执行真实 POSIX 脚本，不改宿主机源和网络设置。 */
+test('APT 镜像只替换官方地址，保留签名并拒绝无界超时', async () => {
+  const directory = await fixture()
+  try {
+    const root = resolve(directory, 'apt')
+    await mkdir(resolve(root, 'apt.conf.d'), { recursive: true })
+    await mkdir(resolve(root, 'sources.list.d'), { recursive: true })
+    const source = resolve(root, 'sources.list.d/debian.sources')
+    const original = [
+      'Types: deb',
+      'URIs: http://deb.debian.org/debian',
+      'Suites: bookworm bookworm-updates',
+      'Components: main',
+      'Signed-By: /usr/share/keyrings/debian-archive-keyring.gpg',
+      '',
+      'Types: deb',
+      'URIs: https://deb.debian.org/debian-security',
+      'Suites: bookworm-security',
+      'Signed-By: /usr/share/keyrings/debian-archive-keyring.gpg',
+      '',
+      'URIs: https://unrelated.example/repository',
+      '',
+    ].join('\n')
+    await writeFile(source, original)
+    let shell = '/bin/sh'
+    if (process.platform === 'win32') {
+      const git = execFileSync('where.exe', ['git'], { encoding: 'utf8' })
+        .trim()
+        .split(/\r?\n/u)[0]
+      assert.ok(git, 'Windows 验证需要已安装 Git 的 POSIX shell')
+      shell = resolve(dirname(dirname(git)), 'usr/bin/sh.exe')
+    }
+    const run = (overrides: NodeJS.ProcessEnv = {}) =>
+      spawnSync(
+        shell,
+        [
+          resolve(repositoryRoot, 'apps/web-admin/deployment/configure-apt.sh'),
+          root,
+        ],
+        {
+          encoding: 'utf8',
+          env: {
+            ...process.env,
+            PATH: `${dirname(shell)}${delimiter}${process.env.PATH ?? ''}`,
+            APT_MIRROR: '',
+            BUILD_HTTP_TIMEOUT: '120',
+            BUILD_HTTP_RETRIES: '3',
+            BUILD_DOWNLOAD_TIMEOUT: '1800',
+            ...overrides,
+          },
+          timeout: 10_000,
+        },
+      )
+    const unchanged = run()
+    assert.equal(unchanged.status, 0, unchanged.stderr)
+    assert.equal(await readFile(source, 'utf8'), original)
+    assert.equal(run({ APT_MIRROR: 'https://mirror.example/' }).status, 0)
+    assert.equal(
+      await readFile(source, 'utf8'),
+      original
+        .replace(
+          'http://deb.debian.org/debian',
+          'https://mirror.example/debian',
+        )
+        .replace(
+          'https://deb.debian.org/debian-security',
+          'https://mirror.example/debian-security',
+        ),
+    )
+    const configuration = await readFile(
+      resolve(root, 'apt.conf.d/80superdsh-network'),
+      'utf8',
+    )
+    assert.match(configuration, /Acquire::Retries "3"/u)
+    assert.match(configuration, /Acquire::https::Timeout "120"/u)
+    for (const invalid of [
+      { APT_MIRROR: 'https://name:secret@mirror.example' },
+      { APT_MIRROR: 'https://mirror.example/$(touch escaped)' },
+      { BUILD_HTTP_TIMEOUT: '0' },
+      { BUILD_HTTP_RETRIES: '11' },
+      { BUILD_DOWNLOAD_TIMEOUT: '0' },
+    ]) {
+      assert.equal(run(invalid).status, 2)
+    }
+  } finally {
+    await rm(directory, { recursive: true, force: true })
+  }
+})
+
+/** frozen 导出必须保留完整版本与原始哈希，不能写锁文件或安装依赖。 */
+test('自定义 Python 镜像的导出仍完全锁定并保留平台条件', async () => {
+  const directory = await fixture()
+  try {
+    const lock = resolve(backendRoot, 'uv.lock')
+    const before = await readFile(lock)
+    const result = spawnSync(
+      'uv',
+      [
+        'export',
+        '--frozen',
+        '--offline',
+        '--no-dev',
+        '--no-emit-project',
+        '--format',
+        'requirements.txt',
+        '--no-header',
+        '--no-annotate',
+        '--output-file',
+        resolve(directory, 'locked-requirements.txt'),
+      ],
+      { cwd: backendRoot, encoding: 'utf8', timeout: 15_000 },
+    )
+    assert.equal(result.status, 0, result.stderr)
+    assert.deepEqual(await readFile(lock), before)
+    const requirements = await readFile(
+      resolve(directory, 'locked-requirements.txt'),
+      'utf8',
+    )
+    const records = requirements
+      .replace(/\\\r?\n\s*/gu, ' ')
+      .trim()
+      .split(/\r?\n/u)
+    assert.ok(records.length > 40)
+    for (const record of records) {
+      assert.match(record, /^[a-zA-Z0-9_.-]+==[^\s]+/u)
+      assert.match(record, /--hash=sha256:[a-f0-9]{64}/u)
+      assert.doesNotMatch(record, /https?:|--index-url|--extra-index-url/u)
+    }
+    assert.match(requirements, /sys_platform == 'win32'/u)
+  } finally {
+    await rm(directory, { recursive: true, force: true })
+  }
+})
+
+async function fixture() {
+  const root = resolve(repositoryRoot, '.superdsh-work/web-admin-validation')
+  await mkdir(root, { recursive: true })
+  return mkdtemp(resolve(root, 'build-network-'))
+}

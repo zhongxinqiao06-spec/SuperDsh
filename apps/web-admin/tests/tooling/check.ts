@@ -49,6 +49,7 @@ async function main() {
     '--test',
     'apps/web-admin/tests/tooling/architecture.test.mjs',
     'apps/web-admin/tests/tooling/configuration.test.ts',
+    'apps/web-admin/tests/tooling/build-network.test.ts',
     'apps/web-admin/tests/tooling/processes.test.ts',
     'apps/web-admin/tests/tooling/python-environment.test.ts',
     'apps/web-admin/tests/tooling/python-cache.test.ts',

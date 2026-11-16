@@ -2,9 +2,15 @@
 ARG NODE_IMAGE
 ARG PYTHON_IMAGE
 FROM ${NODE_IMAGE} AS engine-build
+ARG APT_MIRROR
+ARG YARN_NPM_REGISTRY_SERVER
+ARG BUILD_HTTP_TIMEOUT=120
+ARG BUILD_HTTP_RETRIES=3
+ARG BUILD_DOWNLOAD_TIMEOUT=1800
 WORKDIR /app
 ENV ELECTRON_SKIP_BINARY_DOWNLOAD=1 YARN_NETWORK_CONCURRENCY=2 npm_config_jobs=1
-RUN apt-get update && apt-get install -y --no-install-recommends ca-certificates git python3 make g++ pkg-config && rm -rf /var/lib/apt/lists/* && corepack enable
+COPY apps/web-admin/deployment/configure-apt.sh /tmp/configure-apt.sh
+RUN sh /tmp/configure-apt.sh && timeout --kill-after=30s "${BUILD_DOWNLOAD_TIMEOUT}s" sh -ec 'apt-get update && apt-get install -y --no-install-recommends ca-certificates git python3 make g++ pkg-config' && rm -rf /var/lib/apt/lists/* && corepack enable
 COPY package.json yarn.lock .yarnrc.yml ./
 COPY .yarn/patches/ ./.yarn/patches/
 COPY patches/ ./patches/
@@ -16,7 +22,8 @@ COPY apps/desktop/core/package.json ./apps/desktop/core/package.json
 COPY apps/desktop/plugins/harness/package.json ./apps/desktop/plugins/harness/package.json
 COPY dsh-community-market/package.json ./dsh-community-market/package.json
 COPY dsh-community-fabric/package.json ./dsh-community-fabric/package.json
-RUN --mount=type=cache,target=/root/.yarn/berry/cache corepack yarn install --immutable
+# 镜像仅影响下载位置，继续校验 yarn.lock；空值不覆盖 Yarn 官方默认源。
+RUN --mount=type=cache,target=/root/.yarn/berry/cache if [ -n "$YARN_NPM_REGISTRY_SERVER" ]; then export COREPACK_NPM_REGISTRY="$YARN_NPM_REGISTRY_SERVER"; else unset YARN_NPM_REGISTRY_SERVER; fi; timeout --kill-after=30s "${BUILD_DOWNLOAD_TIMEOUT}s" corepack yarn install --immutable
 COPY apps/desktop/core/src/contracts/ ./apps/desktop/core/src/contracts/
 COPY apps/desktop/plugins/harness/src/ ./apps/desktop/plugins/harness/src/
 COPY apps/desktop/plugins/harness/tsdown.config.ts ./apps/desktop/plugins/harness/tsdown.config.ts
@@ -32,20 +39,42 @@ RUN node apps/web-admin/scripts/build-info.ts && node node_modules/tsdown/dist/r
 
 FROM ${PYTHON_IMAGE} AS python-build
 ARG UV_VERSION
-ENV PYTHONPYCACHEPREFIX=/app/.superdsh-work/web-admin-tools/pycache UV_CACHE_DIR=/app/.superdsh-work/web-admin-tools/uv-cache
-RUN pip install --no-cache-dir uv==${UV_VERSION}
+ARG PYPI_INDEX_URL
+ARG BUILD_HTTP_TIMEOUT=120
+ARG BUILD_HTTP_RETRIES=3
+ARG BUILD_DOWNLOAD_TIMEOUT=1800
+ENV PYTHONPYCACHEPREFIX=/app/.superdsh-work/web-admin-tools/pycache UV_CACHE_DIR=/app/.superdsh-work/web-admin-tools/uv-cache UV_HTTP_TIMEOUT=${BUILD_HTTP_TIMEOUT} UV_HTTP_RETRIES=${BUILD_HTTP_RETRIES} UV_CONCURRENT_DOWNLOADS=4 UV_PYTHON_DOWNLOADS=never
+RUN test "$BUILD_HTTP_TIMEOUT" -gt 0 && test "$BUILD_HTTP_TIMEOUT" -le 600 && test "$BUILD_HTTP_RETRIES" -ge 0 && test "$BUILD_HTTP_RETRIES" -le 10 && test "$BUILD_DOWNLOAD_TIMEOUT" -gt 0 && test "$BUILD_DOWNLOAD_TIMEOUT" -le 7200 && timeout --kill-after=30s "${BUILD_DOWNLOAD_TIMEOUT}s" python -m pip install --no-cache-dir --timeout "$BUILD_HTTP_TIMEOUT" --retries "$BUILD_HTTP_RETRIES" --index-url "${PYPI_INDEX_URL:-https://pypi.org/simple}" uv==${UV_VERSION}
 WORKDIR /app/apps/web-admin/backend
 COPY apps/web-admin/backend/pyproject.toml apps/web-admin/backend/uv.lock ./
 ENV UV_PROJECT_ENVIRONMENT=/opt/venv UV_LINK_MODE=copy
-RUN uv sync --frozen --no-dev --no-install-project
+# frozen 锁中的静态文件地址不受镜像参数影响；自定义源通过精确版本与原始哈希导出安装。
+# 不改写锁文件，不使用现有开发 requirements.txt，也不关闭 TLS 或哈希验证。
+RUN if [ -n "$PYPI_INDEX_URL" ]; then \
+      uv export --frozen --no-dev --no-emit-project --format requirements.txt --output-file /tmp/web-admin-requirements.txt && \
+      uv venv --python /usr/local/bin/python /opt/venv && \
+      timeout --kill-after=30s "${BUILD_DOWNLOAD_TIMEOUT}s" uv pip sync --python /opt/venv/bin/python --require-hashes --strict --default-index "$PYPI_INDEX_URL" /tmp/web-admin-requirements.txt; \
+    else \
+      timeout --kill-after=30s "${BUILD_DOWNLOAD_TIMEOUT}s" uv sync --frozen --no-dev --no-install-project; \
+    fi
 
 FROM ${PYTHON_IMAGE} AS office-fonts
-RUN apt-get update && apt-get install -y --no-install-recommends fonts-noto-cjk python3-fonttools && rm -rf /var/lib/apt/lists/*
+ARG APT_MIRROR
+ARG BUILD_HTTP_TIMEOUT=120
+ARG BUILD_HTTP_RETRIES=3
+ARG BUILD_DOWNLOAD_TIMEOUT=1800
+COPY apps/web-admin/deployment/configure-apt.sh /tmp/configure-apt.sh
+RUN sh /tmp/configure-apt.sh && timeout --kill-after=30s "${BUILD_DOWNLOAD_TIMEOUT}s" sh -ec 'apt-get update && apt-get install -y --no-install-recommends fonts-noto-cjk python3-fonttools' && rm -rf /var/lib/apt/lists/*
 COPY apps/web-admin/deployment/prepare-fonts.py /tmp/prepare-fonts.py
 RUN /usr/bin/python3 /tmp/prepare-fonts.py /usr/share/fonts/opentype/noto /opt/office-fonts && cp /usr/share/doc/fonts-noto-cjk/copyright /opt/office-fonts/LICENSE
 
 FROM ${PYTHON_IMAGE} AS runtime
-RUN apt-get update && apt-get install -y --no-install-recommends ca-certificates git curl openssh-client procps ffmpeg fontconfig fonts-dejavu-core fonts-liberation libreoffice-writer libreoffice-calc libreoffice-impress && rm -rf /var/lib/apt/lists/* && useradd --create-home --uid 1000 webadmin
+ARG APT_MIRROR
+ARG BUILD_HTTP_TIMEOUT=120
+ARG BUILD_HTTP_RETRIES=3
+ARG BUILD_DOWNLOAD_TIMEOUT=1800
+COPY apps/web-admin/deployment/configure-apt.sh /tmp/configure-apt.sh
+RUN sh /tmp/configure-apt.sh && timeout --kill-after=30s "${BUILD_DOWNLOAD_TIMEOUT}s" sh -ec 'apt-get update && apt-get install -y --no-install-recommends ca-certificates git curl openssh-client procps ffmpeg fontconfig fonts-dejavu-core fonts-liberation libreoffice-writer libreoffice-calc libreoffice-impress' && rm -rf /var/lib/apt/lists/* && useradd --create-home --uid 1000 webadmin
 COPY --from=office-fonts /opt/office-fonts /usr/local/share/fonts/superdsh-cjk
 RUN fc-cache -f
 WORKDIR /app

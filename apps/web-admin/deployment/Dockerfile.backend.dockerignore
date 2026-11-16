@@ -42,6 +42,7 @@
 !apps/web-admin/deployment/init_credentials.py
 !apps/web-admin/deployment/initial-admin.json
 !apps/web-admin/deployment/prepare-fonts.py
+!apps/web-admin/deployment/configure-apt.sh
 .git
 .superdsh
 .superdsh-work

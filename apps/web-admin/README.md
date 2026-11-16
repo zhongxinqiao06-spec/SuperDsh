@@ -194,6 +194,27 @@ corepack yarn web-admin:up
 
 已存在同名 builder 时直接设置环境变量并使用；不要重复创建或删除其缓存。独立 builder 的维护方式见 [Docker 官方说明](https://docs.docker.com/build/builders/drivers/docker-container/)。
 
+首次构建遇到官方源大文件下载缓慢时，可以给后端和前端的 `build.args` 传入镜像配置。默认不设置任何镜像；以下配置只保存到部署机器的 Compose override 文件，不改锁文件、依赖版本或运行时模型配置：
+
+```yaml
+services:
+  backend:
+    build:
+      args:
+        APT_MIRROR: https://mirrors.tuna.tsinghua.edu.cn
+        PYPI_INDEX_URL: https://pypi.tuna.tsinghua.edu.cn/simple
+        YARN_NPM_REGISTRY_SERVER: https://registry.npmmirror.com
+  fronted:
+    build:
+      args:
+        APT_MIRROR: https://mirrors.tuna.tsinghua.edu.cn
+        YARN_NPM_REGISTRY_SERVER: https://registry.npmmirror.com
+```
+
+使用 `docker compose -f compose.web-admin.yml -f <本机override文件> build backend fronted` 构建，再用同一组 Compose 文件启动。已有部署继续使用其原有环境文件和卷。镜像地址是可选示例，应在部署机器确认可达；不传 `YARN_NPM_REGISTRY_SERVER` 时保留 Yarn 默认源，传入时同时用于 Corepack 下载固定 Yarn CLI。APT 只替换官方仓库地址，保留 Debian 签名校验。自定义 Python 镜像先从 `uv.lock` 冻结导出精确版本及原始哈希，再执行 `uv pip sync --require-hashes`；未配置镜像时仍执行 `uv sync --frozen`。
+
+三个可选构建参数 `BUILD_HTTP_TIMEOUT`、`BUILD_HTTP_RETRIES`、`BUILD_DOWNLOAD_TIMEOUT` 默认分别为 120 秒、3 次和每个下载步骤 1800 秒；总时限到达后先终止，再给予 30 秒退出宽限。它们不写入业务配置，不关闭 TLS、哈希或锁文件检查；构建失败不会替换正在运行的旧容器。
+
 ## 自测与证据
 
 娱乐创作准备现在按“剧本确认 → 角色造型/音色候选 → 字段级方案对比 → 分镜预演 → 试做一镜”操作。生成先预检，明确确认才提交；采用候选后保存为本片的新素材版本。更新时须正常重启后端以执行迁移，前端开发命令保持不变。页面与接口、数据表和验证边界见[准备阶段交付记录](../../docs/plans/starbridge-studio-preparation-delivery.md)。
