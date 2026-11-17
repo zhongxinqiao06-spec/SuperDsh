@@ -217,6 +217,15 @@ services:
 
 Yarn 安装默认限制为单个网络请求、单个归档任务、进程内异步处理与 768MB V8 堆。可以通过 `build.args` 覆盖 `BUILD_YARN_NETWORK_CONCURRENCY`、`BUILD_YARN_TASK_POOL_CONCURRENCY`、`BUILD_YARN_TASK_POOL_MODE`、`BUILD_YARN_HEAP_MB`。这些参数仅作用于依赖安装步骤，不改变后续 Vite、引擎编译或生产容器；调整时保留此前的 APT 层及 Yarn 下载缓存。堆上限不等于整个构建的内存硬上限，内存紧张时仍需顺序构建阶段或使用有资源限额的 builder，不应以增加 swap 代替构建预算。
 
+镜像构建末尾会修正宿主机私有检出权限：后端 `/app` 和前端静态目录保持 root 所有，业务用户可以读取和遍历，不能写入制品；不会处理 `/data` 或运行时密钥挂载。部署前可在 Linux 主机对已构建镜像执行以下只读检查，不启动应用、不连接数据库；将镜像变量设为本次实际标签：
+
+```sh
+docker run --rm --read-only --network none -i --entrypoint python "$BACKEND_IMAGE" -B - < apps/web-admin/tests/tooling/check_image_permissions.py
+docker run --rm --read-only --network none --user nginx -i --entrypoint sh "$FRONTED_IMAGE" -s < apps/web-admin/tests/tooling/check_static_permissions.sh
+```
+
+该检查也纳入现有生产镜像生命周期验收。后端会真实打开 Alembic 配置、迁移、业务 JSON 和引擎入口；前端以 Nginx worker 身份检查所有文件，覆盖复制进来的字体与图片，避免仅检查文件存在却漏掉启动权限或静态资源 403。可选 workspace 断链单列为 `danglingLinks`；权限检查不替代 DSH 启动和工具执行验收，不代表完整引擎已可用。
+
 ## 自测与证据
 
 娱乐创作准备现在按“剧本确认 → 角色造型/音色候选 → 字段级方案对比 → 分镜预演 → 试做一镜”操作。生成先预检，明确确认才提交；采用候选后保存为本片的新素材版本。更新时须正常重启后端以执行迁移，前端开发命令保持不变。页面与接口、数据表和验证边界见[准备阶段交付记录](../../docs/plans/starbridge-studio-preparation-delivery.md)。

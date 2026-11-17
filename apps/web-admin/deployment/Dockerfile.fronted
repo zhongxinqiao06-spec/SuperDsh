@@ -42,5 +42,9 @@ RUN node apps/web-admin/scripts/build-info.ts && node node_modules/vite/bin/vite
 FROM ${NGINX_IMAGE} AS runtime
 COPY apps/web-admin/deployment/nginx.conf /etc/nginx/conf.d/default.conf
 COPY --from=build /app/apps/web-admin/fronted/dist /usr/share/nginx/html
+# public 静态文件可能沿用宿主机私有权限；只补 worker 读取/遍历权限并禁止其写入制品。
+RUN find /usr/share/nginx/html -type d ! -perm -005 -exec chmod a+rx {} + \
+    && find /usr/share/nginx/html -type f ! -perm -004 -exec chmod a+r {} + \
+    && find /usr/share/nginx/html \( -type f -o -type d \) -perm /022 -exec chmod go-w {} +
 EXPOSE 8080
 HEALTHCHECK --interval=15s --timeout=3s --retries=5 CMD curl --fail http://127.0.0.1:8080/api/health/live || exit 1

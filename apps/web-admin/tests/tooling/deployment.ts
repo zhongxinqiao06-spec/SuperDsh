@@ -208,6 +208,31 @@ async function backendSecrets() {
 }
 
 async function validateImageBoundaries() {
+  const backendPermissions = await readFile(
+    resolve(appRoot, 'tests/tooling/check_image_permissions.py'),
+    'utf8',
+  )
+  await compose(
+    ['exec', '-T', 'backend', 'python', '-B', '-c', backendPermissions],
+    '以业务用户读取后端启动制品并检查只读权限',
+  )
+  const staticPermissions = await readFile(
+    resolve(appRoot, 'tests/tooling/check_static_permissions.sh'),
+    'utf8',
+  )
+  await compose(
+    [
+      'exec',
+      '-T',
+      '--user',
+      'nginx',
+      'fronted',
+      'sh',
+      '-ec',
+      staticPermissions,
+    ],
+    '以 Nginx worker 用户检查字体、图片和全部静态制品读取权限',
+  )
   await compose(
     [
       'exec',
