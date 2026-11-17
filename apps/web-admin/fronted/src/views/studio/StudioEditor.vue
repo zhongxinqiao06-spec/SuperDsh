@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { createUuid } from '@/utils/uuid'
 import StudioProjectBrief from './components/project/StudioProjectBrief.vue'
 import StudioScript from './components/project/StudioScript.vue'
 import StudioTextEditor from './components/project/StudioTextEditor.vue'
@@ -500,7 +501,7 @@ function generate() {
         shots: options.shots,
         lines: options.lines,
         revision: p.value!.revision,
-        requestKey: crypto.randomUUID(),
+        requestKey: createUuid(),
         mode: 'selected',
         video: selectedVideo.value || undefined,
         referenceVideo: selectedReference.value || undefined,

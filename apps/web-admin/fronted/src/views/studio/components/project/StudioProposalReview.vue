@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { createUuid } from '@/utils/uuid'
 import { computed, ref, watch } from 'vue'
 import { preparationApi } from '@/api/studio/preparation-api'
 import type { ProposalComparison } from '@/types/studio/preparation'
@@ -82,7 +83,7 @@ async function review(keep = false) {
     }
     const signature = JSON.stringify([comparison.value.id, data])
     if (intent?.signature !== signature)
-      intent = { signature, key: crypto.randomUUID() }
+      intent = { signature, key: createUuid() }
     await preparationApi.review(props.project.id, comparison.value.id, {
       ...data,
       requestKey: intent.key,

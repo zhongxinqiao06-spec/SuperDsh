@@ -1,3 +1,4 @@
+import { createUuid } from '@/utils/uuid'
 import { computed, nextTick, onScopeDispose, ref, watch } from 'vue'
 import { uploadFile } from '@/api/files/upload-api'
 import { studioApi } from '@/api/studio/studio-api'
@@ -199,7 +200,7 @@ export function useDirectorSources(options: {
       if (attempt?.signature !== signature)
         attempt = {
           signature,
-          requestKey: crypto.randomUUID(),
+          requestKey: createUuid(),
           revision: options.revision(),
         }
       const result = await directorContextApi.prepare(

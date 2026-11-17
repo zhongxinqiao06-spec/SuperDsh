@@ -1,3 +1,4 @@
+import { createUuid } from '@/utils/uuid'
 import { computed, onScopeDispose, ref, watch } from 'vue'
 import { studioApi } from '@/api/studio/studio-api'
 import { conversationApi } from '@/api/workbench/conversation-api'
@@ -141,7 +142,7 @@ export function useDirectorChat(options: {
         throw new Error('当前账号已没有运行导演会话的权限。')
       const signature = JSON.stringify([text, attachments])
       if (receipt.text !== signature)
-        receipt = { text: signature, id: crypto.randomUUID() }
+        receipt = { text: signature, id: createUuid() }
       progress.value = '正在提交本次安排'
       await conversationApi.send(session.value, {
         text,

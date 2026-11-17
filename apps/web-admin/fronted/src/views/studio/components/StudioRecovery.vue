@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { createUuid } from '@/utils/uuid'
 import { computed, ref } from 'vue'
 import { ElMessageBox } from 'element-plus'
 import { useAuthStore } from '@/store/modules/auth-store'
@@ -45,7 +46,7 @@ async function decide(action: JobDecision) {
     acknowledged.value,
     props.job.state,
   ])
-  if (!keys.has(identity)) keys.set(identity, crypto.randomUUID())
+  if (!keys.has(identity)) keys.set(identity, createUuid())
   await mutation.run(async () => {
     const result = await productionApi.decide(
       props.job,

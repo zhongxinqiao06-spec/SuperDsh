@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { createUuid } from '@/utils/uuid'
 import { computed, ref, watch } from 'vue'
 import { preparationApi } from '@/api/studio/preparation-api'
 import type { StageState, StageConfirmation } from '@/types/studio/preparation'
@@ -66,7 +67,7 @@ async function confirm(skipped = false) {
     }
     const signature = JSON.stringify([props.state.key, data])
     if (intent?.signature !== signature)
-      intent = { signature, key: crypto.randomUUID() }
+      intent = { signature, key: createUuid() }
     const body: StageConfirmation = { ...data, requestKey: intent.key }
     await preparationApi.confirm(props.project.id, props.state.key, body)
     intent = undefined

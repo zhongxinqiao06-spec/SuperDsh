@@ -1,3 +1,4 @@
+import { createUuid } from '@/utils/uuid'
 import { computed, onScopeDispose, reactive, ref, watch } from 'vue'
 import { textEditApi } from '@/api/studio/text-edit-api'
 import { useDirectorChat } from '@/composables/studio/use-director-chat'
@@ -143,7 +144,7 @@ export function useTextEdit(options: {
       }
       const signature = JSON.stringify(body)
       if (attempt?.signature !== signature)
-        attempt = { signature, key: crypto.randomUUID() }
+        attempt = { signature, key: createUuid() }
       const record = await textEditApi.create(p.id, {
         ...body,
         requestKey: attempt.key,
@@ -175,7 +176,7 @@ export function useTextEdit(options: {
       }
       const signature = JSON.stringify([edit.id, body])
       if (resolveAttempt?.signature !== signature)
-        resolveAttempt = { signature, key: crypto.randomUUID() }
+        resolveAttempt = { signature, key: createUuid() }
       await textEditApi.resolve(options.project().id, edit.id, {
         ...body,
         requestKey: resolveAttempt.key,

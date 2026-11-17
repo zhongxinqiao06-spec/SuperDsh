@@ -1,3 +1,4 @@
+import { createUuid } from '@/utils/uuid'
 import type { Dialogue, Job, Shot, StudioDocument } from '@/types/studio/studio'
 /** 文本截断与音频冲突都按实际采用配音和剪辑出点计算，未生成的音频时长未知。 */
 export function voiceConflict(
@@ -18,7 +19,7 @@ export function voiceDurations(jobs: Job[]) {
       .map((j) => [j.id, j.duration!]),
   )
 }
-export const newId = () => crypto.randomUUID()
+export const newId = () => createUuid()
 export function newShot(): Shot {
   return {
     id: newId(),

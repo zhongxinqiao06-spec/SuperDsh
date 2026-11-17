@@ -1,3 +1,4 @@
+import { createUuid } from '@/utils/uuid'
 import { computed, onScopeDispose, ref } from 'vue'
 import { productionApi } from '@/api/studio/production-api'
 import { studioApi } from '@/api/studio/studio-api'
@@ -72,7 +73,7 @@ export function usePersonalProduction(entity: string, updated: () => void) {
     await flow.prepare(() =>
       productionApi.personalPrepare(entity, {
         revision: state.value!.revision,
-        requestKey: crypto.randomUUID(),
+        requestKey: createUuid(),
         kind: kind.value,
         configuration: configuration.value || undefined,
         prompt: prompt.value,
@@ -88,7 +89,7 @@ export function usePersonalProduction(entity: string, updated: () => void) {
   async function adopt(job: string) {
     if (!state.value) return
     const key = job + ':' + state.value.revision
-    if (!adoptKeys.has(key)) adoptKeys.set(key, crypto.randomUUID())
+    if (!adoptKeys.has(key)) adoptKeys.set(key, createUuid())
     await mutation.run(async () => {
       await productionApi.adopt(
         entity,

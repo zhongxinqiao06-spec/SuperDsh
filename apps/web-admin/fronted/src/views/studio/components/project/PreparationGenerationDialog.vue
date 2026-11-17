@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { createUuid } from '@/utils/uuid'
 import { computed, ref, watch } from 'vue'
 import ManagementDialog from '@/components/overlay/ManagementDialog.vue'
 import ExpandableText from '@/components/base/ExpandableText.vue'
@@ -98,7 +99,7 @@ async function submit() {
     if (attempt?.signature !== signature) {
       attempt = {
         signature,
-        body: { ...draft, requestKey: crypto.randomUUID() },
+        body: { ...draft, requestKey: createUuid() },
       }
       preview.value = undefined
     }

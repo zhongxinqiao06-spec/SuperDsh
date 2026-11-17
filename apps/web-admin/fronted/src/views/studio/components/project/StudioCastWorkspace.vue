@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { createUuid } from '@/utils/uuid'
 import { computed, ref } from 'vue'
 import { preparationApi } from '@/api/studio/preparation-api'
 import { useAuthStore } from '@/store/modules/auth-store'
@@ -96,7 +97,7 @@ async function adopt(job: Job) {
     }
     const signature = JSON.stringify(body)
     if (attempt?.signature !== signature)
-      attempt = { signature, key: crypto.randomUUID() }
+      attempt = { signature, key: createUuid() }
     await preparationApi.adopt(props.project.id, {
       ...body,
       requestKey: attempt.key,

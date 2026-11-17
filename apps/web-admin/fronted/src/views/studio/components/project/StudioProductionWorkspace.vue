@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { createUuid } from '@/utils/uuid'
 import { computed, ref } from 'vue'
 import type { StudioProject, StudioCatalog } from '@/types/studio/studio'
 import type { ProductionIntent } from '@/types/studio/production'
@@ -32,7 +33,7 @@ async function prepare() {
     await props.save('制作前保存工程')
     return productionApi.prepare(props.project.id, {
       revision: props.project.revision,
-      requestKey: crypto.randomUUID(),
+      requestKey: createUuid(),
       mode: mode.value,
       shots: shots.value,
       lines: lines.value,

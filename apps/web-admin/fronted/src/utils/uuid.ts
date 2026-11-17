@@ -1,6 +1,11 @@
 /** 浏览器在 HTTP 和 HTTPS 下均可生成 RFC 9562 UUIDv4，用于请求和会话标识。 */
 export function createUuid(): string {
-  const bytes = crypto.getRandomValues(new Uint8Array(16))
+  const provider = globalThis.crypto
+  if (typeof provider?.randomUUID === 'function') return provider.randomUUID()
+  // randomUUID 仅在安全上下文可用；HTTP 使用同一 Web Crypto 的密码学随机源。
+  if (typeof provider?.getRandomValues !== 'function')
+    throw new Error('当前浏览器缺少安全随机数能力，请升级浏览器后重试。')
+  const bytes = provider.getRandomValues(new Uint8Array(16))
   bytes[6] = (bytes[6]! & 0x0f) | 0x40
   bytes[8] = (bytes[8]! & 0x3f) | 0x80
   const hex = Array.from(bytes, (byte) =>

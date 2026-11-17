@@ -1,3 +1,4 @@
+import { createUuid } from '@/utils/uuid'
 import { computed, ref } from 'vue'
 import type { StudioProject } from '@/types/studio/studio'
 import { preparationApi } from '@/api/studio/preparation-api'
@@ -48,7 +49,7 @@ export function useScriptConfirmation(options: {
         fingerprint,
       ])
       if (intent?.signature !== signature)
-        intent = { signature, key: crypto.randomUUID() }
+        intent = { signature, key: createUuid() }
       await preparationApi.confirm(project.id, 'script', {
         revision: project.revision,
         requestKey: intent.key,
