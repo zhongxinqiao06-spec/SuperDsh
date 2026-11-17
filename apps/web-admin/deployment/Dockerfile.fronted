@@ -37,7 +37,12 @@ COPY apps/web-admin/contracts/ ./apps/web-admin/contracts/
 COPY apps/web-admin/fronted/ ./apps/web-admin/fronted/
 ARG SOURCE_COMMIT
 ENV WEB_ADMIN_SOURCE_COMMIT=${SOURCE_COMMIT}
-RUN node apps/web-admin/scripts/build-info.ts && node node_modules/vite/bin/vite.js build --config apps/web-admin/fronted/vite.config.ts
+# 编译预算独立于安装步骤，修改此处不使此前 APT 与依赖缓存失效。
+ARG BUILD_VITE_HEAP_MB=1024
+ARG BUILD_VITE_CONCURRENCY=1
+ARG BUILD_COMPILE_TIMEOUT=900
+COPY apps/web-admin/deployment/build-fronted.sh /tmp/build-fronted.sh
+RUN node apps/web-admin/scripts/build-info.ts && sh /tmp/build-fronted.sh
 
 FROM ${NGINX_IMAGE} AS runtime
 COPY apps/web-admin/deployment/nginx.conf /etc/nginx/conf.d/default.conf

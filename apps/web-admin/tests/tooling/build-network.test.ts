@@ -194,6 +194,128 @@ test('Yarn 安装单独约束资源，保留镜像、immutable 和可配置边�
   }
 })
 
+/** 验证真实 shell、timeout 与 Node 环境，仅替换编译入口，不执行完整打包。 */
+test('Vite 编译独立限制堆、线程和时限，真实 Node 接受参数', async () => {
+  const directory = await fixture()
+  try {
+    const shell = posixShell()
+    const executable = resolve(directory, 'node')
+    const output = resolve(directory, 'vite-captured.txt')
+    await writeFile(
+      executable,
+      [
+        '#!/bin/sh',
+        'printf "%s\\n" "$NODE_OPTIONS" "$UV_THREADPOOL_SIZE" "$GOMAXPROCS" "$RAYON_NUM_THREADS" > "$TEST_OUTPUT"',
+        'printf "%s\\n" "$@" >> "$TEST_OUTPUT"',
+        'if [ "${TEST_SLOW:-}" = 1 ]; then exec sleep 10; fi',
+        'exec "$TEST_NODE_BINARY" -e \'process.stdout.write(String(require("node:v8").getHeapStatistics().heap_size_limit))\'',
+        '',
+      ].join('\n'),
+    )
+    await chmod(executable, 0o755)
+    const run = (overrides: NodeJS.ProcessEnv = {}) =>
+      spawnSync(
+        shell,
+        [resolve(repositoryRoot, 'apps/web-admin/deployment/build-fronted.sh')],
+        {
+          encoding: 'utf8',
+          env: {
+            ...process.env,
+            PATH: [directory, dirname(shell), process.env.PATH ?? ''].join(
+              delimiter,
+            ),
+            TEST_OUTPUT: output,
+            TEST_NODE_BINARY: process.execPath,
+            NODE_OPTIONS: '--invalid-inherited-option',
+            UV_THREADPOOL_SIZE: '24',
+            GOMAXPROCS: '24',
+            RAYON_NUM_THREADS: '24',
+            BUILD_VITE_HEAP_MB: '',
+            BUILD_VITE_CONCURRENCY: '',
+            BUILD_COMPILE_TIMEOUT: '',
+            ...overrides,
+          },
+          timeout: 15_000,
+        },
+      )
+    const command = [
+      'node_modules/vite/bin/vite.js',
+      'build',
+      '--config',
+      'apps/web-admin/fronted/vite.config.ts',
+    ]
+    const defaults = run()
+    assert.equal(defaults.status, 0, defaults.stderr)
+    assert.ok(Number(defaults.stdout) >= 1024 * 1024 * 1024)
+    assert.ok(Number(defaults.stdout) < 1280 * 1024 * 1024)
+    assert.deepEqual((await readFile(output, 'utf8')).trim().split(/\r?\n/u), [
+      '--max-old-space-size=1024',
+      '1',
+      '1',
+      '1',
+      ...command,
+    ])
+    const customized = run({
+      BUILD_VITE_HEAP_MB: '512',
+      BUILD_VITE_CONCURRENCY: '2',
+      BUILD_COMPILE_TIMEOUT: '20',
+    })
+    assert.equal(customized.status, 0, customized.stderr)
+    const captured = await readFile(output, 'utf8')
+    assert.deepEqual(captured.trim().split(/\r?\n/u), [
+      '--max-old-space-size=512',
+      '2',
+      '2',
+      '2',
+      ...command,
+    ])
+    assert.ok(Number(customized.stdout) < 768 * 1024 * 1024)
+    for (const invalid of [
+      { BUILD_VITE_HEAP_MB: '255' },
+      { BUILD_VITE_HEAP_MB: '16385' },
+      { BUILD_VITE_CONCURRENCY: '0' },
+      { BUILD_VITE_CONCURRENCY: '33' },
+      { BUILD_VITE_CONCURRENCY: '2x' },
+      { BUILD_COMPILE_TIMEOUT: '0' },
+      { BUILD_COMPILE_TIMEOUT: '7201' },
+      { BUILD_COMPILE_TIMEOUT: '99999999999999999999999' },
+    ]) {
+      assert.equal(run(invalid).status, 2)
+      assert.equal(await readFile(output, 'utf8'), captured)
+    }
+    assert.equal(
+      run({ BUILD_COMPILE_TIMEOUT: '1', TEST_SLOW: '1' }).status,
+      124,
+    )
+    const dockerfile = await readFile(
+      resolve(repositoryRoot, 'apps/web-admin/deployment/Dockerfile.fronted'),
+      'utf8',
+    )
+    for (const parameter of [
+      'BUILD_VITE_HEAP_MB=1024',
+      'BUILD_VITE_CONCURRENCY=1',
+      'BUILD_COMPILE_TIMEOUT=900',
+    ]) {
+      assert.ok(dockerfile.includes(`ARG ${parameter}`))
+    }
+    assert.match(
+      dockerfile,
+      /RUN node apps\/web-admin\/scripts\/build-info\.ts && sh \/tmp\/build-fronted\.sh/u,
+    )
+    assert.doesNotMatch(dockerfile, /^ENV .*NODE_OPTIONS/gmu)
+    const context = await readFile(
+      resolve(
+        repositoryRoot,
+        'apps/web-admin/deployment/Dockerfile.fronted.dockerignore',
+      ),
+      'utf8',
+    )
+    assert.ok(context.includes('!apps/web-admin/deployment/build-fronted.sh'))
+  } finally {
+    await rm(directory, { recursive: true, force: true })
+  }
+})
+
 /** 使用 Dockerfile 中实际参数及项目固定 Yarn，验证真实环境解析；不联网或安装依赖。 */
 test('项目固定 Yarn 接受构建参数环境，并读取安装约束', async () => {
   const shell = posixShell()

@@ -217,6 +217,8 @@ services:
 
 Yarn 安装默认限制为单个网络请求、单个归档任务、进程内异步处理与 768MB V8 堆。可以通过 `build.args` 覆盖 `BUILD_YARN_NETWORK_CONCURRENCY`、`BUILD_YARN_TASK_POOL_CONCURRENCY`、`BUILD_YARN_TASK_POOL_MODE`、`BUILD_YARN_HEAP_MB`。这些参数仅作用于依赖安装步骤，不改变后续 Vite、引擎编译或生产容器；调整时保留此前的 APT 层及 Yarn 下载缓存。堆上限不等于整个构建的内存硬上限，内存紧张时仍需顺序构建阶段或使用有资源限额的 builder，不应以增加 swap 代替构建预算。
 
+前端 Vite 编译有独立预算：`BUILD_VITE_HEAP_MB=1024`（允许 256–16384MB）、`BUILD_VITE_CONCURRENCY=1`（允许 1–32）、`BUILD_COMPILE_TIMEOUT=900`（允许 1–7200 秒）。通过前端 `build.args` 覆盖；仅编译子进程使用明确的 V8 堆上限，并同步限制 libuv、Go 和 Rayon 线程并发。到达时限后终止编译，最多再等待 30 秒强制结束；不会自动增大预算或重试。此限制不等同于整个 builder 的 RSS 硬上限，原生分配、文件缓存和其他构建阶段仍占内存。参数不进入 Nginx 运行环境，修改时保留此前 APT 与依赖安装缓存。
+
 镜像构建末尾会修正宿主机私有检出权限：后端 `/app` 和前端静态目录保持 root 所有，业务用户可以读取和遍历，不能写入制品；不会处理 `/data` 或运行时密钥挂载。部署前可在 Linux 主机对已构建镜像执行以下只读检查，不启动应用、不连接数据库；将镜像变量设为本次实际标签：
 
 ```sh

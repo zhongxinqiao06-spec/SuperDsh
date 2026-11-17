@@ -36,6 +36,7 @@
 !apps/web-admin/deployment/nginx.conf
 !apps/web-admin/deployment/configure-apt.sh
 !apps/web-admin/deployment/install-node-dependencies.sh
+!apps/web-admin/deployment/build-fronted.sh
 .git
 .superdsh
 .superdsh-work
