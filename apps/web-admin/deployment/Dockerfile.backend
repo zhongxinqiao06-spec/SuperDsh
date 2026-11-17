@@ -25,10 +25,10 @@ COPY apps/desktop/plugins/harness/package.json ./apps/desktop/plugins/harness/pa
 COPY dsh-community-market/package.json ./dsh-community-market/package.json
 COPY dsh-community-fabric/package.json ./dsh-community-fabric/package.json
 # 安装资源参数在 APT 层之后声明，调整时继续复用已下载的系统包与 Yarn 缓存。
-ARG YARN_INSTALL_NETWORK_CONCURRENCY=1
-ARG YARN_INSTALL_TASK_POOL_CONCURRENCY=1
-ARG YARN_INSTALL_TASK_POOL_MODE=async
-ARG YARN_INSTALL_HEAP_MB=768
+ARG BUILD_YARN_NETWORK_CONCURRENCY=1
+ARG BUILD_YARN_TASK_POOL_CONCURRENCY=1
+ARG BUILD_YARN_TASK_POOL_MODE=async
+ARG BUILD_YARN_HEAP_MB=768
 COPY apps/web-admin/deployment/install-node-dependencies.sh /tmp/install-node-dependencies.sh
 RUN --mount=type=cache,target=/root/.yarn/berry/cache sh /tmp/install-node-dependencies.sh
 COPY apps/desktop/core/src/contracts/ ./apps/desktop/core/src/contracts/

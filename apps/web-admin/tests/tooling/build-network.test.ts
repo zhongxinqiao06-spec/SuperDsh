@@ -132,10 +132,10 @@ test('Yarn 安装单独约束资源，保留镜像、immutable 和可配置边�
             YARN_TASK_POOL_MODE: 'workers',
             YARN_NPM_REGISTRY_SERVER: '',
             COREPACK_NPM_REGISTRY: '',
-            YARN_INSTALL_NETWORK_CONCURRENCY: '',
-            YARN_INSTALL_TASK_POOL_CONCURRENCY: '',
-            YARN_INSTALL_TASK_POOL_MODE: '',
-            YARN_INSTALL_HEAP_MB: '',
+            BUILD_YARN_NETWORK_CONCURRENCY: '',
+            BUILD_YARN_TASK_POOL_CONCURRENCY: '',
+            BUILD_YARN_TASK_POOL_MODE: '',
+            BUILD_YARN_HEAP_MB: '',
             BUILD_DOWNLOAD_TIMEOUT: '10',
             ...overrides,
           },
@@ -160,10 +160,10 @@ test('Yarn 安装单独约束资源，保留镜像、immutable 和可配置边�
     )
     const mirror = 'https://mirror.example'
     const customized = run({
-      YARN_INSTALL_NETWORK_CONCURRENCY: '2',
-      YARN_INSTALL_TASK_POOL_CONCURRENCY: '2',
-      YARN_INSTALL_TASK_POOL_MODE: 'workers',
-      YARN_INSTALL_HEAP_MB: '512',
+      BUILD_YARN_NETWORK_CONCURRENCY: '2',
+      BUILD_YARN_TASK_POOL_CONCURRENCY: '2',
+      BUILD_YARN_TASK_POOL_MODE: 'workers',
+      BUILD_YARN_HEAP_MB: '512',
       YARN_NPM_REGISTRY_SERVER: mirror,
     })
     assert.equal(customized.status, 0, customized.stderr)
@@ -180,10 +180,10 @@ test('Yarn 安装单独约束资源，保留镜像、immutable 和可配置边�
       '--immutable',
     ])
     for (const invalid of [
-      { YARN_INSTALL_NETWORK_CONCURRENCY: '0' },
-      { YARN_INSTALL_TASK_POOL_CONCURRENCY: '33' },
-      { YARN_INSTALL_TASK_POOL_MODE: 'unbounded' },
-      { YARN_INSTALL_HEAP_MB: '-1' },
+      { BUILD_YARN_NETWORK_CONCURRENCY: '0' },
+      { BUILD_YARN_TASK_POOL_CONCURRENCY: '33' },
+      { BUILD_YARN_TASK_POOL_MODE: 'unbounded' },
+      { BUILD_YARN_HEAP_MB: '-1' },
       { BUILD_DOWNLOAD_TIMEOUT: '0' },
     ]) {
       assert.equal(run(invalid).status, 2)
@@ -192,6 +192,49 @@ test('Yarn 安装单独约束资源，保留镜像、immutable 和可配置边�
   } finally {
     await rm(directory, { recursive: true, force: true })
   }
+})
+
+/** 使用 Dockerfile 中实际参数及项目固定 Yarn，验证真实环境解析；不联网或安装依赖。 */
+test('项目固定 Yarn 接受构建参数环境，并读取安装约束', async () => {
+  const shell = posixShell()
+  const parameters: Record<string, string> = {}
+  for (const kind of ['backend', 'fronted']) {
+    const dockerfile = await readFile(
+      resolve(repositoryRoot, `apps/web-admin/deployment/Dockerfile.${kind}`),
+      'utf8',
+    )
+    for (const match of dockerfile.matchAll(/^ARG (\S*YARN\S*)=(\S+)$/gmu)) {
+      const [, name, value] = match
+      assert.ok(name && value)
+      parameters[name] = value
+    }
+  }
+  assert.equal(Object.keys(parameters).length, 4)
+  const result = spawnSync(
+    shell,
+    [
+      '-c',
+      'corepack yarn config get networkConcurrency && corepack yarn config get taskPoolConcurrency && corepack yarn config get taskPoolMode',
+    ],
+    {
+      cwd: repositoryRoot,
+      encoding: 'utf8',
+      timeout: 30_000,
+      env: {
+        ...process.env,
+        PATH: `${dirname(shell)}${delimiter}${process.env.PATH ?? ''}`,
+        COREPACK_ENABLE_NETWORK: '0',
+        COREPACK_ENABLE_DOWNLOAD_PROMPT: '0',
+        ...parameters,
+        YARN_NETWORK_CONCURRENCY: '1',
+        YARN_TASK_POOL_CONCURRENCY: '1',
+        YARN_TASK_POOL_MODE: 'async',
+        NODE_OPTIONS: '--max-old-space-size=768',
+      },
+    },
+  )
+  assert.equal(result.status, 0, result.stderr)
+  assert.deepEqual(result.stdout.trim().split(/\r?\n/u), ['1', '1', 'async'])
 })
 
 /** frozen 导出必须保留完整版本与原始哈希，不能写锁文件或安装依赖。 */

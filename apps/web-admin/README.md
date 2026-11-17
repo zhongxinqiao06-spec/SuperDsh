@@ -215,7 +215,7 @@ services:
 
 三个可选构建参数 `BUILD_HTTP_TIMEOUT`、`BUILD_HTTP_RETRIES`、`BUILD_DOWNLOAD_TIMEOUT` 默认分别为 120 秒、3 次和每个下载步骤 1800 秒；总时限到达后先终止，再给予 30 秒退出宽限。它们不写入业务配置，不关闭 TLS、哈希或锁文件检查；构建失败不会替换正在运行的旧容器。
 
-Yarn 安装默认限制为单个网络请求、单个归档任务、进程内异步处理与 768MB V8 堆。可以通过 `build.args` 覆盖 `YARN_INSTALL_NETWORK_CONCURRENCY`、`YARN_INSTALL_TASK_POOL_CONCURRENCY`、`YARN_INSTALL_TASK_POOL_MODE`、`YARN_INSTALL_HEAP_MB`。这些参数仅作用于依赖安装步骤，不改变后续 Vite、引擎编译或生产容器；调整时保留此前的 APT 层及 Yarn 下载缓存。堆上限不等于整个构建的内存硬上限，内存紧张时仍需顺序构建阶段或使用有资源限额的 builder，不应以增加 swap 代替构建预算。
+Yarn 安装默认限制为单个网络请求、单个归档任务、进程内异步处理与 768MB V8 堆。可以通过 `build.args` 覆盖 `BUILD_YARN_NETWORK_CONCURRENCY`、`BUILD_YARN_TASK_POOL_CONCURRENCY`、`BUILD_YARN_TASK_POOL_MODE`、`BUILD_YARN_HEAP_MB`。这些参数仅作用于依赖安装步骤，不改变后续 Vite、引擎编译或生产容器；调整时保留此前的 APT 层及 Yarn 下载缓存。堆上限不等于整个构建的内存硬上限，内存紧张时仍需顺序构建阶段或使用有资源限额的 builder，不应以增加 swap 代替构建预算。
 
 ## 自测与证据
 
