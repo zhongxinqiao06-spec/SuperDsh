@@ -12,9 +12,11 @@ from PIL import Image, ImageDraw
 from app.infrastructure.errors import DomainError
 from app.modules.models.entity.vo.model_vo import CapabilityBinding
 from app.modules.models.service.capabilities import validate_parameters
+from app.modules.models.service.image_protocol import download_image
+from app.modules.models.service.image_protocol import image_result as provider_image
 from app.modules.models.service.provider_transport import ProviderTransport
 from app.modules.models.service.startup_configuration import load_startup_models
-from toolkits.office.contracts import InputFile, record
+from toolkits.office.contracts import InputFile
 from toolkits.office.multimodal_protocol import request_body, vision_answer
 
 ROOT = Path(__file__).resolve().parents[4]
@@ -29,15 +31,17 @@ def synthetic_image() -> InputFile:
         return InputFile("synthetic-square.png", output.getvalue())
 
 
-def image_result(value: dict[str, object]) -> dict[str, object]:
+async def image_result(
+    value: dict[str, object], transport: ProviderTransport, base_url: str
+) -> dict[str, object]:
     """验证供应商确实返回一张可解码位图，不把 HTTP 成功当作生成成功。"""
-    images = value.get("data")
-    if not isinstance(images, list) or len(images) != 1:
-        raise ValueError("expected one generated image")
-    encoded = record(images[0], "图片").get("b64_json")
-    if not isinstance(encoded, str):
-        raise ValueError("expected image bytes")
-    raw = base64.b64decode(encoded, validate=True)
+    item = provider_image(value)
+    if isinstance(item.get("b64_json"), str):
+        raw = base64.b64decode(item["b64_json"], validate=True)
+    elif isinstance(item.get("url"), str):
+        raw = await download_image(transport, item["url"], base_url, 24 * 1024 * 1024)
+    else:
+        raise ValueError("expected generated image")
     with Image.open(io.BytesIO(raw)) as image:
         image.load()
         if image.format not in {"PNG", "JPEG", "WEBP"} or min(image.size) < 64:
@@ -72,10 +76,10 @@ async def run(
         if not connection.apiKey or not connection.apiKey.get_secret_value():
             raise ValueError("explicit live probe requires a configured credential")
         parameters = validate_parameters(
-            connection.adapter, item.capability, item.modelId, item.parameters
+            connection.adapter, item.capability, item.modelId, item.parameters, connection.baseUrl
         )
         resolved: dict[str, object] = {
-            "connection": {"adapter": connection.adapter},
+            "connection": {"adapter": connection.adapter, "baseUrl": connection.baseUrl},
             "configuration": {"modelId": item.modelId, "parameters": parameters},
         }
         binding = CapabilityBinding(capability=item.capability, configurationId=item.id, revision=1)
@@ -103,9 +107,10 @@ async def run(
                 )
                 response = await transport.request(
                     "POST",
-                    connection.baseUrl.rstrip("/") + endpoint,
+                    endpoint,
                     {"Authorization": "Bearer " + connection.apiKey.get_secret_value()},
                     body,
+                    read_timeout=240 if item.capability == "image.generate" else 60,
                 )
                 if case == "vision":
                     answer = vision_answer(response)
@@ -113,7 +118,7 @@ async def run(
                         raise ValueError("visual answer did not match the synthetic image")
                     result["answerMatched"] = True
                 else:
-                    result.update(image_result(response))
+                    result.update(await image_result(response, transport, connection.baseUrl))
                 result["passed"] = True
             except Exception as error:
                 result.update(passed=False, errorType=type(error).__name__)

@@ -16,6 +16,7 @@ from app.modules.identity.entity.bo.models import Account
 from app.modules.identity.entity.bo.product_roles import Product
 from app.modules.models.entity.vo.model_vo import CapabilityBinding
 from app.modules.models.service.configuration_service import ConfigurationService
+from app.modules.models.service.image_protocol import download_image, image_result
 from app.modules.models.service.model_operation_service import ModelOperationService, OperationClaim
 from toolkits.office.contracts import Artifact, InputFile, record
 from toolkits.office.images import image_data
@@ -168,19 +169,19 @@ class MultimodalService:
         try:
             async with asyncio.timeout(240):
                 if receipt is None:
-                    connection = record(resolved["connection"], "模型连接")
                     await self.authorize(account, session_id, binding)
                     await self.operations.update(claim)
                     submitted = True
                     async with self.configurations.transport.open_stream(
                         "POST",
-                        str(connection["baseUrl"]).rstrip("/") + endpoint,
+                        endpoint,
                         {
                             "Authorization": "Bearer " + str(resolved["apiKey"]),
                             "Content-Type": "application/json",
                         },
                         body,
                         preserve_status=True,
+                        read_timeout=240 if binding.capability == "image.generate" else 60,
                     ) as response:
                         request_id = response.headers.get(
                             "x-request-id", response.headers.get("x-tt-logid", "")
@@ -277,10 +278,7 @@ class MultimodalService:
         usage: dict[str, object],
     ) -> dict[str, object]:
         """图片下载不带供应商凭据，保存前再次授权并校验真实像素内容。"""
-        data = receipt.get("data")
-        item = data[0] if isinstance(data, list) and data else None
-        if not isinstance(item, dict):
-            raise DomainError(502, "供应商未返回图片")
+        item = image_result(receipt)
         if isinstance(item.get("b64_json"), str):
             encoded = item["b64_json"]
             if len(encoded) > 24 * 1024 * 1024:
@@ -292,10 +290,14 @@ class MultimodalService:
             except (ValueError, binascii.Error) as error:
                 raise DomainError(502, "供应商图片编码无效") from error
         elif isinstance(item.get("url"), str) and len(item["url"]) <= 4096:
-            async with self.configurations.transport.open_stream(
-                "GET", item["url"], {}
-            ) as response:
-                content = await response_bytes(response, 10 * 1024 * 1024)
+            _, resolved = await self.authorize(account, session_id, binding)
+            connection = record(resolved["connection"], "模型连接")
+            content = await download_image(
+                self.configurations.transport,
+                item["url"],
+                str(connection["baseUrl"]),
+                10 * 1024 * 1024,
+            )
         else:
             raise DomainError(502, "供应商未返回支持的图片内容")
         try:

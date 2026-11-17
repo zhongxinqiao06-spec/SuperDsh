@@ -35,6 +35,7 @@ async def configured(
     app: FastAPI,
     client: httpx.AsyncClient,
     capability: Capability,
+    bailian: bool = False,
 ) -> tuple[Account, CapabilityBinding]:
     login = await bootstrap(client)
     connection = await client.post(
@@ -42,7 +43,9 @@ async def configured(
         json={
             "name": "合成多模态供应商",
             "adapter": "openai-completions",
-            "baseUrl": "https://fixture.invalid/api",
+            "baseUrl": "https://token-plan.cn-beijing.maas.aliyuncs.com/compatible-mode/v1"
+            if bailian
+            else "https://fixture.invalid/api",
             "apiKey": "synthetic-provider-key",
         },
     )
@@ -55,7 +58,9 @@ async def configured(
             "capability": capability,
             "modelId": "synthetic-model",
             "enabled": True,
-            "parameters": {"size": "1024x1024"}
+            "parameters": {"imageProfile": "bailian-images", "size": "1024x1024"}
+            if bailian
+            else {"size": "1024x1024"}
             if capability == "image.generate"
             else {"maxTokens": 64},
             "roleIds": [],
@@ -89,18 +94,41 @@ def service(app: FastAPI, account: Account, save: object) -> MultimodalService:
     )
 
 
+@pytest.mark.parametrize("bailian", [False, True])
 async def test_image_receipt_resumes_storage_without_paid_post_after_restart(
     platform: tuple[FastAPI, httpx.AsyncClient],
+    bailian: bool,
 ) -> None:
     app, client = platform
     tmp_path = Path(os.environ["WEB_ADMIN_VALIDATION_DIR"]) / "multimodal-images"
     tmp_path.mkdir(parents=True, exist_ok=True)
-    account, binding = await configured(app, client, "image.generate")
+    account, binding = await configured(app, client, "image.generate", bailian)
     payload = fixture_image()
     requests: list[httpx.Request] = []
 
     async def receiver(request: httpx.Request) -> httpx.Response:
+        if request.method == "GET":
+            assert "authorization" not in request.headers
+            return httpx.Response(200, content=payload)
         requests.append(request)
+        if bailian:
+            assert request.url.path == "/api/v1/services/aigc/multimodal-generation/generation"
+            return httpx.Response(
+                200,
+                json={
+                    "output": {
+                        "choices": [
+                            {
+                                "message": {
+                                    "content": [
+                                        {"image": "https://images.invalid/result.png"},
+                                    ]
+                                }
+                            }
+                        ]
+                    }
+                },
+            )
         return httpx.Response(
             200,
             headers={"x-request-id": "fixture-request"},

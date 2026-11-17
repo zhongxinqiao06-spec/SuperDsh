@@ -230,7 +230,7 @@ async def asset_closure(
 
 
 async def collect(
-    session: AsyncSession, project_id: str
+    session: AsyncSession, project_id: str, history: list[dict[str, Any]] | None = None
 ) -> tuple[dict[str, list[dict[str, Any]]], list[dict[str, Any]], str]:
     """在调用方的只读一致性事务内收集单个工程及显式依赖。"""
     projects = await rows(session, "studio_projects", "id", [project_id])
@@ -241,7 +241,18 @@ async def collect(
     for table, column in PROJECT_TABLES.items():
         data[table] = await rows(session, table, column, [project_id])
     if any(job["state"] != "ready" for job in data["studio_media_jobs"]):
-        raise ValueError("作品仍有未完成任务；先核对状态，不能迁移活动执行队列")
+        if history is None or any(
+            job["state"] not in {"ready", "failed", "cancelled", "unknown", "paused", "unaccepted"}
+            or job.get("lease_token")
+            or job.get("lease_until")
+            for job in data["studio_media_jobs"]
+        ):
+            raise ValueError("作品仍有未完成任务；先核对状态，不能迁移活动执行队列")
+        # 显式归档仅迁移静态证据，未知状态不改成成功，也不进入目标执行表。
+        history.extend(job for job in data["studio_media_jobs"] if job["state"] != "ready")
+        data["studio_media_jobs"] = [
+            job for job in data["studio_media_jobs"] if job["state"] == "ready"
+        ]
     await asset_closure(session, data, owner, project_id)
     job_ids = {job["id"] for job in data["studio_media_jobs"]}
     source_jobs = {
@@ -334,18 +345,24 @@ def copy_checked(source_root: Path, relative: str, destination: Path) -> dict[st
 
 
 async def export_bundle(
-    database: Database, project: str, runtime: Path, destination: Path
+    database: Database,
+    project: str,
+    runtime: Path,
+    destination: Path,
+    *,
+    archive_inactive: bool = False,
 ) -> dict[str, Any]:
     """生成可审阅的离线源数据包；不声称已完成目标导入和原生会话恢复。"""
     if await asyncio.to_thread(destination.exists):
         raise ValueError("目标目录已存在，拒绝覆盖历史迁移包")
     async with database.sessions() as session:
         await session.execute(text("SET TRANSACTION ISOLATION LEVEL REPEATABLE READ, READ ONLY"))
-        data, evidence, owner = await collect(session, project)
+        history: list[dict[str, Any]] | None = [] if archive_inactive else None
+        data, evidence, owner = await collect(session, project, history)
         schema_revision = await session.scalar(text("SELECT version_num FROM alembic_version"))
         await session.rollback()
     return await asyncio.to_thread(
-        write_bundle, data, evidence, owner, project, runtime, destination, schema_revision
+        write_bundle, data, evidence, owner, project, runtime, destination, schema_revision, history
     )
 
 
@@ -357,6 +374,7 @@ def write_bundle(
     runtime: Path,
     destination: Path,
     schema_revision: str | None,
+    history: list[dict[str, Any]] | None = None,
 ) -> dict[str, Any]:
     """事务结束后在线程中复制已冻结数据；manifest 最后写入表示本地打包完整。"""
     destination.mkdir(parents=True)
@@ -370,6 +388,17 @@ def write_bundle(
 
     write("rows.json", clean)
     write("evidence/model-operations.json", sanitized(evidence, removed, "evidence"))
+    history_files = []
+    if history is not None:
+        name = "evidence/inactive-media-jobs.json"
+        write(name, sanitized(history, removed, "inactive-media-jobs"))
+        history_files.append(
+            {
+                "path": name,
+                "bytes": (destination / name).stat().st_size,
+                "sha256": hashlib.sha256((destination / name).read_bytes()).hexdigest(),
+            }
+        )
     copied = []
     for job in data["studio_media_jobs"]:
         if not re.fullmatch(r"[a-zA-Z0-9_-]+", job["id"]):
@@ -412,6 +441,8 @@ def write_bundle(
             for name in ("rows.json", "evidence/model-operations.json")
         ],
         "redactedFields": removed,
+        "evidenceFiles": history_files,
+        "archivedInactiveJobs": len(history or []),
         "importRequirements": [
             "先备份目标，再以单作品事务导入；ID冲突必须停止，不能覆盖现有用户或作品。",
             "显式映射sourceOwnerId到目标已有用户；核验娱乐权限，更新所有owner/owner_id/actor_id及JSON内owner。",
@@ -445,6 +476,11 @@ async def main() -> None:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--project", required=True)
     parser.add_argument("--destination", required=True, type=Path)
+    parser.add_argument(
+        "--archive-inactive",
+        action="store_true",
+        help="失败和未知任务只存只读证据，不导入执行队列；活动任务仍阻止导出",
+    )
     options = parser.parse_args()
     from app.infrastructure.configuration import Settings
     from app.infrastructure.database import Database
@@ -458,7 +494,13 @@ async def main() -> None:
     settings = Settings()
     database = Database(settings.database_url)
     try:
-        result = await export_bundle(database, options.project, settings.data_dir, destination)
+        result = await export_bundle(
+            database,
+            options.project,
+            settings.data_dir,
+            destination,
+            archive_inactive=options.archive_inactive,
+        )
         print(
             json.dumps(
                 {

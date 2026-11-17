@@ -11,6 +11,7 @@ from typing import Any
 from PIL import Image, UnidentifiedImageError
 
 from app.infrastructure.errors import DomainError
+from app.modules.models.service.image_protocol import download_image, image_request, image_result
 from app.modules.models.service.provider_transport import ProviderTransport
 
 
@@ -35,25 +36,21 @@ class ImageProvider:
     async def generate(self, prompt: str, images: list[str], receipt: Path) -> None:
         """只调用一次收费接口；一旦取得结果先原子写入私有收据，再处理文件。"""
         connection, configuration = self.resolved["connection"], self.resolved["configuration"]
-        adapter = connection["adapter"]
-        if adapter not in {"openai-completions", "volcengine-ark"}:
-            raise DomainError(422, "当前连接尚未接入图片能力")
-        if images and adapter != "volcengine-ark":
-            raise DomainError(422, "当前连接不支持参考图编辑")
-        body: dict[str, object] = {
-            "model": configuration["modelId"],
-            "prompt": prompt,
-            "size": configuration["parameters"]["size"],
-            "response_format": "b64_json",
-        }
-        body.update({"watermark": True} if adapter == "volcengine-ark" else {"n": 1})
-        if images:
-            body["image"] = images[0] if len(images) == 1 else images
+        endpoint, body = image_request(
+            connection["adapter"],
+            configuration["modelId"],
+            configuration["parameters"],
+            prompt,
+            images,
+            connection["baseUrl"],
+        )
         response = await self.transport.request(
             "POST",
-            connection["baseUrl"].rstrip("/") + "/images/generations",
+            endpoint,
             {"Authorization": "Bearer " + self.resolved["apiKey"]},
             body,
+            # 参考图编辑通常比文字生图更慢，延长单次等待而非自动重提收费请求。
+            read_timeout=240,
         )
         receipt.parent.mkdir(parents=True, exist_ok=True)
         temporary = receipt.with_suffix(".tmp")
@@ -62,23 +59,19 @@ class ImageProvider:
 
     async def result(self, receipt: Path, destination: Path) -> None:
         value = json.loads(await asyncio.to_thread(receipt.read_text, encoding="utf-8"))
-        data = value.get("data")
-        item = data[0] if isinstance(data, list) and data else None
-        if not isinstance(item, dict):
-            raise DomainError(502, "供应商未返回图片结果")
+        item = image_result(value)
         if isinstance(item.get("b64_json"), str):
             try:
                 content = base64.b64decode(item["b64_json"], validate=True)
             except (ValueError, binascii.Error) as error:
                 raise DomainError(502, "图片编码无效") from error
         elif isinstance(item.get("url"), str):
-            result = bytearray()
-            async with self.transport.open_stream("GET", item["url"], {}) as response:
-                async for block in response.aiter_bytes():
-                    result.extend(block)
-                    if len(result) > 24 * 1024 * 1024:
-                        raise DomainError(502, "图片文件超过处理上限")
-            content = bytes(result)
+            content = await download_image(
+                self.transport,
+                item["url"],
+                self.resolved["connection"]["baseUrl"],
+                24 * 1024 * 1024,
+            )
         else:
             raise DomainError(502, "供应商未返回可读取的图片")
         normalized = await asyncio.to_thread(normalized_image, content)

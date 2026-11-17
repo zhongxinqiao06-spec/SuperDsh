@@ -10,6 +10,20 @@
   ],
   "configurations": [
     {
+      "id": "bailian-studio-image",
+      "name": "百炼 · 角色与场景生图",
+      "modelId": "qwen-image-3.0-pro",
+      "capability": "image.generate",
+      "connectionId": "aliyun-token-plan",
+      "enabled": true,
+      "parameters": {
+        "imageProfile": "bailian-images",
+        "size": "1536x1024",
+        "maxImages": 3
+      },
+      "roleIds": []
+    },
+    {
       "id": "bailian-studio-research",
       "name": "百炼 · 联网资料查询",
       "modelId": "qwen3.8-flash",
@@ -40,7 +54,7 @@
       "connectionId": "aliyun-token-plan",
       "enabled": true,
       "parameters": {
-        "voices": "longanhuan_v3.6,longanlingxin"
+        "voices": "longanhuan_v3.6,longanlingxin,longanlufeng"
       },
       "roleIds": []
     },

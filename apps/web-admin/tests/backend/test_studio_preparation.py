@@ -72,8 +72,20 @@ def preparation_configuration(tmp_path: Path) -> dict[str, object]:
 
 
 @pytest.fixture
-def platform_settings(tmp_path: Path) -> dict[str, object]:
-    return preparation_configuration(tmp_path)
+def platform_settings(tmp_path: Path, request: pytest.FixtureRequest) -> dict[str, object]:
+    settings = preparation_configuration(tmp_path)
+    if getattr(request, "param", "volcano") == "bailian":
+        path = tmp_path / "models.json"
+        value = json.loads(path.read_text("utf-8"))
+        image = value["configurations"][0]
+        image.update(connectionId="speech", modelId="synthetic-image")
+        image["parameters"] = {
+            "imageProfile": "bailian-images",
+            "size": "1024x1024",
+            "maxImages": 3,
+        }
+        path.write_text(json.dumps(value), "utf-8")
+    return settings
 
 
 async def create(client: AsyncClient) -> tuple[str, dict]:
@@ -184,6 +196,7 @@ async def test_confirm_and_three_way_review(platform: tuple[FastAPI, AsyncClient
     ).status_code == 404
 
 
+@pytest.mark.parametrize("platform_settings", ["volcano", "bailian"], indirect=True)
 async def test_reference_voice_candidate_adoption(platform: tuple[FastAPI, AsyncClient]) -> None:
     app, client = platform
     await bootstrap(client)
@@ -201,6 +214,25 @@ async def test_reference_voice_candidate_adoption(platform: tuple[FastAPI, Async
     def provider(request: httpx.Request) -> httpx.Response:
         if request.method == "POST":
             calls.append(request.url.path)
+            if request.url.path.endswith("/multimodal-generation/generation"):
+                body = json.loads(request.content)
+                assert body["model"] == "synthetic-image"
+                return httpx.Response(
+                    200,
+                    json={
+                        "output": {
+                            "choices": [
+                                {
+                                    "message": {
+                                        "content": [
+                                            {"image": "https://images.invalid/result.png"},
+                                        ]
+                                    }
+                                }
+                            ]
+                        }
+                    },
+                )
             if request.url.path.endswith("/images/generations"):
                 return httpx.Response(
                     200,
@@ -209,7 +241,12 @@ async def test_reference_voice_candidate_adoption(platform: tuple[FastAPI, Async
             return httpx.Response(
                 200, json={"output": {"audio": {"url": "https://audio.invalid/voice.wav"}}}
             )
-        return httpx.Response(200, content=sound.getvalue())
+        return httpx.Response(
+            200,
+            content=picture.getvalue()
+            if request.url.host == "images.invalid"
+            else sound.getvalue(),
+        )
 
     app.state.services.model_configurations.transport = ProviderTransport(
         transport=httpx.MockTransport(provider)

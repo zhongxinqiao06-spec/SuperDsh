@@ -9,10 +9,10 @@ from conftest import bootstrap
 from fastapi import FastAPI
 from httpx import AsyncClient
 from sqlalchemy import select
+from tooling.export_studio_project import ALLOWLIST, copy_checked, export_bundle, rows, sanitized
 
 from app.modules.models.entity.do.model_do import ModelOperationRow
 from app.modules.studio.entity.do.models import MediaJob, StudioProject
-from tooling.export_studio_project import ALLOWLIST, copy_checked, export_bundle, rows, sanitized
 
 
 def test_transfer_sanitizes_nested_credentials_and_rejects_path_escape(tmp_path: Path) -> None:
@@ -140,3 +140,17 @@ async def test_transfer_exports_only_selected_project_without_execution_secrets(
     with pytest.raises(ValueError, match="未完成任务"):
         await export_bundle(database, other, runtime, tmp_path / "other-transfer")
     assert not (tmp_path / "other-transfer").exists()
+    archive = tmp_path / "history-transfer"
+    result = await export_bundle(database, other, runtime, archive, archive_inactive=True)
+    assert result["archivedInactiveJobs"] == 1 and result["rows"]["studio_media_jobs"] == 0
+    history = json.loads((archive / "evidence/inactive-media-jobs.json").read_text("utf-8"))
+    assert history[0]["state"] == "unknown"
+    async with database.sessions.begin() as session:
+        job = await session.get(MediaJob, "unrelated")
+        assert job and job.state == "unknown"
+        job.state = "queued"
+    with pytest.raises(ValueError, match="未完成任务"):
+        await export_bundle(
+            database, other, runtime, tmp_path / "active-transfer", archive_inactive=True
+        )
+    assert not (tmp_path / "active-transfer").exists()

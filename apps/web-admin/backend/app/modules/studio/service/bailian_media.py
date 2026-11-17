@@ -2,47 +2,24 @@
 
 import asyncio
 import re
-from functools import cache
 from pathlib import Path
-from typing import Annotated
-from urllib.parse import urlsplit
-
-from pydantic import BaseModel, ConfigDict, Field
 
 from app.infrastructure.errors import DomainError
+from app.modules.models.service.bailian_protocol import (
+    bailian_download,
+    bailian_origin,
+    bailian_routes,
+)
 from app.modules.models.service.provider_transport import ProviderTransport
-
-ProtocolPath = Annotated[str, Field(pattern=r"^/(?:[A-Za-z0-9_-]+/)*[A-Za-z0-9_-]+$")]
-
-
-class BailianRoutes(BaseModel):
-    """随部署发布的媒体协议相对路径，只能追加到已校验的百炼域名。"""
-
-    model_config = ConfigDict(frozen=True, extra="forbid")
-    video: ProtocolPath
-    tasks: ProtocolPath
-    speech: ProtocolPath
-
-
-@cache
-def _routes() -> BailianRoutes:
-    path = Path(__file__).resolve().parents[4] / "resources/providers/bailian-media.json"
-    return BailianRoutes.model_validate_json(path.read_bytes())
 
 
 class BailianMedia:
     """同一供应商连接可同时承载聊天、异步视频和同步语音。"""
 
     def __init__(self, transport: ProviderTransport, base_url: str, key: str, model: str) -> None:
-        endpoint = urlsplit(base_url)
-        if (endpoint.scheme, endpoint.netloc) != (
-            "https",
-            "token-plan.cn-beijing.maas.aliyuncs.com",
-        ):
-            raise DomainError(422, "所选连接未接入百炼 Token Plan 媒体协议")
         self.transport = transport
-        self.origin = f"{endpoint.scheme}://{endpoint.netloc}"
-        self.routes = _routes()
+        self.origin = bailian_origin(base_url)
+        self.routes = bailian_routes()
         self.headers = {"Authorization": f"Bearer {key}"}
         self.model = model
 
@@ -115,21 +92,7 @@ class BailianMedia:
 
     async def download(self, url: str, destination: Path) -> None:
         """下载使用独立无凭据连接和临时文件，完整接收后原子替换。"""
-        parts = urlsplit(url)
-        # 百炼配音可能返回 HTTP 的 OSS 签名；仅在官方 OSS 域名升级为 TLS。
-        if parts.scheme == "http" and parts.netloc.endswith(".aliyuncs.com"):
-            url = parts._replace(scheme="https").geturl()
-        if urlsplit(url).scheme != "https":
-            raise DomainError(502, "媒体下载地址无效")
-        # 百炼为每次生成分配 OSS 分桶。仅允许显式信任的百炼连接在服务商分桶使用代理的合成网段；
-        # 下载仍固定 IP、校验原域名 TLS、不跟随重定向，普通内网和回环地址仍被拒绝。
-        download_origin = urlsplit(url).netloc
-        proxy_dns = self.origin in self.transport.allowed_origins and bool(
-            re.fullmatch(
-                r"dashscope-[a-z0-9-]+\.oss-(?:accelerate|cn-[a-z0-9-]+)\.aliyuncs\.com",
-                download_origin,
-            )
-        )
+        url, proxy_dns = bailian_download(url, self.origin, self.transport.allowed_origins)
         destination.parent.mkdir(parents=True, exist_ok=True)
         partial = destination.with_suffix(".part")
         size = 0

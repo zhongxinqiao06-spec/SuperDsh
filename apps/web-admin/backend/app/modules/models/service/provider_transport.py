@@ -2,6 +2,8 @@
 
 import asyncio
 import ipaddress
+import json
+import re
 import socket
 from collections.abc import AsyncIterator
 from contextlib import asynccontextmanager
@@ -103,13 +105,38 @@ class ProviderTransport:
                     method, requested, headers=headers, json=body, extensions=extensions
                 ) as response:
                     if not 200 <= response.status_code < 300:
+                        # 只保留受限错误标识，不反射可能夹带签名 URL、请求内容或密钥的错误正文。
+                        error_content = bytearray()
+                        async for chunk in response.aiter_bytes():
+                            error_content.extend(chunk[: 8192 - len(error_content)])
+                            if len(error_content) >= 8192:
+                                break
+                        provider_code = ""
+                        try:
+                            value = json.loads(error_content)
+                            error = value.get("error", value) if isinstance(value, dict) else {}
+                            candidate = error.get("code", "") if isinstance(error, dict) else ""
+                            if isinstance(candidate, str) and re.fullmatch(
+                                r"[A-Za-z][A-Za-z0-9_.-]{0,99}", candidate
+                            ):
+                                provider_code = " · " + candidate
+                        except (ValueError, UnicodeError):
+                            pass
+                        detail = (
+                            "供应商未通过图片内容审核，请调整画面内容或使用已有素材"
+                            if "SensitiveContentDetected" in provider_code
+                            else "供应商请求过于频繁，请稍后重试"
+                            if response.status_code == 429
+                            else "供应商拒绝请求，请检查地址、凭据和模型"
+                        )
                         raise DomainError(
                             response.status_code
                             if preserve_status and 400 <= response.status_code < 600
                             else 422
                             if response.status_code < 500
                             else 502,
-                            "供应商拒绝请求，请检查地址、凭据和模型",
+                            f"{detail}（HTTP {response.status_code}{provider_code}）",
+                            f"provider_http_{response.status_code}",
                         )
                     yield response
         except httpx.ReadTimeout as error:
@@ -124,10 +151,18 @@ class ProviderTransport:
             raise DomainError(502, "供应商连接失败") from error
 
     async def request(
-        self, method: str, url: str, headers: dict[str, str], body: dict[str, object] | None = None
+        self,
+        method: str,
+        url: str,
+        headers: dict[str, str],
+        body: dict[str, object] | None = None,
+        *,
+        read_timeout: float = 60,
     ) -> dict[str, object]:
         """非流式结果在相同网络边界内有界收集，不反射供应商错误正文。"""
-        async with self.open_stream(method, url, headers, body) as response:
+        async with self.open_stream(
+            method, url, headers, body, read_timeout=read_timeout
+        ) as response:
             content = bytearray()
             async for chunk in response.aiter_bytes():
                 content.extend(chunk)

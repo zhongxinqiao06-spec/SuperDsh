@@ -154,6 +154,8 @@ corepack yarn web-admin:deps:down
 
 `build` 编译 Vue 和固定引擎适配并校验 Python；`start` 用 Python 服务已构建静态站点，不使用 Vite 开发服务器充当生产入口。`deps:down` 保留开发卷。
 
+百炼图片能力复用现有 Token Plan 连接。`backend/config/studio-media.example.json` 中的 `bailian-studio-image` 可合并到实际 `backend/config/model-defaults.json`，后端启动自动同步：能力 `image.generate`，规格 `bailian-images`，模型 `qwen-image-3.0-pro`，输出 `1536x1024`，最多三张参考图。角色、场景、分镜图和通用 AI 生图工具共用适配及已授权文件。协议依据[百炼生图文档](https://help.aliyun.com/zh/model-studio/token-plan-image-generation)，使用原生媒体接口。模型和参数仍由配置决定；候选须采用后才影响工程，下载恢复不会重新调用收费生成接口。
+
 ## Python 依赖清单
 
 - `backend/requirements.txt`：完整运行依赖，包含全部间接依赖。

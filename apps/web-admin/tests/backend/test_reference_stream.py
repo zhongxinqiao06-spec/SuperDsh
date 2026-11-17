@@ -138,6 +138,10 @@ async def test_transport_allows_bounded_read_override_without_relaxing_connect()
     ) as response:
         await response.aread()
     assert observed == [{"connect": 10, "read": 180, "write": 60, "pool": 60}]
+    assert await transport.request("POST", "https://fixture.invalid", {}, {}, read_timeout=240) == {
+        "ok": True
+    }
+    assert observed[-1] == {"connect": 10, "read": 240, "write": 60, "pool": 60}
     with pytest.raises(DomainError):
         async with transport.open_stream("GET", "https://fixture.invalid", {}, read_timeout=0):
             raise AssertionError("invalid timeout must not open transport")

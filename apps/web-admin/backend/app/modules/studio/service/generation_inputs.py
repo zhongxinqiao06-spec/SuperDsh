@@ -9,6 +9,7 @@ from PIL import Image, UnidentifiedImageError
 from app.infrastructure.errors import DomainError
 from app.modules.identity.entity.bo.models import Account
 from app.modules.models.entity.vo.model_vo import CapabilityBinding
+from app.modules.models.service.image_protocol import supports_reference_images
 from app.modules.studio.service.bailian_media import BailianMedia
 
 if TYPE_CHECKING:
@@ -19,7 +20,7 @@ class GenerationInputs:
     def __init__(self, media: "MediaJobs", account: Account, catalog: dict) -> None:
         self.media, self.account, self.catalog = media, account, catalog
         self.resolved: dict[str, dict] = {}
-        self.checked_images: set[str] = set()
+        self.checked_images: dict[str, tuple[int, int]] = {}
 
     async def model(
         self,
@@ -75,12 +76,13 @@ class GenerationInputs:
             )
         return frozen, self.resolved[key]
 
-    async def images(self, values: list[str], limit: int) -> list[str]:
+    async def images(self, values: list[str], limit: int, *, minimum_side: int = 1) -> list[str]:
         unique = list(dict.fromkeys(values))
         if len(unique) > limit:
             raise DomainError(422, "参考图数量超过模型允许范围")
         for identity in unique:
             if identity in self.checked_images:
+                self._image_dimensions(identity, minimum_side)
                 continue
             entry = await self.media.studio.files.entry(self.account, identity)
             if (
@@ -93,11 +95,23 @@ class GenerationInputs:
                 raise DomainError(422, "参考文件不可读取")
             try:
                 with Image.open(io.BytesIO(content)) as picture:
+                    dimensions = picture.size
                     picture.verify()
             except (OSError, ValueError, UnidentifiedImageError):
                 raise DomainError(422, "参考图片内容损坏，请重新上传") from None
-            self.checked_images.add(identity)
+            self.checked_images[identity] = dimensions
+            self._image_dimensions(identity, minimum_side)
         return unique
+
+    def _image_dimensions(self, identity: str, minimum_side: int) -> None:
+        """尺寸限制属于制作预检，避免视频已提交后才被供应商拒绝。"""
+        width, height = self.checked_images[identity]
+        if min(width, height) < minimum_side:
+            raise DomainError(
+                422,
+                f"参考图片为 {width}×{height}，视频要求至少 {minimum_side}×{minimum_side}；"
+                "请先在角色与场景中生成并采用高清参考图，或上传合规格图片",
+            )
 
     async def speech(
         self, text: str, voice: str, choice: str | None, binding: dict | None = None
@@ -134,6 +148,8 @@ class GenerationInputs:
                 if a.get("fileId") and a["kind"] in {"character", "scene", "prop", "image"}
             ],
             9,
+            # 当前视频适配的参考图片最低尺寸；文字生图/参考图编辑不受此限制。
+            minimum_side=300,
         )
         selected, resolved = await self.model(
             "video.generate",
@@ -195,7 +211,9 @@ class GenerationInputs:
             [asset["fileId"]] if intent.get("useReference") and asset.get("fileId") else [],
             resolved["configuration"]["parameters"].get("maxImages", 1),
         )
-        if images and resolved["connection"]["adapter"] != "volcengine-ark":
+        if images and not supports_reference_images(
+            resolved["connection"]["adapter"], resolved["configuration"]["parameters"]
+        ):
             raise DomainError(422, "当前模型不支持参考图编辑，可取消沿用参考或另选模型")
         return {
             "prompt": "\n".join(

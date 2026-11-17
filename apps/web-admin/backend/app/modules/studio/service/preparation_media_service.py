@@ -5,6 +5,7 @@ from typing import TYPE_CHECKING, Any, cast
 from app.infrastructure.errors import DomainError
 from app.modules.identity.entity.bo.models import Account
 from app.modules.models.entity.vo.model_vo import CapabilityBinding
+from app.modules.models.service.image_protocol import supports_reference_images
 from app.modules.studio.dao.asset_dao import AssetDao
 from app.modules.studio.dao.foundation_dao import FoundationDao
 from app.modules.studio.dao.studio_dao import StudioDao
@@ -138,7 +139,9 @@ class PreparationMediaService:
             else:
                 if not body.useReference:
                     images = []
-                if images and resolved["connection"]["adapter"] != "volcengine-ark":
+                if images and not supports_reference_images(
+                    resolved["connection"]["adapter"], config["parameters"]
+                ):
                     raise DomainError(422, "所选图片连接不支持参考图编辑，请换模型或取消沿用参考图")
                 if len(images) > config["parameters"].get("maxImages", 1):
                     raise DomainError(

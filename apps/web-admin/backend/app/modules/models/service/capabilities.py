@@ -46,7 +46,7 @@ CAPABILITIES: list[dict[str, object]] = [
                 "imageProfile": {
                     "type": "string",
                     "title": "图片模型规格",
-                    "enum": ["auto", "seedream-4", "seedream-5", "openai-images"],
+                    "enum": ["auto", "seedream-4", "seedream-5", "openai-images", "bailian-images"],
                     "default": "auto",
                 },
                 "size": {"type": "string", "title": "输出尺寸／分辨率", "default": "2K"},
@@ -200,6 +200,21 @@ def validate_parameters(
         if adapter not in {"volcengine-ark", "openai-completions"}:
             raise DomainError(422, "当前连接不支持图片生成")
         requested = values.get("imageProfile", "auto")
+        if requested == "bailian-images":
+            endpoint = urlsplit(base_url)
+            if adapter != "openai-completions" or (endpoint.scheme, endpoint.netloc) != (
+                "https",
+                "token-plan.cn-beijing.maas.aliyuncs.com",
+            ):
+                raise DomainError(422, "百炼图片规格需要 Token Plan 连接")
+            size = values.get("size", "1536x1024")
+            if not isinstance(size, str) or size not in {"1024x1024", "1536x1024", "1024x1536"}:
+                raise DomainError(422, "图片尺寸不受支持")
+            return {
+                "size": size,
+                "imageProfile": requested,
+                "maxImages": number("maxImages", 3, 1, 3),
+            }
         if not isinstance(requested, str) or requested not in {
             "auto",
             "seedream-4",

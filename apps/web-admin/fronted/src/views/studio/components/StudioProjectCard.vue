@@ -42,14 +42,16 @@ watch(
       </div>
       <div class="project-caption">
         <h2>{{ project.title }}</h2>
-        <span>{{ project.shots }} 个镜头 · {{ project.adopted }} 个已采用</span>
+        <span class="project-stats"
+          >{{ project.shots }} 个镜头 · {{ project.adopted }} 个已采用</span
+        >
         <progress
           v-if="project.shots"
           :max="project.shots"
           :value="project.adopted"
           aria-label="镜头采用进度"
         />
-        <span v-if="project.aspectWidth"
+        <span v-if="project.aspectWidth" class="project-specification"
           >{{ project.aspectWidth }}:{{ project.aspectHeight }} · 目标
           {{ (project.targetDurationMs ?? 0) / 1000 }} 秒</span
         >
@@ -68,6 +70,8 @@ watch(
 </template>
 <style scoped>
 .studio-project-entry {
+  display: flex;
+  flex-direction: column;
   min-width: 0;
 }
 .project-entry-actions {
@@ -75,7 +79,8 @@ watch(
 }
 .studio-project-card {
   display: grid;
-  align-content: start;
+  grid-template-rows: auto 1fr;
+  flex: 1;
   min-width: 0;
   overflow: hidden;
   border: 1px solid var(--border);
@@ -109,30 +114,30 @@ watch(
   object-fit: cover;
 }
 .project-slate {
-  width: 100%;
-  height: 100%;
+  position: absolute;
+  inset: 0;
   display: grid;
   place-items: center;
+  padding: var(--field-gap) var(--field-gap) 44px;
   background: var(--selection-fill);
 }
 .project-slate strong {
   font-family: var(--font-editorial);
   font-weight: 600;
-  font-size: clamp(22px, 2.4vw, 32px);
+  font-size: clamp(20px, 2vw, 28px);
   line-height: 1.4;
   text-align: center;
-  padding: 8%;
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
   overflow-wrap: anywhere;
   max-height: 100%;
   overflow: hidden;
 }
-.studio-project-card:only-child .project-cover {
-  aspect-ratio: 2.45;
-}
 .project-open {
-  grid-column: 2;
-  grid-row: 1/4;
-  align-self: center;
+  grid-column: 1;
+  grid-row: 6;
+  align-self: end;
   justify-self: end;
   color: var(--foreground);
   border: 1px solid var(--border);
@@ -142,11 +147,6 @@ watch(
 }
 .project-caption > :not(.project-open) {
   grid-column: 1;
-}
-@media (max-width: 600px) {
-  .studio-project-card:only-child .project-cover {
-    aspect-ratio: 1.65;
-  }
 }
 .project-revision {
   position: absolute;
@@ -161,12 +161,17 @@ watch(
 }
 .project-caption {
   display: grid;
-  gap: 8px;
+  grid-template-columns: minmax(0, 1fr);
+  grid-template-rows:
+    minmax(calc(var(--line-height-section) * 2), auto)
+    auto auto auto 1fr auto;
+  gap: var(--control-gap);
   padding: var(--field-gap);
   font-size: var(--font-size-meta);
   color: var(--muted-foreground);
 }
 .project-caption h2 {
+  grid-row: 1;
   margin: 0;
   color: var(--foreground);
   font-size: var(--font-size-section);
@@ -175,11 +180,31 @@ watch(
   overflow-wrap: anywhere;
 }
 .project-caption progress {
+  grid-row: 3;
   width: 100%;
   height: 4px;
   accent-color: var(--primary);
 }
 .project-updated {
-  font-size: 12px;
+  grid-row: 5;
+  align-self: start;
+  display: flex;
+  align-items: baseline;
+  flex-wrap: wrap;
+  gap: 4px var(--control-gap);
+  font-size: var(--font-size-meta);
+}
+.project-stats {
+  grid-row: 2;
+}
+.project-specification {
+  grid-row: 4;
+}
+.project-updated :deep(.date-time) {
+  display: inline-flex;
+  flex-direction: row;
+  align-items: baseline;
+  flex-wrap: wrap;
+  gap: var(--control-gap);
 }
 </style>
