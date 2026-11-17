@@ -37,7 +37,7 @@ const seconds = computed({
       >故事构想<el-input
         v-model="model.brief"
         type="textarea"
-        :rows="3"
+        :autosize="{ minRows: 3, maxRows: 12 }"
         maxlength="12000"
         placeholder="讲谁的故事、发生什么、希望观众感受到什么"
         aria-label="故事构想"
@@ -70,7 +70,7 @@ const seconds = computed({
       >视觉风格<el-input
         v-model="model.styleBrief"
         type="textarea"
-        :rows="2"
+        :autosize="{ minRows: 2, maxRows: 10 }"
         maxlength="12000"
         placeholder="例如：写实雨夜、冷暖灯光、安静克制"
         aria-label="视觉风格"

@@ -11,14 +11,20 @@
   display: flex;
   flex-shrink: 0;
   flex-direction: column;
-  gap: 8px;
   width: 240px;
   min-width: 180px;
   max-width: 40%;
-  padding: 14px 12px;
-  overflow: auto;
+  padding: 0;
   resize: horizontal;
   border-right: 1px solid var(--border);
+  background: var(--sidebar);
+}
+.workspace-sidebar > .scroll-panel__header,
+.workspace-sidebar > .scroll-panel__body {
+  display: flex;
+  flex-direction: column;
+  gap: var(--control-gap);
+  padding: 14px 12px;
   background: var(--sidebar);
 }
 .workspace-new-session.el-button {
@@ -487,7 +493,6 @@
   gap: 4px;
   min-width: 0;
   overflow-x: auto;
-  scrollbar-width: thin;
 }
 .composer-options .el-select,
 .composer-options .runtime-selectors .el-select {
@@ -1031,18 +1036,14 @@
 .office-results-pane {
   width: clamp(228px, 22vw, 355px);
   flex-shrink: 0;
-  overflow: auto;
-  overscroll-behavior: contain;
   background: var(--card);
   border-left: 1px solid var(--border);
-  padding: 16px;
+  padding: 0;
 }
-.office-results-pane > header {
+.office-results-heading {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  border-bottom: 1px solid var(--border);
-  padding-bottom: 10px;
 }
 .office-results-pane h2 {
   font: 600 18px var(--font-sans);

@@ -82,3 +82,16 @@ export function indexedEvidence(cases: string[]): {
 } {
   return { status: 'indexed-only', cases, executed: false }
 }
+
+/** 从统一规范的范围表读取独立验收索引，文档缺失或重复不得静默跳过检查。 */
+export function documentedTaskIds(
+  markdown: string,
+  prefix: 'P2' | 'P3',
+): string[] {
+  const ids = [...markdown.matchAll(/^\|\s*(P[23]-\d+)\s*\|/gmu)]
+    .map((match) => match[1]!)
+    .filter((id) => id.startsWith(`${prefix}-`))
+  if (!ids.length || new Set(ids).size !== ids.length)
+    throw new Error(`${prefix} 文档范围索引为空或重复`)
+  return ids
+}

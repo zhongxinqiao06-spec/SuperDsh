@@ -37,7 +37,7 @@ test('剪辑页只展开选中镜头，轨道切换保留未保存字段', async
   await expect(panels).toHaveCount(4)
   await expect(page.locator('.timeline-shot-editor[open]')).toHaveCount(1)
   await expect(panels.first()).toHaveAttribute('open')
-  await panels.first().getByLabel('入点（毫秒）', { exact: true }).fill('250')
+  await panels.first().getByLabel('入点（秒）', { exact: true }).fill('0.25')
   await panels.first().getByLabel('字幕', { exact: true }).fill('本地字幕草稿')
   await page.getByRole('button', { name: '镜 3', exact: true }).click()
   await expect(panels.nth(2)).toHaveAttribute('open')
@@ -45,8 +45,8 @@ test('剪辑页只展开选中镜头，轨道切换保留未保存字段', async
   await expect(panels.nth(2).locator('summary')).toBeInViewport()
   await page.getByRole('button', { name: '镜 1', exact: true }).click()
   await expect(
-    panels.first().getByLabel('入点（毫秒）', { exact: true }),
-  ).toHaveValue('250')
+    panels.first().getByLabel('入点（秒）', { exact: true }),
+  ).toHaveValue('0.25')
   await expect(panels.first().getByLabel('字幕', { exact: true })).toHaveValue(
     '本地字幕草稿',
   )

@@ -66,7 +66,11 @@ watch(
 )
 </script>
 <template>
-  <span ref="host" class="studio-media">
+  <span
+    ref="host"
+    class="studio-media"
+    :class="{ 'studio-media--preview': controls }"
+  >
     <img
       v-if="kind === 'image' && url"
       class="studio-frame"
@@ -94,5 +98,23 @@ watch(
 .studio-media {
   display: block;
   min-width: 0;
+  max-width: 100%;
+}
+.studio-media audio {
+  display: block;
+  width: 100%;
+  max-width: 100%;
+}
+.studio-media .studio-frame {
+  max-width: 100%;
+}
+/* 正式预览保留媒体原始比例；缩略图继续由卡片决定尺寸。 */
+.studio-media--preview .studio-frame {
+  display: block;
+  width: 100%;
+  height: auto;
+  aspect-ratio: auto;
+  max-height: min(60dvh, 560px);
+  object-fit: contain;
 }
 </style>

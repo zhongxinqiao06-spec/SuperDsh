@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import ExpandableText from '@/components/base/ExpandableText.vue'
 import { computed, ref, watch } from 'vue'
 import type { StudioAsset, StudioProject } from '@/types/studio/studio'
 import StudioMedia from './StudioMedia.vue'
@@ -221,7 +222,7 @@ async function submit() {
           <h3>
             {{ a.name }} <small>{{ assetKinds[a.kind] }}</small>
           </h3>
-          <p>{{ a.description }}</p>
+          <ExpandableText :text="a.description" label="设定" :lines="3" />
           <p class="studio-meta">
             版本 {{ a.version ?? a.id.slice(0, 8) }} ·
             {{ used(a.id).length }} 个镜头引用

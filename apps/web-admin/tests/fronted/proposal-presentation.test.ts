@@ -43,6 +43,15 @@ describe('导演方案人类可读展示', () => {
     ).toBe('2.5 秒')
   })
   it('渲染可读比较但采用仍提交原字段身份，手工冲突必须显式覆盖', async () => {
+    // JSDOM 无布局引擎，显式模拟长文实际溢出；浏览器用例另验真实行高。
+    const getStyle = window.getComputedStyle
+    vi.spyOn(window, 'getComputedStyle').mockImplementation((element) => {
+      const style = getStyle(element)
+      Object.defineProperty(style, 'lineHeight', { value: '20px' })
+      return style
+    })
+    vi.spyOn(HTMLElement.prototype, 'clientWidth', 'get').mockReturnValue(240)
+    vi.spyOn(HTMLElement.prototype, 'scrollHeight', 'get').mockReturnValue(600)
     const { project, comparison } = studioProposalFixture()
     vi.mocked(preparationApi.compare).mockResolvedValue(comparison)
     vi.mocked(preparationApi.review).mockResolvedValue({ revision: 4 })

@@ -165,11 +165,23 @@ async function adopt(job: Job) {
           <ExpandableText
             :text="asset.description || '尚未填写外观或场景设定'"
             label="设定"
+            markdown
+            :lines="3"
           />
           <p v-if="asset.kind === 'character'" class="studio-meta">
-            声音 · {{ asset.voice || '尚未选择'
-            }}{{ asset.voicePreviewJob ? ' · 已采用试听' : '' }}
+            声音 ·
+            {{
+              asset.voicePreviewJob
+                ? '已采用试听'
+                : asset.voice
+                  ? '已选音色，待试听'
+                  : '尚未选择'
+            }}
           </p>
+          <details v-if="asset.voice">
+            <summary class="studio-meta">查看音色标识</summary>
+            <span class="studio-meta">{{ asset.voice }}</span>
+          </details>
           <StudioMedia
             v-if="asset.voicePreviewJob"
             :project="project.id"

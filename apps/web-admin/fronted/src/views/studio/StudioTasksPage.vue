@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { onMounted, onScopeDispose, ref, computed } from 'vue'
 import { useRoute } from 'vue-router'
+import ExpandableText from '@/components/base/ExpandableText.vue'
 import PageHeader from '@/components/layout/PageHeader.vue'
 import FilterBar from '@/components/management/FilterBar.vue'
 import RowActions from '@/components/management/RowActions.vue'
@@ -51,17 +52,25 @@ onMounted(() => {
 onScopeDispose(() => clearInterval(timer))
 </script>
 <template>
-  <section class="page paged-page management-page">
+  <section class="page paged-page management-page studio-tasks-page">
     <PageHeader :title="deliveries ? '成片交付' : '制作任务'" />
     <FilterBar @submit="filter">
-      <el-select v-if="!deliveries" v-model="state" aria-label="任务状态"
+      <el-select
+        v-if="!deliveries"
+        v-model="state"
+        :empty-values="[null, undefined]"
+        aria-label="任务状态"
         ><el-option label="全部状态" value="" /><el-option
           v-for="(label, key) in jobStates"
           :key="key"
           :value="key"
           :label="label"
       /></el-select>
-      <el-select v-if="!deliveries" v-model="kind" aria-label="任务类型"
+      <el-select
+        v-if="!deliveries"
+        v-model="kind"
+        :empty-values="[null, undefined]"
+        aria-label="任务类型"
         ><el-option label="全部类型" value="" /><el-option
           v-for="(label, key) in jobKinds"
           :key="key"
@@ -95,8 +104,12 @@ onScopeDispose(() => clearInterval(timer))
       <tr v-for="job in data?.items" :key="job.id">
         <td>
           <strong>{{ jobKinds[job.kind] }}</strong
-          ><small v-if="job.summary">{{ job.summary }}</small
-          ><small>工程版本 {{ job.revision }}</small>
+          ><ExpandableText
+            v-if="job.summary"
+            :text="job.summary"
+            :lines="2"
+            label="任务内容"
+          /><small>工程版本 {{ job.revision }}</small>
         </td>
         <td data-label="所属作品">{{ job.projectTitle }}</td>
         <td data-label="状态">
@@ -182,5 +195,29 @@ onScopeDispose(() => clearInterval(timer))
 }
 .studio-task-state:is([data-state='unknown'], [data-state='failed'])::before {
   background: var(--destructive);
+}
+</style>
+
+<style scoped>
+.studio-tasks-page :deep(table) {
+  table-layout: fixed;
+}
+.studio-tasks-page :deep(th:nth-child(1)) {
+  width: 38%;
+}
+.studio-tasks-page :deep(th:nth-child(2)) {
+  width: 16%;
+}
+.studio-tasks-page :deep(th:nth-child(3)) {
+  width: 12%;
+}
+.studio-tasks-page :deep(th:nth-child(4)) {
+  width: 15%;
+}
+.studio-tasks-page :deep(th:nth-child(5)) {
+  width: 19%;
+}
+.studio-tasks-page :deep(.expandable-text) {
+  font-size: 13px;
 }
 </style>

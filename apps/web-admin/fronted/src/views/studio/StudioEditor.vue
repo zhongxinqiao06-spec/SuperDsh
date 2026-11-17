@@ -15,6 +15,7 @@ import StudioAnimatic from './components/project/StudioAnimatic.vue'
 import StudioSampleWorkspace from './components/project/StudioSampleWorkspace.vue'
 import { useStudioPreparation } from '@/composables/studio/use-studio-preparation'
 import '@/assets/styles/studio-preparation.css'
+import '@/assets/styles/studio-workspace.css'
 import { nextFoundationStep } from '@/utils/studio/foundation'
 import { computed, nextTick, onScopeDispose, ref, watch } from 'vue'
 import { ElMessageBox } from 'element-plus'
@@ -25,8 +26,10 @@ import {
   useRouter,
 } from 'vue-router'
 import PageHeader from '@/components/layout/PageHeader.vue'
+import ScrollPanel from '@/components/layout/ScrollPanel.vue'
 import AppIcon from '@/components/base/AppIcon.vue'
 import ExpandableText from '@/components/base/ExpandableText.vue'
+import ManagementPagination from '@/components/management/ManagementPagination.vue'
 import ResourceStatus from '@/components/feedback/ResourceStatus.vue'
 import GenerationDialog from './components/GenerationDialog.vue'
 import ProductionPlanDialog from './components/ProductionPlanDialog.vue'
@@ -45,6 +48,7 @@ import ShotEditor from './components/ShotEditor.vue'
 import StudioLibrary from './components/StudioLibrary.vue'
 import StudioTimeline from './components/StudioTimeline.vue'
 import StudioShotMonitor from './components/StudioShotMonitor.vue'
+import StudioWorkspace from './components/StudioWorkspace.vue'
 import StudioFilmstrip from './components/StudioFilmstrip.vue'
 import StudioRecovery from './components/StudioRecovery.vue'
 import StudioProductionWorkspace from './components/project/StudioProductionWorkspace.vue'
@@ -151,6 +155,40 @@ const section = computed(() => {
       ?.key ?? 'brief'
   )
 })
+const jobFilter = ref('all')
+const jobPage = ref(1)
+const jobPageSize = ref(10)
+const visibleJobs = computed(() =>
+  (p.value?.jobs ?? []).filter((job) => {
+    if (section.value === 'delivery') return job.kind === 'export'
+    if (jobFilter.value === 'attention')
+      return ['failed', 'unknown', 'paused', 'unaccepted'].includes(job.state)
+    if (jobFilter.value === 'active')
+      return ['queued', 'submitting', 'polling', 'downloading'].includes(
+        job.state,
+      )
+    if (jobFilter.value === 'ready') return job.state === 'ready'
+    return true
+  }),
+)
+const pageJobs = computed(() =>
+  visibleJobs.value.slice(
+    (jobPage.value - 1) * jobPageSize.value,
+    jobPage.value * jobPageSize.value,
+  ),
+)
+watch([jobFilter, section, jobPageSize], () => {
+  jobPage.value = 1
+})
+watch(
+  () => visibleJobs.value.length,
+  (length) => {
+    jobPage.value = Math.min(
+      jobPage.value,
+      Math.max(1, Math.ceil(length / jobPageSize.value)),
+    )
+  },
+)
 const nextStep = computed(() => {
   const pending = preparation.value?.stages.find(
     (s) => !['confirmed', 'skipped'].includes(s.status),
@@ -770,24 +808,26 @@ const shotCards = computed(() => {
           >
         </div>
         <StudioAnimatic v-if="animaticOpen" :project="p" />
-        <div v-if="!readonly" class="studio-toolbar">
-          <el-button type="primary" @click="newItem">添加分镜</el-button
-          ><el-button :disabled="!shot" @click="duplicate()">复制</el-button
-          ><el-button :disabled="shotIndex <= 0" @click="shiftSelection(-1)"
-            >前移</el-button
-          ><el-button
-            :disabled="
-              shotIndex < 0 || shotIndex >= p.document.shots.length - 1
-            "
-            @click="shiftSelection(1)"
-            >后移</el-button
-          ><el-button
-            :disabled="!shot || shot.duration < 2000"
-            @click="duplicate(true)"
-          >
-            等分镜头</el-button
-          ><el-button :disabled="!shot" @click="remove">移除</el-button
-          ><el-button
+        <div v-if="!readonly" class="studio-toolbar studio-board-actions">
+          <el-button type="primary" @click="newItem">添加分镜</el-button>
+          <div class="toolbar" role="group" aria-label="当前镜头操作">
+            <el-button :disabled="!shot" @click="duplicate()">复制</el-button
+            ><el-button :disabled="shotIndex <= 0" @click="shiftSelection(-1)"
+              >前移</el-button
+            ><el-button
+              :disabled="
+                shotIndex < 0 || shotIndex >= p.document.shots.length - 1
+              "
+              @click="shiftSelection(1)"
+              >后移</el-button
+            ><el-button
+              :disabled="!shot || shot.duration < 2000"
+              @click="duplicate(true)"
+            >
+              等分镜头</el-button
+            ><el-button :disabled="!shot" @click="remove">移除</el-button>
+          </div>
+          <el-button
             v-if="auth.can('models.use')"
             :disabled="busy || !p.document.shots.length"
             @click="
@@ -800,55 +840,73 @@ const shotCards = computed(() => {
             批量生成
           </el-button>
         </div>
-        <div class="studio-board">
-          <aside class="panel studio-panel studio-rail">
-            <h2>分镜顺序</h2>
-            <p v-if="!p.document.shots.length" class="studio-meta">
-              点击「添加分镜」开始设计第一个镜头。
-            </p>
-            <button
-              v-for="(s, i) in p.document.shots"
-              :key="s.id"
-              :draggable="!readonly"
-              :aria-pressed="s.id === shot?.id"
-              class="studio-shot"
-              @dragstart="drag = i"
-              @dragover.prevent
-              @drop.prevent="!readonly && moveShot(p.document, drag, i)"
-              @click="selected = s.id"
+        <StudioWorkspace :selected="shot?.id">
+          <template #rail>
+            <ScrollPanel
+              as="aside"
+              class="panel studio-panel studio-rail"
+              label="分镜目录"
             >
-              <span class="studio-rail-image"
-                ><StudioMedia
-                  v-if="s.candidate"
-                  :project="id"
-                  :job="s.candidate"
-                  kind="video"
-                  lazy
-                /><StudioMedia
-                  v-else-if="auth.can('files.read') && reference(s)"
-                  :project="id"
-                  :asset="reference(s)"
-                  kind="image"
-                  lazy
-                /><b>{{ String(i + 1).padStart(2, '0') }}</b></span
-              ><span class="studio-rail-label"
-                ><strong>{{ s.action || '待填写动作' }}</strong
-                ><small
-                  >{{ s.duration / 1000 }} 秒 ·
-                  {{ shotCards.get(s.id)?.roles || '无角色' }} ·
-                  {{ shotCards.get(s.id)?.status
-                  }}{{ s.candidate ? ' · 已采用候选' : '' }}
-                  <span v-if="shotCards.get(s.id)?.missingVoice">
-                    · 待选音色</span
-                  ></small
-                ></span
+              <template #header><h2>分镜顺序</h2></template>
+              <p v-if="!p.document.shots.length" class="studio-meta">
+                点击「添加分镜」开始设计第一个镜头。
+              </p>
+              <button
+                v-for="(s, i) in p.document.shots"
+                :key="s.id"
+                :draggable="!readonly"
+                :aria-pressed="s.id === shot?.id"
+                class="studio-shot"
+                @dragstart="drag = i"
+                @dragover.prevent
+                @drop.prevent="!readonly && moveShot(p.document, drag, i)"
+                @click="selected = s.id"
               >
-            </button>
-          </aside>
+                <span class="studio-rail-image"
+                  ><StudioMedia
+                    v-if="s.candidate"
+                    :project="id"
+                    :job="s.candidate"
+                    kind="video"
+                    lazy
+                  /><StudioMedia
+                    v-else-if="auth.can('files.read') && reference(s)"
+                    :project="id"
+                    :asset="reference(s)"
+                    kind="image"
+                    lazy
+                  /><b>{{ String(i + 1).padStart(2, '0') }}</b></span
+                ><span class="studio-rail-label"
+                  ><strong
+                    >镜 {{ String(i + 1).padStart(2, '0') }} ·
+                    {{
+                      p.document.scenes?.find((scene) => scene.id === s.sceneId)
+                        ?.title ||
+                      s.scene ||
+                      '场景待定'
+                    }}</strong
+                  ><span class="studio-rail-summary">{{
+                    s.action || '待填写动作'
+                  }}</span
+                  ><small
+                    >{{ s.duration / 1000 }} 秒 ·
+                    {{ shotCards.get(s.id)?.roles || '无角色' }} ·
+                    {{ shotCards.get(s.id)?.status
+                    }}{{ s.candidate ? ' · 已采用候选' : '' }}
+                    <span v-if="shotCards.get(s.id)?.missingVoice">
+                      · 待选音色</span
+                    ></small
+                  ></span
+                >
+              </button>
+            </ScrollPanel>
+          </template>
           <StudioShotMonitor
             v-if="shot"
             :key="shot.id"
             :shot="shot"
+            :aspect-width="p.aspectWidth"
+            :aspect-height="p.aspectHeight"
             :project="id"
             :jobs="p.jobs"
             :reference="auth.can('files.read') ? reference(shot) : undefined"
@@ -856,21 +914,22 @@ const shotCards = computed(() => {
             :busy="busy || stale || readonly"
             @adopt="adoptCandidate"
           />
-          <ShotEditor
-            v-if="shot"
-            :project="id"
-            :model-value="shot"
-            :assets="linked"
-            :jobs="p.jobs"
-            :voices="voices"
-            :scenes="p.document.scenes ?? []"
-            :readonly="readonly"
-            :can-generate="auth.can('models.use') && !busy && !readonly"
-            @update:model-value="(s) => (shot = s)"
-            @preview="(j) => run(() => show(j))"
-            @generate="confirmPlan"
-          />
-        </div>
+          <template #inspector
+            ><ShotEditor
+              v-if="shot"
+              :project="id"
+              :model-value="shot"
+              :assets="linked"
+              :jobs="p.jobs"
+              :voices="voices"
+              :scenes="p.document.scenes ?? []"
+              :readonly="readonly"
+              :can-generate="auth.can('models.use') && !busy && !readonly"
+              @update:model-value="(s) => (shot = s)"
+              @preview="(j) => run(() => show(j))"
+              @generate="confirmPlan"
+          /></template>
+        </StudioWorkspace>
         <StudioFilmstrip
           v-if="p.document.shots.length"
           :project="id"
@@ -940,13 +999,32 @@ const shotCards = computed(() => {
             >导出当前修订</el-button
           ><router-link :to="sectionLink('edit')">返回剪辑检查</router-link>
         </div>
-        <p v-if="!p.jobs.length">还没有生成或导出任务。</p>
-        <article
-          v-for="j in p.jobs.filter(
-            (job) => section !== 'delivery' || job.kind === 'export',
-          )"
-          :key="j.id"
-        >
+        <div v-if="section === 'production'" class="toolbar studio-job-toolbar">
+          <h3>制作记录</h3>
+          <el-select v-model="jobFilter" aria-label="筛选制作记录"
+            ><el-option value="all" label="全部任务" /><el-option
+              value="attention"
+              label="需要处理" /><el-option
+              value="active"
+              label="正在制作" /><el-option value="ready" label="已完成"
+          /></el-select>
+        </div>
+        <p v-if="!visibleJobs.length" class="studio-meta">
+          {{
+            section === 'delivery'
+              ? '尚未导出成片，完成剪辑后可导出当前工程。'
+              : '当前范围没有制作任务。'
+          }}
+        </p>
+        <article v-for="j in pageJobs" :key="j.id">
+          <StudioMedia
+            v-if="section === 'delivery' && j.state === 'ready'"
+            class="delivery-thumbnail"
+            :project="id"
+            :job="j.id"
+            kind="video"
+            lazy
+          />
           <h3>
             {{ jobKinds[j.kind]
             }}<span v-if="productionSummaries[j.id]?.title">
@@ -961,8 +1039,16 @@ const shotCards = computed(() => {
             :lines="2"
           />
           <span class="studio-meta"
-            >{{ jobStates[j.state] ?? j.state }} {{ j.error }}</span
-          >
+            >{{ jobStates[j.state] ?? j.state
+            }}<template v-if="j.duration">
+              · {{ j.duration / 1000 }} 秒</template
+            ></span
+          ><ExpandableText
+            v-if="j.error"
+            :text="j.error"
+            label="失败详情"
+            :lines="2"
+          />
           <div class="studio-actions">
             <el-button
               v-if="j.kind !== 'export' && productionSummaries[j.id]?.shotId"
@@ -971,6 +1057,7 @@ const shotCards = computed(() => {
               >查看对应镜头</el-button
             >
             <StudioRecovery
+              :label="productionSummaries[j.id]?.title"
               :project="id"
               :job="j"
               @recovered="(result) => Object.assign(j, result)"
@@ -997,6 +1084,12 @@ const shotCards = computed(() => {
             </el-button>
           </div>
         </article>
+        <ManagementPagination
+          v-model:current-page="jobPage"
+          v-model:page-size="jobPageSize"
+          :total="visibleJobs.length"
+          :page-sizes="[10, 20, 50]"
+        />
       </section>
       <StudioMediaPreview
         v-if="preview"
@@ -1020,6 +1113,7 @@ const shotCards = computed(() => {
         v-model:reference-video="selectedReference"
         v-model:speech="selectedSpeech"
         :plan="plan"
+        :revision="p.revision"
         :shots="planShots"
         :lines="allLines.filter((line) => plan!.lines.includes(line.id))"
         :has-reference="hasReference"
@@ -1028,25 +1122,17 @@ const shotCards = computed(() => {
         :error="error || selectedProduction.error.value"
         @submit="generate"
       />
-      <el-drawer
-        v-model="textEditorOpen"
-        title="AI 剧本编辑"
-        size="min(600px, 96vw)"
-        :close-on-click-modal="!textEditorBusy"
-        :close-on-press-escape="!textEditorBusy"
-        :show-close="!textEditorBusy"
-      >
-        <StudioTextEditor
-          :project="p"
-          :target="textTarget"
-          :active="textEditorOpen"
-          :allowed="!readonly && canDirect"
-          :save="save"
-          :reload="reload"
-          @busy="textEditorBusy = $event"
-          @draft="textEditorDraft = $event"
-        />
-      </el-drawer>
+      <StudioTextEditor
+        :project="p"
+        :target="textTarget"
+        :active="textEditorOpen"
+        :allowed="!readonly && canDirect"
+        :save="save"
+        :reload="reload"
+        @busy="textEditorBusy = $event"
+        @draft="textEditorDraft = $event"
+        @close="textEditorOpen = false"
+      />
       <DirectorChat
         v-if="!readonly"
         :project="id"

@@ -107,6 +107,8 @@ const tasksLink = computed(() => ({
       v-if="shot"
       :key="shot.id"
       :shot="shot"
+      :aspect-width="project.aspectWidth"
+      :aspect-height="project.aspectHeight"
       :project="project.id"
       :jobs="project.jobs"
       :reference="reference(shot)"

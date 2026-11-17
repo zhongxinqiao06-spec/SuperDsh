@@ -16,7 +16,7 @@
 
 ## New Web Admin implementation
 
-- `apps/web-admin/fronted` and `apps/web-admin/backend` are the planned Vue3/TypeScript and Python/FastAPI implementation. Follow [Web Admin development rules](apps/web-admin/AGENTS.md) and the three plans under `docs/plans/web-admin-*`. Keep `apps/admin`, its existing worktree changes, old commands and the explicit legacy deployment intact. Root `compose.yml` starts the Vue/FastAPI deployment.
+- `apps/web-admin/fronted` and `apps/web-admin/backend` contain the Vue3/TypeScript and Python/FastAPI implementation. Follow [Web Admin development rules](apps/web-admin/AGENTS.md) and the consolidated [design index](docs/plans/README.md). Keep `apps/admin`, its existing worktree changes, old commands and the explicit legacy deployment intact. Root `compose.yml` starts the Vue/FastAPI deployment.
 - New business routes are unversioned. Preserve existing clients through one declarative ingress compatibility mapping, not versioned business handlers. Read release and runtime versions from authoritative metadata; preserve locked dependencies and required protocol identifiers.
 - Separate folders by domain and responsibility, add meaningful Chinese comments to owned public contracts and complex logic, and enforce robustness requirements. Keep all new tests in `apps/web-admin/tests` and generated validation artifacts under `.superdsh-work/web-admin-validation`, outside production code and runtime images.
 

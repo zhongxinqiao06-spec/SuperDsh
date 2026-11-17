@@ -6,6 +6,8 @@ Start development with the root [README](../README.en.md), which owns [upstream 
 
 ## Development topics
 
+Current Vue/FastAPI and dual-product design lives in the [Starbridge design index](plans/README.md) (Chinese): page design, development rules, shared architecture, and separate Office and Entertainment requirements.
+
 | Document                                                  | Covers                                                       |
 | --------------------------------------------------------- | ------------------------------------------------------------ |
 | [Desktop UI index](../apps/desktop/ui/README.md)          | Components, feature directories, and edit locations          |

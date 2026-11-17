@@ -128,7 +128,7 @@ for (const theme of ['light', 'dark']) {
         })
         if (section === 'storyboard' && width === 390)
           await page
-            .getByRole('button', { name: '展开详情', exact: true })
+            .getByRole('button', { name: '镜头设定', exact: true })
             .click()
         await expectControlAppearance(editor)
         expect(

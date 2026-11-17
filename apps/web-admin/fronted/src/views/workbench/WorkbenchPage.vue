@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import ScrollPanel from '@/components/layout/ScrollPanel.vue'
 import { computed, ref } from 'vue'
 import AppIcon from '@/components/base/AppIcon.vue'
 import { useWorkbench } from '@/composables/workbench/use-workbench'
@@ -289,24 +290,26 @@ async function closeFiles(done: () => void): Promise<void> {
           <OfficeComposer :workspace="workspace" />
           <p class="composer-note">未发送的草稿会自动保留，请核实重要信息。</p>
         </div>
-        <aside
+        <ScrollPanel
           v-if="workspace.selected.value && auth.can('files.read')"
           v-show="showResults"
+          as="aside"
           class="office-results-pane"
-          aria-label="会话成果"
+          label="会话成果"
         >
-          <header>
-            <h2>会话成果</h2>
-            <el-button text aria-label="收起成果" @click="showResults = false"
-              ><AppIcon name="x"
-            /></el-button>
-          </header>
+          <template #header
+            ><div class="office-results-heading">
+              <h2>会话成果</h2>
+              <el-button text aria-label="收起成果" @click="showResults = false"
+                ><AppIcon name="x"
+              /></el-button></div
+          ></template>
           <SessionResults
             ref="results"
             :session-id="workspace.selected.value"
             :can-write="auth.can('files.write')"
           />
-        </aside>
+        </ScrollPanel>
       </div>
     </main>
     <SessionShares ref="shares" :session-id="workspace.selected.value" />

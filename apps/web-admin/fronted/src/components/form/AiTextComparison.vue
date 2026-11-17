@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import ExpandableText from '@/components/base/ExpandableText.vue'
 /** 通用文本建议对比：只展示和编辑候选，采用及持久化由调用方控制。 */
 defineProps<{
   original: string
@@ -11,7 +12,9 @@ const suggestion = defineModel<string>({ required: true })
   <section class="ai-text-comparison" aria-label="修改前后对比">
     <div class="field">
       <strong>修改前</strong>
-      <div class="ai-original" tabindex="0">{{ original }}</div>
+      <div class="ai-original">
+        <ExpandableText :text="original" :lines="6" label="原文" />
+      </div>
     </div>
     <label class="field"
       >修改建议 · 可以继续编辑<el-input
@@ -39,8 +42,7 @@ const suggestion = defineModel<string>({ required: true })
   white-space: pre-wrap;
   overflow-wrap: anywhere;
   line-height: 1.8;
-  max-height: 32vh;
-  overflow: auto;
+
   padding: var(--field-gap);
   background: var(--muted);
   border-radius: var(--radius);

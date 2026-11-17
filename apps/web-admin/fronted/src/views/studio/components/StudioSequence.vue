@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed } from 'vue'
+import { computed, ref } from 'vue'
 import type { Job, Shot, StudioDocument } from '@/types/studio/studio'
 import { voiceConflict, voiceDurations } from '@/utils/studio/storyboard'
 const props = defineProps<{
@@ -17,6 +17,7 @@ const segments = computed(() =>
   }),
 )
 const total = computed(() => segments.value.reduce((n, s) => n + s.length, 0))
+const zoom = ref(160)
 const tracks = ['画面', '配音', '字幕', '音乐'] as const
 const audioLengths = computed(() => voiceDurations(props.jobs))
 const marks = computed(() => {
@@ -66,11 +67,26 @@ function cues(shot: Shot, track: '配音' | '字幕') {
         {{ (total / 1000).toLocaleString() }} 秒</span
       >
     </header>
-    <div class="sequence-scroll">
+    <label class="sequence-zoom"
+      >时间线缩放<input
+        v-model.number="zoom"
+        type="range"
+        min="100"
+        max="280"
+        step="20"
+        aria-label="时间线缩放"
+    /></label>
+    <div
+      class="sequence-scroll"
+      tabindex="0"
+      role="region"
+      aria-label="可横向滚动的时间线轨道"
+    >
       <div
         class="sequence-track"
         :style="{
-          minWidth: Math.max(300, Math.min(12000, segments.length * 65)) + 'px',
+          minWidth:
+            Math.max(300, Math.min(12000, segments.length * zoom)) + 'px',
         }"
       >
         <strong>秒</strong>
@@ -89,7 +105,8 @@ function cues(shot: Shot, track: '配音' | '字幕') {
         :key="track"
         class="sequence-track"
         :style="{
-          minWidth: Math.max(300, Math.min(12000, segments.length * 65)) + 'px',
+          minWidth:
+            Math.max(300, Math.min(12000, segments.length * zoom)) + 'px',
         }"
       >
         <strong>{{ track }}</strong>
@@ -135,15 +152,19 @@ function cues(shot: Shot, track: '配音' | '字幕') {
                   title="配音超出镜头时长"
                   >!</span
                 >
-                <span
+                <button
                   v-for="cue in cues(segment.shot, track)"
                   :key="cue.id"
+                  type="button"
                   class="sequence-cue"
                   :class="{ voice: track === '配音' }"
                   :style="{ left: cue.left, width: cue.width }"
                   :title="cue.label"
-                  >{{ cue.label }}</span
+                  :aria-label="track + ' · 镜 ' + (i + 1) + ' · ' + cue.label"
+                  @click="emit('select', segment.shot.id)"
                 >
+                  {{ cue.label }}
+                </button>
               </template>
             </div>
           </template>
@@ -154,7 +175,7 @@ function cues(shot: Shot, track: '配音' | '字幕') {
 </template>
 <style scoped>
 .sequence-ruler {
-  font: 10px var(--font-mono);
+  font: 12px var(--font-mono);
   align-items: center;
   padding: 0 2px;
   color: var(--muted-foreground);
@@ -205,7 +226,7 @@ function cues(shot: Shot, track: '配音' | '字幕') {
 .sequence-cells {
   display: flex;
   overflow: hidden;
-  min-height: 24px;
+  min-height: 40px;
   gap: 1px;
   background: var(--muted);
   border-radius: 3px;
@@ -226,7 +247,7 @@ function cues(shot: Shot, track: '配音' | '字幕') {
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
-  font-size: 11px;
+  font-size: 13px;
   padding: 4px 5px;
   box-sizing: border-box;
 }
@@ -239,15 +260,27 @@ function cues(shot: Shot, track: '配音' | '字幕') {
 .sequence-slot button[aria-pressed='true'] {
   box-shadow: inset 0 0 0 2px var(--primary);
 }
-.sequence-cue {
+.sequence-slot .sequence-cue {
   position: absolute;
   height: 100%;
+  color: var(--foreground);
   background: color-mix(in srgb, #ab83cd 40%, var(--card));
 }
-.sequence-cue.voice {
+.sequence-slot .sequence-cue.voice {
   background: color-mix(in srgb, #4bb8ae 40%, var(--card));
 }
 .sequence-music {
   background: color-mix(in srgb, #729cc6 35%, var(--card));
+}
+.sequence-zoom {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--control-gap);
+  align-items: center;
+  font-size: 13px;
+  margin-bottom: var(--field-gap);
+}
+.sequence-zoom input {
+  max-width: 100%;
 }
 </style>

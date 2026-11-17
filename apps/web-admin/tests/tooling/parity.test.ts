@@ -1,7 +1,9 @@
 import assert from 'node:assert/strict'
+import { readFile } from 'node:fs/promises'
 import { test } from 'node:test'
 import {
   contractProjection,
+  documentedTaskIds,
   indexedEvidence,
   templateMatches,
 } from './parity-contracts.ts'
@@ -52,4 +54,46 @@ test('测试索引不得作为已执行证据', () => {
     cases: ['synthetic-case'],
     executed: false,
   })
+})
+
+test('范围索引只读取表格编号且允许格式化后的单元格间距', () => {
+  const markdown = [
+    '正文 P2-99 仅为举例',
+    '| P2-01     | 功能 |',
+    '| P3-01 | 验证 |',
+    '|P2-02|功能|',
+  ].join('\n')
+  assert.deepEqual(documentedTaskIds(markdown, 'P2'), ['P2-01', 'P2-02'])
+  assert.deepEqual(documentedTaskIds(markdown, 'P3'), ['P3-01'])
+})
+
+test('范围表被清空、改成普通文字或重复时禁止假通过', () => {
+  for (const markdown of [
+    '',
+    '### P2-01 未迁移的旧标题',
+    '| P2-01 | 功能 |\n| P2-01 | 重复 |',
+  ])
+    assert.throws(() => documentedTaskIds(markdown, 'P2'), /为空或重复/u)
+})
+
+test('统一规范与现有功能清单及验收分组保持完整对应', async () => {
+  const markdown = await readFile(
+    new URL('../../../../docs/plans/开发规范.md', import.meta.url),
+    'utf8',
+  )
+  const features = JSON.parse(
+    await readFile(new URL('../parity/features.json', import.meta.url), 'utf8'),
+  ) as {
+    tasks: { id: string }[]
+    evidenceGroups: { planTaskIds: string[] }[]
+  }
+  assert.deepEqual(
+    documentedTaskIds(markdown, 'P2').sort(),
+    features.tasks.map((task) => task.id).sort(),
+  )
+  const parityIds = documentedTaskIds(markdown, 'P3')
+  assert.equal(parityIds.length, 14)
+  for (const group of features.evidenceGroups)
+    for (const id of group.planTaskIds)
+      assert.ok(parityIds.includes(id), `验收引用未纳入统一规范：${id}`)
 })

@@ -57,6 +57,13 @@ async function workspace(page: Page) {
   const messages: string[] = []
   let reviewed = false,
     confirmed = false
+  await page.route(
+    '**/api/studio/projects/script-film/director-context',
+    (route) =>
+      route.fulfill({
+        json: { vision: { available: false }, research: { available: false } },
+      }),
+  )
   await page.route('**/api/studio/projects/script-film', async (route) => {
     if (route.request().method() === 'PUT') {
       project.document = route.request().postDataJSON().document
@@ -297,7 +304,7 @@ test('构想起草需明确发送，建议可定位审阅，采用后才出现�
   await expect(
     drawer.getByRole('heading', { name: '根据构想起草故事' }),
   ).toBeVisible()
-  await expect(drawer).toContainText('这一步不生成图片、视频或配音')
+  await expect(drawer).toContainText('这一步不生成视频或配音')
   expect(messages).toHaveLength(0)
   await drawer.getByLabel('补充要求（可选）').fill('保留结尾悬念。')
   await drawer.getByRole('button', { name: '开始根据构想起草故事' }).click()

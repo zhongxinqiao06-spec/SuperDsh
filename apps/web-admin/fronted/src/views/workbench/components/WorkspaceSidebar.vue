@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import ScrollPanel from '@/components/layout/ScrollPanel.vue'
 import { computed, ref } from 'vue'
 import AppIcon from '@/components/base/AppIcon.vue'
 import SidebarSessionItem from './SidebarSessionItem.vue'
@@ -81,14 +82,16 @@ const sessionGroups = computed(() =>
 )
 </script>
 <template>
-  <aside class="workspace-sidebar">
-    <strong class="workspace-sidebar-title">Agent 工作台</strong>
-    <el-button
-      v-if="canRun"
-      class="workspace-new-session"
-      @click="$emit('fresh')"
-      ><AppIcon name="plus" />新会话</el-button
-    >
+  <ScrollPanel as="aside" class="workspace-sidebar" label="会话导航">
+    <template #header>
+      <strong class="workspace-sidebar-title">Agent 工作台</strong>
+      <el-button
+        v-if="canRun"
+        class="workspace-new-session"
+        @click="$emit('fresh')"
+        ><AppIcon name="plus" />新会话</el-button
+      >
+    </template>
     <section v-if="canDevices" class="sidebar-group sidebar-devices-group">
       <div class="workspace-section-heading">
         <button
@@ -268,5 +271,5 @@ const sessionGroups = computed(() =>
     <el-button v-if="hasMore" class="sidebar-more" text @click="$emit('more')"
       >加载更多会话</el-button
     >
-  </aside>
+  </ScrollPanel>
 </template>

@@ -22,6 +22,7 @@ const emit = defineEmits<{
 const preferences = usePreferences()
 const formId = `management-form-${useId()}`
 const form = ref<HTMLFormElement>()
+const errorBlock = ref<HTMLElement>()
 const changed = ref(false)
 watch(
   () => props.modelValue,
@@ -83,17 +84,22 @@ function submit(): void {
       @input="changed = true"
       @change="changed = true"
     >
+      <div v-if="error" ref="errorBlock" class="dialog-error">
+        <el-alert :title="error" type="error" :closable="false" show-icon />
+      </div>
       <slot />
     </form>
     <template #footer>
-      <el-alert
+      <!-- 完整错误留在正文，避免长异常挤占固定底栏和提交按钮。 -->
+      <el-button
         v-if="error"
-        :title="error"
-        type="error"
-        :closable="false"
-        show-icon
-        class="dialog-error"
-      />
+        text
+        type="danger"
+        @click="errorBlock?.scrollIntoView({ block: 'nearest' })"
+        >{{
+          preferences.tr('操作未完成，查看错误', 'Action failed. View details')
+        }}</el-button
+      >
       <div class="dialog-actions">
         <slot name="footer-leading" />
         <el-button

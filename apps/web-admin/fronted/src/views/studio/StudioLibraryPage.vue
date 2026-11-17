@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import ExpandableText from '@/components/base/ExpandableText.vue'
 import { ref, computed, watch } from 'vue'
 import { useRoute } from 'vue-router'
 import { ElMessage } from 'element-plus'
@@ -86,12 +87,18 @@ function linked(title: string) {
   <section class="page paged-page management-page">
     <PageHeader :title="title" />
     <FilterBar @submit="filter">
-      <el-select v-model="scope" aria-label="素材范围"
+      <el-select
+        v-model="scope"
+        :empty-values="[null, undefined]"
+        aria-label="素材范围"
         ><el-option label="个人素材" value="personal" /><el-option
           label="作品素材"
           value="project"
       /></el-select>
-      <el-select v-model="kind" aria-label="筛选素材类型"
+      <el-select
+        v-model="kind"
+        :empty-values="[null, undefined]"
+        aria-label="筛选素材类型"
         ><el-option label="全部类型" value="" /><el-option
           v-for="(label, k) in availableKinds"
           :key="k"
@@ -220,9 +227,13 @@ function linked(title: string) {
         {{ assetKinds[viewing.kind] }} · 版本
         {{ viewing.version ?? viewing.id.slice(0, 8) }}
       </p>
-      <p v-if="viewing.description" class="asset-description">
-        {{ viewing.description }}
-      </p>
+      <ExpandableText
+        v-if="viewing.description"
+        class="asset-description"
+        :text="viewing.description"
+        label="设定"
+        :lines="3"
+      />
       <p v-if="viewing.voice">默认音色 · {{ viewing.voice }}</p>
       <StudioMedia
         v-if="viewing.fileId && auth.can('files.read')"

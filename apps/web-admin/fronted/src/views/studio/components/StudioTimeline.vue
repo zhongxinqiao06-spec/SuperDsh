@@ -1,6 +1,8 @@
 <script setup lang="ts">
 import type { StudioProject } from '@/types/studio/studio'
 import { computed, nextTick, type ComponentPublicInstance } from 'vue'
+import DurationField from '@/components/form/DurationField.vue'
+import LongTextField from '@/components/form/LongTextField.vue'
 import ExpandableText from '@/components/base/ExpandableText.vue'
 import StudioSequence from './StudioSequence.vue'
 import StudioMedia from './StudioMedia.vue'
@@ -48,6 +50,11 @@ async function focusShot(id: string) {
   emit('select', id)
   // 等待所选镜头展开后再定位，避免轨道点击落到仍折叠的编辑区。
   await nextTick()
+  // 长文折叠和文本域自适应会在下一帧完成；再定位可避免滚到变高前的旧位置。
+  await new Promise<void>((resolve) =>
+    requestAnimationFrame(() => requestAnimationFrame(() => resolve())),
+  )
+  if (active.value?.id !== id) return
   panels.get(id)?.focus({ preventScroll: true })
   panels.get(id)?.scrollIntoView({ block: 'start' })
 }
@@ -130,72 +137,58 @@ async function focusShot(id: string) {
             @click="moveShot(p.document, i, i + 1)"
           >
             延后</el-button
-          ><label class="field"
-            >入点（毫秒）<input
-              v-model.number="s.trimStart"
-              class="native-control"
-              :disabled="readonly"
-              type="number"
-              min="0" /></label
-          ><label class="field"
-            >出点（毫秒）<input
-              class="native-control"
-              :disabled="readonly"
-              type="number"
-              :max="s.duration"
-              :value="s.trimEnd ?? s.duration"
-              @input="
-                s.trimEnd = Number(($event.target as HTMLInputElement).value)
-              "
-          /></label>
+          >
+          <DurationField
+            :model-value="s.trimStart"
+            label="入点"
+            :disabled="readonly"
+            :min="0"
+            :max="s.duration"
+            @update:model-value="s.trimStart = $event ?? 0"
+          />
+          <DurationField
+            :model-value="s.trimEnd ?? s.duration"
+            label="出点"
+            :disabled="readonly"
+            :min="0"
+            :max="s.duration"
+            @update:model-value="s.trimEnd = $event"
+          />
         </div>
-        <fieldset v-for="line in s.lines" :key="line.id">
-          <legend>{{ line.text }}</legend>
+        <fieldset
+          v-for="(line, lineIndex) in s.lines"
+          :key="line.id"
+          class="timeline-dialogue form-stack"
+        >
+          <legend>
+            第 {{ lineIndex + 1 }} 句 ·
+            {{
+              p.assets.find((asset) => asset.id === line.role)?.name ||
+              '角色台词'
+            }}
+          </legend>
+          <ExpandableText :text="line.text" label="原台词" :lines="2" />
           <p v-if="voiceConflict(line, s, audioLengths)" class="studio-error">
             配音超出镜头时长
           </p>
-          <label class="field"
-            >字幕<input
-              class="native-control"
+          <LongTextField
+            :model-value="line.subtitle ?? line.text"
+            label="字幕"
+            :min-rows="2"
+            :max-rows="6"
+            :disabled="readonly"
+            @update:model-value="line.subtitle = $event"
+          />
+          <div class="timeline-field-grid">
+            <DurationField
+              :model-value="line.start"
+              label="配音起点"
               :disabled="readonly"
-              :value="line.subtitle ?? line.text"
-              @input="
-                line.subtitle = ($event.target as HTMLInputElement).value
-              "
-          /></label>
-          <div class="studio-actions">
+              :min="0"
+              @update:model-value="line.start = $event ?? 0"
+            />
             <label class="field"
-              >配音起点（毫秒）<input
-                v-model.number="line.start"
-                class="native-control"
-                :disabled="readonly"
-                type="number"
-                min="0" /></label
-            ><label class="field"
-              >字幕起点（毫秒）<input
-                class="native-control"
-                :disabled="readonly"
-                type="number"
-                min="0"
-                :placeholder="String(line.start)"
-                :value="line.subtitleStart"
-                @input="
-                  line.subtitleStart =
-                    ($event.target as HTMLInputElement).value === ''
-                      ? null
-                      : Number(($event.target as HTMLInputElement).value)
-                " /></label
-            ><label class="field"
-              >字幕终点（毫秒）<input
-                class="native-control"
-                :disabled="readonly"
-                type="number"
-                :value="line.end ?? s.duration"
-                @input="
-                  line.end = Number(($event.target as HTMLInputElement).value)
-                " /></label
-            ><label class="field"
-              >配音音量<input
+              >配音音量 · {{ Math.round(line.volume * 100) }}%<input
                 v-model.number="line.volume"
                 :disabled="readonly"
                 type="range"
@@ -203,6 +196,23 @@ async function focusShot(id: string) {
                 max="2"
                 step=".05"
             /></label>
+          </div>
+          <div class="timeline-field-grid">
+            <DurationField
+              :model-value="line.subtitleStart"
+              label="字幕起点"
+              :disabled="readonly"
+              :min="0"
+              :placeholder="line.start"
+              @update:model-value="line.subtitleStart = $event"
+            />
+            <DurationField
+              :model-value="line.end ?? s.duration"
+              label="字幕终点"
+              :disabled="readonly"
+              :min="0"
+              @update:model-value="line.end = $event"
+            />
           </div>
         </fieldset>
       </div>
@@ -334,8 +344,8 @@ async function focusShot(id: string) {
 .timeline-picture {
   display: grid;
   place-items: center;
-  aspect-ratio: 16/9;
-  max-height: 32vh;
+  min-height: 240px;
+  padding: var(--control-gap);
   width: 100%;
   overflow: hidden;
   border-radius: 8px;
@@ -345,7 +355,9 @@ async function focusShot(id: string) {
 .timeline-picture :deep(.studio-media),
 .timeline-picture :deep(.studio-frame) {
   width: 100%;
-  height: 100%;
+  height: auto;
+  max-height: 48dvh;
+  aspect-ratio: auto;
   object-fit: contain;
   margin: 0;
 }
@@ -353,5 +365,14 @@ async function focusShot(id: string) {
   .timeline-monitor {
     grid-template-columns: minmax(0, 1fr);
   }
+}
+.timeline-field-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 180px), 1fr));
+  gap: var(--field-gap);
+}
+.timeline-dialogue legend {
+  padding-inline: var(--control-gap);
+  font-weight: 600;
 }
 </style>

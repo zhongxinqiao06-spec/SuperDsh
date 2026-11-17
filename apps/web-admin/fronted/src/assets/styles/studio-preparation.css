@@ -28,7 +28,6 @@
   border-radius: var(--radius-card);
   background: var(--card);
   box-shadow: var(--shadow-card);
-  scrollbar-width: thin;
 }
 .preparation-steps a {
   /* 隐藏的辅助状态跟随本项定位，避免窄屏水平滚动时撑开页面。 */
@@ -309,5 +308,11 @@
   }
   .cast-card audio {
     max-width: 100%;
+  }
+}
+
+@media (min-width: 768px) and (max-width: 1000px) {
+  .sample-workspace {
+    grid-template-columns: minmax(0, 1fr);
   }
 }

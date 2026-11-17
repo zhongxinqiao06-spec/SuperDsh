@@ -128,7 +128,7 @@ corepack.cmd yarn server:dev
 
 ### 新管理端 Vue 与 Python
 
-新实现位于 `apps/web-admin/fronted` 和 `apps/web-admin/backend`，与旧管理端独立运行。后端遵循若依 `controller → service → dao` 分层，DSH 保持固定执行引擎。启动、独立 Docker 部署、初始化和测试清理见 [Web Admin 开发说明](apps/web-admin/README.md)，实施状态见[第一份计划](docs/plans/web-admin-01-foundation.md)。
+新实现位于 `apps/web-admin/fronted` 和 `apps/web-admin/backend`，与旧管理端独立运行。后端遵循若依 `controller → service → dao` 分层，DSH 保持固定执行引擎。启动、独立 Docker 部署、初始化和测试清理见 [Web Admin 开发说明](apps/web-admin/README.md)，实施状态见[统一设计文档](docs/plans/README.md)。
 
 ```powershell
 corepack.cmd yarn web-admin:sync

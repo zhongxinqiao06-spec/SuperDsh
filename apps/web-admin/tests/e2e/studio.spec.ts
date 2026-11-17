@@ -43,7 +43,7 @@ test('只读作品可查看各步骤，剧本分镜和剪辑控件不能修改',
   await expect(page.getByLabel('动作摘要')).toBeDisabled()
   const steps = page.getByRole('navigation', { name: '作品工作区' })
   await steps.getByRole('link', { name: '剪辑与字幕' }).click()
-  await expect(page.getByLabel('入点（毫秒）')).toBeDisabled()
+  await expect(page.getByLabel('入点（秒）')).toBeDisabled()
   await expect(page.getByRole('button', { name: '导出 MP4' })).toBeDisabled()
   await steps.getByRole('link', { name: '剧本与场次' }).click()
   await expect(page.getByLabel('剧本正文')).toBeDisabled()
@@ -185,6 +185,13 @@ test('作品步骤可直达、后退和刷新，剧本、分镜与剪辑共用�
         return route.fulfill({
           json: { revision: project.revision, stages: [] },
         })
+      if (path.endsWith('/director-context'))
+        return route.fulfill({
+          json: {
+            vision: { available: false },
+            research: { available: false },
+          },
+        })
       if (path.endsWith('/catalog'))
         return route.fulfill({
           json: { configurations: [], defaults: [], agents: [] },
@@ -279,7 +286,7 @@ test('作品步骤可直达、后退和刷新，剧本、分镜与剪辑共用�
   await page.getByRole('button', { name: '保存工程' }).click()
   await step('剪辑与字幕').click()
   await page.getByRole('button', { name: '提前' }).last().click()
-  await page.getByLabel('出点（毫秒）').first().fill('3000')
+  await page.getByLabel('出点（秒）').first().fill('3')
   await page.getByRole('button', { name: '保存工程' }).click()
   await expect.poll(() => project.document.shots[0]?.action).toBe('小禾回头')
   await expect.poll(() => project.document.shots[0]?.trimEnd).toBe(3000)
@@ -319,6 +326,13 @@ test('作品步骤可直达、后退和刷新，剧本、分镜与剪辑共用�
       mediaDialog.getByRole('button', { name: '关闭', exact: true }),
     ).toBeInViewport()
     await expect(page.locator('video[controls]')).toBeInViewport()
+    // 等待弹窗入场动画与响应式重新排版，不能把过渡帧当作越界。
+    await expect
+      .poll(async () => {
+        const rect = await mediaDialog.boundingBox()
+        return rect !== null && rect.y >= 0 && rect.y + rect.height <= 845
+      })
+      .toBe(true)
     const bounds = await mediaDialog.boundingBox()
     expect(bounds).not.toBeNull()
     expect(bounds!.x).toBeGreaterThanOrEqual(0)
@@ -338,11 +352,11 @@ test('作品步骤可直达、后退和刷新，剧本、分镜与剪辑共用�
   await expect(mediaDialog).toBeVisible()
   await page.reload()
   await expect(step('剪辑与字幕')).toHaveAttribute('aria-current', 'page')
-  await expect(page.getByLabel('出点（毫秒）').first()).toHaveValue('3000')
+  await expect(page.getByLabel('出点（秒）').first()).toHaveValue('3')
   await page.getByRole('button', { name: '导出 MP4' }).click()
   const confirmation = page.getByRole('dialog', { name: '确认导出当前工程' })
   await expect(confirmation).toBeVisible()
-  await confirmation.getByRole('button', { name: '确认提交' }).click()
+  await confirmation.getByRole('button', { name: '导出这一版 MP4' }).click()
   await expect(step('成片交付')).toHaveAttribute('aria-current', 'page')
   await step('剧本与场次').click()
   await expect(page.getByLabel('剧本正文')).toHaveValue(
@@ -831,7 +845,7 @@ test('任务中心与作品任务共用安全恢复入口，未知受理不会�
   )
   await page.goto('/#/entertainment/tasks')
   await page.getByRole('button', { name: '核对任务' }).click()
-  const dialog = page.getByRole('dialog', { name: '核对任务' })
+  const dialog = page.getByRole('dialog', { name: /^核对任务 · / })
   await expect(dialog).toContainText('系统不会自动重发')
   await expect(
     dialog.getByRole('button', { name: '恢复结果查询或下载' }),
@@ -840,6 +854,10 @@ test('任务中心与作品任务共用安全恢复入口，未知受理不会�
   await expect(dialog).toBeHidden()
   await page.getByRole('link', { name: '查看作品任务' }).first().click()
   await page.getByRole('button', { name: '恢复原任务', exact: true }).click()
-  await expect(page.getByText('生成中', { exact: true })).toBeVisible()
+  await expect(
+    page
+      .getByRole('region', { name: '制作任务', exact: true })
+      .getByText('生成中', { exact: true }),
+  ).toBeVisible()
   expect(calls).toBe(1)
 })

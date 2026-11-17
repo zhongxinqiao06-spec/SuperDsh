@@ -482,3 +482,19 @@
     line-height: 44px;
   }
 }
+.el-checkbox {
+  max-width: 100%;
+  height: auto;
+  min-height: 32px;
+  white-space: normal;
+  align-items: flex-start;
+}
+.el-checkbox .el-checkbox__input {
+  margin-top: 5px;
+}
+.el-checkbox .el-checkbox__label {
+  min-width: 0;
+  white-space: normal;
+  overflow-wrap: anywhere;
+  line-height: 1.6;
+}

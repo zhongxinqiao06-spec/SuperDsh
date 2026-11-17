@@ -188,11 +188,12 @@ form.stack {
   min-width: 0;
   border: 1px solid var(--border);
   padding: 12px;
-  max-height: 300px;
-  overflow: auto;
   border-radius: 8px;
 }
 .permission-list .el-checkbox-group {
+  max-height: 300px;
+  overflow: auto;
+  overscroll-behavior: contain;
   display: flex;
   flex-direction: column;
 }

@@ -30,6 +30,33 @@ const items = computed(() =>
     }
   }),
 )
+const groups = computed(() =>
+  [
+    {
+      title: '需要处理',
+      open: true,
+      items: items.value.filter((item) =>
+        ['blocked', 'uncertain'].includes(item.status),
+      ),
+    },
+    {
+      title: '本次提交',
+      open: true,
+      items: items.value.filter(
+        (item) =>
+          item.selected && !['blocked', 'uncertain'].includes(item.status),
+      ),
+    },
+    {
+      title: '已跳过，不重复生成',
+      open: false,
+      items: items.value.filter(
+        (item) =>
+          !item.selected && !['blocked', 'uncertain'].includes(item.status),
+      ),
+    },
+  ].filter((group) => group.items.length),
+)
 const imageCount = computed(
   () => selected.value.filter((item) => item.kind === 'image').length,
 )
@@ -77,45 +104,68 @@ const states: Record<string, string> = {
         :key="issue.target + issue.message"
         type="error"
         :closable="false"
-        :title="issue.message"
+        :title="
+          (items.find((item) => item.target === issue.target)?.title ||
+            '制作范围') +
+          '：' +
+          issue.message
+        "
       />
       <p v-if="!selected.length">
         当前范围没有需要新生成的内容。已有候选请审看采用；执行中和待核对任务请到任务记录处理。
       </p>
-      <article
-        v-for="item in items"
-        :key="item.kind + item.target"
-        class="panel studio-panel form-stack"
+      <details
+        v-for="group in groups"
+        :key="group.title"
+        :open="group.open"
+        class="production-check-group"
       >
-        <div class="toolbar">
-          <strong>{{ item.title }}</strong
-          ><el-tag :type="item.selected ? 'warning' : 'info'">{{
-            item.selected ? '本次提交' : '不重复提交'
-          }}</el-tag>
-        </div>
-        <ExpandableText
-          :text="item.description"
-          :label="item.kind === 'speech' ? '台词' : '镜头要求'"
-          :lines="3"
-        />
-        <span
-          >{{ states[item.status] ?? item.status
-          }}<template v-if="item.message"> · {{ item.message }}</template></span
+        <summary>{{ group.title }} · {{ group.items.length }}</summary>
+        <article
+          v-for="item in group.items"
+          :key="item.kind + item.target"
+          class="panel studio-panel form-stack"
         >
-        <small v-if="item.model || item.references !== undefined"
-          >{{ item.model
-          }}<template v-if="item.seconds"> · {{ item.seconds }} 秒</template
-          ><template v-if="item.voice"> · 音色 {{ item.voice }}</template
-          ><template
-            v-if="
-              (item.kind === 'video' || item.kind === 'image') &&
-              item.references !== undefined
-            "
+          <div class="toolbar">
+            <strong>{{ item.title }}</strong
+            ><el-tag :type="item.selected ? 'warning' : 'info'">{{
+              item.selected ? '本次提交' : '不重复提交'
+            }}</el-tag>
+          </div>
+          <ExpandableText
+            :text="item.description"
+            :label="item.kind === 'speech' ? '台词' : '镜头要求'"
+            :lines="3"
+          />
+          <span
+            >{{ states[item.status] ?? item.status
+            }}<template v-if="item.message">
+              · {{ item.message }}</template
+            ></span
           >
-            · 输入参考图 {{ item.references }} 张</template
-          ></small
-        >
-      </article>
+          <small v-if="item.model || item.references !== undefined"
+            >{{ item.model
+            }}<template v-if="item.seconds"> · {{ item.seconds }} 秒</template
+            ><template v-if="item.voice"> · 音色 {{ item.voice }}</template
+            ><template
+              v-if="
+                (item.kind === 'video' || item.kind === 'image') &&
+                item.references !== undefined
+              "
+            >
+              · 输入参考图 {{ item.references }} 张</template
+            ></small
+          >
+        </article>
+      </details>
     </div>
   </ManagementDialog>
 </template>
+
+<style scoped>
+.production-check-group > summary {
+  font-weight: 600;
+  cursor: pointer;
+  padding-block: var(--control-gap);
+}
+</style>

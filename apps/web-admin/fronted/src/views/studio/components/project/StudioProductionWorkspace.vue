@@ -6,6 +6,7 @@ import type { ProductionIntent } from '@/types/studio/production'
 import { productionApi } from '@/api/studio/production-api'
 import { useProductionPlan } from '@/composables/studio/use-production-plan'
 import ProductionPlanDialog from '../ProductionPlanDialog.vue'
+import SelectionOption from '@/components/form/SelectionOption.vue'
 /** 批量入口先选范围再逐项预检，保存和网络错误保留当前工程。 */
 const props = defineProps<{
   project: StudioProject
@@ -47,12 +48,16 @@ async function prepare() {
 }
 </script>
 <template>
-  <section class="panel studio-panel stack" aria-label="批量制作范围">
+  <section class="studio-panel stack" aria-label="批量制作范围">
     <div class="toolbar">
       <h2>选择制作范围</h2>
       <el-tag>先检查，再提交</el-tag>
     </div>
-    <el-radio-group v-model="mode" aria-label="制作范围">
+    <el-radio-group
+      v-model="mode"
+      class="studio-mode-options"
+      aria-label="制作范围"
+    >
       <el-radio-button value="missing">只补缺失</el-radio-button
       ><el-radio-button value="failed">只重做失败项</el-radio-button
       ><el-radio-button value="selected">自选镜头与台词</el-radio-button
@@ -68,18 +73,19 @@ async function prepare() {
         class="panel studio-panel form-stack"
       >
         <el-checkbox-group v-model="shots"
-          ><el-checkbox :value="shot.id"
-            >镜 {{ index + 1 }} · {{ shot.action }}</el-checkbox
-          ></el-checkbox-group
-        >
+          ><SelectionOption
+            :value="shot.id"
+            :title="`镜 ${index + 1} · ${shot.scene || '镜头视频'}`"
+            :description="shot.action"
+        /></el-checkbox-group>
         <el-checkbox-group v-model="lines" class="form-stack"
-          ><el-checkbox
-            v-for="line in shot.lines"
+          ><SelectionOption
+            v-for="(line, lineIndex) in shot.lines"
             :key="line.id"
             :value="line.id"
-            >配音 · {{ line.text }}</el-checkbox
-          ></el-checkbox-group
-        >
+            :title="`配音 · 第 ${lineIndex + 1} 句`"
+            :description="line.text"
+        /></el-checkbox-group>
       </article>
     </div>
     <div class="studio-grid">

@@ -15,6 +15,7 @@ const video = defineModel<string>('video', { required: true })
 const referenceVideo = defineModel<string>('referenceVideo', { required: true })
 const speech = defineModel<string>('speech', { required: true })
 const props = defineProps<{
+  revision?: number
   plan: Generation
   shots: Shot[]
   lines: Dialogue[]
@@ -78,12 +79,14 @@ const missingModel = computed(
     :busy="busy"
     :error="error"
     :submit-disabled="missingModel"
-    :submit-text="plan.export ? '确认提交' : '检查生成方案'"
+    :submit-text="plan.export ? '导出这一版 MP4' : '检查生成方案'"
     @submit="emit('submit')"
   >
     <div class="studio-form">
       <p v-if="plan.export">
-        使用已采用的镜头和配音，按当前剪辑与字幕生成 MP4。
+        工程版本
+        {{ revision ?? '当前' }}：使用已采用的镜头和配音，按当前剪辑与字幕生成
+        MP4。后续编辑不会改动此次导出的版本。
       </p>
       <template v-else>
         <p>
@@ -92,6 +95,28 @@ const missingModel = computed(
           秒。配音 {{ lines.length }} 句，共
           {{ lines.reduce((n, l) => n + [...l.text].length, 0) }} 字。
         </p>
+        <label
+          v-for="choice in videoSelections"
+          :key="choice.label"
+          class="field"
+        >
+          {{ choice.label }}
+          <select
+            v-model="choice.selection.value"
+            class="native-control"
+            :required="!choice.automatic"
+          >
+            <option v-if="choice.automatic && choice.models.length" value="">
+              角色音色或默认模型
+            </option>
+            <option v-if="!choice.models.length" disabled value="">
+              暂无可用配置
+            </option>
+            <option v-for="m in choice.models" :key="m.id" :value="m.id">
+              {{ m.name }}
+            </option>
+          </select>
+        </label>
         <ul
           v-if="shots.length"
           class="generation-shot-list"
@@ -109,30 +134,11 @@ const missingModel = computed(
           </li>
         </ul>
         <ul v-if="lines.length" aria-label="本次生成台词">
-          <li v-for="line in lines" :key="line.id">{{ line.text }}</li>
+          <li v-for="(line, index) in lines" :key="line.id">
+            <strong>第 {{ index + 1 }} 句</strong
+            ><ExpandableText :text="line.text" :lines="2" label="台词" />
+          </li>
         </ul>
-        <label
-          v-for="choice in videoSelections"
-          :key="choice.label"
-          class="field"
-        >
-          {{ choice.label }}
-          <select
-            v-model="choice.selection.value"
-            class="native-control"
-            :required="!choice.automatic"
-          >
-            <option v-if="choice.automatic && choice.models.length" value="">
-              沿用角色已采用音色与模型；未设置时使用默认模型
-            </option>
-            <option v-if="!choice.models.length" disabled value="">
-              暂无可用配置
-            </option>
-            <option v-for="m in choice.models" :key="m.id" :value="m.id">
-              {{ m.name }}
-            </option>
-          </select>
-        </label>
         <p v-if="missingModel" class="studio-meta">
           请为本次任务选择已启用的模型配置。
         </p>

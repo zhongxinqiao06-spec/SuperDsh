@@ -1,0 +1,50 @@
+/* 全站只统一滚动条外观，不改变页面、输入、弹层及第三方控件的滚动行为。 */
+:where(html, body, body *) {
+  scrollbar-width: thin;
+  scrollbar-color: var(--scrollbar-thumb) transparent;
+}
+/* Chromium 的标准 thin 会覆盖伪元素皮肤并保留系统箭头，支持时使用自定义轨道。 */
+@supports selector(::-webkit-scrollbar) {
+  :where(html, body, body *) {
+    scrollbar-width: auto;
+    scrollbar-color: auto;
+  }
+  ::-webkit-scrollbar {
+    width: var(--scrollbar-size);
+    height: var(--scrollbar-size);
+  }
+  ::-webkit-scrollbar-track,
+  ::-webkit-scrollbar-corner {
+    background: transparent;
+  }
+  ::-webkit-scrollbar-thumb {
+    min-height: 32px;
+    border: 2px solid transparent;
+    border-radius: var(--radius-control);
+    background: var(--scrollbar-thumb);
+    background-clip: padding-box;
+  }
+  ::-webkit-scrollbar-thumb:hover {
+    background-color: var(--scrollbar-thumb-hover);
+  }
+  ::-webkit-scrollbar-button {
+    display: none;
+    width: 0;
+    height: 0;
+  }
+}
+/* Element Plus 的虚拟滑块沿用同一色值，避免下拉框和正文两套外观。 */
+.el-scrollbar {
+  --el-scrollbar-bg-color: var(--scrollbar-thumb);
+  --el-scrollbar-hover-bg-color: var(--scrollbar-thumb-hover);
+  --el-scrollbar-opacity: 1;
+  --el-scrollbar-hover-opacity: 1;
+}
+@media (forced-colors: active) {
+  :where(html, body, body *) {
+    scrollbar-color: auto;
+  }
+  ::-webkit-scrollbar-thumb {
+    background-color: CanvasText;
+  }
+}

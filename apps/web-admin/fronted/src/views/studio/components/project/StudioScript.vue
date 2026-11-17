@@ -340,9 +340,16 @@ defineExpose({ focusScript })
                 text
                 class="script-shot-link"
                 @click="emit('shot', shot.id)"
-                >查看镜头：{{ shot.action || '待补动作'
-                }}<AppIcon name="arrow-right"
-              /></el-button>
+                ><span class="script-shot-copy"
+                  ><strong
+                    >镜
+                    {{
+                      model.shots.findIndex((item) => item.id === shot.id) + 1
+                    }}
+                    · {{ shot.scene || '场景待定' }}</strong
+                  ><span>{{ shot.action || '尚无动作' }}</span></span
+                ><AppIcon name="arrow-right" />
+              </el-button>
             </div>
             <div class="toolbar">
               <span class="studio-meta">{{

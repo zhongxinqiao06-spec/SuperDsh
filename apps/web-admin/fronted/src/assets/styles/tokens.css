@@ -59,6 +59,17 @@
   --radius-panel: 14px;
   /* 控制台统一尺度：业务页面只消费语义变量，不复制控件皮肤。 */
   --radius-control: 8px;
+  --scrollbar-size: 8px;
+  --scrollbar-thumb: color-mix(
+    in srgb,
+    var(--muted-foreground) 35%,
+    transparent
+  );
+  --scrollbar-thumb-hover: color-mix(
+    in srgb,
+    var(--muted-foreground) 60%,
+    transparent
+  );
   --radius-card: 10px;
   --control-height: 40px;
   --control-height-small: 32px;

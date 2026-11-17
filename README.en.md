@@ -128,7 +128,7 @@ Existing databases require both `AGENT_SERVER_DB_URL` and `AGENT_SERVER_REDIS_UR
 
 ### New Vue and Python admin
 
-The new implementation lives in `apps/web-admin/fronted` and `apps/web-admin/backend` and runs independently of the existing admin. Its Python backend follows RuoYi-style `controller → service → dao` layering while keeping the fixed DSH engine. See [Web Admin development](apps/web-admin/README.md) for startup, separate Docker deployment, initialization and test cleanup, and [phase one](docs/plans/web-admin-01-foundation.md) for implementation status.
+The new implementation lives in `apps/web-admin/fronted` and `apps/web-admin/backend` and runs independently of the existing admin. Its Python backend follows RuoYi-style `controller → service → dao` layering while keeping the fixed DSH engine. See [Web Admin development](apps/web-admin/README.md) for startup, separate Docker deployment, initialization and test cleanup, and [consolidated design documents](docs/plans/README.md) for implementation status.
 
 ```powershell
 corepack.cmd yarn web-admin:sync

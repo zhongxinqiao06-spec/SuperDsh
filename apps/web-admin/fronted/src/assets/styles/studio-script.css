@@ -272,3 +272,33 @@
     line-height: 1.5;
   }
 }
+
+/* 镜头入口只展示摘要；正文完整保留在对应镜头编辑器。 */
+.script-shot-link {
+  justify-content: space-between;
+  min-width: 0;
+  width: 100%;
+}
+.script-shot-link > span {
+  width: 100%;
+  min-width: 0;
+  gap: var(--control-gap);
+}
+.script-shot-copy {
+  display: grid;
+  min-width: 0;
+  gap: var(--label-gap);
+  text-align: start;
+  line-height: 1.6;
+}
+.script-shot-copy strong,
+.script-shot-copy > span {
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+.script-shot-copy > span {
+  color: var(--muted-foreground);
+  font-weight: 400;
+}

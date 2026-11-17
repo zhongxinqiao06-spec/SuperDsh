@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { jobKinds, jobStates } from '@/utils/studio/media-labels'
 import { createUuid } from '@/utils/uuid'
 import { computed, ref } from 'vue'
 import { ElMessageBox } from 'element-plus'
@@ -10,6 +11,7 @@ import type { Job } from '@/types/studio/studio'
 import type { JobDecision } from '@/types/studio/production'
 /** 取消、原回执恢复与人工核对在项目、个人库和任务目录复用同一交互。 */
 const props = defineProps<{
+  label?: string
   project: string | null
   job: Pick<
     Job,
@@ -108,9 +110,21 @@ function inspect() {
   <small v-if="mutation.error.value && !open" role="alert">{{
     mutation.error.value
   }}</small>
-  <ManagementDialog v-if="open" v-model="open" title="核对任务" readonly>
+  <ManagementDialog
+    v-if="open"
+    v-model="open"
+    :title="'核对任务 · ' + (label || jobKinds[job.kind])"
+    :busy="mutation.busy.value"
+    readonly
+  >
     <div class="stack">
-      <p>修订 {{ job.revision }} · 任务 {{ job.id }}</p>
+      <p>
+        {{ jobStates[job.state] ?? job.state }} · 工程版本 {{ job.revision }}
+      </p>
+      <details>
+        <summary>查看任务标识</summary>
+        <p class="studio-meta">{{ job.id }}</p>
+      </details>
       <p>
         先查询本次提交的持久回执。没有回执时，按提交时间到供应商控制台核对并记录依据；系统不会自动重发。
       </p>

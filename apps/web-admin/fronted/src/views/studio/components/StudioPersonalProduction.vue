@@ -1,6 +1,8 @@
 <script setup lang="ts">
-import { watch } from 'vue'
+import { computed, ref, watch } from 'vue'
+import ExpandableText from '@/components/base/ExpandableText.vue'
 import ManagementDialog from '@/components/overlay/ManagementDialog.vue'
+import ManagementPagination from '@/components/management/ManagementPagination.vue'
 import { usePersonalProduction } from '@/composables/studio/use-personal-production'
 import { jobStates } from '@/utils/studio/media-labels'
 import ProductionPlanDialog from './ProductionPlanDialog.vue'
@@ -26,6 +28,52 @@ const {
   adopt,
   refresh,
 } = usePersonalProduction(props.entity, () => emit('updated'))
+const dirty = ref(false)
+const candidates = computed(
+  () =>
+    state.value?.jobs.filter((job) =>
+      kind.value === 'voice' ? job.kind === 'speech' : job.kind === 'image',
+    ) ?? [],
+)
+const candidatePage = ref(1)
+const candidatePageSize = ref(10)
+const visibleCandidates = computed(() =>
+  candidates.value.slice(
+    (candidatePage.value - 1) * candidatePageSize.value,
+    candidatePage.value * candidatePageSize.value,
+  ),
+)
+watch([kind, candidatePageSize], () => {
+  candidatePage.value = 1
+})
+watch(
+  () => candidates.value.length,
+  (count) => {
+    candidatePage.value = Math.min(
+      candidatePage.value,
+      Math.max(1, Math.ceil(count / candidatePageSize.value)),
+    )
+  },
+)
+const adopted = (id: string) =>
+  [state.value?.asset.sourceJob, state.value?.asset.voicePreviewJob].includes(
+    id,
+  )
+watch(
+  [
+    kind,
+    configuration,
+    voice,
+    text,
+    prompt,
+    useReference,
+    allowDuplicate,
+    reason,
+  ],
+  () => {
+    dirty.value = true
+  },
+)
 watch(kind, () => {
   configuration.value = ''
   voice.value = ''
@@ -35,11 +83,22 @@ watch(kind, () => {
   <ManagementDialog
     :model-value="true"
     title="个人素材制作"
-    readonly
+    :busy="flow.busy.value || mutation.busy.value"
+    :dirty="dirty"
+    :error="flow.error.value || mutation.error.value"
+    :submit-disabled="!state"
+    submit-text="检查生成方案"
+    @submit="prepare"
     @update:model-value="emit('close')"
   >
     <div class="stack">
-      <p v-if="mutation.error.value" role="alert">{{ mutation.error.value }}</p>
+      <p v-if="!state" role="status">
+        {{
+          mutation.error.value
+            ? '素材加载失败，请关闭后重试。'
+            : '正在读取素材与候选…'
+        }}
+      </p>
       <template v-if="state">
         <h3>
           {{ state.asset.name }} · 当前版本
@@ -57,7 +116,10 @@ watch(kind, () => {
           ></el-radio-group
         >
         <label class="field"
-          >模型<el-select v-model="configuration" aria-label="个人素材模型"
+          >模型<el-select
+            v-model="configuration"
+            :empty-values="[null, undefined]"
+            aria-label="个人素材模型"
             ><el-option value="" label="后台默认模型" /><el-option
               v-for="model in models"
               :key="model.id"
@@ -66,7 +128,10 @@ watch(kind, () => {
         ></label>
         <template v-if="kind === 'voice'">
           <label class="field"
-            >音色<el-select v-model="voice" aria-label="试听音色"
+            >音色<el-select
+              v-model="voice"
+              :empty-values="[null, undefined]"
+              aria-label="试听音色"
               ><el-option
                 v-for="item in voices"
                 :key="item"
@@ -92,13 +157,6 @@ watch(kind, () => {
             >沿用当前参考图</el-checkbox
           ></template
         >
-        <div class="toolbar">
-          <el-button type="primary" :loading="flow.busy.value" @click="prepare"
-            >检查生成方案</el-button
-          ><span v-if="flow.error.value" role="alert">{{
-            flow.error.value
-          }}</span>
-        </div>
         <template
           v-if="
             state.jobs.some((j) =>
@@ -114,9 +172,9 @@ watch(kind, () => {
               aria-label="个人素材重新生成原因" /></label
         ></template>
         <h3>生成候选</h3>
-        <p v-if="!state.jobs.length">暂无候选，先选择模型并检查方案。</p>
+        <p v-if="!candidates.length">暂无候选，先选择模型并检查方案。</p>
         <article
-          v-for="job in state.jobs"
+          v-for="job in visibleCandidates"
           :key="job.id"
           class="panel studio-panel form-stack"
         >
@@ -126,8 +184,17 @@ watch(kind, () => {
             }}</strong
             ><span>{{ jobStates[job.state] ?? job.state }}</span>
           </div>
-          <p v-if="job.error">{{ job.error }}</p>
-          <p v-if="job.text">{{ job.text }}</p>
+          <ExpandableText
+            v-if="job.error"
+            :text="job.error"
+            label="失败详情"
+            :lines="2"
+          /><ExpandableText
+            v-if="job.text"
+            :text="job.text"
+            label="台词"
+            :lines="2"
+          />
           <StudioMedia
             v-if="job.state === 'ready'"
             :project="null"
@@ -138,12 +205,20 @@ watch(kind, () => {
           <div class="toolbar">
             <el-button
               v-if="job.state === 'ready'"
-              :disabled="mutation.busy.value"
+              :disabled="mutation.busy.value || adopted(job.id)"
               @click="adopt(job.id)"
-              >采用并保存新版本</el-button
+              >{{
+                adopted(job.id) ? '当前已采用' : '采用并保存新版本'
+              }}</el-button
             ><StudioRecovery :project="null" :job="job" @recovered="refresh" />
           </div>
         </article>
+        <ManagementPagination
+          v-if="candidates.length"
+          v-model:current-page="candidatePage"
+          v-model:page-size="candidatePageSize"
+          :total="candidates.length"
+        />
       </template>
     </div>
     <ProductionPlanDialog

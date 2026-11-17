@@ -13,6 +13,7 @@ import { verifyOwnership } from './ownership.ts'
 import { executeParitySuites } from './parity-execution.ts'
 import {
   contractProjection,
+  documentedTaskIds,
   indexedEvidence,
   record,
   templateMatches,
@@ -127,29 +128,25 @@ export async function runParity(reportOnly = false): Promise<number> {
   const features = (await json(
     resolve(appRoot, 'tests/parity/features.json'),
   )) as Features
-  const plan = await readFile(
-    resolve(
-      repositoryRoot,
-      'docs/plans/web-admin-02-function-and-interaction.md',
-    ),
+  const developmentRules = await readFile(
+    resolve(repositoryRoot, 'docs/plans/开发规范.md'),
     'utf8',
   )
-  const taskIds = [...plan.matchAll(/^### (P2-\d+) /gmu)].map(
-    (match) => match[1]!,
-  )
+  let taskIds: string[] = []
+  let parityTaskIds: string[] = []
+  try {
+    taskIds = documentedTaskIds(developmentRules, 'P2')
+    parityTaskIds = documentedTaskIds(developmentRules, 'P3')
+  } catch (error) {
+    structuralErrors.push(String(error))
+  }
   const featureIds = features.tasks.map((task) => task.id)
   if (
     new Set(featureIds).size !== featureIds.length ||
-    taskIds.some((id) => !featureIds.includes(id))
+    taskIds.some((id) => !featureIds.includes(id)) ||
+    featureIds.some((id) => !taskIds.includes(id))
   )
-    structuralErrors.push('计划二任务索引重复或遗漏')
-  const parityPlan = await readFile(
-    resolve(repositoryRoot, 'docs/plans/web-admin-03-parity-validation.md'),
-    'utf8',
-  )
-  const parityTaskIds = [...parityPlan.matchAll(/^## (P3-\d+) /gmu)].map(
-    (match) => match[1]!,
-  )
+    structuralErrors.push('功能范围与用例索引不一致或重复')
   const groupIds = features.evidenceGroups.map((group) => group.id)
   if (!groupIds.length || new Set(groupIds).size !== groupIds.length)
     structuralErrors.push('第三阶段证据分组为空或重复')

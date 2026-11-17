@@ -48,6 +48,7 @@ const inputId = `long-text-${useId()}`
       error
     }}</small>
     <el-dialog
+      v-if="expanded"
       v-model="expanded"
       :title="label"
       class="long-text-dialog"
