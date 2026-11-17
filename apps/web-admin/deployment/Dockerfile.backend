@@ -24,8 +24,13 @@ COPY apps/desktop/core/package.json ./apps/desktop/core/package.json
 COPY apps/desktop/plugins/harness/package.json ./apps/desktop/plugins/harness/package.json
 COPY dsh-community-market/package.json ./dsh-community-market/package.json
 COPY dsh-community-fabric/package.json ./dsh-community-fabric/package.json
-# 镜像仅影响下载位置，继续校验 yarn.lock；空值不覆盖 Yarn 官方默认源。
-RUN --mount=type=cache,target=/root/.yarn/berry/cache if [ -n "$YARN_NPM_REGISTRY_SERVER" ]; then export COREPACK_NPM_REGISTRY="$YARN_NPM_REGISTRY_SERVER"; else unset YARN_NPM_REGISTRY_SERVER; fi; timeout --kill-after=30s "${BUILD_DOWNLOAD_TIMEOUT}s" corepack yarn install --immutable
+# 安装资源参数在 APT 层之后声明，调整时继续复用已下载的系统包与 Yarn 缓存。
+ARG YARN_INSTALL_NETWORK_CONCURRENCY=1
+ARG YARN_INSTALL_TASK_POOL_CONCURRENCY=1
+ARG YARN_INSTALL_TASK_POOL_MODE=async
+ARG YARN_INSTALL_HEAP_MB=768
+COPY apps/web-admin/deployment/install-node-dependencies.sh /tmp/install-node-dependencies.sh
+RUN --mount=type=cache,target=/root/.yarn/berry/cache sh /tmp/install-node-dependencies.sh
 COPY apps/desktop/core/src/contracts/ ./apps/desktop/core/src/contracts/
 COPY apps/desktop/plugins/harness/src/ ./apps/desktop/plugins/harness/src/
 COPY apps/desktop/plugins/harness/tsdown.config.ts ./apps/desktop/plugins/harness/tsdown.config.ts

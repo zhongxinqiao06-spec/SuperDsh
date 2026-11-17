@@ -24,8 +24,13 @@ COPY apps/desktop/core/package.json ./apps/desktop/core/package.json
 COPY apps/desktop/plugins/harness/package.json ./apps/desktop/plugins/harness/package.json
 COPY dsh-community-market/package.json ./dsh-community-market/package.json
 COPY dsh-community-fabric/package.json ./dsh-community-fabric/package.json
-# 可选镜像不改变锁文件与依赖校验；保留官方默认源和构建缓存。
-RUN --mount=type=cache,target=/root/.yarn/berry/cache if [ -n "$YARN_NPM_REGISTRY_SERVER" ]; then export COREPACK_NPM_REGISTRY="$YARN_NPM_REGISTRY_SERVER"; else unset YARN_NPM_REGISTRY_SERVER; fi; timeout --kill-after=30s "${BUILD_DOWNLOAD_TIMEOUT}s" corepack yarn install --immutable
+# 限制仅作用于依赖安装；后续 Vite 编译沿用原有环境，APT 和下载缓存仍可复用。
+ARG YARN_INSTALL_NETWORK_CONCURRENCY=1
+ARG YARN_INSTALL_TASK_POOL_CONCURRENCY=1
+ARG YARN_INSTALL_TASK_POOL_MODE=async
+ARG YARN_INSTALL_HEAP_MB=768
+COPY apps/web-admin/deployment/install-node-dependencies.sh /tmp/install-node-dependencies.sh
+RUN --mount=type=cache,target=/root/.yarn/berry/cache sh /tmp/install-node-dependencies.sh
 COPY upstream.json ./
 COPY apps/web-admin/scripts/ ./apps/web-admin/scripts/
 COPY apps/web-admin/contracts/ ./apps/web-admin/contracts/

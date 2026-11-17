@@ -1,6 +1,13 @@
 import assert from 'node:assert/strict'
 import { execFileSync, spawnSync } from 'node:child_process'
-import { mkdir, mkdtemp, readFile, rm, writeFile } from 'node:fs/promises'
+import {
+  chmod,
+  mkdir,
+  mkdtemp,
+  readFile,
+  rm,
+  writeFile,
+} from 'node:fs/promises'
 import { delimiter, dirname, resolve } from 'node:path'
 import { test } from 'node:test'
 import { backendRoot, repositoryRoot } from '../../scripts/paths.ts'
@@ -29,14 +36,7 @@ test('APT 镜像只替换官方地址，保留签名并拒绝无界超时', asyn
       '',
     ].join('\n')
     await writeFile(source, original)
-    let shell = '/bin/sh'
-    if (process.platform === 'win32') {
-      const git = execFileSync('where.exe', ['git'], { encoding: 'utf8' })
-        .trim()
-        .split(/\r?\n/u)[0]
-      assert.ok(git, 'Windows 验证需要已安装 Git 的 POSIX shell')
-      shell = resolve(dirname(dirname(git)), 'usr/bin/sh.exe')
-    }
+    const shell = posixShell()
     const run = (overrides: NodeJS.ProcessEnv = {}) =>
       spawnSync(
         shell,
@@ -94,6 +94,106 @@ test('APT 镜像只替换官方地址，保留签名并拒绝无界超时', asyn
   }
 })
 
+/** 用隔离假命令记录实际子进程参数，验证安装约束而不联网、不安装或改依赖缓存。 */
+test('Yarn 安装单独约束资源，保留镜像、immutable 和可配置边界', async () => {
+  const directory = await fixture()
+  try {
+    const shell = posixShell()
+    const executable = resolve(directory, 'corepack')
+    const output = resolve(directory, 'captured.txt')
+    const script = [
+      '#!/bin/sh',
+      'printf "%s\\n" "$NODE_OPTIONS" "$YARN_NETWORK_CONCURRENCY" "$YARN_TASK_POOL_CONCURRENCY" "$YARN_TASK_POOL_MODE" "${YARN_NPM_REGISTRY_SERVER:-}" "${COREPACK_NPM_REGISTRY:-}" > "$TEST_OUTPUT"',
+      'printf "%s\\n" "$@" >> "$TEST_OUTPUT"',
+      '',
+    ].join('\n')
+    await writeFile(executable, script)
+    await chmod(executable, 0o755)
+    const run = (overrides: NodeJS.ProcessEnv = {}) =>
+      spawnSync(
+        shell,
+        [
+          resolve(
+            repositoryRoot,
+            'apps/web-admin/deployment/install-node-dependencies.sh',
+          ),
+        ],
+        {
+          encoding: 'utf8',
+          env: {
+            ...process.env,
+            PATH: [directory, dirname(shell), process.env.PATH ?? ''].join(
+              delimiter,
+            ),
+            TEST_OUTPUT: output,
+            NODE_OPTIONS: '--max-old-space-size=3072',
+            YARN_NETWORK_CONCURRENCY: '2',
+            YARN_TASK_POOL_CONCURRENCY: '24',
+            YARN_TASK_POOL_MODE: 'workers',
+            YARN_NPM_REGISTRY_SERVER: '',
+            COREPACK_NPM_REGISTRY: '',
+            YARN_INSTALL_NETWORK_CONCURRENCY: '',
+            YARN_INSTALL_TASK_POOL_CONCURRENCY: '',
+            YARN_INSTALL_TASK_POOL_MODE: '',
+            YARN_INSTALL_HEAP_MB: '',
+            BUILD_DOWNLOAD_TIMEOUT: '10',
+            ...overrides,
+          },
+          timeout: 15_000,
+        },
+      )
+    const defaults = run()
+    assert.equal(defaults.status, 0, defaults.stderr)
+    assert.deepEqual(
+      (await readFile(output, 'utf8')).trimEnd().split(/\r?\n/u),
+      [
+        '--max-old-space-size=768',
+        '1',
+        '1',
+        'async',
+        '',
+        '',
+        'yarn',
+        'install',
+        '--immutable',
+      ],
+    )
+    const mirror = 'https://mirror.example'
+    const customized = run({
+      YARN_INSTALL_NETWORK_CONCURRENCY: '2',
+      YARN_INSTALL_TASK_POOL_CONCURRENCY: '2',
+      YARN_INSTALL_TASK_POOL_MODE: 'workers',
+      YARN_INSTALL_HEAP_MB: '512',
+      YARN_NPM_REGISTRY_SERVER: mirror,
+    })
+    assert.equal(customized.status, 0, customized.stderr)
+    const captured = await readFile(output, 'utf8')
+    assert.deepEqual(captured.trimEnd().split(/\r?\n/u), [
+      '--max-old-space-size=512',
+      '2',
+      '2',
+      'workers',
+      mirror,
+      mirror,
+      'yarn',
+      'install',
+      '--immutable',
+    ])
+    for (const invalid of [
+      { YARN_INSTALL_NETWORK_CONCURRENCY: '0' },
+      { YARN_INSTALL_TASK_POOL_CONCURRENCY: '33' },
+      { YARN_INSTALL_TASK_POOL_MODE: 'unbounded' },
+      { YARN_INSTALL_HEAP_MB: '-1' },
+      { BUILD_DOWNLOAD_TIMEOUT: '0' },
+    ]) {
+      assert.equal(run(invalid).status, 2)
+      assert.equal(await readFile(output, 'utf8'), captured)
+    }
+  } finally {
+    await rm(directory, { recursive: true, force: true })
+  }
+})
+
 /** frozen 导出必须保留完整版本与原始哈希，不能写锁文件或安装依赖。 */
 test('自定义 Python 镜像的导出仍完全锁定并保留平台条件', async () => {
   const directory = await fixture()
@@ -143,4 +243,13 @@ async function fixture() {
   const root = resolve(repositoryRoot, '.superdsh-work/web-admin-validation')
   await mkdir(root, { recursive: true })
   return mkdtemp(resolve(root, 'build-network-'))
+}
+
+function posixShell() {
+  if (process.platform !== 'win32') return '/bin/sh'
+  const git = execFileSync('where.exe', ['git'], { encoding: 'utf8' })
+    .trim()
+    .split(/\r?\n/u)[0]
+  assert.ok(git, 'Windows 验证需要已安装 Git 的 POSIX shell')
+  return resolve(dirname(dirname(git)), 'usr/bin/sh.exe')
 }
