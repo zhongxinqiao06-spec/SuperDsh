@@ -20,6 +20,12 @@ defineEmits<{ 'update:modelValue': [value: boolean] }>()
     :destroy-on-close="false"
     @update:model-value="$emit('update:modelValue', $event)"
   >
+    <template v-if="$slots.toolbar" #header="{ titleId, titleClass }">
+      <div class="app-drawer-heading">
+        <h2 :id="titleId" :class="titleClass">{{ title }}</h2>
+        <slot name="toolbar" />
+      </div>
+    </template>
     <slot />
     <template v-if="$slots.footer" #footer>
       <div class="app-drawer-actions"><slot name="footer" /></div>
@@ -28,6 +34,16 @@ defineEmits<{ 'update:modelValue': [value: boolean] }>()
 </template>
 
 <style>
+.app-drawer-heading {
+  display: grid;
+  min-width: 0;
+  flex: 1;
+  gap: var(--field-gap);
+}
+.app-drawer-heading h2 {
+  margin: 0;
+  font-size: var(--font-size-section);
+}
 .app-drawer .el-drawer__header {
   flex-shrink: 0;
   padding: var(--field-gap) var(--panel-padding);

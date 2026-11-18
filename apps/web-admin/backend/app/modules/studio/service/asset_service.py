@@ -11,6 +11,7 @@ from app.modules.studio.entity.bo.foundation import stable_id
 from app.modules.studio.entity.do.asset_do import (
     AssetFamily,
     AssetVersion,
+    EntityVariant,
     EntityVersion,
     EntityVersionAsset,
     StudioEntity,
@@ -31,6 +32,9 @@ class StudioAssetService:
         origin: str | None = None,
         *,
         version_id: str | None = None,
+        target_family: str | None = None,
+        target_variant: str | None = None,
+        variant_name: str | None = None,
     ) -> str:
         """调用者先校验文件；同范围追加版本，跨范围引用创建独立实体。"""
         dao = AssetDao(session)
@@ -47,7 +51,7 @@ class StudioAssetService:
             raise DomainError(404, "素材来源不存在")
         if parent and parent.definition["kind"] != body.kind:
             raise DomainError(422, "新版本须与来源素材类型一致")
-        family_id = (
+        family_id = target_family or (
             parent.family
             if parent and parent.project == body.project
             else (
@@ -60,6 +64,13 @@ class StudioAssetService:
         record_id = version_id or identifier()
         if body.kind in {"character", "scene", "prop"}:
             family = await dao.entity(family_id, lock=True)
+            if family and (
+                family.owner_id != account.user_id
+                or family.project_id != body.project
+                or family.kind != body.kind
+                or family.archived_at is not None
+            ):
+                raise DomainError(404, "目标设定不存在")
             if family is None:
                 family = StudioEntity(
                     id=family_id,
@@ -76,11 +87,41 @@ class StudioAssetService:
                 family.name = body.name
                 family.current_version_id = record_id
             source = await dao.entity_version(parent.id) if parent else None
+            source_variant = (
+                await dao.variant(source.variant_id) if source and source.variant_id else None
+            )
+            variant_id = target_variant or (
+                source_variant.id
+                if source_variant and source_variant.entity_id == family_id
+                else stable_id(
+                    family_id, source_variant.id if source_variant else "default-variant"
+                )
+            )
+            variant = await dao.variant(variant_id)
+            if variant and variant.entity_id != family_id:
+                raise DomainError(422, "造型不属于目标设定")
+            if variant is None:
+                variant = EntityVariant(
+                    id=variant_id,
+                    entity_id=family_id,
+                    name=variant_name
+                    or (
+                        source_variant.name
+                        if source_variant
+                        else ("默认造型" if body.kind == "character" else "默认设定")
+                    ),
+                    current_version_id=record_id,
+                )
+                dao.add(variant)
+                await session.flush()
+            else:
+                variant.current_version_id = record_id
             record = EntityVersion(
                 id=record_id,
                 entity_id=family_id,
                 version_no=await dao.next_entity_version(family_id),
                 origin_version_id=body.parent,
+                variant_id=variant_id,
                 name=body.name,
                 description=body.description,
                 voice_id=body.voice,
@@ -96,9 +137,30 @@ class StudioAssetService:
                     record.voice_parameters.pop("previewJob", None)
             dao.add(record)
             await session.flush()
+            if parent and parent.definition.get("fileId") != body.fileId:
+                # 更换参考画面不能顺带抹掉已确认的声音试听等独立用途。
+                for reference in await dao.references(parent.id):
+                    if reference.purpose != "reference" and (
+                        reference.purpose != "voice-preview"
+                        or source is not None
+                        and source.voice_id == body.voice
+                    ):
+                        dao.add(
+                            EntityVersionAsset(
+                                entity_version_id=record_id,
+                                asset_version_id=reference.asset_version_id,
+                                purpose=reference.purpose,
+                                position=reference.position,
+                            )
+                        )
             # 旧角色图片转为普通媒体引用；版本关系不依赖一个特殊 fileId 字段。
             if parent and parent.definition.get("fileId") == body.fileId:
                 for reference in await dao.references(parent.id):
+                    # 声音已改时旧试听不再代表当前角色；外观变化则仍保留原声音试听。
+                    if reference.purpose == "voice-preview" and (
+                        source is None or source.voice_id != body.voice
+                    ):
+                        continue
                     dao.add(
                         EntityVersionAsset(
                             entity_version_id=record_id,
@@ -144,6 +206,13 @@ class StudioAssetService:
                 await self.files.bind_studio_asset(session, account, body.fileId, media_id)
         else:
             media_family = await dao.media_family(family_id)
+            if media_family and (
+                media_family.owner_id != account.user_id
+                or media_family.project_id != body.project
+                or media_family.kind != body.kind
+                or media_family.archived_at is not None
+            ):
+                raise DomainError(404, "目标媒体不存在")
             if media_family is None:
                 media_family = AssetFamily(
                     id=family_id,
@@ -157,6 +226,8 @@ class StudioAssetService:
                 await session.flush()
             else:
                 media_family.name, media_family.current_version_id = body.name, record_id
+            source_media = await dao.media_version(parent.id) if parent else None
+            same_file = source_media is not None and source_media.file_id == body.fileId
             dao.add(
                 AssetVersion(
                     id=record_id,
@@ -166,8 +237,12 @@ class StudioAssetService:
                     file_id=body.fileId,
                     name=body.name,
                     description=body.description,
+                    # 替换文件保留 parent 溯源，但不能继续把旧任务与旧时长当成新文件事实。
                     source_job_id=origin
-                    or (parent.definition.get("sourceJob") if parent else None),
+                    or (parent.definition.get("sourceJob") if parent and same_file else None),
+                    duration_ms=source_media.duration_ms if same_file and source_media else None,
+                    width=source_media.width if same_file and source_media else None,
+                    height=source_media.height if same_file and source_media else None,
                 )
             )
         await session.flush()

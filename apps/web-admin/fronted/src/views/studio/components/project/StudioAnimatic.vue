@@ -1,9 +1,9 @@
 <script setup lang="ts">
-import { toRef } from 'vue'
+import { toRef, type ComponentPublicInstance } from 'vue'
 import StudioMedia from '../StudioMedia.vue'
 import type { StudioProject } from '@/types/studio/studio'
 import { useStudioAnimatic } from '@/composables/studio/use-studio-animatic'
-/** 静态画面与配音的预演视图，播放生命周期交给组合函数。 */
+/** 已采用画面或参考图与配音的预演视图，播放生命周期交给组合函数。 */
 const props = defineProps<{ project: StudioProject }>()
 const {
   playing,
@@ -13,11 +13,16 @@ const {
   error,
   shot,
   picture,
+  videoUrl,
+  videoPlayer,
   length,
   currentLines,
   play,
   pause,
 } = useStudioAnimatic(toRef(props, 'project'))
+function bindVideo(element: Element | ComponentPublicInstance | null) {
+  videoPlayer.value = element instanceof HTMLVideoElement ? element : undefined
+}
 </script>
 <template>
   <section class="panel preparation-animatic" aria-label="分镜预演">
@@ -34,8 +39,18 @@ const {
       >
     </div>
     <div class="animatic-screen">
+      <video
+        v-if="videoUrl"
+        :ref="bindVideo"
+        :src="videoUrl"
+        muted
+        playsinline
+        preload="metadata"
+        class="studio-frame"
+        aria-label="当前镜头预演画面"
+      />
       <StudioMedia
-        v-if="picture"
+        v-else-if="picture"
         :project="project.id"
         :asset="picture.id"
         kind="image"
@@ -62,7 +77,7 @@ const {
       >
     </div>
     <p class="studio-meta">
-      静态分镜预演，不是正式成片。未采用配音的台词以字幕展示；已有配音按起点播放，超长配音会延长本镜预演，正式时长请在剪辑中确认。
+      按已采用画面、配音、音效和音乐预演，暂无画面时展示参考图。未采用配音的台词以字幕展示；超长配音会延长本镜预演，正式时长请在剪辑中确认。正式导出另行生成。
     </p>
     <p v-if="error" role="alert">{{ error }}</p>
   </section>

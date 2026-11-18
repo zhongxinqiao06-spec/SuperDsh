@@ -23,6 +23,13 @@ const candidates = computed(() =>
 )
 const chosen = ref('')
 const comparing = ref(false)
+const libraryPreview = ref(!!props.shot.videoAssetId)
+watch(
+  () => props.shot.videoAssetId,
+  (value) => {
+    libraryPreview.value = !!value
+  },
+)
 const active = computed(
   () =>
     candidates.value.find((j) => j.id === chosen.value) ??
@@ -48,6 +55,10 @@ function takeLabel(id: string) {
     (candidates.value.length - candidates.value.findIndex((j) => j.id === id))
   )
 }
+function previewCandidate(jobId: string) {
+  chosen.value = jobId
+  libraryPreview.value = false
+}
 </script>
 <template>
   <section
@@ -60,8 +71,20 @@ function takeLabel(id: string) {
         <h2>镜头预览</h2>
         <span>镜 {{ String(position).padStart(2, '0') }}</span>
       </header>
-      <div class="studio-picture" :class="{ compare: comparing && other }">
-        <figure v-if="active">
+      <div
+        class="studio-picture"
+        :class="{ compare: !libraryPreview && comparing && other }"
+      >
+        <figure v-if="libraryPreview && shot.videoAssetId">
+          <StudioMedia
+            :project="project"
+            :asset="shot.videoAssetId"
+            kind="video"
+            controls
+          />
+          <figcaption>媒体库画面 · 已采用</figcaption>
+        </figure>
+        <figure v-else-if="active">
           <StudioMedia
             :project="project"
             :job="active.id"
@@ -73,7 +96,7 @@ function takeLabel(id: string) {
             }}{{ active.id === shot.candidate ? ' · 已采用' : '' }}
           </figcaption>
         </figure>
-        <figure v-if="active && comparing && other">
+        <figure v-if="!libraryPreview && active && comparing && other">
           <StudioMedia
             :project="project"
             :job="other.id"
@@ -86,12 +109,14 @@ function takeLabel(id: string) {
           </figcaption>
         </figure>
         <StudioMedia
-          v-if="!active && reference"
+          v-if="!libraryPreview && !active && reference"
           :project="project"
           :asset="reference"
           kind="image"
         />
-        <span v-if="!active && !reference" class="studio-monitor-empty"
+        <span
+          v-if="!libraryPreview && !active && !reference"
+          class="studio-monitor-empty"
           >暂无镜头画面</span
         >
       </div>
@@ -100,7 +125,7 @@ function takeLabel(id: string) {
           >{{ shot.camera || '未设景别' }} · {{ shot.duration / 1000 }} 秒</span
         >
         <button
-          v-if="other"
+          v-if="other && !libraryPreview"
           type="button"
           :aria-pressed="comparing"
           @click="comparing = !comparing"
@@ -115,7 +140,7 @@ function takeLabel(id: string) {
           镜头候选 <small>{{ candidates.length }}</small>
         </h2>
         <el-button
-          v-if="active"
+          v-if="active && !libraryPreview"
           type="primary"
           :disabled="busy || active.id === shot.candidate"
           @click="emit('adopt', active.id)"
@@ -123,6 +148,12 @@ function takeLabel(id: string) {
           {{ active.id === shot.candidate ? '时间线已采用' : '采用到时间线' }}
         </el-button>
       </div>
+      <el-button
+        v-if="shot.videoAssetId"
+        :aria-pressed="libraryPreview"
+        @click="libraryPreview = true"
+        >查看当前采用的媒体库画面</el-button
+      >
       <p v-if="!candidates.length" class="studio-meta">
         生成完成的画面会出现在这里。
       </p>
@@ -139,7 +170,7 @@ function takeLabel(id: string) {
           :key="job.id"
           type="button"
           :aria-pressed="job.id === active?.id"
-          @click="chosen = job.id"
+          @click="previewCandidate(job.id)"
         >
           <StudioMedia :project="project" :job="job.id" kind="video" lazy />
           <strong>{{ takeLabel(job.id) }}</strong

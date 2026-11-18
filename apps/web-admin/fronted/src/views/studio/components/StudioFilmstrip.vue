@@ -34,9 +34,10 @@ const emit = defineEmits<{ select: [string] }>()
       >
         <span class="filmstrip-picture">
           <StudioMedia
-            v-if="shot.candidate"
+            v-if="shot.videoAssetId || shot.candidate"
             :project="project"
-            :job="shot.candidate"
+            :job="shot.candidate ?? undefined"
+            :asset="shot.videoAssetId ?? undefined"
             kind="video"
             lazy
           />

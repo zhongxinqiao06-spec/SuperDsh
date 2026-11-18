@@ -89,10 +89,16 @@ class PreparationMediaService:
             if body.kind == "storyboard":
                 if not shot:
                     raise DomainError(404, "镜头不存在")
+                scene = next((s for s in document.scenes if s.id == shot.sceneId), None)
+                scene_asset = shot.sceneAssetId or (scene.sceneAssetId if scene else None)
                 references = [
                     assets[ref].definition
                     for ref in dict.fromkeys(
-                        [*shot.references, *(line.role for line in shot.lines)]
+                        [
+                            *shot.references,
+                            *(line.role for line in shot.lines),
+                            *([scene_asset] if scene_asset else []),
+                        ]
                     )
                 ]
                 prompt = "\n".join(
@@ -271,7 +277,12 @@ class PreparationMediaService:
                 document.assets = list(
                     dict.fromkeys(created if ref == source.id else ref for ref in document.assets)
                 )
+                for scene in document.scenes:
+                    if scene.sceneAssetId == source.id:
+                        scene.sceneAssetId = created
                 for shot in document.shots:
+                    if shot.sceneAssetId == source.id:
+                        shot.sceneAssetId = created
                     shot.references = [
                         created if ref == source.id else ref for ref in shot.references
                     ]

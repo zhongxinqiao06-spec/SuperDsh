@@ -230,6 +230,24 @@ docker run --rm --read-only --network none --user nginx -i --entrypoint sh "$FRO
 
 该检查也纳入现有生产镜像生命周期验收。后端会真实打开 Alembic 配置、迁移、业务 JSON 和引擎入口；前端以 Nginx worker 身份检查所有文件，覆盖复制进来的字体与图片，避免仅检查文件存在却漏掉启动权限或静态资源 403。可选 workspace 断链单列为 `danglingLinks`；权限检查不替代 DSH 启动和工具执行验收，不代表完整引擎已可用。
 
+## 服务端 Agent 执行栅栏恢复
+
+办公、作品导演与剧本编辑助手按用户复用同一受管 DSH。`runtime_recovery_required` 表示旧执行者尚未确认退出；更换容器后，新的 PID 命名空间不能证明旧进程已结束。普通刷新或重启不会自动删除跨机器栅栏，也不能把 PostgreSQL 锁空闲视为旧进程退出证明。
+
+部署管理员可在当前后端容器执行只读检查。入口复用既有持久部署凭据，不迁移数据库、不启动 Host 或模型，不需要把数据库密码写进命令：
+
+```sh
+docker compose exec -T backend python apps/web-admin/deployment/bootstrap.py runtime-recovery --owner USER_ID
+```
+
+先核对输出的旧 `generation`、`machine`、`pid`，并在对应宿主机确认旧容器、PID 命名空间和所属进程树已经退出。只有完成核实后才能使用完整旧快照显式释放；PID 未记录时传 `none`：
+
+```sh
+docker compose exec -T backend python apps/web-admin/deployment/bootstrap.py runtime-recovery --owner USER_ID --release --expected-generation OLD_GENERATION --expected-machine 'OLD_MACHINE' --expected-pid OLD_PID --confirm-executor-exited
+```
+
+恢复事务与 Host 申请同一个用户运行锁，活跃持锁者、本机仍存活的 PID 或任何快照变化都会拒绝操作。不同机器的退出事实由运维核实，确认参数不会代为终止或验证远端进程。释放只删除匹配的栅栏，不改会话、用户目录、执行收据或媒体任务，也不会自动重发消息。成功后从产品入口重新准备 Agent；若命令报连接或提交失败，先重新执行只读检查，不能推断操作成功。
+
 ## 自测与证据
 
 娱乐创作准备现在按“剧本确认 → 角色造型/音色候选 → 字段级方案对比 → 分镜预演 → 试做一镜”操作。生成先预检，明确确认才提交；采用候选后保存为本片的新素材版本。更新时须正常重启后端以执行迁移，前端开发命令保持不变。页面与接口、数据表和验证边界见[娱乐需求与设计](../../docs/plans/星桥娱乐/需求与设计.md)。

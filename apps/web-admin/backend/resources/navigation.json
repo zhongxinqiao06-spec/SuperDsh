@@ -169,7 +169,7 @@
     {
       "id": "studio.library",
       "route": "#/entertainment/library",
-      "title": "媒体素材",
+      "title": "媒体库",
       "icon": "book-open",
       "permissions": ["studio.assets.read"],
       "product": "entertainment"
@@ -232,8 +232,16 @@
     {
       "id": "studio.environments",
       "route": "#/entertainment/environments",
-      "title": "场景与道具",
+      "title": "场景库",
       "icon": "book-open",
+      "permissions": ["studio.assets.read"],
+      "product": "entertainment"
+    },
+    {
+      "id": "studio.props",
+      "route": "#/entertainment/props",
+      "title": "道具库",
+      "icon": "folder",
       "permissions": ["studio.assets.read"],
       "product": "entertainment"
     },
@@ -271,7 +279,12 @@
       "title": "素材中心",
       "icon": "book-open",
       "product": "entertainment",
-      "pages": ["studio.characters", "studio.environments", "studio.library"]
+      "pages": [
+        "studio.characters",
+        "studio.environments",
+        "studio.props",
+        "studio.library"
+      ]
     },
     {
       "id": "capabilities",

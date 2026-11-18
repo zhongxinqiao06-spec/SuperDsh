@@ -50,6 +50,9 @@ class EntityVersion(Base):
     entity_id: Mapped[str] = mapped_column(ForeignKey("studio_entities.id"), index=True)
     version_no: Mapped[int]
     origin_version_id: Mapped[str | None] = mapped_column(ForeignKey("studio_entity_versions.id"))
+    variant_id: Mapped[str | None] = mapped_column(
+        ForeignKey("studio_entity_variants.id"), index=True
+    )
     name: Mapped[str]
     description: Mapped[str] = mapped_column(default="")
     voice_id: Mapped[str] = mapped_column(default="")
@@ -72,6 +75,21 @@ class EntityVersion(Base):
             "num_nonnulls(voice_configuration_id, voice_configuration_revision) IN (0,2)"
         ),
     )
+
+
+class EntityVariant(Base):
+    """同一角色的不同造型可并存，每个造型独立指向其最新不可变版本。"""
+
+    __tablename__ = "studio_entity_variants"
+    id: Mapped[str] = mapped_column(primary_key=True)
+    entity_id: Mapped[str] = mapped_column(ForeignKey("studio_entities.id"), index=True)
+    name: Mapped[str] = mapped_column(String(120))
+    current_version_id: Mapped[str] = mapped_column(
+        ForeignKey(
+            "studio_entity_versions.id", deferrable=True, initially="DEFERRED", use_alter=True
+        )
+    )
+    __table_args__ = (UniqueConstraint("entity_id", "name"),)
 
 
 class AssetFamily(Base):
@@ -105,6 +123,9 @@ class AssetVersion(Base):
     name: Mapped[str]
     description: Mapped[str] = mapped_column(default="")
     source_job_id: Mapped[str | None] = mapped_column(ForeignKey("studio_media_jobs.id"))
+    duration_ms: Mapped[int | None]
+    width: Mapped[int | None]
+    height: Mapped[int | None]
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
     __table_args__ = (
         UniqueConstraint("family_id", "version_no"),

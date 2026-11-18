@@ -26,14 +26,43 @@ watch([page, size], () => void reload())
       <router-link
         :to="{
           path: '/entertainment/' + work.project,
-          query: { section: 'library' },
+          query: { section: 'cast', asset },
         }"
         >{{ work.title }}</router-link
       >
       <span v-if="work.music"> · 背景音乐已采用</span>
-      <span v-if="!work.shots.length && !work.music">
+      <span
+        v-if="
+          !work.shots.length &&
+          !work.music &&
+          !work.scenes?.length &&
+          !work.soundEffects?.length
+        "
+      >
         · 已关联，尚未用于镜头</span
       >
+      <ul v-if="work.scenes?.length">
+        <li v-for="scene in work.scenes" :key="scene.id">
+          <router-link
+            :to="{
+              path: '/entertainment/' + work.project,
+              query: { section: 'script', scene: scene.id },
+            }"
+            >场次 · {{ scene.title }}</router-link
+          >
+        </li>
+      </ul>
+      <ul v-if="work.soundEffects?.length">
+        <li v-for="effect in work.soundEffects" :key="effect.id">
+          <router-link
+            :to="{
+              path: '/entertainment/' + work.project,
+              query: { section: 'edit', shot: effect.shotId ?? undefined },
+            }"
+            >查看音效位置</router-link
+          >
+        </li>
+      </ul>
       <ul v-if="work.shots.length">
         <li v-for="shot in work.shots" :key="shot.id">
           <router-link

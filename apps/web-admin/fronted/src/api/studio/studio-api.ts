@@ -35,6 +35,8 @@ export const studioApi = {
         title: string
         music: boolean
         shots: { id: string; number: number; adopted: boolean }[]
+        scenes?: { id: string; title: string }[]
+        soundEffects?: { id: string; shotId: string | null }[]
       }>
     >('/studio/library/' + encodeURIComponent(asset) + '/usage', {
       query: { project: project ?? undefined, page, pageSize },
@@ -54,11 +56,21 @@ export const studioApi = {
       signal,
     }),
   libraryPage: (
-    query: StudioPageQuery & { scope: string; kind: string; category?: string },
+    query: StudioPageQuery & {
+      scope: string
+      kind: string
+      kinds?: string
+      category?: string
+      archived?: boolean
+    },
     signal: AbortSignal,
   ) =>
     request<StudioPage<DirectoryAsset>>('/studio/library', {
-      query: { ...query },
+      query: {
+        ...query,
+        archived:
+          query.archived === undefined ? undefined : String(query.archived),
+      },
       signal,
     }),
   jobPage: (
@@ -141,7 +153,7 @@ export const studioApi = {
       | 'fileId'
       | 'parent'
       | 'project'
-    >,
+    > & { requestKey?: string; expectedVersionId?: string },
   ) => request<StudioAsset>('/studio/assets', { method: 'POST', body }),
   library: () => request<StudioAsset[]>('/studio/assets'),
   chat: (id: string, agent?: string, purpose?: 'text-edit') =>

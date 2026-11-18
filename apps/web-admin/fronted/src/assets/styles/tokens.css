@@ -12,6 +12,31 @@
   font-display: swap;
 }
 :root {
+  /* 公开娱乐展示色阶：页面只消费这些变量，和管理端共用字体及品牌橙。 */
+  --showcase-canvas: #fffcf8;
+  --showcase-soft: #fff2e6;
+  --showcase-peach: #ffe3cd;
+  --showcase-accent: #ef9453;
+  --showcase-primary: #b84c20;
+  --showcase-primary-hover: #963c1b;
+  --showcase-ink: #302a27;
+  --showcase-poster-ink: #302a27;
+  --showcase-poster-canvas: #fffcf8;
+  --showcase-muted: #76685e;
+  --showcase-border: #ecd6c4;
+  --showcase-white: #fff;
+  --showcase-film: #232a31;
+  --showcase-film-muted: #b9c1c6;
+  --showcase-film-track: #778c91;
+  --showcase-hero-wash: linear-gradient(
+    120deg,
+    #fffcf8 32%,
+    #fff2e6 73%,
+    #ffe3cd
+  );
+  --showcase-button: linear-gradient(110deg, #bf5226, #b84c20);
+  --showcase-scrim: linear-gradient(180deg, transparent 38%, #101a27c9);
+  --showcase-shadow: 0 18px 48px #76351012;
   --rail-width: 248px;
   --navigation-drawer-width: 280px;
   color-scheme: light;
@@ -152,6 +177,20 @@
     0 24px 64px -16px rgb(0 0 0 / 22%), 0 4px 16px rgb(0 0 0 / 6%);
 }
 .dark {
+  --showcase-canvas: #211d1a;
+  --showcase-soft: #2b2521;
+  --showcase-peach: #3c2d22;
+  --showcase-primary: #edaa78;
+  --showcase-primary-hover: #963c1b;
+  --showcase-ink: #f5ede5;
+  --showcase-muted: #c4b3a5;
+  --showcase-border: #554337;
+  --showcase-hero-wash: linear-gradient(
+    120deg,
+    #211d1a 32%,
+    #2b2521 73%,
+    #3c2d22
+  );
   color-scheme: dark;
   --background: oklch(0.145 0 0);
   --foreground: oklch(0.985 0 0);

@@ -4,6 +4,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.infrastructure.errors import DomainError
 from app.modules.identity.entity.bo.models import Account
+from app.modules.studio.dao.asset_dao import AssetDao
 from app.modules.studio.dao.document_dao import DocumentDao
 from app.modules.studio.dao.studio_dao import StudioDao
 from app.modules.studio.entity.bo.document_projection import project_rows, read_document
@@ -44,10 +45,21 @@ class ProjectDocumentService:
                 session, account, project.id, catalog[identifier]
             )
         document.assets = list(dict.fromkeys(mapping.values()))
+        for effect in document.soundEffects:
+            effect.assetId = mapping[effect.assetId]
+        for scene in document.scenes:
+            if scene.sceneAssetId:
+                scene.sceneAssetId = mapping[scene.sceneAssetId]
         for shot in document.shots:
             shot.references = list(dict.fromkeys(mapping[ref] for ref in shot.references))
+            if shot.sceneAssetId:
+                shot.sceneAssetId = mapping[shot.sceneAssetId]
+            if shot.videoAssetId:
+                shot.videoAssetId = mapping[shot.videoAssetId]
             for line in shot.lines:
                 line.role = mapping[line.role]
+                if line.audioAssetId:
+                    line.audioAssetId = mapping[line.audioAssetId]
         catalog = {row.id: row for row in await dao.assets(account.user_id, project.id)}
         jobs = await dao.jobs(project)
         clock = timebase()
@@ -60,7 +72,10 @@ class ProjectDocumentService:
             document,
             {key: row.definition["kind"] for key, row in catalog.items()},
             clock[0],
-            {row.id: int(row.payload.get("duration") or 0) for row in jobs},
+            {
+                **(await AssetDao(session).media_metadata(document.assets)),
+                **{row.id: int(row.payload.get("duration") or 0) for row in jobs},
+            },
         )
         await DocumentDao(session).write(
             project.id, document.script, rows, clock, document.adaptationMode, document.musicVolume

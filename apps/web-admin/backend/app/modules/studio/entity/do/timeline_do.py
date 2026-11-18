@@ -47,6 +47,7 @@ class StudioClip(Base):
     track_id: Mapped[str]
     shot_id: Mapped[str | None]
     line_id: Mapped[str | None]
+    effect_id: Mapped[str | None]
     role: Mapped[str]
     job_id: Mapped[str | None] = mapped_column(ForeignKey("studio_media_jobs.id"))
     asset_version_id: Mapped[str | None] = mapped_column(ForeignKey("studio_asset_versions.id"))

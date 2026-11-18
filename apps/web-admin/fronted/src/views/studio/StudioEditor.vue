@@ -38,9 +38,20 @@ import { useProductionPlan } from '@/composables/studio/use-production-plan'
 import { useAuthStore } from '@/store/modules/auth-store'
 import { useStudioEditor } from '@/composables/studio/use-studio-editor'
 import { studioApi } from '@/api/studio/studio-api'
-import { copyShot, moveShot, newShot } from '@/utils/studio/storyboard'
+import {
+  duplicateShot,
+  moveShot,
+  newShot,
+  removeShot,
+  splitShot,
+  voiceDurations,
+} from '@/utils/studio/storyboard'
 import { jobKinds, jobStates } from '@/utils/studio/media-labels'
-import type { Generation, Shot } from '@/types/studio/studio'
+import type { Generation, Shot, StudioAsset } from '@/types/studio/studio'
+import { applyAssetUse, type AssetUseTarget } from '@/utils/studio/asset-use'
+import { prepareAssetUse } from '@/composables/studio/prepare-asset-use'
+import StudioAssetPicker from './components/library/StudioAssetPicker.vue'
+import StudioCollectionDialog from './components/library/StudioCollectionDialog.vue'
 import StudioMedia from './components/StudioMedia.vue'
 import StudioMediaPreview from './components/StudioMediaPreview.vue'
 import DirectorChat from './components/DirectorChat.vue'
@@ -77,8 +88,39 @@ const {
   selectedVideo,
   selectedReference,
   selectedSpeech,
-  snapshotAsset,
+  importAsset,
+  applyLibraryResult,
 } = useStudioEditor(id)
+const assetPicker = ref<{
+  title: string
+  kinds: StudioAsset['kind'][]
+  target: AssetUseTarget
+}>()
+const collection = ref<StudioAsset>()
+function pickAsset(value: {
+  title: string
+  kinds: StudioAsset['kind'][]
+  target: AssetUseTarget
+}) {
+  assetPicker.value = value
+}
+async function resolveAsset(source: StudioAsset) {
+  const target = assetPicker.value?.target
+  if (!target || readonly.value) throw new Error('当前作品不可编辑')
+  if (!p.value) throw new Error('作品已关闭')
+  const prepared = await prepareAssetUse(source, target, p.value.document)
+  const asset = await importAsset(prepared.asset)
+  if (!p.value) throw new Error('作品已关闭')
+  applyAssetUse(p.value.document, asset, prepared.target)
+  await save('选用素材库素材')
+  return asset
+}
+async function collectAsset(source: StudioAsset) {
+  await run(async () => {
+    await save()
+    collection.value = source
+  })
+}
 const {
   state: preparation,
   error: preparationError,
@@ -132,6 +174,13 @@ function openSceneShot(id: string) {
   })
 }
 const castWorkspace = ref<InstanceType<typeof StudioCastWorkspace>>()
+watch(
+  [() => route.query.asset, () => castWorkspace.value],
+  ([assetId, workspace]) => {
+    if (typeof assetId === 'string' && workspace) workspace.inspect(assetId)
+  },
+  { flush: 'post' },
+)
 const sections = [
   { key: 'brief', title: '作品构想' },
   { key: 'script', title: '剧本与场次' },
@@ -205,6 +254,10 @@ const activePreparation = computed(() =>
 async function preparedUpdate() {
   await run(reload)
   refreshPreparation()
+}
+async function collectionSaved() {
+  collection.value = undefined
+  await preparedUpdate()
 }
 function confirmedStage() {
   refreshPreparation()
@@ -386,12 +439,15 @@ async function adoptCandidate(candidate: string) {
     return
   await run(async () => {
     const previous = target.candidate
+    const previousAsset = target.videoAssetId
     target.candidate = candidate
+    target.videoAssetId = null
     try {
       await save('采用分镜候选')
     } catch (failure) {
       // 失败仅撤回本次选片，其它未保存的编辑应继续保留。
       target.candidate = previous
+      target.videoAssetId = previousAsset
       throw failure
     }
   })
@@ -437,36 +493,18 @@ function newItem() {
 }
 function duplicate(split = false) {
   if (!p.value || !shot.value) return
-  const source = shot.value,
-    copy = copyShot(source)
-  if (split) {
-    if (source.duration < 2000) return
-    const middle = Math.floor(source.duration / 2)
-    copy.duration = source.duration - middle
-    copy.lines = source.lines
-      .filter((l) => l.start >= middle)
-      .map((l) => ({
-        ...l,
-        start: l.start - middle,
-        subtitleStart:
-          l.subtitleStart == null
-            ? null
-            : Math.max(0, l.subtitleStart - middle),
-        end: l.end === null ? null : Math.max(1, l.end - middle),
-      }))
-    source.lines = source.lines.filter((l) => l.start < middle)
-    source.duration = middle
-    source.trimStart = 0
-    source.trimEnd = null
-    copy.trimStart = 0
-    copy.trimEnd = null
+  try {
+    const copy = split
+      ? splitShot(
+          p.value.document,
+          shot.value.id,
+          voiceDurations(p.value.jobs, p.value.assets),
+        )
+      : duplicateShot(p.value.document, shot.value.id)
+    if (copy) selected.value = copy.id
+  } catch (cause) {
+    error.value = cause instanceof Error ? cause.message : String(cause)
   }
-  p.value.document.shots.splice(
-    p.value.document.shots.findIndex((s) => s.id === source.id) + 1,
-    0,
-    copy,
-  )
-  selected.value = copy.id
 }
 async function remove() {
   if (
@@ -475,9 +513,7 @@ async function remove() {
     !(await confirmChange('移除此分镜和它的台词？', '移除分镜'))
   )
     return
-  p.value.document.shots = p.value.document.shots.filter(
-    (s) => s.id !== shot.value!.id,
-  )
+  removeShot(p.value.document, shot.value.id)
   selected.value = ''
 }
 function jobSummary(subject: string) {
@@ -730,10 +766,25 @@ const shotCards = computed(() => {
           :brief="p.brief"
           :can-direct="canDirect"
           :has-proposal="!!p.proposal"
+          :assets="linked"
+          :project="id"
+          :selected-scene="
+            typeof route.query.scene === 'string'
+              ? route.query.scene
+              : undefined
+          "
           @direct="openDirector"
           @review="reviewProposal"
           @shot="openSceneShot"
           @assist="openTextEditor"
+          @pick-scene="
+            (scene) =>
+              pickAsset({
+                title: '为' + scene.title + '选择场景',
+                kinds: ['scene'],
+                target: { kind: 'scene', sceneId: scene.id },
+              })
+          "
         />
       </div>
       <div
@@ -768,6 +819,8 @@ const shotCards = computed(() => {
         :catalog="catalog"
         :readonly="readonly"
         :save="save"
+        :import-asset="importAsset"
+        :apply-library-result="applyLibraryResult"
         @updated="preparedUpdate"
       >
         <StudioLibrary
@@ -777,11 +830,14 @@ const shotCards = computed(() => {
           :busy="busy"
           :create="(a, link) => run(() => asset(a, link))"
           @draft="materialDraft = $event"
-          @favorite="(a) => run(() => snapshotAsset(a, true))"
+          @favorite="collectAsset"
           @link="
             (key) => {
-              p!.document.assets.push(key)
-              run(() => save('引用素材'))
+              const source = p!.assets.find((item) => item.id === key)
+              if (source)
+                run(async () => {
+                  await importAsset(source)
+                })
             }
           "
         />
@@ -821,7 +877,12 @@ const shotCards = computed(() => {
               @click="shiftSelection(1)"
               >后移</el-button
             ><el-button
-              :disabled="!shot || shot.duration < 2000"
+              :disabled="
+                !shot ||
+                (shot.videoAssetId
+                  ? (shot.trimEnd ?? shot.duration) - shot.trimStart
+                  : shot.duration) < 2000
+              "
               @click="duplicate(true)"
             >
               等分镜头</el-button
@@ -928,6 +989,7 @@ const shotCards = computed(() => {
               @update:model-value="(s) => (shot = s)"
               @preview="(j) => run(() => show(j))"
               @generate="confirmPlan"
+              @pick="pickAsset"
           /></template>
         </StudioWorkspace>
         <StudioFilmstrip
@@ -976,6 +1038,7 @@ const shotCards = computed(() => {
         @preview="previewTimeline"
         @restore="restoreVersion"
         @export="confirmPlan([], [], true)"
+        @pick="pickAsset"
       />
       <section
         v-if="section === 'production' || section === 'delivery'"
@@ -1097,6 +1160,21 @@ const shotCards = computed(() => {
         :kind="preview.kind"
         :revision="preview.revision"
         @close="preview = null"
+      />
+      <StudioAssetPicker
+        v-if="assetPicker"
+        :project="p"
+        :title="assetPicker.title"
+        :kinds="assetPicker.kinds"
+        :resolve="resolveAsset"
+        @selected="assetPicker = undefined"
+        @close="assetPicker = undefined"
+      />
+      <StudioCollectionDialog
+        v-if="collection"
+        :asset="collection"
+        @saved="collectionSaved"
+        @close="collection = undefined"
       />
       <ProductionPlanDialog
         v-if="selectedProduction.plan.value"

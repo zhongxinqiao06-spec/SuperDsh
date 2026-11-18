@@ -1,6 +1,16 @@
 import type { ProjectBrief, StoryScene } from './foundation'
 /** ID 始终指向具体素材版本、镜头、台词或生成回执，不使用显示顺序寻址。 */
 export interface StudioAsset {
+  variantId?: string | null
+  variantName?: string | null
+  origin?: {
+    family: string
+    versionId: string
+    currentVersionId: string
+    /** 按字段基线判断剩余更新，部分采用后不能仅比较版本 ID。 */
+    hasUpdates?: boolean
+    name: string
+  } | null
   version?: number
   entityId?: string
   id: string
@@ -19,8 +29,12 @@ export interface StudioAsset {
     capability: string
   } | null
   voicePreviewJob?: string | null
+  voicePreviewAssetId?: string | null
+  durationMs?: number | null
 }
 export interface Dialogue {
+  /** 库内配音与生成任务互斥，保存时由后端校验实际文件归属。 */
+  audioAssetId?: string | null
   id: string
   role: string
   text: string
@@ -33,6 +47,9 @@ export interface Dialogue {
   volume: number
 }
 export interface Shot {
+  /** 空值继承所属场次的场景；镜头覆盖不会改动其他镜头。 */
+  sceneAssetId?: string | null
+  videoAssetId?: string | null
   sceneId?: string | null
   id: string
   action: string
@@ -48,6 +65,15 @@ export interface Shot {
   trimEnd: number | null
 }
 export interface StudioDocument {
+  soundEffects?: {
+    id: string
+    assetId: string
+    shotId: string | null
+    start: number
+    volume: number
+    trimStart: number
+    trimEnd: number | null
+  }[]
   adaptationMode?: 'original' | 'adapt'
   scenes?: StoryScene[]
   script: string
@@ -114,6 +140,8 @@ export type ProjectSummary = Pick<
   adopted: number
   /** 当前镜序中第一个可播放的已采用结果，通过作品媒体接口授权。 */
   coverJobId: string | null
+  /** 采用库内画面时用素材版本封面，始终走当前作品授权。 */
+  coverAssetId?: string | null
 }
 export interface DirectoryAsset extends StudioAsset {
   workId: string | null

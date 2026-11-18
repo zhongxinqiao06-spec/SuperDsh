@@ -7,6 +7,7 @@ import { useAuthStore } from '@/store/modules/auth-store'
 import ManagementDialog from '@/components/overlay/ManagementDialog.vue'
 import { assetKinds, mediaKind } from '@/utils/studio/media-labels'
 import type { StudioAsset } from '@/types/studio/studio'
+import { createUuid } from '@/utils/uuid'
 const props = defineProps<{
   asset?: StudioAsset
   kinds?: Partial<Record<StudioAsset['kind'], string>>
@@ -31,6 +32,15 @@ const file = ref<File>(),
 const mediaRequired = computed(() =>
   ['image', 'video', 'audio', 'music'].includes(kind.value),
 )
+const changed = computed(
+  () =>
+    !props.asset ||
+    !!file.value ||
+    name.value.trim() !== props.asset.name ||
+    description.value !== props.asset.description ||
+    voice.value.trim() !== props.asset.voice ||
+    fileId.value !== props.asset.fileId,
+)
 watch(kind, () => {
   file.value = undefined
   fileId.value = null
@@ -48,7 +58,7 @@ async function save() {
         fileId.value = (await uploadFile(file.value)).fileId ?? null
         if (!fileId.value) throw new Error('文件上传未完成')
       }
-      await studioApi.asset({
+      const body = {
         name: name.value.trim(),
         description: description.value,
         kind: kind.value,
@@ -56,11 +66,17 @@ async function save() {
         fileId: fileId.value,
         parent: props.asset?.id ?? null,
         project: null,
-      })
+        expectedVersionId: props.asset?.id,
+      }
+      const signature = JSON.stringify(body)
+      if (attempt?.signature !== signature)
+        attempt = { signature, key: createUuid() }
+      await studioApi.asset({ ...body, requestKey: attempt.key })
     })
   )
     emit('saved')
 }
+let attempt: { signature: string; key: string } | undefined
 </script>
 <template>
   <ManagementDialog
@@ -68,8 +84,10 @@ async function save() {
     :title="asset ? '创建素材新版本' : '新增个人素材'"
     :busy="mutation.busy.value"
     :error="mutation.error.value"
-    :dirty="Boolean(name || description || voice || file)"
-    :submit-disabled="!name.trim() || (mediaRequired && !file && !fileId)"
+    :dirty="changed && Boolean(name || description || voice || file)"
+    :submit-disabled="
+      !changed || !name.trim() || (mediaRequired && !file && !fileId)
+    "
     @update:model-value="emit('close')"
     @submit="save"
   >

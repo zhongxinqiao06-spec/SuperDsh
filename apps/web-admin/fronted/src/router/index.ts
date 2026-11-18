@@ -20,6 +20,7 @@ const pages: Record<string, RouteRecordRaw['component']> = {
   'studio.library': () => import('@/views/studio/StudioLibraryPage.vue'),
   'studio.characters': () => import('@/views/studio/StudioLibraryPage.vue'),
   'studio.environments': () => import('@/views/studio/StudioLibraryPage.vue'),
+  'studio.props': () => import('@/views/studio/StudioLibraryPage.vue'),
   'studio.deliveries': () => import('@/views/studio/StudioTasksPage.vue'),
   'studio.tasks': () => import('@/views/studio/StudioTasksPage.vue'),
   overview: () => import('@/views/console/OverviewPage.vue'),

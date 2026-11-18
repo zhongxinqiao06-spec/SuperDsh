@@ -8,6 +8,8 @@ import StudioShowcase from './components/StudioShowcase.vue'
 import OfficeShowcase from './components/OfficeShowcase.vue'
 import OfficeResources from './components/OfficeResources.vue'
 import '@/assets/styles/product-website.css'
+import '@/assets/styles/website/studio-landing.css'
+import { studioChapters } from '@/utils/website/studio-showcase'
 
 /** 公开产品切换使用路由查询态，支持复制地址、刷新与回退，无需读取账号。 */
 const route = useRoute()
@@ -21,13 +23,21 @@ const products = [
   { key: 'entertainment', title: ['星桥娱乐', 'Studio'] },
   { key: 'office', title: ['星桥办公', 'Office'] },
 ] as const
-const sections = [
+const officeSections = [
   ['website-capabilities', '产品能力', 'Capabilities'],
   ['website-scenarios', '应用场景', 'Scenarios'],
   ['website-architecture', '平台架构', 'Architecture'],
   ['website-connected', '多端体验', 'Connected'],
   ['website-faq', '常见问题', 'FAQ'],
 ] as const
+const sections = computed(() =>
+  product.value === 'office'
+    ? officeSections
+    : studioChapters.map(
+        (item) => [item.id, item.title[0], item.title[1]] as const,
+      ),
+)
+const studio = ref<InstanceType<typeof StudioShowcase>>()
 const menu = ref<HTMLElement>()
 const menuButton = ref<HTMLButtonElement>()
 const menuOpen = ref(false)
@@ -43,7 +53,17 @@ function outside(event: PointerEvent) {
 }
 async function jump(id: string) {
   closeMenu()
-  if (sections.some(([key]) => key === id) && product.value !== 'office') {
+  if (
+    product.value === 'entertainment' &&
+    studioChapters.some((item) => item.id === id)
+  ) {
+    studio.value?.jump(id)
+    return
+  }
+  if (
+    officeSections.some(([key]) => key === id) &&
+    product.value !== 'office'
+  ) {
     await router.push(productLocation('office'))
   }
   await nextTick()
@@ -71,7 +91,11 @@ onBeforeUnmount(() => document.removeEventListener('pointerdown', outside))
 </script>
 
 <template>
-  <div class="starbridge-public product-website" :data-product="product">
+  <div
+    class="starbridge-public product-website"
+    :class="{ 'studio-landing': product === 'entertainment' }"
+    :data-product="product"
+  >
     <a
       class="skip"
       href="#website-main"
@@ -156,12 +180,12 @@ onBeforeUnmount(() => document.removeEventListener('pointerdown', outside))
       </div>
     </header>
     <main id="website-main" tabindex="-1">
-      <StudioShowcase v-if="product === 'entertainment'" @jump="jump" />
+      <StudioShowcase v-if="product === 'entertainment'" ref="studio" />
       <template v-else
         ><OfficeShowcase @jump="jump" /><OfficeResources
       /></template>
     </main>
-    <footer class="site-footer wrap">
+    <footer v-if="product === 'office'" class="site-footer wrap">
       <b>{{ tr('星桥', 'Starbridge') }} <span>STARBRIDGE</span></b>
       <div>
         <router-link to="/privacy">{{

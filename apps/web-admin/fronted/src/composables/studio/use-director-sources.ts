@@ -1,7 +1,6 @@
 import { createUuid } from '@/utils/uuid'
 import { computed, nextTick, onScopeDispose, ref, watch } from 'vue'
 import { uploadFile } from '@/api/files/upload-api'
-import { studioApi } from '@/api/studio/studio-api'
 import { directorContextApi } from '@/api/studio/director-context-api'
 import { ApiError } from '@/utils/errors'
 import type { StudioAsset } from '@/types/studio/studio'
@@ -12,7 +11,7 @@ import type {
   DirectorUpload,
 } from '@/types/studio/director-context'
 
-/** 上传、形象库引用和 AI 资料准备共享一次确认；失败保留输入，重试复用请求身份。 */
+/** 上传与库内角色、场景、道具共用一次资料准备；确认前冻结具体版本，不修改工程。 */
 export function useDirectorSources(options: {
   project: string
   active: () => boolean
@@ -31,8 +30,7 @@ export function useDirectorSources(options: {
     research = ref(false),
     researchQuery = ref('')
   const uploading = ref(false),
-    preparing = ref(false),
-    loading = ref(false)
+    preparing = ref(false)
   const error = ref(''),
     progress = ref('')
   const libraryOpen = ref(false)
@@ -45,6 +43,15 @@ export function useDirectorSources(options: {
   )
   const references = computed(
     () => selected.value.length + uploads.value.length,
+  )
+  const referenceImages = computed(
+    () =>
+      new Set([
+        ...uploads.value.map((item) => item.file.fileId),
+        ...selectedAssets.value.flatMap((asset) =>
+          asset.fileId ? [asset.fileId] : [],
+        ),
+      ]).size,
   )
   let attempt:
     | {
@@ -72,23 +79,32 @@ export function useDirectorSources(options: {
     { immediate: true },
   )
 
-  async function openLibrary() {
-    libraryOpen.value = true
-    if (!options.canReadAssets()) return
-    loading.value = true
-    error.value = ''
-    try {
-      const items = await studioApi.library()
-      if (!abort.signal.aborted)
-        assets.value = items.filter(
-          (item) =>
-            item.project === null && ['character', 'image'].includes(item.kind),
-        )
-    } catch (cause) {
-      if (!abort.signal.aborted) error.value = String(cause)
-    } finally {
-      loading.value = false
+  function openLibrary() {
+    if (options.canReadAssets()) libraryOpen.value = true
+  }
+  /** 公共选择器负责搜索分页；这里只收取用户确认的版本，不按名称或最新指针替换。 */
+  function addAsset(asset: StudioAsset) {
+    if (
+      !options.canReadAssets() ||
+      asset.project !== null ||
+      !['character', 'scene', 'prop', 'image'].includes(asset.kind)
+    )
+      return
+    if (selected.value.includes(asset.id)) {
+      libraryOpen.value = false
+      return
     }
+    if (references.value >= 4) {
+      error.value = '每次最多选择 4 份参考资料，请先移除不需要的内容。'
+      return
+    }
+    assets.value = [
+      ...assets.value.filter((item) => item.id !== asset.id),
+      asset,
+    ]
+    selected.value.push(asset.id)
+    libraryOpen.value = false
+    error.value = ''
   }
   /** 资料输入由所属用例更新，展示组件只通过事件调用，不直接修改传入状态。 */
   function setLibraryOpen(value: boolean) {
@@ -110,13 +126,17 @@ export function useDirectorSources(options: {
   function toggleAsset(id: string) {
     if (selected.value.includes(id))
       selected.value = selected.value.filter((value) => value !== id)
-    else if (selected.value.length < 4) selected.value.push(id)
+    else if (
+      references.value < 4 &&
+      assets.value.some((asset) => asset.id === id)
+    )
+      selected.value.push(id)
   }
   async function upload(files: File[]) {
     if (uploading.value || !options.canUpload()) return
-    const available = 4 - uploads.value.length
+    const available = 4 - references.value
     if (files.length > available) {
-      error.value = '每次最多上传 4 张参考图，请减少后重试。'
+      error.value = '上传与库内选择合计最多 4 份参考资料，请减少后重试。'
       return
     }
     if (
@@ -170,7 +190,7 @@ export function useDirectorSources(options: {
         name: item.name.trim(),
       })),
       analyzeImages: !!(
-        references.value &&
+        referenceImages.value &&
         analyzeImages.value &&
         capabilities.value?.vision.available
       ),
@@ -189,10 +209,10 @@ export function useDirectorSources(options: {
     }
     preparing.value = true
     progress.value = input.analyzeImages
-      ? '正在理解参考形象并准备故事资料'
+      ? '正在理解参考图并准备故事资料'
       : research.value
         ? '正在查询故事相关资料'
-        : '正在关联本片参考形象'
+        : '正在关联本片参考资料'
     error.value = ''
     try {
       await options.save()
@@ -236,6 +256,7 @@ export function useDirectorSources(options: {
     uploads.value.forEach((item) => URL.revokeObjectURL(item.preview))
     uploads.value = []
     selected.value = []
+    assets.value = []
     research.value = false
     researchQuery.value = ''
     attempt = undefined
@@ -257,13 +278,14 @@ export function useDirectorSources(options: {
     researchQuery,
     uploading,
     preparing,
-    loading,
     error,
     progress,
     libraryOpen,
     hasSources,
     references,
+    referenceImages,
     openLibrary,
+    addAsset,
     setLibraryOpen,
     setAnalyzeImages,
     setResearch,

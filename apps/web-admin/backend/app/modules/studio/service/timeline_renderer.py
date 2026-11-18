@@ -78,16 +78,35 @@ class TimelineRenderer:
         music: AsyncIterator[bytes] | None = None,
         *,
         aspect: tuple[int, int] = (16, 9),
+        media: dict[str, AsyncIterator[bytes]] | None = None,
     ) -> None:
         """先统一画幅、帧率及采样率再拼接，字幕相对裁剪点重新计算。"""
         width, height = export_canvas(aspect)
         if not document.shots or any(
-            not s.candidate or any(not line.audio for line in s.lines) for s in document.shots
+            not (s.candidate or s.videoAssetId)
+            or any(not (line.audio or line.audioAssetId) for line in s.lines)
+            for s in document.shots
         ):
             raise DomainError(422, "每个镜头和台词均需采用候选后才能导出")
         self.root.mkdir(parents=True, exist_ok=True)
         with tempfile.TemporaryDirectory(dir=self.root) as workspace:
             directory = Path(workspace)
+            # 库文件先以服务端命名流式落入临时目录；不把上传文件名交给 FFmpeg。
+            source_paths = {}
+            for index, (identity, content) in enumerate((media or {}).items()):
+                path = directory / f"source-{index}.media"
+                with path.open("wb") as destination:
+                    async for chunk in content:
+                        await asyncio.to_thread(destination.write, chunk)
+                source_paths[identity] = path
+
+            def source(asset: str | None, job: str | None, suffix: str) -> str:
+                if asset:
+                    if asset not in source_paths:
+                        raise DomainError(422, "采用的媒体素材未准备完成")
+                    return str(source_paths[asset])
+                return str(self.root / f"{job}{suffix}")
+
             segments: list[str] = []
             for index, shot in enumerate(document.shots):
                 start, end = shot.trimStart, shot.trimEnd or shot.duration
@@ -98,7 +117,7 @@ class TimelineRenderer:
                     "-ss",
                     str(start / 1000),
                     "-i",
-                    str(self.root / f"{shot.candidate}.mp4"),
+                    source(shot.videoAssetId, shot.candidate, ".mp4"),
                 ]
                 mix = ["[1:a]"]
                 filters: list[str] = []
@@ -110,7 +129,7 @@ class TimelineRenderer:
                         "-protocol_whitelist",
                         "file",
                         "-i",
-                        str(self.root / f"{line.audio}.wav"),
+                        source(line.audioAssetId, line.audio, ".wav"),
                     ]
                     label = f"voice{line_index}"
                     filters.append(
@@ -169,6 +188,9 @@ class TimelineRenderer:
                 segments.append(f"file '{segment}'")
             (directory / "clips.txt").write_text("\n".join(segments), encoding="ascii")
             args = ["-protocol_whitelist", "file", "-f", "concat", "-safe", "1", "-i", "clips.txt"]
+            audio_labels = ["[0:a]"]
+            audio_filters = []
+            audio_index = 1
             if music is not None:
                 with (directory / "music").open("wb") as target_music:
                     async for chunk in music:
@@ -180,8 +202,37 @@ class TimelineRenderer:
                     "file",
                     "-i",
                     "music",
+                ]
+                audio_filters.append(f"[{audio_index}:a]volume={document.musicVolume}[bg]")
+                audio_labels.append("[bg]")
+                audio_index += 1
+            offsets, cursor = {}, 0
+            for shot in document.shots:
+                offsets[shot.id] = cursor - shot.trimStart
+                cursor += (shot.trimEnd or shot.duration) - shot.trimStart
+            for index, effect in enumerate(document.soundEffects):
+                position = effect.start + (offsets[effect.shotId] if effect.shotId else 0)
+                begin = effect.trimStart + max(0, -position)
+                if position >= cursor or (effect.trimEnd is not None and effect.trimEnd <= begin):
+                    continue
+                args += ["-protocol_whitelist", "file", "-i", source(effect.assetId, None, "")]
+                label = f"effect{index}"
+                trim = f"atrim=start={begin / 1000}"
+                if effect.trimEnd is not None:
+                    trim += f":end={effect.trimEnd / 1000}"
+                audio_filters.append(
+                    f"[{audio_index}:a]{trim},asetpts=PTS-STARTPTS,volume={effect.volume},adelay={max(0, position)}:all=1[{label}]"
+                )
+                audio_labels.append(f"[{label}]")
+                audio_index += 1
+            if audio_index > 1:
+                audio_filters.append(
+                    "".join(audio_labels)
+                    + f"amix=inputs={audio_index}:duration=first:normalize=0[mix]"
+                )
+                args += [
                     "-filter_complex",
-                    f"[1:a]volume={document.musicVolume}[bg];[0:a][bg]amix=inputs=2:duration=first:normalize=0[mix]",
+                    ";".join(audio_filters),
                     "-map",
                     "0:v:0",
                     "-map",

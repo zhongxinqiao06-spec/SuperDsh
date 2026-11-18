@@ -2,7 +2,7 @@
 
 from collections.abc import Sequence
 
-from sqlalchemy import select
+from sqlalchemy import delete, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.modules.runtime.entity.do.models import (
@@ -59,6 +59,22 @@ class ProjectionDao:
     async def delete_fence(self, row: RuntimeExecutionFence) -> None:
         """仅删除 service 已核实代际和退出状态的栅栏。"""
         await self.session.delete(row)
+
+    async def delete_fence_if_matches(
+        self, owner: str, generation: str, machine: str, pid: int | None
+    ) -> bool:
+        """按运维核实的完整快照条件删除，迟到确认不得删除变化后的执行者。"""
+        removed = await self.session.scalar(
+            delete(RuntimeExecutionFence)
+            .where(
+                RuntimeExecutionFence.owner == owner,
+                RuntimeExecutionFence.generation == generation,
+                RuntimeExecutionFence.machine == machine,
+                RuntimeExecutionFence.pid == pid,
+            )
+            .returning(RuntimeExecutionFence.owner)
+        )
+        return removed is not None
 
     def add(
         self, row: RuntimeBatch | RuntimeCheckpoint | RuntimeReceipt | RuntimeExecutionFence

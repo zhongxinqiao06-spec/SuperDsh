@@ -78,7 +78,7 @@ class DocumentDao:
             self.session.add_all(
                 [
                     StudioTrack(project_id=project, id=kind, kind=kind, position=i)
-                    for i, kind in enumerate(("video", "voice", "subtitle", "music"))
+                    for i, kind in enumerate(("video", "voice", "subtitle", "music", "sound"))
                 ]
             )
             await self.session.flush()

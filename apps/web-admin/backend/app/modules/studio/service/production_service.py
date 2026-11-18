@@ -47,6 +47,9 @@ class ProductionService:
         if body.allowDuplicate and not body.reason.strip():
             raise DomainError(422, "承担重复执行风险需说明原因")
         for position, shot in enumerate(document["shots"], 1):
+            # 镜头明确选择优先，否则继承所属场次；只冻结本次输入，不改写工程。
+            scene: dict = next((s for s in document["scenes"] if s["id"] == shot["sceneId"]), {})
+            shot = {**shot, "sceneAssetId": shot.get("sceneAssetId") or scene.get("sceneAssetId")}
             targets = [("video", shot["id"], f"镜 {position} · {shot['action']}", shot)]
             targets += [
                 ("speech", line["id"], f"镜 {position} · {line['text']}", line)
@@ -58,6 +61,24 @@ class ProductionService:
                 ):
                     continue
                 try:
+                    adopted_asset = source.get(
+                        "videoAssetId" if kind == "video" else "audioAssetId"
+                    )
+                    if adopted_asset and body.mode in {"missing", "failed"}:
+                        items.append(
+                            {
+                                "target": target,
+                                "shot": shot["id"],
+                                "kind": kind,
+                                "label": label,
+                                "selected": False,
+                                "status": "ready",
+                                "message": "已使用媒体库素材",
+                                "model": "媒体库",
+                                "payload": {},
+                            }
+                        )
+                        continue
                     if kind == "video":
                         payload = await inputs.video(source, assets, intent, brief)
                     else:

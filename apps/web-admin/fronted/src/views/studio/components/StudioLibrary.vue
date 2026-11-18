@@ -7,6 +7,7 @@ import { uploadFile } from '@/api/files/upload-api'
 import { useAuthStore } from '@/store/modules/auth-store'
 import type { studioApi } from '@/api/studio/studio-api'
 import { assetKinds, mediaKind } from '@/utils/studio/media-labels'
+import { createUuid } from '@/utils/uuid'
 const auth = useAuthStore()
 const props = defineProps<{
   readonly?: boolean
@@ -36,6 +37,7 @@ const adopted = ref(''),
   use = ref(''),
   uploading = ref(false),
   error = ref('')
+const mode = ref(props.readonly ? 'library' : 'edit')
 const fileInput = ref<HTMLInputElement>()
 const fields = computed(() => ({
   name: name.value,
@@ -81,6 +83,7 @@ const matches = computed(() =>
   ),
 )
 function revise(a: StudioAsset) {
+  mode.value = 'edit'
   kind.value = a.kind
   name.value = a.name
   description.value = a.description
@@ -114,17 +117,34 @@ function cancelVersion() {
 }
 async function submit() {
   const submitted = fields.value
+  const signature = JSON.stringify(submitted)
+  if (attempt?.signature !== signature)
+    attempt = { signature, key: createUuid() }
   if (
-    (await props.create(submitted, !personal.value)) &&
+    (await props.create(
+      {
+        ...submitted,
+        requestKey: attempt.key,
+        expectedVersionId: submitted.parent ?? undefined,
+      },
+      !personal.value,
+    )) &&
     submitted === fields.value
   )
     cancelVersion()
 }
+let attempt: { signature: string; key: string } | undefined
 </script>
 <template>
-  <div class="studio-columns">
+  <div class="form-stack">
+    <el-tabs v-model="mode" aria-label="本片素材维护"
+      ><el-tab-pane
+        v-if="!readonly && auth.can('studio.assets.write')"
+        label="新建或编辑设定"
+        name="edit" /><el-tab-pane label="本片素材" name="library"
+    /></el-tabs>
     <form
-      v-if="!readonly && auth.can('studio.assets.write')"
+      v-if="mode === 'edit' && !readonly && auth.can('studio.assets.write')"
       class="panel studio-panel studio-form"
       @submit.prevent="submit"
     >
@@ -181,7 +201,7 @@ async function submit() {
         </el-button>
       </div>
     </form>
-    <section class="panel studio-panel">
+    <section v-if="mode === 'library'" class="panel studio-panel">
       <h2>{{ scope === 'project' ? '已引用项目素材' : '从个人库引用' }}</h2>
       <div class="studio-toolbar">
         <select v-model="scope" class="native-control" aria-label="素材库">
@@ -265,13 +285,20 @@ async function submit() {
 <style scoped>
 .asset-card-grid {
   display: grid;
-  align-items: start;
+  align-items: stretch;
   gap: 10px;
   margin: 12px 0;
   grid-template-columns: repeat(auto-fill, minmax(min(100%, 180px), 1fr));
 }
 .asset-card-grid article {
   margin: 0;
+  display: flex;
+  flex-direction: column;
+  gap: var(--control-gap);
+  min-width: 0;
+}
+.asset-card-grid .studio-actions {
+  margin-top: auto;
 }
 .asset-card-grid h3 {
   font-size: 15px;

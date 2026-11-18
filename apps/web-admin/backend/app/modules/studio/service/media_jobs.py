@@ -24,10 +24,11 @@ from app.modules.studio.entity.vo.studio_vo import AssetInput, Batch, Document, 
 from app.modules.studio.service.bailian_media import BailianMedia
 from app.modules.studio.service.image_provider import ImageProvider
 from app.modules.studio.service.job_lifecycle_service import JobLifecycleService
+from app.modules.studio.service.media_source_service import MediaSourceService
 from app.modules.studio.service.personal_generation_service import PersonalGenerationService
 from app.modules.studio.service.preparation_media_service import PreparationMediaService
 from app.modules.studio.service.production_service import ProductionService
-from app.modules.studio.service.studio_service import StudioService, job_view
+from app.modules.studio.service.studio_service import StudioService, job_view, validate_document
 from app.modules.studio.service.timeline_renderer import TimelineRenderer, export_canvas
 
 logger = logging.getLogger(__name__)
@@ -45,6 +46,7 @@ class MediaJobs:
         self.studio, self.models, self.identity, self.cipher = studio, models, identity, cipher
         self.database, self.root = studio.database, root
         self.renderer = TimelineRenderer(root)
+        self.sources = MediaSourceService(studio, root)
         self.runner: asyncio.Task[None] | None = None
         self.stopping = asyncio.Event()
         self.active: set[asyncio.Task[None]] = set()
@@ -75,6 +77,16 @@ class MediaJobs:
         fingerprint = hashlib.sha256(
             json.dumps(batch.model_dump(), sort_keys=True).encode()
         ).hexdigest()
+        # 重试先返回冻结回执，不因后续编辑或媒体变更重复检查并提交。
+        async with self.database.sessions() as session:
+            dao = StudioDao(session)
+            project = await dao.project(account.user_id, project_id)
+            prior = [j for j in await dao.jobs(project) if j.request_key == batch.requestKey]
+            if prior:
+                if prior[0].payload["fingerprint"] != fingerprint:
+                    raise DomainError(409, "请求标识已用于其他生成方案")
+                return [job_view(j) for j in prior]
+        inspected = await self.sources.inspect_export(account, project_id, batch.revision)
         async with self.database.sessions.begin() as session:
             dao = StudioDao(session)
             project = await dao.project(account.user_id, project_id, lock=True)
@@ -89,7 +101,9 @@ class MediaJobs:
             if project.revision != batch.revision:
                 raise DomainError(409, "工程已更新，请重新确认生成方案")
             document = Document.model_validate((await dao.snapshot(project)).document)
-            assets = {a.id: a.definition for a in await dao.assets(account.user_id, project.id)}
+            asset_rows = await dao.assets(account.user_id, project.id)
+            validate_document(document, asset_rows, jobs)
+            assets = {a.id: a.definition for a in asset_rows}
             inputs: list[tuple[str, str, dict]] = []
             if batch.export:
                 if batch.shots or batch.lines or not document.shots:
@@ -98,18 +112,24 @@ class MediaJobs:
                 export_canvas(aspect)
                 candidates = {j.id: j for j in jobs if j.state == "ready"}
                 for shot in document.shots:
-                    if shot.candidate not in candidates:
+                    if not shot.videoAssetId and shot.candidate not in candidates:
                         raise DomainError(422, "请先采用镜头候选")
-                    if (shot.trimEnd or shot.duration) > candidates[shot.candidate].payload[
-                        "duration"
-                    ]:
+                    video_duration = (
+                        inspected["durations"][shot.videoAssetId]
+                        if shot.videoAssetId
+                        else candidates[shot.candidate or ""].payload["duration"]
+                    )
+                    if (shot.trimEnd or shot.duration) > video_duration:
                         raise DomainError(422, "裁剪结束时间超过视频长度")
                     for line in shot.lines:
-                        if (
-                            line.audio not in candidates
-                            or line.start + candidates[line.audio].payload["duration"]
-                            > shot.duration
-                        ):
+                        voice_duration = (
+                            inspected["durations"].get(line.audioAssetId)
+                            if line.audioAssetId
+                            else candidates[line.audio].payload["duration"]
+                            if line.audio in candidates
+                            else None
+                        )
+                        if voice_duration is None or line.start + voice_duration > shot.duration:
                             raise DomainError(422, "请先采用配音并处理超出镜头时长的台词")
                 inputs.append(
                     (
@@ -117,6 +137,7 @@ class MediaJobs:
                         "timeline",
                         {
                             "document": document.model_dump(),
+                            "mediaFiles": inspected["files"],
                             # 与工程版本一起冻结，后台继续编辑作品规格不会改变已提交的导出。
                             "aspect": {"width": aspect[0], "height": aspect[1]},
                             "music": assets[document.music].get("fileId")
@@ -250,6 +271,9 @@ class MediaJobs:
             account = await self.identity.get_account(job.payload["owner"])
             account.require("products.entertainment")
             if job.kind == "export":
+                account.require("studio.projects.write")
+                if job.payload.get("mediaFiles"):
+                    account.require("studio.assets.read")
                 if not await self.claim(job):
                     return
                 music = (
@@ -257,6 +281,10 @@ class MediaJobs:
                     if job.payload.get("music")
                     else None
                 )
+                media = {
+                    asset: (await self.studio.files.stream(account, file_id, None))[0]
+                    for asset, file_id in job.payload.get("mediaFiles", {}).items()
+                }
                 await self.renderer.render(
                     Document.model_validate(job.payload["document"]),
                     self.path(job),
@@ -266,6 +294,7 @@ class MediaJobs:
                         job.payload.get("aspect", {}).get("width", 16),
                         job.payload.get("aspect", {}).get("height", 9),
                     ),
+                    media=media,
                 )
             else:
                 resolved = cast(

@@ -8,6 +8,7 @@ import { conversationApi } from '../../fronted/src/api/workbench/conversation-ap
 import { uploadFile } from '../../fronted/src/api/files/upload-api'
 import { ApiError } from '../../fronted/src/utils/errors'
 import type { UploadedAttachment } from '../../fronted/src/types/workbench/models'
+import type { StudioAsset } from '../../fronted/src/types/studio/studio'
 
 vi.mock('../../fronted/src/api/studio/director-context-api', () => ({
   directorContextApi: { capabilities: vi.fn(), prepare: vi.fn() },
@@ -66,6 +67,48 @@ function sourcePanel(revision = () => 3) {
   return { scope, sources, save, reload }
 }
 describe('导演参考资料与工具恢复', () => {
+  it('角色、场景和道具选择保留具体版本，文字设定不会误触发读图', async () => {
+    const { scope, sources } = sourcePanel()
+    try {
+      for (const kind of ['character', 'scene', 'prop'] as const) {
+        const asset: StudioAsset = {
+          id: kind + '-version',
+          family: kind,
+          kind,
+          name: kind,
+          parent: null,
+          project: null,
+          description: '已确认设定',
+          voice: '',
+          fileId: null,
+        }
+        sources.addAsset(asset)
+        sources.addAsset(asset)
+      }
+      expect(sources.selected.value).toEqual([
+        'character-version',
+        'scene-version',
+        'prop-version',
+      ])
+      expect(sources.selectedAssets.value).toHaveLength(3)
+      expect(directorContextApi.prepare).not.toHaveBeenCalled()
+      vi.mocked(directorContextApi.prepare).mockResolvedValue({
+        text: '准备完成',
+        attachments: [],
+        revision: 4,
+        assetIds: [],
+      })
+      await sources.prepare('太空旅行')
+      expect(
+        vi.mocked(directorContextApi.prepare).mock.calls[0]![1],
+      ).toMatchObject({
+        assetIds: ['character-version', 'scene-version', 'prop-version'],
+        analyzeImages: false,
+      })
+    } finally {
+      scope.stop()
+    }
+  })
   it('图片上传失败保留已上传资料，准备前不会创建角色或工程', async () => {
     const { scope, sources } = sourcePanel()
     vi.mocked(uploadFile)

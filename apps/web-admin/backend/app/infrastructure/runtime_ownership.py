@@ -5,11 +5,21 @@ from __future__ import annotations
 import asyncio
 import contextlib
 import hashlib
+from collections.abc import AsyncIterator
 
 from sqlalchemy import text
 from sqlalchemy.ext.asyncio import AsyncConnection, AsyncEngine
 
 from app.integrations.dsh.protocol import RuntimeFailure
+
+
+def runtime_ownership_key(owner: str) -> int:
+    """运行与运维恢复共用同一锁键，不能用新命名空间绕过活跃执行者。"""
+    return int.from_bytes(
+        hashlib.sha256(f"superdsh:web-admin:runtime:{owner}".encode()).digest()[:8],
+        "big",
+        signed=True,
+    )
 
 
 class PostgresOwnership:
@@ -61,11 +71,7 @@ class PostgresOwnershipProvider:
         """原子申请所有权；SQLite 等不具备该能力的数据库明确拒绝。"""
         if self.engine.dialect.name != "postgresql":
             raise RuntimeFailure("runtime_requires_postgresql", "执行租约要求 PostgreSQL")
-        key = int.from_bytes(
-            hashlib.sha256(f"superdsh:web-admin:runtime:{owner}".encode()).digest()[:8],
-            "big",
-            signed=True,
-        )
+        key = runtime_ownership_key(owner)
         connection = await self.engine.connect()
         try:
             acquired = await connection.scalar(
@@ -78,3 +84,18 @@ class PostgresOwnershipProvider:
         except BaseException:
             await connection.close()
             raise
+
+    @contextlib.asynccontextmanager
+    async def recovery_transaction(self, owner: str) -> AsyncIterator[AsyncConnection]:
+        """恢复检查和条件删除共享持锁事务；连接丢失即失败，绝不重连后继续删除。"""
+        if self.engine.dialect.name != "postgresql":
+            raise RuntimeFailure("runtime_requires_postgresql", "执行租约要求 PostgreSQL")
+        async with self.engine.begin() as connection:
+            # 事务锁与 Host 持有的会话锁在相同 key 上互斥，提交/回滚同时释放。
+            acquired = await connection.scalar(
+                text("SELECT pg_try_advisory_xact_lock(:key)"),
+                {"key": runtime_ownership_key(owner)},
+            )
+            if not acquired:
+                raise RuntimeFailure("runtime_owned_elsewhere", "运行时由另一实例管理", 409)
+            yield connection

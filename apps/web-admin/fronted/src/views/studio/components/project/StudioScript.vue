@@ -2,7 +2,9 @@
 import { computed, nextTick, ref, watch } from 'vue'
 import type { InputInstance } from 'element-plus'
 import AppIcon from '@/components/base/AppIcon.vue'
-import type { StudioDocument } from '@/types/studio/studio'
+import type { StudioDocument, StudioAsset } from '@/types/studio/studio'
+import type { StoryScene } from '@/types/studio/foundation'
+import StudioReferenceGroup from '../library/StudioReferenceGroup.vue'
 import type { DirectorAction } from '@/types/studio/director'
 import { useScriptScenes } from '@/composables/studio/use-script-scenes'
 import { sceneSummary } from '@/utils/studio/script-workspace'
@@ -17,15 +19,26 @@ const props = defineProps<{
   brief?: string
   canDirect?: boolean
   hasProposal?: boolean
+  assets?: StudioAsset[]
+  project?: string
+  selectedScene?: string
 }>()
 const emit = defineEmits<{
   direct: [DirectorAction]
   review: []
   shot: [string]
   assist: [TextEditTarget?]
+  'pick-scene': [scene: StoryScene]
 }>()
 const { scenes, selected, active, summary, add, move, remove } =
   useScriptScenes(model, () => props.disabled)
+watch(
+  () => props.selectedScene,
+  (id) => {
+    if (id && scenes.value.some((scene) => scene.id === id)) selected.value = id
+  },
+  { immediate: true },
+)
 const reading = ref(false),
   selection = ref('')
 const selectionRange = ref({ start: 0, end: 0 })
@@ -308,6 +321,27 @@ defineExpose({ focusScript })
                 :disabled="disabled"
                 placeholder="谁在这里，做了什么？保留关键动作和对白。"
             /></label>
+            <StudioReferenceGroup
+              v-if="project"
+              label="本场景设定"
+              :project="project"
+              :assets="
+                assets?.filter((asset) => asset.id === active?.sceneAssetId) ??
+                []
+              "
+              :readonly="disabled"
+              add-label="从素材库选择场景"
+              empty="场次是故事顺序；选用的场景会作为本场镜头的默认环境。"
+              @choose="emit('pick-scene', active)"
+              @remove="active.sceneAssetId = null"
+            />
+            <p
+              v-if="active.sceneAssetId && summary.shots.length"
+              class="studio-meta"
+            >
+              {{ summary.shots.length }}
+              个镜头默认沿用本场景，单镜指定的场景保持不变。
+            </p>
             <template v-if="active.scriptRange">
               <label class="field"
                 >本场正文 · 与全文同步<el-input

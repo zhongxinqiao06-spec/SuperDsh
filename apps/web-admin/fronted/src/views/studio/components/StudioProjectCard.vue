@@ -13,7 +13,7 @@ const props = defineProps<{
 const emit = defineEmits<{ archive: [] }>()
 const unavailable = ref(false)
 watch(
-  () => props.project.coverJobId,
+  () => [props.project.coverJobId, props.project.coverAssetId],
   () => {
     unavailable.value = false
   },
@@ -28,9 +28,10 @@ watch(
     >
       <div class="project-cover">
         <StudioMedia
-          v-if="project.coverJobId && !unavailable"
+          v-if="(project.coverJobId || project.coverAssetId) && !unavailable"
           :project="project.id"
-          :job="project.coverJobId"
+          :job="project.coverJobId ?? undefined"
+          :asset="project.coverAssetId ?? undefined"
           kind="video"
           lazy
           @unavailable="unavailable = true"

@@ -30,7 +30,14 @@ class Line(Input):
     start: Millis = 0
     end: Millis | None = None
     audio: Identifier | None = None
+    audioAssetId: Identifier | None = None
     volume: Volume = 1
+
+    @model_validator(mode="after")
+    def audio_source(self) -> Self:
+        if self.audio and self.audioAssetId:
+            raise ValueError("配音只能选择生成候选或媒体素材其中之一")
+        return self
 
 
 class Shot(Input):
@@ -38,6 +45,7 @@ class Shot(Input):
     action: Notes
     scene: Short = ""
     sceneId: Identifier | None = None
+    sceneAssetId: Identifier | None = None
     camera: Short = ""
     framing: Short = ""
     movement: Short = ""
@@ -45,11 +53,14 @@ class Shot(Input):
     references: list[Identifier] = Field(default_factory=list, max_length=64)
     lines: list[Line] = Field(default_factory=list, max_length=64)
     candidate: Identifier | None = None
+    videoAssetId: Identifier | None = None
     trimStart: Millis = 0
     trimEnd: Millis | None = None
 
     @model_validator(mode="after")
     def trim(self) -> Self:
+        if self.candidate and self.videoAssetId:
+            raise ValueError("画面只能选择生成候选或媒体素材其中之一")
         if (
             not self.trimStart
             < (self.trimEnd if self.trimEnd is not None else self.duration)
@@ -77,6 +88,25 @@ class StorySceneInput(Input):
     title: Short
     synopsis: Notes = ""
     scriptRange: ScriptRange | None = None
+    sceneAssetId: Identifier | None = None
+
+
+class SoundEffect(Input):
+    """音效可锚定镜头以随镜重排；空锚点表示全片绝对时间。"""
+
+    id: Identifier = Field(default_factory=identifier)
+    assetId: Identifier
+    shotId: Identifier | None = None
+    start: Millis = 0
+    volume: Volume = 1
+    trimStart: Millis = 0
+    trimEnd: Millis | None = None
+
+    @model_validator(mode="after")
+    def trim(self) -> Self:
+        if self.trimEnd is not None and self.trimEnd <= self.trimStart:
+            raise ValueError("音效裁剪结束必须晚于开始")
+        return self
 
 
 class Document(Input):
@@ -88,6 +118,7 @@ class Document(Input):
     shots: list[Shot] = Field(default_factory=list, max_length=200)
     music: Identifier | None = None
     musicVolume: Volume = 0.25
+    soundEffects: list[SoundEffect] = Field(default_factory=list, max_length=500)
 
     @model_validator(mode="after")
     def identifiers(self) -> Self:
@@ -97,6 +128,12 @@ class Document(Input):
         scene_ids = [scene.id for scene in self.scenes]
         if len(scene_ids) != len(set(scene_ids)):
             raise ValueError("场次标识重复")
+        effect_ids = [effect.id for effect in self.soundEffects]
+        if len(effect_ids) != len(set(effect_ids)):
+            raise ValueError("音效标识重复")
+        shot_ids = {shot.id for shot in self.shots}
+        if any(effect.shotId and effect.shotId not in shot_ids for effect in self.soundEffects):
+            raise ValueError("音效绑定的镜头不存在")
         for scene in self.scenes:
             if (
                 scene.scriptRange
@@ -125,6 +162,8 @@ class AssetInput(Input):
     fileId: Identifier | None = None
     parent: Identifier | None = None
     project: Identifier | None = None
+    requestKey: Identifier | None = None
+    expectedVersionId: Identifier | None = None
 
 
 class Review(Input):

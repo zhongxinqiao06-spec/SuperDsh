@@ -25,12 +25,15 @@ def project_rows(
             "synopsis": scene.synopsis,
             "position": index,
             "script_range": scene.scriptRange.model_dump() if scene.scriptRange else None,
+            "scene_asset_id": scene.sceneAssetId,
         }
         for index, scene in enumerate(document.scenes)
     ]
     scene_ids = {scene.id for scene in document.scenes}
     cursor = 0
+    offsets: dict[str, int] = {}
     for position, shot in enumerate(document.shots):
+        offsets[shot.id] = cursor - shot.trimStart
         scene_id = shot.sceneId or stable_id(project, "scene:" + shot.scene)
         shot.sceneId = scene_id
         if scene_id not in scene_ids:
@@ -40,6 +43,7 @@ def project_rows(
                     "title": shot.scene or "未命名场次",
                     "synopsis": "",
                     "script_range": None,
+                    "scene_asset_id": None,
                     "position": len(scene_ids),
                 }
             )
@@ -51,6 +55,7 @@ def project_rows(
                 "position": position,
                 "action": shot.action,
                 "scene": shot.scene,
+                "scene_asset_id": shot.sceneAssetId,
                 "camera": shot.camera,
                 "framing": shot.framing,
                 "movement": shot.movement,
@@ -65,6 +70,7 @@ def project_rows(
                 "shot_id": shot.id,
                 "role": "primary_video",
                 "job_id": shot.candidate,
+                "asset_version_id": shot.videoAssetId,
                 "start_ticks": cursor * scale,
                 "duration_ticks": length * scale,
                 "source_start_ticks": shot.trimStart * scale,
@@ -93,7 +99,7 @@ def project_rows(
                 }
             )
             offset = line.start - shot.trimStart
-            voice_length = durations.get(line.audio or "", 0)
+            voice_length = durations.get(line.audio or line.audioAssetId or "", 0)
             rows["clips"].append(
                 {
                     "id": stable_id(project, "voice:" + line.id),
@@ -101,6 +107,7 @@ def project_rows(
                     "line_id": line.id,
                     "role": "primary_voice",
                     "job_id": line.audio,
+                    "asset_version_id": line.audioAssetId,
                     "start_ticks": (cursor + max(0, offset)) * scale,
                     "duration_ticks": max(0, voice_length - max(0, -offset)) * scale,
                     "source_start_ticks": max(0, -offset) * scale,
@@ -125,6 +132,25 @@ def project_rows(
                 }
             )
         cursor += length
+    for effect in document.soundEffects:
+        offset = offsets[effect.shotId] if effect.shotId else 0
+        end = effect.trimEnd if effect.trimEnd is not None else durations.get(effect.assetId, 0)
+        rows["clips"].append(
+            {
+                "id": stable_id(project, "effect:" + effect.id),
+                "track_id": "sound",
+                "role": "sound_effect",
+                "effect_id": effect.id,
+                "shot_id": effect.shotId,
+                "asset_version_id": effect.assetId,
+                "start_ticks": max(0, offset + effect.start) * scale,
+                "anchor_offset_ticks": effect.start * scale,
+                "duration_ticks": max(0, end - effect.trimStart) * scale,
+                "source_start_ticks": effect.trimStart * scale,
+                "timing_mode": "auto" if effect.trimEnd is None else "manual",
+                "gain": effect.volume,
+            }
+        )
     if document.music:
         rows["clips"].append(
             {
@@ -166,6 +192,7 @@ def read_document(rows: dict[str, Any]) -> Document:
                     "voice": line.voice,
                     "start": voice.anchor_offset_ticks // scale + trim,
                     "audio": voice.job_id,
+                    "audioAssetId": voice.asset_version_id,
                     "volume": voice.gain,
                     "subtitle": caption.subtitle_text,
                     "subtitleStart": None if caption.subtitle_follow_voice else caption_start,
@@ -180,6 +207,7 @@ def read_document(rows: dict[str, Any]) -> Document:
                 "sceneId": shot.story_scene_id,
                 "action": shot.action,
                 "scene": shot.scene,
+                "sceneAssetId": shot.scene_asset_id,
                 "camera": shot.camera,
                 "framing": shot.framing,
                 "movement": shot.movement,
@@ -193,6 +221,7 @@ def read_document(rows: dict[str, Any]) -> Document:
                 ],
                 "lines": lines,
                 "candidate": clip.job_id,
+                "videoAssetId": clip.asset_version_id,
                 "trimStart": trim,
                 "trimEnd": None
                 if clip.timing_mode == "auto"
@@ -210,6 +239,7 @@ def read_document(rows: dict[str, Any]) -> Document:
                     "title": r.title,
                     "synopsis": r.synopsis,
                     "scriptRange": r.script_range,
+                    "sceneAssetId": r.scene_asset_id,
                 }
                 for r in sorted(rows["scenes"], key=lambda r: r.position)
             ],
@@ -217,5 +247,20 @@ def read_document(rows: dict[str, Any]) -> Document:
             "shots": shots,
             "music": music.asset_version_id if music else None,
             "musicVolume": rows["timeline"].music_gain,
+            "soundEffects": [
+                {
+                    "id": clip.effect_id,
+                    "assetId": clip.asset_version_id,
+                    "shotId": clip.shot_id,
+                    "start": clip.anchor_offset_ticks // scale,
+                    "volume": clip.gain,
+                    "trimStart": clip.source_start_ticks // scale,
+                    "trimEnd": None
+                    if clip.timing_mode == "auto"
+                    else (clip.source_start_ticks + clip.duration_ticks) // scale,
+                }
+                for clip in rows["clips"]
+                if clip.role == "sound_effect"
+            ],
         }
     )

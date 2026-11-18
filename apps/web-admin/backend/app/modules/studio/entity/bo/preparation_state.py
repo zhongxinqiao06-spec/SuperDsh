@@ -22,14 +22,22 @@ def preparation_inputs(document: dict, assets: list[dict], jobs: list[dict], bri
     script = {
         "script": document["script"],
         "mode": document.get("adaptationMode", "original"),
-        "scenes": document.get("scenes", []),
+        "scenes": [
+            {
+                key: value
+                for key, value in scene.items()
+                if key != "sceneAssetId" or value is not None
+            }
+            for scene in document.get("scenes", [])
+        ],
     }
     cast = {"script": content_hash(script), "entities": linked}
     shots = [
         {
             key: value
             for key, value in shot.items()
-            if key not in {"candidate", "trimStart", "trimEnd", "lines"}
+            if key not in {"candidate", "videoAssetId", "trimStart", "trimEnd", "lines"}
+            and (key != "sceneAssetId" or value is not None)
         }
         | {
             "lines": [
@@ -47,7 +55,15 @@ def preparation_inputs(document: dict, assets: list[dict], jobs: list[dict], bri
     }
     sample = {
         "storyboard": content_hash(board),
-        "candidates": [(s["id"], s.get("candidate")) for s in document["shots"]],
+        "candidates": [
+            (
+                s["id"],
+                {"assetVersion": s["videoAssetId"]}
+                if s.get("videoAssetId")
+                else s.get("candidate"),
+            )
+            for s in document["shots"]
+        ],
     }
     return {"script": script, "cast": cast, "storyboard": board, "sample": sample}
 
@@ -98,7 +114,11 @@ def preparation_issues(
     for index, shot in enumerate(document["shots"], 1):
         if not shot["action"].strip():
             issue("storyboard", "action:" + shot["id"], f"第 {index} 镜缺少动作描述", shot["id"])
-        if not any(linked.get(ref, {}).get("fileId") for ref in shot["references"]):
+        scene: dict = next(
+            (s for s in document.get("scenes", []) if s["id"] == shot.get("sceneId")), {}
+        )
+        scene_asset = shot.get("sceneAssetId") or scene.get("sceneAssetId")
+        if not any(linked.get(ref, {}).get("fileId") for ref in [*shot["references"], scene_asset]):
             issue(
                 "storyboard",
                 "board:" + shot["id"],

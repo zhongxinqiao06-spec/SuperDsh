@@ -117,7 +117,10 @@ class PreparationService:
                     if (
                         not selected
                         or len(selected) != len(set(body.shots))
-                        or any(s.get("candidate") not in ready for s in selected)
+                        or any(
+                            s.get("candidate") not in ready and not s.get("videoAssetId")
+                            for s in selected
+                        )
                     ):
                         raise DomainError(422, "请先采用并审看所选代表镜头的视频")
             record = StageReview(

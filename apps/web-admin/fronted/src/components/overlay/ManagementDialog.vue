@@ -76,6 +76,12 @@ function submit(): void {
     :before-close="requestClose"
     @update:model-value="$emit('update:modelValue', $event)"
   >
+    <template v-if="$slots.toolbar" #header="{ titleId, titleClass }">
+      <div class="management-dialog-heading">
+        <h2 :id="titleId" :class="titleClass">{{ title }}</h2>
+        <slot name="toolbar" />
+      </div>
+    </template>
     <form
       :id="formId"
       ref="form"
@@ -127,3 +133,15 @@ function submit(): void {
     </template>
   </el-dialog>
 </template>
+<style scoped>
+.management-dialog-heading {
+  display: grid;
+  min-width: 0;
+  flex: 1;
+  gap: var(--field-gap);
+}
+.management-dialog-heading h2 {
+  margin: 0;
+  font-size: var(--font-size-section);
+}
+</style>

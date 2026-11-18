@@ -15,6 +15,14 @@ from app.modules.studio.entity.vo.production_vo import (
 router = APIRouter(prefix="/studio", tags=["studio-production"])
 
 
+@router.get("/assets/{asset}/metadata")
+async def media_metadata(
+    asset: str, request: Request, account: User, project: str | None = None
+) -> dict:
+    """素材元数据仍按源版本与作品归属授权，不接收任意文件路径。"""
+    return await request.app.state.services.media_jobs.sources.metadata(account, asset, project)
+
+
 @router.post("/projects/{project}/generation-plans")
 async def prepare(project: str, body: ProductionIntent, request: Request, account: User) -> dict:
     return await request.app.state.services.media_jobs.production.prepare(account, project, body)

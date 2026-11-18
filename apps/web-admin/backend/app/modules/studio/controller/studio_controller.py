@@ -10,6 +10,7 @@ from fastapi.responses import FileResponse, StreamingResponse
 from app.api.dependencies import require_permission
 from app.infrastructure.errors import DomainError
 from app.modules.identity.entity.bo.models import Account
+from app.modules.studio.controller.library_controller import router as library_router
 from app.modules.studio.entity.vo.foundation_vo import ArchiveProject, CreateProject, UpdateBrief
 from app.modules.studio.entity.vo.studio_vo import (
     AssetInput,
@@ -20,6 +21,7 @@ from app.modules.studio.entity.vo.studio_vo import (
     Review,
     SaveDocument,
 )
+from app.modules.studio.service.library_service import StudioLibraryService
 
 router = APIRouter(prefix="/studio", tags=["星桥娱乐"])
 User = Annotated[Account, Depends(require_permission("products.entertainment"))]
@@ -81,13 +83,18 @@ async def asset_directory(
     account: User,
     page: Page = 1,
     pageSize: PageSize = 10,
-    category: Literal["", "characters", "environments", "media"] = "",
+    category: Literal["", "characters", "environments", "scenes", "props", "media"] = "",
     scope: Literal["personal", "project"] = "personal",
     kind: Literal["", "character", "scene", "prop", "image", "video", "audio", "music"] = "",
     search: Search = "",
+    kinds: Annotated[str, Query(max_length=100)] = "",
+    archived: bool = False,
 ) -> dict:
-    return await request.app.state.services.studio.asset_page(
-        account, page, pageSize, scope, kind, search.strip(), category
+    selected = list(dict.fromkeys(value.strip() for value in kinds.split(",") if value.strip()))
+    if set(selected) - {"character", "scene", "prop", "image", "video", "audio", "music"}:
+        raise DomainError(422, "不支持的素材类型")
+    return await StudioLibraryService(request.app.state.services.studio).page(
+        account, page, pageSize, scope, kind, search.strip(), category, selected, archived
     )
 
 
@@ -369,3 +376,6 @@ async def media(
         filename=path.name if download else None,
         headers={"Cache-Control": "private, no-store", "X-Content-Type-Options": "nosniff"},
     )
+
+
+router.include_router(library_router)

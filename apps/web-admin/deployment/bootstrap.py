@@ -43,6 +43,12 @@ def load_compose_environment() -> None:
 def main() -> None:
     """迁移失败立即退出，不带错误 schema 提供业务接口。"""
     load_compose_environment()
+    if sys.argv[1:2] == ["runtime-recovery"]:
+        # 显式运维命令复用持久配置；不能顺带迁移或启动服务及模型。
+        from app.runtime_recovery import main as recover_runtime
+
+        recover_runtime(sys.argv[2:])
+        return
     backend = Path(__file__).resolve().parents[1] / "backend"
     subprocess.run(
         [

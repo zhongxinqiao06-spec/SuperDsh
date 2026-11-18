@@ -1,6 +1,8 @@
 <script setup lang="ts">
 import { createUuid } from '@/utils/uuid'
 import { computed, ref } from 'vue'
+import { ElMessage } from 'element-plus'
+import type { LibraryProjectResult } from '@/types/studio/library'
 import { preparationApi } from '@/api/studio/preparation-api'
 import { useAuthStore } from '@/store/modules/auth-store'
 import type {
@@ -14,6 +16,11 @@ import ExpandableText from '@/components/base/ExpandableText.vue'
 import AppDrawer from '@/components/overlay/AppDrawer.vue'
 import StudioMedia from '../StudioMedia.vue'
 import PreparationGenerationDialog from './PreparationGenerationDialog.vue'
+import StudioAssetPicker from '../library/StudioAssetPicker.vue'
+import StudioCollectionDialog from '../library/StudioCollectionDialog.vue'
+import StudioAssetDetail from '../library/StudioAssetDetail.vue'
+import StudioLibraryUpdateDialog from '../library/StudioLibraryUpdateDialog.vue'
+import { hasLibraryUpdates, libraryPath } from '@/utils/studio/library'
 
 /** 设定卡直接管理造型、音色和候选；完整素材维护仍复用已有版本表单。 */
 const props = defineProps<{
@@ -21,21 +28,49 @@ const props = defineProps<{
   catalog?: StudioCatalog
   readonly: boolean
   save: () => Promise<void>
+  importAsset: (asset: StudioAsset) => Promise<StudioAsset>
+  applyLibraryResult: (result: LibraryProjectResult) => void
 }>()
 const emit = defineEmits<{ updated: [] }>()
 const auth = useAuthStore()
-const category = ref('character'),
+const category = ref<StudioAsset['kind']>('character'),
   libraryOpen = ref(false),
   selected = ref<StudioAsset>(),
   busy = ref(false),
   error = ref('')
 const generation = ref<{ kind: 'reference' | 'voice'; asset: StudioAsset }>()
+const picking = ref(false),
+  collecting = ref<StudioAsset>(),
+  inspecting = ref<StudioAsset>(),
+  updating = ref<StudioAsset>()
 const assets = computed(() =>
   props.project.assets.filter(
     (a) =>
       props.project.document.assets.includes(a.id) && a.kind === category.value,
   ),
 )
+async function collect(asset: StudioAsset) {
+  try {
+    await props.save()
+    collecting.value = asset
+  } catch (cause) {
+    error.value = cause instanceof Error ? cause.message : String(cause)
+  }
+}
+function collected() {
+  collecting.value = undefined
+  ElMessage.success('已保存到素材库，本片内容保持不变')
+  emit('updated')
+}
+function picked() {
+  picking.value = false
+  emit('updated')
+}
+function applied(result: LibraryProjectResult) {
+  props.applyLibraryResult(result)
+  updating.value = undefined
+  emit('updated')
+}
 const current = computed(
   () =>
     selected.value &&
@@ -70,7 +105,14 @@ function locate(identity: string) {
   category.value = asset.kind
   selected.value = asset
 }
-defineExpose({ locate })
+function inspect(identity: string) {
+  const asset = props.project.assets.find((item) => item.id === identity)
+  if (asset) {
+    category.value = asset.kind
+    inspecting.value = asset
+  }
+}
+defineExpose({ locate, inspect })
 function submitted() {
   selected.value = generation.value?.asset
   generation.value = undefined
@@ -118,8 +160,12 @@ async function adopt(job: Job) {
         ><el-radio-button value="character">人物与声音</el-radio-button
         ><el-radio-button value="scene">场景</el-radio-button
         ><el-radio-button value="prop">道具</el-radio-button></el-radio-group
-      ><span class="toolbar-spacer" /><el-button @click="libraryOpen = true">{{
-        readonly ? '查看素材库' : '添加或引用素材'
+      ><span class="toolbar-spacer" /><el-button
+        v-if="!readonly"
+        @click="picking = true"
+        >从素材库选用</el-button
+      ><el-button @click="libraryOpen = true">{{
+        readonly ? '查看本片素材' : '新建或编辑本片设定'
       }}</el-button>
     </div>
     <div v-if="!assets.length" class="preparation-empty panel">
@@ -135,9 +181,13 @@ async function adopt(job: Job) {
       <p>
         可以从个人库复用已有设定，也可以为本片新增。没有人物或对白的作品不必添加角色。
       </p>
-      <el-button v-if="!readonly" type="primary" @click="libraryOpen = true"
-        >添加或引用素材</el-button
-      >
+      <div class="toolbar">
+        <el-button v-if="!readonly" type="primary" @click="picking = true"
+          >从素材库选用</el-button
+        ><el-button v-if="!readonly" @click="libraryOpen = true"
+          >为本片新建</el-button
+        >
+      </div>
     </div>
     <div class="cast-card-grid">
       <article v-for="asset in assets" :key="asset.id" class="cast-card panel">
@@ -183,12 +233,29 @@ async function adopt(job: Job) {
             <span class="studio-meta">{{ asset.voice }}</span>
           </details>
           <StudioMedia
-            v-if="asset.voicePreviewJob"
+            v-if="asset.voicePreviewAssetId"
+            :project="null"
+            :asset="asset.voicePreviewAssetId"
+            kind="audio"
+            controls
+          />
+          <StudioMedia
+            v-else-if="asset.voicePreviewJob"
             :project="project.id"
             :job="asset.voicePreviewJob"
             kind="audio"
             controls
           />
+          <p v-if="asset.origin" class="studio-meta">
+            已关联素材库 ·
+            <router-link
+              :to="{
+                path: libraryPath(asset.kind),
+                query: { asset: asset.origin.currentVersionId },
+              }"
+              >{{ asset.origin.name }}</router-link
+            ><span v-if="asset.variantName"> · {{ asset.variantName }}</span>
+          </p>
           <div class="toolbar cast-card-actions">
             <el-button
               v-if="canCreate"
@@ -199,10 +266,63 @@ async function adopt(job: Job) {
               @click="generation = { kind: 'voice', asset }"
               >试听选音色</el-button
             ><el-button @click="selected = asset">候选与版本</el-button>
+            <el-button
+              v-if="!readonly && auth.can('studio.assets.write')"
+              :aria-label="
+                asset.name + (asset.origin ? '存回素材库' : '收藏到素材库')
+              "
+              @click="collect(asset)"
+              >{{ asset.origin ? '存回素材库' : '收藏到素材库' }}</el-button
+            >
+            <el-button
+              v-if="
+                asset.origin && !readonly && auth.can('studio.assets.write')
+              "
+              :type="hasLibraryUpdates(asset) ? 'primary' : 'default'"
+              @click="updating = asset"
+              >{{
+                hasLibraryUpdates(asset) ? '比较库内更新' : '检查库内更新'
+              }}</el-button
+            >
           </div>
         </div>
       </article>
     </div>
+    <el-alert
+      v-if="error && !selected"
+      :title="error"
+      type="error"
+      :closable="false"
+    />
+    <StudioAssetPicker
+      v-if="picking"
+      :project="project"
+      :title="'为本片选择' + assetKinds[category]"
+      :kinds="[category]"
+      :resolve="importAsset"
+      personal-first
+      @selected="picked"
+      @close="picking = false"
+    />
+    <StudioCollectionDialog
+      v-if="collecting"
+      :asset="collecting"
+      @saved="collected"
+      @close="collecting = undefined"
+    />
+    <StudioAssetDetail
+      v-if="inspecting"
+      :asset="inspecting"
+      @close="inspecting = undefined"
+    />
+    <StudioLibraryUpdateDialog
+      v-if="updating"
+      :project="project.id"
+      :asset="updating"
+      :save="save"
+      @close="updating = undefined"
+      @applied="applied"
+    />
     <AppDrawer
       v-model="libraryOpen"
       title="项目素材与个人库"

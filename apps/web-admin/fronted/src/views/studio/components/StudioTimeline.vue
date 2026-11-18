@@ -1,5 +1,8 @@
 <script setup lang="ts">
-import type { StudioProject } from '@/types/studio/studio'
+import type { StudioProject, StudioAsset } from '@/types/studio/studio'
+import type { AssetUseTarget } from '@/utils/studio/asset-use'
+import StudioReferenceGroup from './library/StudioReferenceGroup.vue'
+import StudioSoundEffects from './library/StudioSoundEffects.vue'
 import { computed, nextTick, type ComponentPublicInstance } from 'vue'
 import DurationField from '@/components/form/DurationField.vue'
 import LongTextField from '@/components/form/LongTextField.vue'
@@ -17,6 +20,13 @@ const emit = defineEmits<{
   export: []
   preview: []
   select: [string]
+  pick: [
+    value: {
+      title: string
+      kinds: StudioAsset['kind'][]
+      target: AssetUseTarget
+    },
+  ]
 }>()
 const props = defineProps<{
   readonly?: boolean
@@ -30,7 +40,9 @@ const active = computed(
     p.value.document.shots[0],
 )
 const panels = new Map<string, HTMLElement>()
-const audioLengths = computed(() => voiceDurations(p.value.jobs))
+const audioLengths = computed(() =>
+  voiceDurations(p.value.jobs, p.value.assets),
+)
 function capturePanel(
   id: string,
   el: Element | ComponentPublicInstance | null,
@@ -65,9 +77,10 @@ async function focusShot(id: string) {
     <div v-if="active" class="timeline-monitor">
       <div class="timeline-picture">
         <StudioMedia
-          v-if="active.candidate"
+          v-if="active.videoAssetId || active.candidate"
           :project="p.id"
-          :job="active.candidate"
+          :job="active.candidate ?? undefined"
+          :asset="active.videoAssetId ?? undefined"
           kind="video"
           controls
         />
@@ -101,6 +114,7 @@ async function focusShot(id: string) {
       v-if="p.document.shots.length"
       :document="p.document"
       :jobs="p.jobs"
+      :assets="p.assets"
       :music-name="p.assets.find((a) => a.id === p.document.music)?.name"
       :selected="selected"
       @select="focusShot"
@@ -121,6 +135,26 @@ async function focusShot(id: string) {
         >
       </summary>
       <div class="timeline-shot-fields form-stack">
+        <StudioReferenceGroup
+          label="采用画面"
+          :project="p.id"
+          :assets="p.assets.filter((asset) => asset.id === s.videoAssetId)"
+          :readonly="readonly"
+          add-label="从媒体库选视频"
+          :empty="
+            s.candidate
+              ? '当前采用本镜生成的画面，可选择库内视频替换。'
+              : '此镜尚未采用画面。'
+          "
+          @choose="
+            emit('pick', {
+              title: '为镜 ' + (i + 1) + ' 选择视频',
+              kinds: ['video'],
+              target: { kind: 'video', shotId: s.id },
+            })
+          "
+          @remove="s.videoAssetId = null"
+        />
         <ExpandableText
           :text="s.action || '尚未填写镜头动作'"
           label="镜头要求"
@@ -168,6 +202,31 @@ async function focusShot(id: string) {
             }}
           </legend>
           <ExpandableText :text="line.text" label="原台词" :lines="2" />
+          <StudioReferenceGroup
+            label="采用配音"
+            :project="p.id"
+            :assets="p.assets.filter((asset) => asset.id === line.audioAssetId)"
+            :readonly="readonly"
+            add-label="从媒体库选配音"
+            :empty="line.audio ? '使用本句生成的配音' : '此句尚无配音'"
+            @choose="
+              emit('pick', {
+                title:
+                  '为镜 ' + (i + 1) + ' 第 ' + (lineIndex + 1) + ' 句选择配音',
+                kinds: ['audio'],
+                target: { kind: 'audio', shotId: s.id, lineId: line.id },
+              })
+            "
+            @remove="line.audioAssetId = null"
+          />
+          <StudioMedia
+            v-if="line.audioAssetId || line.audio"
+            :project="p.id"
+            :asset="line.audioAssetId ?? undefined"
+            :job="line.audio ?? undefined"
+            kind="audio"
+            controls
+          />
           <p v-if="voiceConflict(line, s, audioLengths)" class="studio-error">
             配音超出镜头时长
           </p>
@@ -215,29 +274,32 @@ async function focusShot(id: string) {
             />
           </div>
         </fieldset>
+        <StudioSoundEffects
+          v-model="p.document"
+          :project="p.id"
+          :shot-id="s.id"
+          :assets="p.assets"
+          :readonly="readonly"
+          @pick="emit('pick', $event)"
+        />
       </div>
     </details>
+    <StudioReferenceGroup
+      label="背景音乐"
+      :project="p.id"
+      :assets="p.assets.filter((asset) => asset.id === p.document.music)"
+      :readonly="readonly"
+      add-label="从媒体库选择"
+      @choose="
+        emit('pick', {
+          title: '选择作品背景音乐',
+          kinds: ['audio', 'music'],
+          target: { kind: 'music' },
+        })
+      "
+      @remove="p.document.music = null"
+    />
     <label class="field"
-      >背景音乐<select
-        v-model="p.document.music"
-        class="native-control"
-        :disabled="readonly"
-      >
-        <option :value="null">无</option>
-        <option
-          v-for="a in p.assets.filter(
-            (a) =>
-              p.document.assets.includes(a.id) &&
-              a.fileId &&
-              ['audio', 'music'].includes(a.kind),
-          )"
-          :key="a.id"
-          :value="a.id"
-        >
-          {{ a.name }}
-        </option>
-      </select></label
-    ><label class="field"
       >音乐音量<input
         v-model.number="p.document.musicVolume"
         :disabled="readonly"

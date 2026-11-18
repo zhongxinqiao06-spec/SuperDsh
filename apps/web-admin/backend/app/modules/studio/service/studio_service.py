@@ -4,6 +4,7 @@ from app.infrastructure.database import Database
 from app.infrastructure.errors import DomainError
 from app.modules.files.service.file_service import FileService
 from app.modules.identity.entity.bo.models import Account
+from app.modules.studio.dao.asset_dao import AssetDao
 from app.modules.studio.dao.directory_dao import DirectoryDao
 from app.modules.studio.dao.foundation_dao import FoundationDao
 from app.modules.studio.dao.studio_dao import StudioDao
@@ -78,6 +79,16 @@ def validate_document(document: Document, assets: list[StudioAsset], jobs: list[
     catalog = {item.id: item for item in assets}
     adopted = {job.id: job for job in jobs if job.state == "ready"}
     linked = set(document.assets)
+
+    def require_asset(identity: str | None, kinds: set[str], label: str) -> None:
+        if identity and (
+            identity not in linked
+            or identity not in catalog
+            or catalog[identity].definition["kind"] not in kinds
+            or (kinds != {"scene"} and not catalog[identity].definition.get("fileId"))
+        ):
+            raise DomainError(422, label + "需要选择已加入本片的对应素材版本")
+
     if linked - catalog.keys() or (
         document.music
         and (
@@ -87,10 +98,17 @@ def validate_document(document: Document, assets: list[StudioAsset], jobs: list[
         )
     ):
         raise DomainError(422, "工程引用了不可访问的素材")
+    for scene in document.scenes:
+        require_asset(scene.sceneAssetId, {"scene"}, "场次场景")
+    for effect in document.soundEffects:
+        require_asset(effect.assetId, {"audio", "music"}, "音效")
     for shot in document.shots:
+        require_asset(shot.sceneAssetId, {"scene"}, "镜头场景")
+        require_asset(shot.videoAssetId, {"video"}, "镜头画面")
         if set(shot.references) - linked:
             raise DomainError(422, "请先把参考素材加入作品")
         for line in shot.lines:
+            require_asset(line.audioAssetId, {"audio"}, "台词配音")
             if line.role not in linked or catalog[line.role].definition["kind"] != "character":
                 raise DomainError(422, "台词需要绑定作品角色")
         for target, selected, kind in [
@@ -101,6 +119,20 @@ def validate_document(document: Document, assets: list[StudioAsset], jobs: list[
                 job = adopted.get(selected)
                 if not job or job.kind != kind or job.subject != target:
                     raise DomainError(422, "所选候选与镜头或台词不匹配")
+
+
+def validate_media_trims(document: Document, durations: dict[str, int]) -> None:
+    """使用已探测事实检查裁剪；台词超长允许保留待修，正式导出再阻断。"""
+    for shot in document.shots:
+        length = durations.get(shot.videoAssetId or "")
+        if length and (shot.trimEnd or shot.duration) > length:
+            raise DomainError(422, "镜头裁剪超过所选视频长度，请调整镜头时长")
+    for effect in document.soundEffects:
+        length = durations.get(effect.assetId)
+        if length and (
+            effect.trimStart >= length or (effect.trimEnd is not None and effect.trimEnd > length)
+        ):
+            raise DomainError(422, "音效裁剪超过所选音频长度")
 
 
 class StudioService:
@@ -121,7 +153,9 @@ class StudioService:
                 {
                     **project_view(p),
                     "shots": len(doc["shots"]),
-                    "adopted": sum(bool(s["candidate"]) for s in doc["shots"]),
+                    "adopted": sum(
+                        bool(s.get("candidate") or s.get("videoAssetId")) for s in doc["shots"]
+                    ),
                 }
                 for p, doc in await StudioDao(session).summaries(account.user_id)
             ]
@@ -199,12 +233,19 @@ class StudioService:
             )
             origin = asset.definition.get("sourceJob")
             items = []
-            for work, title, shots, music in rows:
+            for work, title, shots, music, scenes, effects in rows:
                 uses = []
+                scene_ids = {s["id"] for s in (scenes or []) if s.get("sceneAssetId") in versions}
+                effect_uses = [
+                    effect for effect in (effects or []) if effect["assetId"] in versions
+                ]
                 for index, shot in enumerate(shots, 1):
                     lines = shot.get("lines", [])
                     adopted = bool(
-                        origin
+                        shot.get("videoAssetId") in versions
+                        or any(line.get("audioAssetId") in versions for line in lines)
+                        or any(effect.get("shotId") == shot["id"] for effect in effect_uses)
+                        or origin
                         and (
                             origin == shot.get("candidate")
                             or any(origin == line.get("audio") for line in lines)
@@ -212,12 +253,28 @@ class StudioService:
                     )
                     if (
                         adopted
+                        or shot.get("sceneAssetId") in versions
+                        or (not shot.get("sceneAssetId") and shot.get("sceneId") in scene_ids)
                         or set(versions).intersection(shot.get("references", []))
                         or any(line.get("role") in versions for line in lines)
                     ):
                         uses.append({"id": shot["id"], "number": index, "adopted": adopted})
                 items.append(
-                    {"project": work, "title": title, "music": music in versions, "shots": uses}
+                    {
+                        "project": work,
+                        "title": title,
+                        "music": music in versions,
+                        "shots": uses,
+                        "scenes": [
+                            {"id": s["id"], "title": s["title"]}
+                            for s in (scenes or [])
+                            if s["id"] in scene_ids
+                        ],
+                        "soundEffects": [
+                            {"id": effect["id"], "shotId": effect.get("shotId")}
+                            for effect in effect_uses
+                        ],
+                    }
                 )
             return {"items": items, "total": total}
 
@@ -243,6 +300,8 @@ class StudioService:
             return {"items": [dict(row._mapping) for row in rows], "total": total}
 
     async def open(self, account: Account, project_id: str) -> dict:
+        from app.modules.studio.service.library_service import StudioLibraryService
+
         account.require("products.entertainment")
         account.require("studio.projects.read")
         async with self.database.sessions() as session:
@@ -252,13 +311,17 @@ class StudioService:
                 **project_view(project),
                 "document": (await self.documents.read(session, project.id)).model_dump(),
                 "history": await dao.history(project),
-                "assets": [asset_view(a) for a in await dao.assets(account.user_id, project_id)],
+                "assets": await StudioLibraryService(self).views(
+                    session, account, await dao.assets(account.user_id, project_id)
+                ),
                 "jobs": [job_view(j) for j in await dao.jobs(project)],
             }
 
     async def save(
         self, account: Account, project_id: str, change: SaveDocument, restore: int | None = None
     ) -> dict:
+        from app.modules.studio.service.library_service import StudioLibraryService
+
         account.require("products.entertainment")
         account.require("studio.projects.write")
         async with self.database.sessions.begin() as session:
@@ -297,6 +360,7 @@ class StudioService:
             validate_document(
                 document, await dao.assets(account.user_id, project_id), await dao.jobs(project)
             )
+            validate_media_trims(document, await AssetDao(session).media_metadata(document.assets))
             saved = await self.documents.persist(
                 session,
                 account,
@@ -307,7 +371,9 @@ class StudioService:
             result = {
                 "revision": project.revision,
                 "document": saved.model_dump(),
-                "assets": [asset_view(a) for a in await dao.assets(account.user_id, project_id)],
+                "assets": await StudioLibraryService(self).views(
+                    session, account, await dao.assets(account.user_id, project_id)
+                ),
             }
             if change.requestKey:
                 commands.remember(
@@ -405,15 +471,6 @@ class StudioService:
             return [asset_view(a) for a in await StudioDao(session).assets(account.user_id, None)]
 
     async def asset(self, account: Account, body: AssetInput, *, origin: str | None = None) -> dict:
-        account.require("products.entertainment")
-        account.require("studio.assets.write")
-        if body.fileId:
-            file = await self.files.entry(account, body.fileId)
-            expected = {"music": "audio", "audio": "audio", "video": "video"}.get(
-                body.kind, "image"
-            )
-            if not str(file["mediaType"]).startswith(expected + "/"):
-                raise DomainError(422, "素材类型与上传文件不一致")
-        async with self.database.sessions.begin() as session:
-            record_id = await self.asset_versions.create(session, account, body, origin)
-            return asset_view(await StudioDao(session).owned_asset(account.user_id, record_id))
+        from app.modules.studio.service.library_service import StudioLibraryService
+
+        return await StudioLibraryService(self).save_asset(account, body, origin=origin)

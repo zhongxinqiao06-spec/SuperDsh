@@ -138,7 +138,11 @@ class GenerationInputs:
         refs = [
             assets[identity]
             for identity in dict.fromkeys(
-                [*shot["references"], *(line["role"] for line in shot["lines"])]
+                [
+                    *shot["references"],
+                    *(line["role"] for line in shot["lines"]),
+                    *([shot["sceneAssetId"]] if shot.get("sceneAssetId") else []),
+                ]
             )
         ]
         images = await self.images(
@@ -176,7 +180,11 @@ class GenerationInputs:
         reference_labels = [
             f"参考图 [Image {index}] 中的主体："
             + "、".join(dict.fromkeys(a["name"] for a in refs if a.get("fileId") == image))
-            + "。沿用主体外观，背景按本镜场景设定。"
+            + (
+                "。沿用环境布局、光线和场景设定。"
+                if all(a["kind"] == "scene" for a in refs if a.get("fileId") == image)
+                else "。沿用主体外观，背景按本镜场景设定。"
+            )
             for index, image in enumerate(images, 1)
         ]
         prompt = "\n".join(

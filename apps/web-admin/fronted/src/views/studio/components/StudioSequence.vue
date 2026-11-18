@@ -1,12 +1,18 @@
 <script setup lang="ts">
 import { computed, ref } from 'vue'
-import type { Job, Shot, StudioDocument } from '@/types/studio/studio'
+import type {
+  Job,
+  Shot,
+  StudioDocument,
+  StudioAsset,
+} from '@/types/studio/studio'
 import { voiceConflict, voiceDurations } from '@/utils/studio/storyboard'
 const props = defineProps<{
   document: StudioDocument
   selected?: string
   jobs: Job[]
   musicName?: string
+  assets?: StudioAsset[]
 }>()
 const emit = defineEmits<{ select: [string] }>()
 const segments = computed(() =>
@@ -18,8 +24,8 @@ const segments = computed(() =>
 )
 const total = computed(() => segments.value.reduce((n, s) => n + s.length, 0))
 const zoom = ref(160)
-const tracks = ['画面', '配音', '字幕', '音乐'] as const
-const audioLengths = computed(() => voiceDurations(props.jobs))
+const tracks = ['画面', '配音', '字幕', '音效', '音乐'] as const
+const audioLengths = computed(() => voiceDurations(props.jobs, props.assets))
 const marks = computed(() => {
   let start = 0
   return segments.value.map((segment) => {
@@ -29,14 +35,38 @@ const marks = computed(() => {
   })
 })
 /** 将字幕与真实配音裁切到当前可见区间，避免剪去的台词继续占用轨道。 */
-function cues(shot: Shot, track: '配音' | '字幕') {
+function cues(shot: Shot, track: '配音' | '字幕' | '音效') {
   const cut = shot.trimStart,
     end = shot.trimEnd ?? shot.duration,
     length = end - cut
   if (length <= 0) return []
+  if (track === '音效') {
+    const offset =
+      (marks.value.find((mark) => mark.shot.id === shot.id)?.time ?? 0) * 1000
+    return (props.document.soundEffects ?? []).flatMap((effect) => {
+      if (effect.shotId && effect.shotId !== shot.id) return []
+      const asset = props.assets?.find((item) => item.id === effect.assetId)
+      const duration =
+        (effect.trimEnd ?? asset?.durationMs ?? 0) - effect.trimStart
+      const start = effect.shotId ? effect.start : effect.start - offset + cut
+      const from = Math.max(cut, start),
+        to = Math.min(end, start + duration)
+      return from < to
+        ? [
+            {
+              id: effect.id,
+              label: asset?.name || '音效',
+              left: ((from - cut) / length) * 100 + '%',
+              width: ((to - from) / length) * 100 + '%',
+            },
+          ]
+        : []
+    })
+  }
   return shot.lines.flatMap((line) => {
     const audio = track === '配音'
-    const duration = line.audio ? audioLengths.value.get(line.audio) : undefined
+    const source = line.audioAssetId || line.audio
+    const duration = source ? audioLengths.value.get(source) : undefined
     const label = audio ? line.text : (line.subtitle ?? line.text)
     if (!label || (audio && duration == null)) return []
     const start = audio ? line.start : (line.subtitleStart ?? line.start)
@@ -139,7 +169,11 @@ function cues(shot: Shot, track: '配音' | '字幕') {
               >
                 镜 {{ i + 1 }}
               </button>
-              <template v-else-if="track === '配音' || track === '字幕'">
+              <template
+                v-else-if="
+                  track === '配音' || track === '字幕' || track === '音效'
+                "
+              >
                 <span
                   v-if="
                     track === '配音' &&

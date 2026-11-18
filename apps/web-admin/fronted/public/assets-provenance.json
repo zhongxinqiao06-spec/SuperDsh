@@ -75,6 +75,54 @@
       "path": "images/website/shot-rain.webp",
       "source": "https://github.com/zhongxinqiao06-spec/SuperDsh/blob/44b2b2dee852c5e5f73274a911574630a3dff2e0/docs/plans/starbridge-web-design/assets/shot-rain.webp",
       "owner": "SuperDsh product artwork"
+    },
+    {
+      "path": "images/website/studio-underwater.webp",
+      "source": "OpenAI Image Gen / 2026-11-18 / user-approved orange Starbridge Studio homepage art direction",
+      "owner": "SuperDsh original generated concept artwork",
+      "usage": "Public visual illustration; not a customer production or real user asset"
+    },
+    {
+      "path": "images/website/studio-world.webp",
+      "source": "OpenAI Image Gen / 2026-11-18 / user-approved orange Starbridge Studio homepage art direction",
+      "owner": "SuperDsh original generated concept artwork",
+      "usage": "Public visual illustration; not a customer production or real user asset"
+    },
+    {
+      "path": "images/website/studio-character.webp",
+      "source": "OpenAI Image Gen / 2026-11-18 / user-approved orange Starbridge Studio homepage art direction",
+      "owner": "SuperDsh original generated concept artwork",
+      "usage": "Public visual illustration; not a customer production or real user asset"
+    },
+    {
+      "path": "images/website/studio-animation.webp",
+      "source": "OpenAI Image Gen / 2026-11-18 / user-approved orange Starbridge Studio homepage art direction",
+      "owner": "SuperDsh original generated concept artwork",
+      "usage": "Public visual illustration; not a customer production or real user asset"
+    },
+    {
+      "path": "images/website/studio-story.webp",
+      "source": "OpenAI Image Gen / 2026-11-18 / user-approved orange Starbridge Studio homepage art direction",
+      "owner": "SuperDsh original generated concept artwork",
+      "usage": "Public visual illustration; not a customer production or real user asset"
+    },
+    {
+      "path": "images/website/studio-portrait.webp",
+      "source": "OpenAI Image Gen / 2026-11-18 / user-approved orange Starbridge Studio homepage art direction",
+      "owner": "SuperDsh original generated concept artwork",
+      "usage": "Public visual illustration; not a customer production or real user asset"
+    },
+    {
+      "path": "images/website/studio-rain-actor.webp",
+      "source": "OpenAI Image Gen / 2026-11-18 / user-approved orange Starbridge Studio homepage art direction",
+      "owner": "SuperDsh original generated concept artwork",
+      "usage": "Public visual illustration; not a customer production or real user asset"
+    },
+    {
+      "path": "images/website/studio-mountains.webp",
+      "source": "OpenAI Image Gen / 2026-11-18 / user-approved orange Starbridge Studio homepage art direction",
+      "owner": "SuperDsh original generated concept artwork",
+      "usage": "Public visual illustration; not a customer production or real user asset"
     }
   ]
 }

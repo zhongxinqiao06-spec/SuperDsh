@@ -4,9 +4,10 @@ import { useStudioAnimatic } from '../../fronted/src/composables/studio/use-stud
 import { studioApi } from '../../fronted/src/api/studio/studio-api'
 import { newShot } from '../../fronted/src/utils/studio/storyboard'
 import type { StudioProject } from '../../fronted/src/types/studio/studio'
+import { previewAudioTracks } from '../../fronted/src/utils/studio/media-source'
 
 vi.mock('../../fronted/src/api/studio/studio-api', () => ({
-  studioApi: { media: vi.fn() },
+  studioApi: { media: vi.fn(), reference: vi.fn() },
 }))
 
 /** 预演协调音轨、暂停和离开清理，始终不修改工程或提交任务。 */
@@ -23,6 +24,9 @@ describe('静态分镜预演', () => {
     })
     players.length = 0
     vi.mocked(studioApi.media).mockResolvedValue('/authorized-audio')
+    vi.mocked(studioApi.reference).mockResolvedValue(
+      '/authorized-library-media',
+    )
     vi.stubGlobal(
       'Audio',
       class {
@@ -150,6 +154,80 @@ describe('静态分镜预演', () => {
     await pending
     expect(players).toHaveLength(0)
     expect(state.playing.value).toBe(false)
+    expect(vi.getTimerCount()).toBe(0)
+  })
+  it('音效跨镜衔接、背景音乐和台词使用同一裁剪时基', () => {
+    const { value, scope } = setup()
+    try {
+      value.value.document.shots[0]!.trimStart = 500
+      value.value.document.shots[0]!.trimEnd = 3500
+      value.value.document.music = 'music-version'
+      value.value.document.soundEffects = [
+        {
+          id: 'spark',
+          assetId: 'spark-version',
+          shotId: 'one',
+          start: 3800,
+          volume: 0.4,
+          trimStart: 200,
+          trimEnd: 1200,
+        },
+      ]
+      const first = previewAudioTracks(value.value, 0)
+      expect(first.find((track) => track.id === 'line')!.start).toBe(500)
+      const second = previewAudioTracks(value.value, 1)
+      expect(second.find((track) => track.id === 'effect:spark')).toMatchObject(
+        { start: 300, sourceStart: 200, duration: 1000, volume: 0.4 },
+      )
+      expect(
+        second.find((track) => track.id === 'background-music'),
+      ).toMatchObject({ start: -3000, loop: true })
+    } finally {
+      scope.stop()
+    }
+  })
+  it('采用库配音与库画面通过素材授权播放，裁剪和刷新保留来源', async () => {
+    const { value, state, scope } = setup()
+    value.value.assets = [
+      {
+        id: 'voice-version',
+        family: 'voice',
+        kind: 'audio',
+        project: null,
+        name: '收藏配音',
+        parent: null,
+        fileId: 'file',
+        voice: '',
+        description: '',
+        durationMs: 2000,
+      },
+    ]
+    value.value.document.shots[0]!.videoAssetId = 'video-version'
+    value.value.document.shots[0]!.trimStart = 500
+    value.value.document.shots[0]!.trimEnd = 3500
+    value.value.document.shots[0]!.lines[0]!.audio = null
+    value.value.document.shots[0]!.lines[0]!.audioAssetId = 'voice-version'
+    await nextTick()
+    try {
+      await state.play()
+      expect(studioApi.reference).toHaveBeenCalledWith(
+        'project',
+        'voice-version',
+        expect.any(AbortSignal),
+      )
+      expect(studioApi.reference).toHaveBeenCalledWith(
+        'project',
+        'video-version',
+        expect.any(AbortSignal),
+      )
+      expect(state.videoUrl.value).toBe('/authorized-library-media')
+      expect(state.length.value).toBe(3000)
+      await vi.advanceTimersByTimeAsync(1200)
+      expect(players.at(-1)!.play).toHaveBeenCalled()
+      state.pause()
+    } finally {
+      scope.stop()
+    }
     expect(vi.getTimerCount()).toBe(0)
   })
 })

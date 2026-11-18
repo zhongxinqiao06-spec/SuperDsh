@@ -81,7 +81,9 @@ async def test_foundation_workflow(platform: tuple[FastAPI, AsyncClient]) -> Non
     opened = (await client.get(path)).json()
     assert opened["revision"] == 2 and opened["aspectWidth"] == brief["aspectWidth"]
     current = opened["document"]
-    assert current["scenes"] == [{**scene, "scriptRange": None} for scene in original_scenes]
+    assert current["scenes"] == [
+        {**scene, "scriptRange": None, "sceneAssetId": None} for scene in original_scenes
+    ]
     assert current["musicVolume"] == 0.6
     assert current["shots"][0]["lines"][0]["start"] == 7000
     assert current["assets"] != [role]
@@ -153,6 +155,7 @@ async def test_five_roles_and_combined_product_access(
         "studio.deliveries",
         "studio.characters",
         "studio.environments",
+        "studio.props",
         "studio.library",
     }
     profiles = [

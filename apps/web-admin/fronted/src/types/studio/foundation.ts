@@ -15,6 +15,8 @@ export interface CreationDefaults {
   language: string
 }
 export interface StoryScene {
+  /** 场次选用的环境版本，镜头可以单独覆盖。 */
+  sceneAssetId?: string | null
   id: string
   title: string
   synopsis: string

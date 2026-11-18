@@ -119,6 +119,7 @@ async def test_product_menu_access_and_independent_revisions(
         "studio.projects",
         "studio.characters",
         "studio.environments",
+        "studio.props",
         "studio.deliveries",
     }
     assert next(i for i in pages if i["id"] == "studio.projects")["title"] == "我的片单"
@@ -150,6 +151,7 @@ async def test_product_menu_access_and_independent_revisions(
         "studio.tasks",
         "studio.characters",
         "studio.environments",
+        "studio.props",
         "studio.deliveries",
     }
     assert (await client.get(menus)).json() == office

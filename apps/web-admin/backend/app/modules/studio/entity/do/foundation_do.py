@@ -38,6 +38,7 @@ class StoryScene(Base):
     title: Mapped[str]
     synopsis: Mapped[str] = mapped_column(default="")
     script_range: Mapped[dict | None] = mapped_column(JSONB)
+    scene_asset_id: Mapped[str | None] = mapped_column(ForeignKey("studio_entity_versions.id"))
     position: Mapped[int] = mapped_column(BigInteger)
     archived_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
 
@@ -50,6 +51,7 @@ class StudioShot(Base):
     position: Mapped[int] = mapped_column(BigInteger)
     action: Mapped[str]
     scene: Mapped[str] = mapped_column(default="")
+    scene_asset_id: Mapped[str | None] = mapped_column(ForeignKey("studio_entity_versions.id"))
     camera: Mapped[str] = mapped_column(default="")
     framing: Mapped[str] = mapped_column(default="")
     movement: Mapped[str] = mapped_column(default="")

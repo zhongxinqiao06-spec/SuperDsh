@@ -1,6 +1,8 @@
 import { ApiError } from '@/utils/errors'
 import { computed, onMounted, onScopeDispose, ref, watch } from 'vue'
 import { studioApi } from '@/api/studio/studio-api'
+import { libraryApi } from '@/api/studio/library-api'
+import type { LibraryProjectResult } from '@/types/studio/library'
 import { useAuthStore } from '@/store/modules/auth-store'
 import type {
   Generation,
@@ -25,6 +27,7 @@ export function useStudioEditor(id: string) {
     selectedSpeech = ref('')
   const before = ref('')
   const saving = ref(false)
+  const libraryChanging = ref(false)
   const saveFailed = ref(false)
   let saveTimer: ReturnType<typeof setTimeout> | undefined
   let saveFlight: Promise<void> | undefined
@@ -63,6 +66,51 @@ export function useStudioEditor(id: string) {
   async function reload() {
     setProject(await studioApi.open(id, controller.signal))
   }
+  /** 公共引用先保存当前草稿，再以当前修订导入；返回的完整快照成为下一次编辑基线。 */
+  const importAttempts = new Map<string, { revision: number; key: string }>()
+  async function importAsset(source: StudioAsset): Promise<StudioAsset> {
+    if (libraryChanging.value) throw new Error('正在引用素材，请稍候')
+    await save()
+    if (libraryChanging.value) throw new Error('正在引用素材，请稍候')
+    const current = project.value
+    if (!current) throw new Error('作品尚未加载完成')
+    const existing = current.assets.find(
+      (item) =>
+        item.id === source.id && current.document.assets.includes(item.id),
+    )
+    if (existing) return existing
+    let attempt = importAttempts.get(source.id)
+    if (attempt?.revision !== current.revision) {
+      attempt = { revision: current.revision, key: newId() }
+      importAttempts.set(source.id, attempt)
+    }
+    libraryChanging.value = true
+    try {
+      const result = await libraryApi.import(id, {
+        sourceVersionId: source.id,
+        expectedRevision: attempt.revision,
+        requestKey: attempt.key,
+      })
+      if (controller.signal.aborted) throw new Error('作品已关闭')
+      applyLibraryResult(result)
+      importAttempts.delete(source.id)
+      const imported = result.assets.find((item) => item.id === result.assetId)
+      if (!imported) throw new Error('已引用素材，但未返回对应版本，请刷新作品')
+      return imported
+    } finally {
+      libraryChanging.value = false
+    }
+  }
+  function applyLibraryResult(result: LibraryProjectResult) {
+    if (!project.value) return
+    if (result.revision < project.value.revision) return
+    setProject({
+      ...project.value,
+      revision: result.revision,
+      document: result.document,
+      assets: result.assets,
+    })
+  }
   async function poll() {
     try {
       if (
@@ -72,7 +120,7 @@ export function useStudioEditor(id: string) {
         await initialize()
         error.value = ''
       }
-      if (project.value && !busy.value) {
+      if (project.value && !busy.value && !libraryChanging.value) {
         const current = await studioApi.open(id, controller.signal)
         // 重载/网络短暂中断恢复后只清除轮询错误，保存或用户操作失败继续保留。
         if (pollError && error.value === pollError) error.value = ''
@@ -81,6 +129,7 @@ export function useStudioEditor(id: string) {
         if (
           !project.value ||
           busy.value ||
+          libraryChanging.value ||
           current.revision < project.value.revision
         )
           return
@@ -163,7 +212,7 @@ export function useStudioEditor(id: string) {
     )
       return
     saveTimer = setTimeout(() => {
-      if (busy.value || saving.value) {
+      if (busy.value || saving.value || libraryChanging.value) {
         scheduleSave()
         return
       }
@@ -185,8 +234,10 @@ export function useStudioEditor(id: string) {
   ) {
     const a = await studioApi.asset(body)
     if (!project.value) return
-    project.value.assets.push(a)
-    if (link) project.value.document.assets.push(a.id)
+    if (!project.value.assets.some((item) => item.id === a.id))
+      project.value.assets.push(a)
+    if (link && !project.value.document.assets.includes(a.id))
+      project.value.document.assets.push(a.id)
     await save('关联素材版本')
   }
   async function submit(options: Generation) {
@@ -307,5 +358,7 @@ export function useStudioEditor(id: string) {
     selectedReference,
     selectedSpeech,
     snapshotAsset,
+    importAsset,
+    applyLibraryResult,
   }
 }

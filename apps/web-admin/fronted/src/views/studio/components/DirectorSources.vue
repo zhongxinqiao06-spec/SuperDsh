@@ -2,6 +2,7 @@
 import { ref } from 'vue'
 import type { useDirectorSources } from '@/composables/studio/use-director-sources'
 import StudioMedia from './StudioMedia.vue'
+import StudioAssetPicker from './library/StudioAssetPicker.vue'
 
 /** 创作资料选择器展示上传、来源和实际能力；发送前不改动作品。 */
 const props = defineProps<{
@@ -21,13 +22,15 @@ async function upload(event: Event) {
 <template>
   <section class="form-stack director-sources" aria-label="导演参考资料">
     <div class="director-sources-heading">
-      <strong>参考形象</strong
-      ><small class="studio-meta">可选，先选主角再讲故事也可以</small>
+      <strong>参考资料</strong
+      ><small class="studio-meta"
+        >选择主角、场景或道具，再让导演围绕它们起草</small
+      >
     </div>
     <div class="toolbar director-source-actions">
       <el-button
         v-if="canUpload"
-        :disabled="disabled || sources.uploads.value.length >= 4"
+        :disabled="disabled || sources.references.value >= 4"
         :loading="sources.uploading.value"
         @click="fileInput?.click()"
         >上传形象图片</el-button
@@ -42,9 +45,9 @@ async function upload(event: Event) {
       />
       <el-button
         v-if="canReadAssets"
-        :disabled="disabled"
+        :disabled="disabled || sources.references.value >= 4"
         @click="sources.openLibrary"
-        >从个人形象库选择</el-button
+        >从素材库选择</el-button
       >
     </div>
     <div v-if="sources.references.value" class="director-sources-list">
@@ -92,7 +95,7 @@ async function upload(event: Event) {
         <div class="form-stack">
           <strong>{{ item.name }}</strong
           ><small class="studio-meta"
-            >个人形象库 ·
+            >素材库 ·
             {{
               item.version === undefined ? '已有版本' : '版本 ' + item.version
             }}</small
@@ -104,13 +107,13 @@ async function upload(event: Event) {
         <el-button
           text
           :disabled="disabled"
-          :aria-label="'移除形象 ' + item.name"
+          :aria-label="'移除参考 ' + item.name"
           @click="sources.toggleAsset(item.id)"
           >移除</el-button
         >
       </article>
     </div>
-    <div v-if="sources.references.value" class="form-stack">
+    <div v-if="sources.referenceImages.value" class="form-stack">
       <el-checkbox
         :model-value="sources.analyzeImages.value"
         :disabled="disabled || !sources.capabilities.value?.vision.available"
@@ -160,7 +163,8 @@ async function upload(event: Event) {
       </p>
     </div>
     <p v-if="sources.references.value" class="studio-meta">
-      发送后才引用到本片。个人库原形象保留，生成的视频和配音在后续确认后制作。
+      已选 {{ sources.references.value }}/4
+      份资料，发送后才引用到本片。库内原设定保留，视频和配音在后续确认后制作。
     </p>
     <el-alert
       v-if="sources.error.value"
@@ -191,65 +195,15 @@ async function upload(event: Event) {
         </section>
       </div>
     </details>
-    <el-dialog
-      :model-value="sources.libraryOpen.value"
-      title="选择个人形象"
-      width="min(760px, 96vw)"
-      append-to-body
-      @update:model-value="sources.setLibraryOpen"
-    >
-      <div class="form-stack">
-        <p class="studio-meta">
-          选择已有形象及其版本，本片会保存独立引用。已选
-          {{ sources.selected.value.length }}/4。
-        </p>
-        <p v-if="sources.loading.value" role="status">正在读取形象库…</p>
-        <p v-else-if="!sources.assets.value.length" class="studio-meta">
-          个人形象库暂无形象，可以先上传参考图片。
-        </p>
-        <div class="director-library-grid">
-          <button
-            v-for="item in sources.assets.value"
-            :key="item.id"
-            class="director-library-item"
-            :aria-label="'选择形象 ' + item.name"
-            :aria-pressed="sources.selected.value.includes(item.id)"
-            :disabled="
-              disabled ||
-              (!sources.selected.value.includes(item.id) &&
-                sources.selected.value.length >= 4)
-            "
-            @click="sources.toggleAsset(item.id)"
-          >
-            <StudioMedia
-              v-if="item.fileId && canPreview"
-              :project="null"
-              :asset="item.id"
-              kind="image"
-              lazy
-            />
-            <strong>{{ item.name }}</strong
-            ><small
-              >{{
-                item.version === undefined
-                  ? '已有版本'
-                  : '版本 ' + item.version
-              }}{{
-                sources.selected.value.includes(item.id) ? ' · 已选择' : ''
-              }}</small
-            >
-            <p v-if="item.description" class="source-description">
-              {{ item.description }}
-            </p>
-          </button>
-        </div>
-      </div>
-      <template #footer
-        ><el-button type="primary" @click="sources.setLibraryOpen(false)"
-          >完成选择</el-button
-        ></template
-      >
-    </el-dialog>
+    <StudioAssetPicker
+      v-if="sources.libraryOpen.value && canReadAssets"
+      title="为导演选择角色、场景或道具"
+      :kinds="['character', 'scene', 'prop', 'image']"
+      :exclude-ids="sources.selected.value"
+      :resolve="async (asset) => asset"
+      @selected="sources.addAsset"
+      @close="sources.setLibraryOpen(false)"
+    />
   </section>
 </template>
 <style scoped>
@@ -313,34 +267,6 @@ async function upload(event: Event) {
   -webkit-line-clamp: 3;
   -webkit-box-orient: vertical;
   overflow: hidden;
-}
-.director-library-grid {
-  display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(160px, 1fr));
-  gap: var(--field-gap);
-}
-.director-library-item {
-  display: grid;
-  align-content: start;
-  gap: var(--control-gap);
-  padding: var(--field-gap);
-  text-align: start;
-  color: var(--foreground);
-  background: var(--card);
-  border: 1px solid var(--border);
-  border-radius: var(--radius);
-}
-.director-library-item[aria-pressed='true'] {
-  border-color: var(--primary);
-  background: var(--accent);
-}
-.director-library-item :deep(.studio-frame) {
-  width: 100%;
-  height: 120px;
-  object-fit: contain;
-}
-.director-library-item small {
-  color: var(--muted-foreground);
 }
 .director-evidence > div {
   padding-top: var(--field-gap);

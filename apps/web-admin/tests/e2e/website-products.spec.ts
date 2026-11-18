@@ -3,6 +3,88 @@ import { test, expect, type Page } from '@playwright/test'
 import { installFoundationFixture } from './foundation-fixture'
 
 const products = ['products.office', 'products.entertainment']
+
+for (const theme of ['light', 'dark']) {
+  test(`娱乐五屏在 ${theme} 下可翻页、预览，并完整容纳各档内容`, async ({
+    page,
+  }, info) => {
+    test.setTimeout(90_000)
+    await page.addInitScript(
+      (value) => localStorage.setItem('starbridge.theme', value),
+      theme,
+    )
+    await installFoundationFixture(page)
+    await page.emulateMedia({ reducedMotion: 'reduce' })
+    const errors: string[] = []
+    page.on('pageerror', (error) => errors.push(error.message))
+    await page.goto('/#/')
+    const chapterNav = page.getByRole('navigation', { name: '章节导航' })
+    const names = ['灵感开场', '创作类型', '制作流程', '创作优势', '开始创作']
+    for (const [width, height] of [
+      [390, 844],
+      [768, 960],
+      [1280, 600],
+      [1440, 960],
+    ]) {
+      await page.setViewportSize({ width: width!, height: height! })
+      for (const [index, name] of names.entries()) {
+        await chapterNav.getByRole('button', { name, exact: true }).click()
+        await expect(
+          chapterNav.getByRole('button', { name, exact: true }),
+        ).toHaveAttribute('aria-current', 'step')
+        const chapter = page.locator('[data-chapter]').nth(index)
+        const root = await page.locator('.studio-pages').boundingBox()
+        const bounds = await chapter.boundingBox()
+        expect(Math.abs(bounds!.y - root!.y)).toBeLessThan(2)
+        await expectNoOverflow(page)
+        expect(
+          await chapter.evaluate(
+            (element) => element.scrollWidth <= element.clientWidth,
+          ),
+        ).toBe(true)
+        await chapter.locator('img').evaluateAll(async (images) => {
+          await Promise.all(
+            images.map((img) => (img as HTMLImageElement).decode()),
+          )
+        })
+        if (width === 1440 || width === 390) {
+          await page.screenshot({
+            path: info.outputPath(`chapter-${index + 1}-${theme}-${width}.png`),
+            animations: 'disabled',
+          })
+        }
+      }
+    }
+    await chapterNav
+      .getByRole('button', { name: '灵感开场', exact: true })
+      .click()
+    await page.locator('#studio-intro').press('PageDown')
+    await expect(
+      chapterNav.getByRole('button', { name: '创作类型', exact: true }),
+    ).toHaveAttribute('aria-current', 'step')
+    await page.locator('#studio-creations').press('Home')
+    const image = page.getByRole('button', { name: '查看水下幻想画面' })
+    await image.click()
+    await expect(page.getByRole('dialog')).toBeVisible()
+    await page.keyboard.press('Escape')
+    await expect(page.getByRole('dialog')).not.toBeVisible()
+    await expect(image).toBeFocused()
+    await chapterNav
+      .getByRole('button', { name: '创作优势', exact: true })
+      .click()
+    const comparison = page.getByRole('group', { name: '候选画面对比示意' })
+    await comparison.getByRole('button').first().click()
+    await expect(comparison.getByRole('button').first()).toHaveAttribute(
+      'aria-pressed',
+      'true',
+    )
+    await expect(comparison.getByRole('button').last()).toHaveAttribute(
+      'aria-pressed',
+      'false',
+    )
+    expect(errors).toEqual([])
+  })
+}
 async function expectNoOverflow(page: Page) {
   expect(
     await page.evaluate(
@@ -19,7 +101,7 @@ test('匿名访客切镜、切换产品并核对 CSV，刷新与历史可续接'
   const preview = page.getByRole('region', { name: '雨后站台分镜预览' })
   await expect(preview.locator('.preview-view img')).toHaveAttribute(
     'src',
-    '/images/website/film.webp',
+    '/images/website/shot-2.webp',
   )
   await preview.getByRole('button', { name: /雨棚/ }).press('Enter')
   await expect(preview.locator('.preview-meta')).toContainText(
@@ -53,7 +135,7 @@ test('匿名访客切镜、切换产品并核对 CSV，刷新与历史可续接'
     (Array.from(totals.values()).reduce((a, b) => a + b) / 10000).toFixed(1),
   )
   await page.goBack()
-  await expect(page.getByRole('heading', { level: 1 })).toContainText('短片')
+  await expect(page.getByRole('heading', { level: 1 })).toContainText('让想象')
   await page.goForward()
   await page.getByRole('button', { name: '打开导航' }).click()
   await page.getByRole('button', { name: 'English' }).click()

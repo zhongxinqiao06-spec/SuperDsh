@@ -30,6 +30,7 @@ describe('路由、菜单和账号草稿', () => {
     ).toEqual([
       'studio.deliveries',
       'studio.environments',
+      'studio.props',
       'studio.characters',
       'studio.projects',
       'studio.library',

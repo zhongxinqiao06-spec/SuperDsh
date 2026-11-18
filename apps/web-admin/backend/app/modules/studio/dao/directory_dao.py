@@ -24,27 +24,45 @@ class DirectoryDao:
         return list(rows), int(count or 0)
 
     def projects(self, owner: str, search: str, lifecycle: str = "active") -> Select:
-        # 封面沿用当前剪辑顺序，只展示同作品、同镜头已采用且可播放的生成结果。
+        # 封面沿剪辑顺序选择同镜生成结果或本人已引用的媒体版本，两者不可串权。
         shots = (
             func.jsonb_array_elements(StudioRevision.document["shots"])
             .table_valued(column("value", JSONB), with_ordinality="position")
             .render_derived(name="shot")
         )
-        cover = (
+        cover_sources = (
             select(MediaJob.id)
             .select_from(shots)
-            .join(MediaJob, MediaJob.id == shots.c.value["candidate"].astext)
+            .outerjoin(
+                MediaJob,
+                and_(
+                    MediaJob.id == shots.c.value["candidate"].astext,
+                    MediaJob.project == StudioProject.id,
+                    MediaJob.subject == shots.c.value["id"].astext,
+                    MediaJob.kind == "video",
+                    MediaJob.state == "ready",
+                ),
+            )
+            .outerjoin(
+                StudioAsset,
+                and_(
+                    StudioAsset.id == shots.c.value["videoAssetId"].astext,
+                    StudioAsset.owner == owner,
+                    or_(StudioAsset.project.is_(None), StudioAsset.project == StudioProject.id),
+                    StudioRevision.document["assets"].op("?")(StudioAsset.id),
+                    StudioAsset.definition["kind"].as_string() == "video",
+                    StudioAsset.definition["fileId"].as_string().is_not(None),
+                ),
+            )
             .where(
-                MediaJob.project == StudioProject.id,
-                MediaJob.subject == shots.c.value["id"].astext,
-                MediaJob.kind == "video",
-                MediaJob.state == "ready",
+                or_(MediaJob.id.is_not(None), StudioAsset.id.is_not(None)),
             )
             .order_by(shots.c.position)
             .limit(1)
             .correlate(StudioProject, StudioRevision)
-            .scalar_subquery()
         )
+        cover = cover_sources.scalar_subquery()
+        asset_cover = cover_sources.with_only_columns(StudioAsset.id).scalar_subquery()
         return (
             select(
                 StudioProject.id,
@@ -56,11 +74,15 @@ class DirectoryDao:
                 StudioProject.revision,
                 StudioProject.updated,
                 cover.label("coverJobId"),
+                asset_cover.label("coverAssetId"),
                 func.jsonb_array_length(StudioRevision.document["shots"]).label("shots"),
                 func.jsonb_array_length(
                     func.jsonb_path_query_array(
                         StudioRevision.document,
-                        cast('$.shots[*] ? (@.candidate.type() == "string")', JSONPATH),
+                        cast(
+                            '$.shots[*] ? (@.candidate.type() == "string" || @.videoAssetId.type() == "string")',
+                            JSONPATH,
+                        ),
                     )
                 ).label("adopted"),
             )
@@ -151,6 +173,8 @@ class DirectoryDao:
                 StudioProject.title,
                 document["shots"],
                 document["music"].as_string(),
+                document["scenes"],
+                document["soundEffects"],
             )
             .join(
                 StudioRevision,
