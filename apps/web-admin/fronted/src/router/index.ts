@@ -120,7 +120,10 @@ export const router = createRouter({
         },
         {
           path: '/entertainment/series/new',
-          component: () => import('@/views/studio/StudioSeriesCreate.vue'),
+          redirect: (to) => ({
+            path: '/entertainment',
+            query: { ...to.query, create: 'series' },
+          }),
           meta: { product: 'entertainment', moduleId: 'studio.projects' },
         },
         {

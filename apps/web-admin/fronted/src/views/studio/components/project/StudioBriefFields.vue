@@ -3,6 +3,7 @@ import { computed } from 'vue'
 import type { ProjectBrief } from '@/types/studio/foundation'
 /** 新建和编辑共享规格表单；分钟秒数仅为展示，接口统一使用毫秒。 */
 const model = defineModel<ProjectBrief>({ required: true })
+defineProps<{ disabled?: boolean }>()
 const ratio = computed({
   get: () =>
     model.value.aspectWidth && model.value.aspectHeight
@@ -30,12 +31,14 @@ const seconds = computed({
     <label class="field"
       >作品名称<el-input
         v-model="model.title"
+        :disabled="disabled"
         maxlength="120"
         aria-label="作品名称"
     /></label>
     <label class="field"
       >故事构想<el-input
         v-model="model.brief"
+        :disabled="disabled"
         type="textarea"
         :autosize="{ minRows: 3, maxRows: 12 }"
         maxlength="12000"
@@ -46,6 +49,7 @@ const seconds = computed({
       <label class="field"
         >画幅<el-select
           v-model="ratio"
+          :disabled="disabled"
           aria-label="画幅"
           placeholder="选择画幅"
           allow-create
@@ -60,6 +64,7 @@ const seconds = computed({
       <label class="field"
         >目标时长（秒）<el-input-number
           v-model="seconds"
+          :disabled="disabled"
           :min="1"
           :max="3600"
           :precision="0"
@@ -69,6 +74,7 @@ const seconds = computed({
     <label class="field"
       >视觉风格<el-input
         v-model="model.styleBrief"
+        :disabled="disabled"
         type="textarea"
         :autosize="{ minRows: 2, maxRows: 10 }"
         maxlength="12000"
@@ -78,6 +84,7 @@ const seconds = computed({
     <label class="field"
       >主要语言<el-input
         v-model="model.language"
+        :disabled="disabled"
         maxlength="35"
         placeholder="例如 zh-CN"
         aria-label="主要语言"

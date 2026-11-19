@@ -60,21 +60,24 @@ test('系列短剧创建、编排、锁定、单集上下文与结构拆合导�
   await page.goto('/#/entertainment')
   await page.getByRole('button', { name: /新建作品/ }).click()
   await page.getByRole('menuitem', { name: /系列短剧/ }).click()
-  await expect(
-    page.getByRole('heading', { name: '新建系列短剧', exact: true }),
-  ).toBeVisible()
+  const createDialog = page.getByRole('dialog', {
+    name: '新建系列短剧',
+    exact: true,
+  })
+  await expect(createDialog).toBeVisible()
   await expect(page.getByLabel('主要语言', { exact: true })).toHaveValue(
     'zh-CN',
   )
   await page
     .getByRole('spinbutton', { name: '计划集数', exact: true })
     .fill('2')
-  await page.getByRole('link', { name: '← 我的作品', exact: true }).click()
+  await createDialog.getByRole('button', { name: '取消', exact: true }).click()
   await expect(
-    page.getByRole('dialog', { name: '处理未保存的修改', exact: true }),
+    page.getByRole('dialog', { name: '未保存的修改', exact: true }),
   ).toBeVisible()
-  await page.keyboard.press('Escape')
-  await expect(page).toHaveURL(/\/series\/new$/)
+  await page.getByRole('button', { name: '继续编辑', exact: true }).click()
+  await expect(createDialog).toBeVisible()
+  await expect(page).toHaveURL(/\/entertainment(?:\?[^#]*)?$/)
   await expect(
     page.getByRole('spinbutton', { name: '计划集数', exact: true }),
   ).toHaveValue('2')

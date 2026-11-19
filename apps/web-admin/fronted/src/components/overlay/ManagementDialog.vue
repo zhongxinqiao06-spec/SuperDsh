@@ -14,6 +14,8 @@ const props = defineProps<{
   submitText?: string
   submitDisabled?: boolean
   dirty?: boolean
+  /** 领域已提供完整导航保护时关闭本组件的产品级保护，避免重复询问。 */
+  navigationGuard?: boolean
 }>()
 const emit = defineEmits<{
   'update:modelValue': [value: boolean]
@@ -31,7 +33,7 @@ watch(
   },
 )
 const confirmingNavigation = useProductEditorGuard({
-  open: () => props.modelValue,
+  open: () => props.modelValue && props.navigationGuard !== false,
   busy: () => !!props.busy,
   dirty: () => !props.readonly && (props.dirty || changed.value),
   save: () => form.value?.requestSubmit(),

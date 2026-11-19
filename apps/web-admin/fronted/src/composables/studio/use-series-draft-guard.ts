@@ -6,8 +6,10 @@ import { ElMessageBox } from 'element-plus'
 export function useSeriesDraftGuard(
   dirty: () => boolean,
   save: () => Promise<boolean>,
+  busy: () => boolean = () => false,
 ) {
   async function leave() {
+    if (busy()) return false
     if (!dirty()) return true
     try {
       await ElMessageBox.confirm(
@@ -25,15 +27,15 @@ export function useSeriesDraftGuard(
     }
   }
   function protect(event: BeforeUnloadEvent) {
-    if (dirty()) {
+    if (dirty() || busy()) {
       event.preventDefault()
       event.returnValue = ''
     }
   }
   watch(
-    dirty,
-    (value) => {
-      if (value) window.addEventListener('beforeunload', protect)
+    [dirty, busy],
+    ([changed, pending]) => {
+      if (changed || pending) window.addEventListener('beforeunload', protect)
       else window.removeEventListener('beforeunload', protect)
     },
     { immediate: true },

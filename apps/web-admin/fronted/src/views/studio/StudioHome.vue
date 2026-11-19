@@ -1,12 +1,12 @@
 <script setup lang="ts">
-import { ref, onScopeDispose } from 'vue'
+import { nextTick, ref, onScopeDispose, watch } from 'vue'
 import { ElMessageBox } from 'element-plus'
 import { useAuthStore } from '@/store/modules/auth-store'
 import { initialBrief, projectBrief } from '@/utils/studio/foundation'
 import { newId } from '@/utils/studio/storyboard'
 import StudioBriefFields from './components/project/StudioBriefFields.vue'
 import type { WorkMode, WorkSummary } from '@/types/studio/works'
-import { useRouter } from 'vue-router'
+import { useRoute, useRouter } from 'vue-router'
 import PageHeader from '@/components/layout/PageHeader.vue'
 import FilterBar from '@/components/management/FilterBar.vue'
 import ManagementList from '@/components/management/ManagementList.vue'
@@ -18,6 +18,7 @@ import { studioApi } from '@/api/studio/studio-api'
 import { worksApi } from '@/api/studio/works-api'
 import StudioWorkCard from './components/StudioWorkCard.vue'
 import ResourceStatus from '@/components/feedback/ResourceStatus.vue'
+import SeriesCreateDialog from './components/series/SeriesCreateDialog.vue'
 
 const auth = useAuthStore()
 const lifecycle = ref('active')
@@ -34,7 +35,38 @@ const { page, pageSize, data, query, search, filter, loading, error, reload } =
     [lifecycle, mode],
   )
 const router = useRouter()
+const route = useRoute()
 const creating = ref(false)
+const creatingSeries = ref(false)
+watch(
+  () => route.query.create,
+  (value, previous) => {
+    if (value === 'series') creatingSeries.value = true
+    else if (previous === 'series') creatingSeries.value = false
+  },
+  { immediate: true },
+)
+/** 旧新建链接仍可打开弹窗；确认关闭后清理入口参数，重新打开获得独立草稿。 */
+async function closeSeries(open: boolean) {
+  creatingSeries.value = open
+  if (!open && route.query.create === 'series') {
+    await nextTick()
+    const query = { ...route.query }
+    delete query.create
+    await router.replace({ query })
+  }
+}
+async function seriesCreated(id: string, openEditor: boolean) {
+  creatingSeries.value = false
+  // 先卸载已保存的弹窗及路由保护，再进入新工程，避免成功提交后重复询问。
+  await nextTick()
+  if (openEditor) {
+    await router.push({
+      path: '/entertainment/series/' + encodeURIComponent(id),
+      query: { section: 'episodes' },
+    })
+  } else await reload()
+}
 const form = ref(projectBrief())
 let creationKey = newId()
 let creationSignature = ''
@@ -58,8 +90,10 @@ async function start() {
 /** 三种入口仅决定创作组织方式，共用账号与制作能力。 */
 async function startMode(value: string) {
   if (!auth.can('studio.projects.write')) return
-  if (value === 'quick' || value === 'series') {
-    await router.push('/entertainment/' + value + '/new')
+  if (value === 'series') {
+    creatingSeries.value = true
+  } else if (value === 'quick') {
+    await router.push('/entertainment/quick/new')
   } else await start()
 }
 async function create() {
@@ -212,6 +246,12 @@ async function archive(project: WorkSummary) {
     >
       <StudioBriefFields v-model="form" />
     </ManagementDialog>
+    <SeriesCreateDialog
+      v-if="creatingSeries"
+      :model-value="creatingSeries"
+      @update:model-value="closeSeries"
+      @created="seriesCreated"
+    />
   </section>
 </template>
 
