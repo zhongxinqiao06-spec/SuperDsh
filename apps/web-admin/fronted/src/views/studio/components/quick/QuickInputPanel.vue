@@ -169,7 +169,9 @@ function mode(value: string | number) {
             :placeholder="
               draft.configurationId
                 ? '已保存模型当前不可用'
-                : '暂无可用视频模型'
+                : models.length
+                  ? '请选择视频模型'
+                  : '暂无可用视频模型'
             "
             aria-label="视频模型"
             @update:model-value="emit('model', String($event))"

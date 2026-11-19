@@ -153,6 +153,26 @@ beforeEach(() => {
 afterEach(() => wrappers.forEach((wrapper) => wrapper.unmount()))
 
 describe('快速视频输入能力', () => {
+  it('有模型未选、没有兼容模型、已保存模型失效分别提示且保留原选择', () => {
+    const draft = {
+      ...initialQuickDraft(capabilities),
+      prompt: '月球旅行',
+      configurationId: null,
+    }
+    expect(quickDraftIssue(draft, undefined, capabilities.models)).toBe(
+      '请选择视频模型后再生成。',
+    )
+    expect(quickDraftIssue(draft, undefined, [])).toContain('暂无可用视频模型')
+    expect(
+      quickDraftIssue(draft, undefined, [capabilities.models[1]!]),
+    ).toContain('暂无可用视频模型')
+    expect(draft.configurationId).toBeNull()
+    const unavailable = { ...draft, configurationId: 'removed-model' }
+    expect(
+      quickDraftIssue(unavailable, undefined, capabilities.models),
+    ).toContain('已保存模型当前不可用')
+    expect(unavailable.configurationId).toBe('removed-model')
+  })
   it('默认值来自所选模型，切换模型保留正文和参考并校正不支持的参数', () => {
     const draft = initialQuickDraft(capabilities)
     expect(draft).toMatchObject({

@@ -74,7 +74,9 @@ export function useQuickProject(initialId: string | null) {
   const model = computed(() =>
     models.value.find((item) => item.id === draft.value.configurationId),
   )
-  const issue = computed(() => quickDraftIssue(draft.value, model.value))
+  const issue = computed(() =>
+    quickDraftIssue(draft.value, model.value, models.value),
+  )
   const jobs = computed(() => state.value?.jobs ?? [])
   const selected = computed(() =>
     jobs.value.find((item) => item.id === selectedId.value),

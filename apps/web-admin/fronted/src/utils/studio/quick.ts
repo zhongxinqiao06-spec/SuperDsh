@@ -56,10 +56,25 @@ export function alignQuickModel(
   }
 }
 /** 就近提示可操作缺项；最终权限、输入及受理状态仍由服务端预检。 */
-export function quickDraftIssue(draft: QuickDraft, model?: QuickModel): string {
+export function quickDraftIssue(
+  draft: QuickDraft,
+  model?: QuickModel,
+  availableModels: readonly QuickModel[] = model ? [model] : [],
+): string {
   if (!draft.prompt.trim()) return '先描述你想生成的画面、动作或故事。'
-  if (!model || !model.inputModes.includes(draft.inputMode))
-    return '当前方式没有可用模型，请选择已配置的模型或切换生成方式。'
+  // 草稿未选择与已保存配置失效分别提示，不自动替用户选择另一模型。
+  if (!draft.configurationId)
+    return availableModels.some((item) =>
+      item.inputModes.includes(draft.inputMode),
+    )
+      ? '请选择视频模型后再生成。'
+      : '当前方式暂无可用视频模型，请配置模型或切换生成方式。'
+  if (
+    !model ||
+    model.id !== draft.configurationId ||
+    !model.inputModes.includes(draft.inputMode)
+  )
+    return '已保存模型当前不可用，请重新选择视频模型。'
   if (
     !model.durations.includes(draft.durationSeconds) ||
     !model.aspects.includes(draft.aspect) ||

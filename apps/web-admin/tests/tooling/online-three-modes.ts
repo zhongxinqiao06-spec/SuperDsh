@@ -1,8 +1,10 @@
 /** 发布后只读验收；不记录认证材料，不启动制作任务，不改线上业务数据。 */
 import { mkdir, readFile, writeFile } from 'node:fs/promises'
+import { existsSync } from 'node:fs'
 import { resolve } from 'node:path'
 import { chromium, expect, type Page } from '@playwright/test'
 import type { WorkSummary } from '../../fronted/src/types/studio/works'
+import type { QuickModel } from '../../fronted/src/types/studio/quick'
 
 const origin = new URL(
   process.env.WEB_ADMIN_ONLINE_URL ?? 'http://43.142.137.254:5174',
@@ -29,6 +31,7 @@ const report = {
   pageErrors: [] as string[],
   unexpectedWrites: [] as string[],
   failedRequests: [] as string[],
+  quickModels: [] as QuickModel[],
   loggedOut: false,
   passed: false,
   failure: '',
@@ -48,7 +51,22 @@ function safeMessage(value: string): string {
 }
 
 await mkdir(output, { recursive: true })
-const browser = await chromium.launch({ headless: true })
+// 与本地回归配置一致，Windows 复用已安装 Edge，浏览器数据仍完全隔离。
+const installedEdge =
+  process.platform === 'win32' &&
+  ['PROGRAMFILES(X86)', 'PROGRAMFILES', 'LOCALAPPDATA'].some((key) => {
+    const directory = process.env[key]
+    return (
+      directory &&
+      existsSync(resolve(directory, 'Microsoft/Edge/Application/msedge.exe'))
+    )
+  })
+const browser = await chromium.launch({
+  headless: true,
+  channel:
+    process.env.WEB_ADMIN_BROWSER_CHANNEL ??
+    (installedEdge ? 'msedge' : undefined),
+})
 const context = await browser.newContext({
   baseURL: origin,
   viewport: { width: 1440, height: 1000 },
@@ -116,9 +134,36 @@ async function capture(
     )
     .toBeTruthy()
   await expect(page.locator('.el-alert--error')).toHaveCount(0)
+  // 先等可见媒体解码首帧，避免把请求刚发出时的空播放器误当作验收截图。
+  await expect
+    .poll(
+      () =>
+        page.locator('.studio-media:visible').evaluateAll((hosts) =>
+          hosts.every((element) => {
+            const box = element.getBoundingClientRect()
+            const video = element.querySelector('video')
+            const image = element.querySelector('img')
+            return (
+              box.bottom < 0 ||
+              box.top > innerHeight ||
+              box.right < 0 ||
+              box.left > innerWidth ||
+              Boolean(
+                video &&
+                video.readyState >= 2 &&
+                video.videoWidth > 0 &&
+                !video.error,
+              ) ||
+              Boolean(image && image.complete && image.naturalWidth > 0)
+            )
+          }),
+        ),
+      { timeout: 45_000 },
+    )
+    .toBeTruthy()
   const filename = `${name}-${dark ? 'dark' : 'light'}-${width}.png`
   await page.screenshot({ path: resolve(output, filename), fullPage: true })
-  report.screenshots.push(filename)
+  if (!report.screenshots.includes(filename)) report.screenshots.push(filename)
 }
 
 async function catalog(mode: string, label: string): Promise<WorkSummary[]> {
@@ -205,7 +250,45 @@ try {
     report.checks.push(`${width}px：四类作品筛选与横向溢出检查通过`)
 
     step = `quick-${width}`
+    const quickResponse = page.waitForResponse((response) =>
+      new URL(response.url()).pathname.endsWith(
+        '/' + identities.quickId + '/quick',
+      ),
+    )
     await visit('/entertainment/quick/' + identities.quickId)
+    // 只读取能力公开字段；鉴权头仅在内存转交请求，不写日志或验证产物。
+    const detail = await quickResponse
+    const authorization = detail.request().headers().authorization
+    if (!authorization) throw new Error('快速草稿请求缺少有效会话')
+    const capabilities = await page.request.get(
+      '/api/studio/quick-capabilities',
+      {
+        headers: { authorization },
+      },
+    )
+    expect(capabilities.ok()).toBeTruthy()
+    const capabilityData = (await capabilities.json()) as {
+      models: QuickModel[]
+    }
+    report.quickModels = capabilityData.models.map(
+      ({
+        id,
+        name,
+        inputModes,
+        durations,
+        aspects,
+        resolutions,
+        maxReferences,
+      }) => ({
+        id,
+        name,
+        inputModes,
+        durations,
+        aspects,
+        resolutions,
+        maxReferences,
+      }),
+    )
     await expect(page.getByLabel('快速作品名称')).not.toHaveValue('')
     await expect(page.locator('.quick-workspace')).toBeVisible()
     await capture('quick-draft', width, dark)
@@ -237,6 +320,23 @@ try {
       step = `legacy-${index + 1}-${width}`
       await visit('/entertainment/' + project.id + '?section=storyboard')
       await expect(page.locator('.studio-shot').first()).toBeVisible()
+      const preview = page.locator('video[controls]').first()
+      await expect(preview).toBeVisible()
+      await preview.evaluate(async (element) => {
+        const video = element as HTMLVideoElement
+        video.muted = true
+        await video.play()
+      })
+      await expect
+        .poll(
+          () =>
+            preview.evaluate(
+              (element) => (element as HTMLVideoElement).currentTime,
+            ),
+          { timeout: 30_000 },
+        )
+        .toBeGreaterThan(0.15)
+      await preview.evaluate((element) => (element as HTMLVideoElement).pause())
       await capture('legacy-project-' + (index + 1), width, dark)
     }
     report.checks.push(`${width}px：原有小狗与噜噜作品分镜可读`)
@@ -246,6 +346,7 @@ try {
   expect(report.consoleErrors).toEqual([])
   expect(report.pageErrors).toEqual([])
   step = 'logout'
+  recording = false
   await signOut(page)
   report.passed = true
 } catch (error) {
@@ -255,6 +356,7 @@ try {
     safeMessage(error instanceof Error ? error.message : String(error))
   process.exitCode = 1
 } finally {
+  recording = false
   if (signedIn) {
     try {
       await signOut(page)
