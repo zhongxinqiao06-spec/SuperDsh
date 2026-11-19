@@ -87,10 +87,20 @@ async def test_batch_resume_adopt_export(platform: tuple[FastAPI, AsyncClient]) 
         wav.setparams((1, 2, 22050, 0, "NONE", ""))
         wav.writeframes(b"\x00\x01" * 22050)
     posts: list[str] = []
+    speech_active = 0
+    speech_peak = 0
 
-    def provider(req: httpx.Request) -> httpx.Response:
+    async def provider(req: httpx.Request) -> httpx.Response:
+        nonlocal speech_active, speech_peak
         if req.method == "POST":
             posts.append(req.url.path)
+            if "video-generation" not in req.url.path:
+                speech_active += 1
+                speech_peak = max(speech_peak, speech_active)
+                try:
+                    await asyncio.sleep(0.03)
+                finally:
+                    speech_active -= 1
             return httpx.Response(
                 200,
                 json={"output": {"task_id": "test-task"}}
@@ -173,11 +183,11 @@ async def test_batch_resume_adopt_export(platform: tuple[FastAPI, AsyncClient]) 
                     select(MediaJob).where(MediaJob.state.in_(["queued", "polling", "downloading"]))
                 )
             )
-        for job in waiting:
-            await jobs.process(job)
+        await asyncio.gather(*(jobs.process(job) for job in waiting))
 
     await run_stage()
     assert len(posts) == 8
+    assert speech_peak == 1
     assert {j["state"] for j in (await client.get(uri)).json()["jobs"]} == {
         "polling",
         "downloading",
@@ -233,7 +243,8 @@ async def test_batch_resume_adopt_export(platform: tuple[FastAPI, AsyncClient]) 
     ).status_code == 200
     await run_stage()
     result = next(j for j in (await client.get(uri)).json()["jobs"] if j["id"] == export["id"])
-    assert result["revision"] == 3 and result["state"] == "ready", result
+    assert result["revision"] == 3
+    assert result["state"] == "ready", result["error"]
     await jobs.renderer.command(
         jobs.root,
         ["-i", result["id"] + ".mp4", "-frames:v", "1", "frozen-export.png"],

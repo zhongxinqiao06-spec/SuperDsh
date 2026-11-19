@@ -9,6 +9,74 @@ from app.infrastructure.configuration import Settings
 from app.modules.identity.entity.do.models import UserRow
 
 
+@pytest.mark.parametrize("platform_configuration", ["00a2e93fb844"], indirect=True)
+@pytest.mark.parametrize("missing_column", [True, False])
+async def test_prompt_repair_preserves_deployed_series(
+    platform_configuration: Settings, missing_column: bool
+) -> None:
+    """复现已记账但缺列的旧库，并验证已有冻结指令不会被升级重置。"""
+    engine = create_async_engine(platform_configuration.database_url)
+    try:
+        async with engine.begin() as connection:
+            await connection.execute(
+                insert(UserRow).values(
+                    id="prompt-owner",
+                    username="prompt-owner",
+                    password_hash="unchanged-hash",
+                    roles=["admin"],
+                )
+            )
+            await connection.execute(
+                text(
+                    "INSERT INTO studio_projects (id, owner, title, revision) "
+                    "VALUES ('prompt-project', 'prompt-owner', '保留工程', 7)"
+                )
+            )
+            await connection.execute(
+                text(
+                    "INSERT INTO studio_series (id, owner, title, creation_key, creation_hash) "
+                    "VALUES ('prompt-series', 'prompt-owner', '保留整剧', 'key', 'hash')"
+                )
+            )
+            await connection.execute(
+                text(
+                    "INSERT INTO studio_series_proposals "
+                    "(id, series_id, project_id, base_revision, original, instruction, prompt_text) "
+                    "VALUES ('prompt-draft', 'prompt-series', 'prompt-project', 1, '[]', "
+                    "'用户安排', '已冻结的完整上下文')"
+                )
+            )
+            if missing_column:
+                await connection.execute(
+                    text("ALTER TABLE studio_series_proposals DROP COLUMN prompt_text")
+                )
+            before = await connection.scalar(
+                text("SELECT to_jsonb(p) - 'prompt_text' FROM studio_series_proposals p")
+            )
+        await upgrade_database(platform_configuration.database_url)
+        await upgrade_database(platform_configuration.database_url)
+        async with engine.connect() as connection:
+            after = await connection.scalar(
+                text("SELECT to_jsonb(p) FROM studio_series_proposals p")
+            )
+            assert after.pop("prompt_text") == ("" if missing_column else "已冻结的完整上下文")
+            assert after == before
+            assert (
+                await connection.scalar(
+                    text("SELECT revision FROM studio_projects WHERE id='prompt-project'")
+                )
+                == 7
+            )
+            assert (
+                await connection.scalar(
+                    text("SELECT password_hash FROM users WHERE id='prompt-owner'")
+                )
+                == "unchanged-hash"
+            )
+    finally:
+        await engine.dispose()
+
+
 @pytest.mark.parametrize("platform_configuration", ["00895f4a6c12"], indirect=True)
 async def test_series_upgrade_preserves_existing_projects(platform_configuration: Settings) -> None:
     engine = create_async_engine(platform_configuration.database_url)

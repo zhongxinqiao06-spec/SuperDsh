@@ -68,6 +68,137 @@ async def create_series(client: AsyncClient) -> dict:
     return response.json()
 
 
+async def test_initial_three_episodes_can_expand_without_rewriting_projects(
+    platform: tuple[FastAPI, AsyncClient],
+) -> None:
+    """初始集数只创建草稿；扩集、重排和缩小规划不覆盖既有单集工程。"""
+    app, client = platform
+    await bootstrap(client)
+    created = await client.post(
+        ROOT + "/series",
+        json={
+            "title": "隔离扩集验证",
+            "narrativeMode": "anthology",
+            "plannedEpisodes": 3,
+            "targetDurationMs": 90000,
+            "createEpisodeDrafts": True,
+            "requestKey": "initial-three",
+        },
+    )
+    assert created.status_code == 200, created.text
+    series = created.json()
+    original_ids = [ep["id"] for ep in series["episodes"]]
+    first = series["episodes"][0]
+    project_path = f"{ROOT}/projects/{first['projectId']}"
+    project = (await client.get(project_path)).json()
+    document = {
+        **project["document"],
+        "script": "用户已手工编辑的原稿必须保留",
+        "shots": [{"id": "stable-shot", "action": "保留手工镜头", "duration": 5000}],
+    }
+    saved = await client.put(
+        project_path,
+        json={"revision": project["revision"], "document": document, "requestKey": "edit-shot"},
+    )
+    assert saved.status_code == 200, saved.text
+    series = (await client.get(f"{ROOT}/series/{series['id']}")).json()
+    # 合成交付回执验证扩集不改变已交付工程；不冒充真实媒体渲染覆盖。
+    async with app.state.services.studio.database.sessions.begin() as session:
+        for index, episode in enumerate(series["episodes"]):
+            session.add(
+                MediaJob(
+                    id=f"expand-export-{index}",
+                    project=episode["projectId"],
+                    request_key=f"expand-export-{index}",
+                    subject="timeline",
+                    kind="export",
+                    revision=episode["projectRevision"],
+                    state="ready",
+                    payload={"duration": 1000},
+                )
+            )
+    series = (await client.get(f"{ROOT}/series/{series['id']}")).json()
+    originals = {ep["id"]: ep for ep in series["episodes"]}
+    snapshots = {
+        ep["projectId"]: (await client.get(f"{ROOT}/projects/{ep['projectId']}")).json()
+        for ep in series["episodes"]
+    }
+    addition = {
+        "title": "新增第四集",
+        "story": {"synopsis": "后续主题", "ending": "独立成篇"},
+        "targetDurationMs": 120000,
+        "revision": series["revision"],
+        "requestKey": "add-fourth-once",
+    }
+    episode_path = f"{ROOT}/series/{series['id']}/episodes"
+    added = await client.post(episode_path, json=addition)
+    assert added.status_code == 200, added.text
+    series = added.json()
+    assert len(series["episodes"]) == 4 and series["plannedEpisodes"] == 3
+    assert (await client.post(episode_path, json=addition)).json() == series
+    fourth = series["episodes"][-1]
+    assert fourth["targetDurationMs"] == 120000 and fourth["projectId"] not in snapshots
+    reordered = await client.put(
+        f"{ROOT}/series/{series['id']}/order",
+        json={
+            "revision": series["revision"],
+            "requestKey": "move-fourth-first",
+            "episodeIds": [fourth["id"], *original_ids],
+        },
+    )
+    assert reordered.status_code == 409
+    # 成片锁阻止改序；用户明确解锁后才重排，既有交付仍绑定原工程修订。
+    for original_id in original_ids:
+        unlocked = await client.post(
+            f"{ROOT}/series/{series['id']}/episodes/{original_id}/lock",
+            json={
+                "revision": series["revision"],
+                "requestKey": "unlock-" + original_id,
+                "locked": False,
+            },
+        )
+        assert unlocked.status_code == 200, unlocked.text
+        series = unlocked.json()
+    reordered = await client.put(
+        f"{ROOT}/series/{series['id']}/order",
+        json={
+            "revision": series["revision"],
+            "requestKey": "reorder-after-unlock",
+            "episodeIds": [fourth["id"], *original_ids],
+        },
+    )
+    assert reordered.status_code == 200, reordered.text
+    series = reordered.json()
+    changed_plan = await client.patch(
+        f"{ROOT}/series/{series['id']}",
+        json={
+            "title": series["title"],
+            "narrativeMode": "anthology",
+            "plannedEpisodes": 2,
+            "revision": series["revision"],
+            "requestKey": "planning-is-not-delete",
+        },
+    )
+    assert changed_plan.status_code == 200, changed_plan.text
+    current = changed_plan.json()
+    assert [ep["id"] for ep in current["episodes"]] == [fourth["id"], *original_ids]
+    for ep in current["episodes"][1:]:
+        before = originals[ep["id"]]
+        for key in (
+            "projectId",
+            "projectRevision",
+            "title",
+            "story",
+            "targetDurationMs",
+            "deliverable",
+        ):
+            assert ep[key] == before[key]
+        after = (await client.get(f"{ROOT}/projects/{ep['projectId']}")).json()
+        for key in ("document", "revision", "history", "jobs"):
+            assert after[key] == snapshots[ep["projectId"]][key]
+    assert (await client.get(ROOT + "/jobs")).json()["total"] == 3
+
+
 async def add_episode(client: AsyncClient, series: dict, name: str) -> dict:
     response = await client.post(
         f"{ROOT}/series/{series['id']}/episodes",

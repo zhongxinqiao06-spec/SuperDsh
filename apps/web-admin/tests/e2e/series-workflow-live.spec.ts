@@ -69,7 +69,7 @@ test('系列短剧创建、编排、锁定、单集上下文与结构拆合导�
     'zh-CN',
   )
   await page
-    .getByRole('spinbutton', { name: '计划集数', exact: true })
+    .getByRole('spinbutton', { name: '初始集数', exact: true })
     .fill('2')
   await createDialog.getByRole('button', { name: '取消', exact: true }).click()
   await expect(
@@ -79,7 +79,7 @@ test('系列短剧创建、编排、锁定、单集上下文与结构拆合导�
   await expect(createDialog).toBeVisible()
   await expect(page).toHaveURL(/\/entertainment(?:\?[^#]*)?$/)
   await expect(
-    page.getByRole('spinbutton', { name: '计划集数', exact: true }),
+    page.getByRole('spinbutton', { name: '初始集数', exact: true }),
   ).toHaveValue('2')
   await page
     .getByLabel('作品名称', { exact: true })
@@ -90,7 +90,7 @@ test('系列短剧创建、编排、锁定、单集上下文与结构拆合导�
       '两位旅伴从小镇出发，在不同季节寻找同一张星图。每集拥有明确转折，同时保留前情和人物选择。',
     )
   await page
-    .getByRole('spinbutton', { name: '计划集数', exact: true })
+    .getByRole('spinbutton', { name: '初始集数', exact: true })
     .fill('2')
   await page
     .getByRole('button', { name: '创建并编排故事', exact: true })

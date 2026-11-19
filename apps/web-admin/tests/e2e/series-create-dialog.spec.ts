@@ -178,14 +178,14 @@ for (const theme of ['light', 'dark']) {
       expect(Math.abs(afterHeader!.y - header!.y)).toBeLessThanOrEqual(1)
       expect(Math.abs(afterFooter!.y - footer!.y)).toBeLessThanOrEqual(1)
       await expect(
-        dialog.getByRole('spinbutton', { name: '计划集数', exact: true }),
+        dialog.getByRole('spinbutton', { name: '初始集数', exact: true }),
       ).toBeInViewport()
       await captureDesign(page, `series-create-${theme}-${width}-bottom.png`)
     }
 
-    // 只改计划集数，也必须被识别为未保存编辑；继续编辑不应丢失。
+    // 只改初始集数，也必须被识别为未保存编辑；继续编辑不应丢失。
     const count = dialog.getByRole('spinbutton', {
-      name: '计划集数',
+      name: '初始集数',
       exact: true,
     })
     const initialCount = await count.inputValue()

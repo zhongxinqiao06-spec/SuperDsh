@@ -73,16 +73,16 @@ useSeriesDraftGuard(
         :disabled="mutation.busy.value || !canCreate"
       />
       <label class="field">
-        计划集数
+        初始集数
         <el-input-number
           v-model="form.plannedEpisodes"
           :disabled="mutation.busy.value || !canCreate"
           :min="1"
           :max="100"
-          aria-label="计划集数"
+          aria-label="初始集数"
         />
         <small
-          >目标时长按每集计算；集数可调整。创建后先编排故事，确认后再进入单集制作。</small
+          >先创建这些分集草稿，后续可在「故事与分集」添加新集。目标时长按每集计算，确认故事后再进入单集制作。</small
         >
       </label>
     </fieldset>

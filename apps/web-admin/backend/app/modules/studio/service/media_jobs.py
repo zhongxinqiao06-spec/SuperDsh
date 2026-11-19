@@ -52,6 +52,9 @@ class MediaJobs:
         self.runner: asyncio.Task[None] | None = None
         self.stopping = asyncio.Event()
         self.active: set[asyncio.Task[None]] = set()
+        # 单一媒体调度者已持有数据库租约；同连接的同步配音串行提交，
+        # 避免逐句批量任务瞬间耗尽供应商并发额度。视频轮询和下载仍可并行。
+        self.speech_submission_locks: dict[str, asyncio.Lock] = {}
         self.preparation = PreparationMediaService(self)
         self.production = ProductionService(self)
         self.personal = PersonalGenerationService(self)
@@ -372,10 +375,10 @@ class MediaJobs:
                             + ";base64,"
                             + base64.b64encode(content).decode("ascii")
                         )
-                    if not await self.claim(job):
-                        return
-                    state = "submitting"
                     if job.kind == "video":
+                        if not await self.claim(job):
+                            return
+                        state = "submitting"
                         task = await provider.video(
                             job.payload["prompt"],
                             job.payload["seconds"],
@@ -386,9 +389,18 @@ class MediaJobs:
                         self.save_submission(job, task=task)
                         await self.mark(job, "polling", provider_id=task)
                         return
-                    url = await provider.speech(job.payload["text"], job.payload["voice"])
-                    self.save_submission(job, url=url)
-                    await self.mark(job, "downloading", provider_id=self.cipher.seal(url, job.id))
+                    connection_id = resolved["configuration"]["connectionId"]
+                    gate = self.speech_submission_locks.setdefault(connection_id, asyncio.Lock())
+                    async with gate:
+                        # 等待名额期间仍是 queued，可正常取消；取得名额后才争取提交权。
+                        if not await self.claim(job):
+                            return
+                        state = "submitting"
+                        url = await provider.speech(job.payload["text"], job.payload["voice"])
+                        self.save_submission(job, url=url)
+                        await self.mark(
+                            job, "downloading", provider_id=self.cipher.seal(url, job.id)
+                        )
                     return
                 if state == "polling":
                     status, url = await provider.status(job.provider_id or "")
