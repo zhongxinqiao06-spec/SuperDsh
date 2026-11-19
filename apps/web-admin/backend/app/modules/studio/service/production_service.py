@@ -11,6 +11,7 @@ from app.modules.studio.entity.vo.studio_vo import Batch
 from app.modules.studio.service.document_service import brief_view
 from app.modules.studio.service.generation_inputs import GenerationInputs
 from app.modules.studio.service.generation_plan_service import GenerationPlans
+from app.modules.studio.service.series_access_service import assert_episode_editable
 
 if TYPE_CHECKING:
     from app.modules.studio.service.media_jobs import MediaJobs
@@ -31,6 +32,7 @@ class ProductionService:
             project = await dao.project(account.user_id, project_id)
             if project.revision != body.revision or project.lifecycle == "archived":
                 raise DomainError(409, "工程已更新或归档，请重新读取")
+            await assert_episode_editable(session, account, project)
             document = (await self.media.studio.documents.read(session, project_id)).model_dump()
             assets = {a.id: a.definition for a in await dao.assets(account.user_id, project_id)}
             jobs = await dao.jobs(project)

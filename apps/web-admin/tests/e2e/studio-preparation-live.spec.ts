@@ -27,7 +27,8 @@ test('创作准备页面与真实接口对应，采用候选并保留局部编�
   }
   await page.getByRole('link', { name: /星桥娱乐/ }).click()
   await page.getByRole('button', { name: '新建作品' }).click()
-  const creating = page.getByRole('dialog', { name: '新建作品' })
+  await page.getByRole('menuitem', { name: /分镜创作/ }).click()
+  const creating = page.getByRole('dialog', { name: '新建分镜作品' })
   await creating
     .getByLabel('作品名称', { exact: true })
     .fill('雨后站台 · 创作准备')

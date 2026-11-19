@@ -33,7 +33,8 @@ def parameters(schema: object) -> dict[str, object]:
     return {
         str(key): {
             "type": item.get("type")
-            if item.get("type") in {"string", "number", "boolean"}
+            if isinstance(item.get("type"), str)
+            and item.get("type") in {"string", "number", "boolean"}
             else "json",
             "description": str(item.get("description", key)),
             **({"required": True} if isinstance(required, list) and key in required else {}),

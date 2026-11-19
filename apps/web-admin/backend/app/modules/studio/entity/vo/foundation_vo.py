@@ -1,6 +1,6 @@
 """基础制作契约：规格、幂等写入和角色版本操作不暴露数据库对象。"""
 
-from typing import Self
+from typing import Literal, Self
 
 from pydantic import Field, model_validator
 
@@ -25,6 +25,7 @@ class ProjectBrief(Input):
 
 class CreateProject(ProjectBrief):
     requestKey: Identifier | None = None
+    creationMode: Literal["storyboard", "quick"] = "storyboard"
 
 
 class UpdateBrief(ProjectBrief):

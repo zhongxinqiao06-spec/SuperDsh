@@ -171,6 +171,7 @@ export async function installParityFixture(
     '/admin/extensions': { items: [] },
     '/admin/tools/sources': { items: [] },
     '/studio/projects': paging,
+    '/studio/works': paging,
     '/studio/library': paging,
     '/studio/jobs': paging,
     '/products/office/members': paging,
@@ -477,6 +478,11 @@ export async function installParityFixture(
         return json({ connectorId: 'parity-device', runtimeTypes: [] })
       if (path.endsWith('/catalogs/permission'))
         return json({ permissions: [] })
+      if (
+        method === 'GET' &&
+        /^\/studio\/projects\/[^/]+\/episode-context$/u.test(path)
+      )
+        return json(null)
       if (path.match(/\/(agent-artifacts|skill-runs|plans|shares)$/))
         return json({ items: [] })
       if (path.endsWith('/selections') || path.endsWith('/sync'))

@@ -5,6 +5,7 @@ defineProps<{
   original: string
   disabled?: boolean
   conflict?: string | null
+  suggestionLabel?: string
 }>()
 const suggestion = defineModel<string>({ required: true })
 </script>
@@ -17,7 +18,8 @@ const suggestion = defineModel<string>({ required: true })
       </div>
     </div>
     <label class="field"
-      >修改建议 · 可以继续编辑<el-input
+      >{{ suggestionLabel ?? '修改建议 · 可以继续编辑'
+      }}<el-input
         v-model="suggestion"
         type="textarea"
         :autosize="{ minRows: 6, maxRows: 16 }"

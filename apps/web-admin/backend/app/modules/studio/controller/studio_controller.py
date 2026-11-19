@@ -69,10 +69,11 @@ async def projects(
     pageSize: PageSize = 10,
     search: Search = "",
     lifecycle: Literal["active", "archived"] = "active",
+    mode: Literal["all", "quick", "storyboard"] = "all",
 ) -> list[dict] | dict:
     if page is not None:
         return await request.app.state.services.studio.project_page(
-            account, page, pageSize, search.strip(), lifecycle
+            account, page, pageSize, search.strip(), lifecycle, mode
         )
     return await request.app.state.services.studio.list_projects(account)
 

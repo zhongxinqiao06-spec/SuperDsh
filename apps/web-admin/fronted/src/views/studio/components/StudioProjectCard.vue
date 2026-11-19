@@ -9,6 +9,10 @@ const props = defineProps<{
   project: ProjectSummary
   canEdit?: boolean
   busy?: boolean
+  to?: string
+  kindLabel?: string
+  actionLabel?: string
+  coverProjectId?: string | null
 }>()
 const emit = defineEmits<{ archive: [] }>()
 const unavailable = ref(false)
@@ -23,13 +27,13 @@ watch(
   <article class="studio-project-entry">
     <router-link
       class="studio-project-card"
-      :to="'/entertainment/' + project.id"
+      :to="to ?? '/entertainment/' + project.id"
       :aria-label="project.title"
     >
       <div class="project-cover">
         <StudioMedia
           v-if="(project.coverJobId || project.coverAssetId) && !unavailable"
-          :project="project.id"
+          :project="coverProjectId ?? project.id"
           :job="project.coverJobId ?? undefined"
           :asset="project.coverAssetId ?? undefined"
           kind="video"
@@ -40,32 +44,46 @@ watch(
           ><strong>{{ project.title }}</strong></span
         >
         <span class="project-revision">工程修订 {{ project.revision }}</span>
+        <span v-if="kindLabel" class="project-kind">{{ kindLabel }}</span>
       </div>
       <div class="project-caption">
         <h2>{{ project.title }}</h2>
-        <span class="project-stats"
-          >{{ project.shots }} 个镜头 · {{ project.adopted }} 个已采用</span
-        >
-        <progress
-          v-if="project.shots"
-          :max="project.shots"
-          :value="project.adopted"
-          aria-label="镜头采用进度"
-        />
-        <span v-if="project.aspectWidth" class="project-specification"
-          >{{ project.aspectWidth }}:{{ project.aspectHeight }} · 目标
-          {{ (project.targetDurationMs ?? 0) / 1000 }} 秒</span
-        >
+        <div class="project-summary">
+          <slot name="summary"
+            ><span class="project-stats"
+              >{{ project.shots }} 个镜头 · {{ project.adopted }} 个已采用</span
+            >
+            <progress
+              v-if="project.shots"
+              :max="project.shots"
+              :value="project.adopted"
+              aria-label="镜头采用进度"
+            />
+            <span v-if="project.aspectWidth" class="project-specification"
+              >{{ project.aspectWidth }}:{{ project.aspectHeight }} · 目标
+              {{ (project.targetDurationMs ?? 0) / 1000 }} 秒</span
+            ></slot
+          >
+        </div>
         <span class="project-updated"
           >最近更新 <DateTime :value="project.updated"
         /></span>
-        <span class="project-open" aria-hidden="true">进入作品 →</span>
+        <span class="project-open" aria-hidden="true"
+          >{{ actionLabel ?? '进入作品' }} →</span
+        >
       </div>
     </router-link>
-    <div v-if="canEdit" class="toolbar project-entry-actions">
-      <el-button link :disabled="busy" @click="emit('archive')">{{
-        project.lifecycle === 'archived' ? '恢复作品' : '归档作品'
-      }}</el-button>
+    <div v-if="canEdit || $slots.actions" class="toolbar project-entry-actions">
+      <slot name="actions" />
+      <el-button
+        v-if="canEdit"
+        link
+        :disabled="busy"
+        @click="emit('archive')"
+        >{{
+          project.lifecycle === 'archived' ? '恢复作品' : '归档作品'
+        }}</el-button
+      >
     </div>
   </article>
 </template>
@@ -77,6 +95,8 @@ watch(
 }
 .project-entry-actions {
   padding: var(--control-gap);
+  min-height: calc(32px + 2 * var(--control-gap));
+  box-sizing: border-box;
 }
 .studio-project-card {
   display: grid;
@@ -119,7 +139,7 @@ watch(
   inset: 0;
   display: grid;
   place-items: center;
-  padding: var(--field-gap) var(--field-gap) 44px;
+  padding: 38px var(--field-gap) 44px;
   background: var(--selection-fill);
 }
 .project-slate strong {
@@ -136,18 +156,22 @@ watch(
   overflow: hidden;
 }
 .project-open {
-  grid-column: 1;
-  grid-row: 6;
-  align-self: end;
-  justify-self: end;
+  align-self: flex-end;
   color: var(--foreground);
   border: 1px solid var(--border);
   border-radius: var(--radius-control);
   padding: 6px 10px;
   white-space: nowrap;
 }
-.project-caption > :not(.project-open) {
-  grid-column: 1;
+.project-kind {
+  position: absolute;
+  top: var(--control-gap);
+  left: var(--control-gap);
+  padding: 3px 8px;
+  background: var(--card);
+  border-radius: var(--radius-control);
+  color: var(--foreground);
+  font-size: var(--font-size-meta);
 }
 .project-revision {
   position: absolute;
@@ -161,18 +185,15 @@ watch(
   font-size: var(--font-size-meta);
 }
 .project-caption {
-  display: grid;
-  grid-template-columns: minmax(0, 1fr);
-  grid-template-rows:
-    minmax(calc(var(--line-height-section) * 2), auto)
-    auto auto auto 1fr auto;
+  display: flex;
+  flex-direction: column;
   gap: var(--control-gap);
   padding: var(--field-gap);
   font-size: var(--font-size-meta);
   color: var(--muted-foreground);
 }
 .project-caption h2 {
-  grid-row: 1;
+  min-height: calc(var(--line-height-section) * 2);
   margin: 0;
   color: var(--foreground);
   font-size: var(--font-size-section);
@@ -181,25 +202,24 @@ watch(
   overflow-wrap: anywhere;
 }
 .project-caption progress {
-  grid-row: 3;
   width: 100%;
   height: 4px;
   accent-color: var(--primary);
 }
 .project-updated {
-  grid-row: 5;
-  align-self: start;
+  margin-top: auto;
   display: flex;
   align-items: baseline;
   flex-wrap: wrap;
   gap: 4px var(--control-gap);
   font-size: var(--font-size-meta);
 }
-.project-stats {
-  grid-row: 2;
-}
-.project-specification {
-  grid-row: 4;
+.project-summary {
+  display: flex;
+  flex-direction: column;
+  gap: var(--control-gap);
+  min-height: 78px;
+  overflow-wrap: anywhere;
 }
 .project-updated :deep(.date-time) {
   display: inline-flex;

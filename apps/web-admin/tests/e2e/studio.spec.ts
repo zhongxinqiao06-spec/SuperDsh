@@ -683,6 +683,7 @@ test('作品目录采用真实电影封面、标题空封面和分页搜索', as
   ])
   identity.signedIn = true
   const entry = {
+    kind: 'storyboard',
     id: 'film',
     title: '夜航灯塔',
     shots: 2,
@@ -693,7 +694,7 @@ test('作品目录采用真实电影封面、标题空封面和分页搜索', as
   }
   let grants = 0
   let covered = true
-  await page.route(/\/api\/studio\/projects\?/, (route) => {
+  await page.route(/\/api\/studio\/works\?/, (route) => {
     const query = new URL(route.request().url()).searchParams.get('search')
     return route.fulfill({
       json: query
@@ -718,8 +719,8 @@ test('作品目录采用真实电影封面、标题空封面和分页搜索', as
   const card = page.getByRole('link', { name: entry.title, exact: true })
   await expect.poll(() => grants).toBe(1)
   const bounds = await card.boundingBox()
-  expect(bounds?.width).toBeGreaterThan(600)
-  expect(bounds?.width).toBeLessThanOrEqual(911)
+  expect(bounds?.width).toBeGreaterThanOrEqual(260)
+  expect(bounds?.width).toBeLessThanOrEqual(400)
   await page.getByLabel('搜索作品名称').fill('找不到')
   await page.getByRole('button', { name: '搜索', exact: true }).click()
   await expect(page.getByText(/没有匹配的作品/)).toBeVisible()

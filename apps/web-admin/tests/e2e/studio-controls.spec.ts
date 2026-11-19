@@ -71,6 +71,8 @@ async function installControlsFixture(page: Page, readonly = false) {
     }
     const responses: Record<string, unknown> = {
       '/api/studio/projects/controls-film': project,
+      '/api/studio/projects/controls-film/episode-context': null,
+      '/api/studio/works': { total: 0, items: [] },
       '/api/studio/projects/controls-film/preparation': {
         revision: 1,
         stages: [],
@@ -171,7 +173,7 @@ for (const theme of ['light', 'dark']) {
       }
       if (section === 'cast') {
         await page
-          .getByRole('button', { name: '添加或引用素材', exact: true })
+          .getByRole('button', { name: '新建或编辑本片设定', exact: true })
           .first()
           .click()
         const drawer = page.getByRole('dialog', {
@@ -210,7 +212,11 @@ for (const theme of ['light', 'dark']) {
     }
     await page.goto('/#/entertainment')
     await page.getByRole('button', { name: '新建作品', exact: true }).click()
-    const dialog = page.getByRole('dialog', { name: '新建作品', exact: true })
+    await page.getByRole('menuitem', { name: /分镜创作/ }).click()
+    const dialog = page.getByRole('dialog', {
+      name: '新建分镜作品',
+      exact: true,
+    })
     for (const width of [1440, 1280, 768, 390]) {
       await page.setViewportSize({ width, height: width === 390 ? 844 : 1000 })
       await expectControlAppearance(dialog)

@@ -297,9 +297,12 @@ export async function installFoundationFixture(
         })
       }
       if (
-        ['/studio/projects', '/studio/library', '/studio/jobs'].includes(
-          path,
-        ) &&
+        [
+          '/studio/projects',
+          '/studio/works',
+          '/studio/library',
+          '/studio/jobs',
+        ].includes(path) &&
         request.method() === 'GET'
       ) {
         if (!identity.permissions.includes('products.entertainment'))
@@ -315,6 +318,8 @@ export async function installFoundationFixture(
       }
       if (/^\/studio\/projects\/[^/]+\/preparation$/u.test(path))
         return json({ revision: 1, stages: [] })
+      if (/^\/studio\/projects\/[^/]+\/episode-context$/u.test(path))
+        return json(null)
       if (path === '/announcement') return json({ announcement: null })
       if (path === '/admin/users' && request.method() === 'GET')
         return json({ users, total: users.length, page: 1, pageSize: 25 })

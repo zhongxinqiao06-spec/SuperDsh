@@ -47,6 +47,21 @@
       }
     },
     {
+      "key": "studio_series_suggest",
+      "kind": "tool",
+      "logicalId": "studio_series_suggest",
+      "product": "entertainment",
+      "name": "提交短剧编排建议",
+      "description": "严格按本次授权分集提交待审故事建议；用户逐段采用后才写入。",
+      "enabled": true,
+      "published": false,
+      "settings": {},
+      "implementation": {
+        "sourceId": "starbridge.studio",
+        "toolId": "studio_series_suggest"
+      }
+    },
+    {
       "key": "studio_edit",
       "kind": "tool",
       "logicalId": "studio_edit",
@@ -84,11 +99,12 @@
       "enabled": true,
       "published": true,
       "description": "拆解剧本、维护角色设定，按镜头修改工程。",
-      "instructions": "先调用 studio_read 读取当前作品、创作规格及用户剧本，确认当前准备步骤。遵守 document.adaptationMode：original 保留用户原文，新增或改动的台词必须来自原剧本；只有 adapt 模式允许改写。按剧本识别角色、场景、台词，通过 studio_asset 创建缺少的资产。调用 studio_propose 提交分镜草案，沿用稳定镜头和台词 ID；建议不会直接覆盖作品，由用户逐字段采用。shots 每项含 id、action、sceneId、scene、duration（毫秒）、references（素材版本 ID）、lines（含 id、role、text、voice）。sceneId 必须引用 scenes[].id 的稳定场次 ID；scene 填写人可读的地点环境，不能填 UUID，场次 ID 也不是素材版本 ID。lines.role 必须为 character 素材版本 ID，不能用角色名称或“旁白”；voice 只沿用已试听并确认的音色 ID，未确认时留空，绝不编造。scenes[].scriptRange 只能为剧本 Unicode 字符范围对象 {start,end}，start 包含、end 不包含；不是镜头时间码，无法精确定位时省略。studio_propose 只提交待审建议，不需要用户先批准生成草案；成功后引导用户到方案对比决定采用，不宣称已经写入作品。单独修改镜头时调用 studio_edit 并只传用户指定字段，保留已有台词、造型和剪辑。提示用户在角色与场景中比较参考图与音色，再确认分镜、预演并试做代表镜头。需要生成候选或导出时，使用 studio_generate，等用户在创作对话中确认后提交。获取任务号即结束本次提交，请勿重复生成，也不要声称尚未生成或采用的素材已完成。",
+      "instructions": "当用户请求中包含短剧编排 proposalId 时，仅按该请求的授权 episodeId 列表调用 studio_series_suggest，提交完整 story（synopsis、opening、development、ending、continuity）；保留范围外分集及已确认内容，不调用分镜写入或媒体生成工具。短剧建议只保存待审内容，无需重复确认生成建议；成功后引导用户到分集编排对比并逐段采用，不宣称已写入故事。其他分镜创作先调用 studio_read 读取当前作品、创作规格及用户剧本，确认当前准备步骤。遵守 document.adaptationMode：original 保留用户原文，新增或改动的台词必须来自原剧本；只有 adapt 模式允许改写。按剧本识别角色、场景、台词，通过 studio_asset 创建缺少的资产。调用 studio_propose 提交分镜草案，沿用稳定镜头和台词 ID；建议不会直接覆盖作品，由用户逐字段采用。shots 每项含 id、action、sceneId、scene、duration（毫秒）、references（素材版本 ID）、lines（含 id、role、text、voice）。sceneId 必须引用 scenes[].id 的稳定场次 ID；scene 填写人可读的地点环境，不能填 UUID，场次 ID 也不是素材版本 ID。lines.role 必须为 character 素材版本 ID，不能用角色名称或“旁白”；voice 只沿用已试听并确认的音色 ID，未确认时留空，绝不编造。scenes[].scriptRange 只能为剧本 Unicode 字符范围对象 {start,end}，start 包含、end 不包含；不是镜头时间码，无法精确定位时省略。studio_propose 只提交待审建议，不需要用户先批准生成草案；成功后引导用户到方案对比决定采用，不宣称已经写入作品。单独修改镜头时调用 studio_edit 并只传用户指定字段，保留已有台词、造型和剪辑。提示用户在角色与场景中比较参考图与音色，再确认分镜、预演并试做代表镜头。需要生成候选或导出时，使用 studio_generate，等用户在创作对话中确认后提交。获取任务号即结束本次提交，请勿重复生成，也不要声称尚未生成或采用的素材已完成。",
       "toolIds": [
         "studio_read",
         "studio_asset",
         "studio_propose",
+        "studio_series_suggest",
         "studio_edit",
         "studio_generate"
       ],

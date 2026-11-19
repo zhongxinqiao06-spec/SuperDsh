@@ -1,8 +1,8 @@
 {
   "id": "starbridge.studio",
   "name": "星桥创作工具",
-  "version": "1.0.1",
-  "description": "按作品授权的分镜和素材编辑",
+  "version": "1.0.2",
+  "description": "按作品授权的分镜、短剧故事建议和素材编辑",
   "license": "MIT",
   "runtime": "python",
   "entrypoint": "app/modules/studio/service/studio_agent.py",
@@ -273,6 +273,84 @@
         },
         "required": ["revision", "shots"],
         "description": "保存待审建议；成功只表示草案已提交，必须由用户采用后才进入作品。"
+      },
+      "permissions": ["products.entertainment", "sessions.run"]
+    },
+    {
+      "id": "studio_series_suggest",
+      "name": "提交短剧编排建议",
+      "description": "只为当前会话绑定作品的编排请求提交分集故事建议。严格沿用 proposalId 和授权的全部 episodeId；不改工程、不改范围外分集、不生成媒体，用户对比后逐段采用。",
+      "mode": "draft",
+      "inputSchema": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "proposalId": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 100,
+            "description": "用户本次编排请求的稳定 ID，只能来自本次请求上下文。"
+          },
+          "episodes": {
+            "type": "array",
+            "minItems": 1,
+            "maxItems": 20,
+            "description": "必须完整且不重复地覆盖本次授权分集，不得增加、遗漏或替换 episodeId。",
+            "items": {
+              "type": "object",
+              "additionalProperties": false,
+              "properties": {
+                "episodeId": {
+                  "type": "string",
+                  "minLength": 1,
+                  "maxLength": 100,
+                  "description": "本次编排请求列出的分集稳定 ID，不是分集作品 projectId。"
+                },
+                "story": {
+                  "type": "object",
+                  "additionalProperties": false,
+                  "properties": {
+                    "synopsis": {
+                      "type": "string",
+                      "maxLength": 12000,
+                      "description": "本集故事梗概。"
+                    },
+                    "opening": {
+                      "type": "string",
+                      "maxLength": 12000,
+                      "description": "开头与引入。"
+                    },
+                    "development": {
+                      "type": "string",
+                      "maxLength": 12000,
+                      "description": "发展、冲突与转折。"
+                    },
+                    "ending": {
+                      "type": "string",
+                      "maxLength": 12000,
+                      "description": "本集结尾。"
+                    },
+                    "continuity": {
+                      "type": "string",
+                      "maxLength": 12000,
+                      "description": "前后集承接、伏笔或共同设定。"
+                    }
+                  },
+                  "required": [
+                    "synopsis",
+                    "opening",
+                    "development",
+                    "ending",
+                    "continuity"
+                  ],
+                  "description": "完整故事五字段；用户未要求修改的字段保留原文。"
+                }
+              },
+              "required": ["episodeId", "story"]
+            }
+          }
+        },
+        "required": ["proposalId", "episodes"]
       },
       "permissions": ["products.entertainment", "sessions.run"]
     },

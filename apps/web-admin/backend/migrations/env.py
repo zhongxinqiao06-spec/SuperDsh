@@ -29,6 +29,7 @@ from app.modules.studio.entity.do import (
     foundation_do,
     preparation_do,
     production_do,
+    series_do,
     text_edit_do,
     timeline_do,
 )
@@ -36,6 +37,7 @@ from app.modules.studio.entity.do import models as studio_models
 
 # 导入只注册自有 DO 元数据，历史 revision 文件不依赖这份可变模型。
 MODEL_MODULES = (
+    series_do,
     text_edit_do,
     production_do,
     preparation_do,

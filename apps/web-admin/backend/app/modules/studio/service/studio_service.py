@@ -173,7 +173,13 @@ class StudioService:
             return project_view(project)
 
     async def project_page(
-        self, account: Account, page: int, size: int, search: str, lifecycle: str = "active"
+        self,
+        account: Account,
+        page: int,
+        size: int,
+        search: str,
+        lifecycle: str = "active",
+        mode: str = "all",
     ) -> dict:
         """作品目录仅返回当前版本的进度和入口，不读取整个工程历史。"""
         account.require("products.entertainment")
@@ -181,7 +187,7 @@ class StudioService:
         async with self.database.sessions() as session:
             dao = DirectoryDao(session)
             rows, total = await dao.page(
-                dao.projects(account.user_id, search, lifecycle), page, size
+                dao.projects(account.user_id, search, lifecycle, mode), page, size
             )
             return {"items": [dict(row._mapping) for row in rows], "total": total}
 

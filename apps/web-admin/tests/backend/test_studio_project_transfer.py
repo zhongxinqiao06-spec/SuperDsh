@@ -9,10 +9,10 @@ from conftest import bootstrap
 from fastapi import FastAPI
 from httpx import AsyncClient
 from sqlalchemy import select
-from tooling.export_studio_project import ALLOWLIST, copy_checked, export_bundle, rows, sanitized
 
 from app.modules.models.entity.do.model_do import ModelOperationRow
 from app.modules.studio.entity.do.models import MediaJob, StudioProject
+from tooling.export_studio_project import ALLOWLIST, copy_checked, export_bundle, rows, sanitized
 
 
 def test_transfer_sanitizes_nested_credentials_and_rejects_path_escape(tmp_path: Path) -> None:

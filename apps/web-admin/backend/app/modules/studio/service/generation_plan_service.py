@@ -12,6 +12,7 @@ from app.modules.studio.entity.do.models import MediaJob
 from app.modules.studio.entity.do.production_do import GenerationPlan
 from app.modules.studio.entity.vo.production_vo import ConfirmPlan
 from app.modules.studio.entity.vo.studio_vo import identifier
+from app.modules.studio.service.series_access_service import assert_episode_editable
 from app.modules.studio.service.studio_service import job_view
 
 if TYPE_CHECKING:
@@ -67,6 +68,7 @@ class GenerationPlans:
                 revision = record.revision
                 if record.lifecycle == "archived":
                     raise DomainError(409, "请先恢复作品")
+                await assert_episode_editable(session, account, record)
             else:
                 revision = (await dao.entity(account.user_id, entity or "", lock=True)).revision
             previous = await dao.request(account.user_id, intent["requestKey"])
@@ -125,11 +127,13 @@ class GenerationPlans:
                 raise DomainError(409, "确认内容与原计划不一致")
             if plan.state == "confirmed":
                 return plan.result or {}
+            if plan.project:
+                await assert_episode_editable(session, account, project)
             if revision != plan.revision or content_hash(rebuilt) != plan.plan_hash:
                 raise DomainError(409, "作品、模型或任务状态已变化，请重新预检")
             if rebuilt["issues"] or not any(i["selected"] for i in rebuilt["items"]):
                 raise DomainError(422, "请先处理阻塞项并选择需要制作的内容")
-            rows = []
+            rows: list[MediaJob] = []
             for item in rebuilt["items"]:
                 if not item["selected"]:
                     continue
@@ -165,6 +169,22 @@ class GenerationPlans:
                     "inputHash": input_hash(item["kind"], item["payload"]),
                     "fingerprint": plan.request_hash,
                 }
+                if payload.get("quickDraft"):
+                    # 候选编号在作品锁内分配，任务轮询、核对和重试都不改变展示顺序。
+                    candidates = [
+                        job
+                        for job in [*jobs, *rows]
+                        if job.kind == "video" and job.subject == item["target"]
+                    ]
+                    # 旧记录没有编号，界面仍稳定显示为 1..N；新编号必须从 N 后延续。
+                    legacy = sum(not job.payload.get("quickSequence") for job in candidates)
+                    payload["quickSequence"] = 1 + max(
+                        legacy,
+                        max(
+                            (int(job.payload.get("quickSequence") or 0) for job in candidates),
+                            default=0,
+                        ),
+                    )
                 row = MediaJob(
                     id=identifier(),
                     owner=account.user_id,

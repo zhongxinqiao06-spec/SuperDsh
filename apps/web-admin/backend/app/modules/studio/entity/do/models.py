@@ -19,6 +19,8 @@ class StudioProject(Base):
     session_id: Mapped[str | None] = mapped_column(unique=True)
     brief: Mapped[str] = mapped_column(default="", server_default="")
     lifecycle: Mapped[str] = mapped_column(default="active", server_default="active")
+    creation_mode: Mapped[str] = mapped_column(default="storyboard", server_default="storyboard")
+    quick_draft: Mapped[dict] = mapped_column(JSONB, default=dict, server_default="{}")
     aspect_width: Mapped[int | None]
     aspect_height: Mapped[int | None]
     target_duration_ms: Mapped[int | None]
@@ -32,6 +34,7 @@ class StudioProject(Base):
         UniqueConstraint("id", "owner"),
         UniqueConstraint("owner", "creation_key"),
         CheckConstraint("lifecycle IN ('active', 'archived')"),
+        CheckConstraint("creation_mode IN ('storyboard', 'quick')", name="ck_studio_creation_mode"),
         CheckConstraint(
             "(aspect_width IS NULL AND aspect_height IS NULL) OR "
             "(aspect_width IS NOT NULL AND aspect_height IS NOT NULL "

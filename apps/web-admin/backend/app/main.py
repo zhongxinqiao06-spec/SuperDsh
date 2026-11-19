@@ -95,6 +95,8 @@ from app.modules.studio.controller.director_context_controller import (
 )
 from app.modules.studio.controller.preparation_controller import router as studio_preparation_router
 from app.modules.studio.controller.production_controller import router as studio_production_router
+from app.modules.studio.controller.quick_controller import router as studio_quick_router
+from app.modules.studio.controller.series_controller import router as studio_series_router
 from app.modules.studio.controller.studio_controller import router as studio_router
 from app.modules.studio.service.director_context_service import DirectorContextService
 from app.modules.studio.service.media_jobs import MediaJobs
@@ -588,6 +590,8 @@ def create_app(settings: Settings | None = None) -> FastAPI:
 
     for router in (
         studio_router,
+        studio_quick_router,
+        studio_series_router,
         director_context_router,
         studio_preparation_router,
         studio_production_router,

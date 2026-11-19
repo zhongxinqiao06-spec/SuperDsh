@@ -27,7 +27,8 @@ test('新建规格、场次与分镜自动保存，冲突不覆盖草稿，归�
   }
   await page.getByRole('link', { name: /星桥娱乐/ }).click()
   await page.getByRole('button', { name: '新建作品' }).click()
-  const dialog = page.getByRole('dialog', { name: '新建作品' })
+  await page.getByRole('menuitem', { name: /分镜创作/ }).click()
+  const dialog = page.getByRole('dialog', { name: '新建分镜作品' })
   await dialog
     .getByLabel('作品名称', { exact: true })
     .fill('雨后站台 · 基础验收')

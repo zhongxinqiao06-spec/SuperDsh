@@ -20,8 +20,9 @@ test('真实账号切换产品并重新打开作品', async ({ page }) => {
   await page.getByRole('button', { name: '登录 ↵', exact: true }).click()
   await page.getByRole('link', { name: /星桥娱乐/ }).click()
   await page.getByRole('button', { name: '新建作品' }).click()
+  await page.getByRole('menuitem', { name: /分镜创作/ }).click()
   await page
-    .getByRole('dialog', { name: '新建作品' })
+    .getByRole('dialog', { name: '新建分镜作品' })
     .getByLabel('作品名称', { exact: true })
     .fill(title)
   await page.getByRole('button', { name: '创建并进入' }).click()

@@ -106,9 +106,16 @@ export async function runLiveBrowser(
     pythonExecutable(),
     [
       '-m',
-      specifications.includes('studio-production-live.spec.ts')
-        ? 'fixtures.studio_application'
-        : 'app.launcher',
+      specifications.includes('series-workflow-live.spec.ts')
+        ? 'fixtures.series_application'
+        : specifications.some((name) =>
+              [
+                'studio-production-live.spec.ts',
+                'quick-workflow-live.spec.ts',
+              ].includes(name),
+            )
+          ? 'fixtures.studio_application'
+          : 'app.launcher',
       '--host',
       '127.0.0.1',
       '--port',

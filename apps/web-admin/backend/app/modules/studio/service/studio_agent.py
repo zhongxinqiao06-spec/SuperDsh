@@ -12,6 +12,7 @@ from app.modules.resources.service.resources import ResourceService
 from app.modules.studio.dao.studio_dao import StudioDao
 from app.modules.studio.dao.text_edit_dao import TextEditDao
 from app.modules.studio.entity.vo.preparation_vo import ProposeDocument
+from app.modules.studio.entity.vo.series_vo import SuggestSeriesProposal
 from app.modules.studio.entity.vo.studio_vo import (
     AssetInput,
     Batch,
@@ -22,6 +23,8 @@ from app.modules.studio.entity.vo.studio_vo import (
 )
 from app.modules.studio.entity.vo.text_edit_vo import SuggestText
 from app.modules.studio.service.media_jobs import MediaJobs
+from app.modules.studio.service.series_proposal_service import SeriesProposalService
+from app.modules.studio.service.series_service import SeriesService
 from app.modules.studio.service.studio_service import StudioService
 
 
@@ -61,8 +64,11 @@ class StudioAgent:
         if text_edit:
             async with self.studio.database.sessions() as session:
                 existing = await TextEditDao(session).conversation(project_id)
+        package = self.text_package if text_edit else self.package
         if existing:
             await self.conversations.get_session(account, existing)
+            binding = await self.conversations.binding(account, str(existing))
+            await self.resources.validate_product_binding(account, package, binding or {})
             return str(existing)
         if text_edit:
             agent_id = (await self.resources.initialize_product(account, self.text_package))[
@@ -74,6 +80,9 @@ class StudioAgent:
                 raise DomainError(403, "此智能体未发布到星桥娱乐")
         else:
             agent_id = (await self.resources.initialize_product(account, self.package))["director"]
+        await self.resources.validate_product_binding(
+            account, package, await self.resources.published_bundle(account, agent_id)
+        )
         devices = self.conversations.devices
         await devices.ensure_native(account.user_id)
         await self.conversations.projects.ensure_native(account.user_id)
@@ -197,6 +206,20 @@ class StudioAgent:
             if project["lifecycle"] == "archived":
                 raise DomainError(409, "请先恢复作品，再继续编辑")
         data = dict(arguments)
+        if tool == "studio_series_suggest":
+            # 作品来自可信会话绑定，工具参数不能扩大到其他作品或未经授权的分集。
+            try:
+                suggestion = SuggestSeriesProposal.model_validate(data)
+            except ValidationError:
+                raise DomainError(
+                    422,
+                    "短剧建议字段格式无效，请沿用授权标识并提供完整故事字段",
+                    "studio_tool_arguments_invalid",
+                ) from None
+            result = await SeriesProposalService(SeriesService(self.studio)).suggest(
+                account, project_id, suggestion
+            )
+            return {"structuredContent": result}
         if tool == "studio_generate":
             receipt = context.get("receiptId")
             if not isinstance(receipt, str) or not receipt:

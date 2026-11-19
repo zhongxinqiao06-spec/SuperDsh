@@ -100,6 +100,7 @@ class ResourceService:
             raise RuntimeError("默认资源包结构无效")
         bootstrap = replace(account, permissions=(*account.permissions, "agents.manage"))
         changed = 0
+        added: dict[str, str] = {}
         async with self.repository.transaction() as tx:
             await tx.lock("configuration-graph")
             await tx.lock(account.user_id)
@@ -115,9 +116,43 @@ class ResourceService:
                     )
                 )
                 current = await tx.get(identifier)
+                if current is None:
+                    # 从未创建的新版本工具只在显式刷新中补装；软删除记录不能走此分支。
+                    payload = {
+                        key: copy.deepcopy(value)
+                        for key, value in definition.items()
+                        if key not in {"key", "kind", "name", "description", "enabled", "published"}
+                    }
+                    await self._validate_references(tx, bootstrap, "tool", payload)
+                    settings = payload.get("settings", {})
+                    schema = payload.get("configurationSchema", {"type": "object"})
+                    assert isinstance(settings, dict) and isinstance(schema, dict)
+                    self.validator.validate(settings, schema)
+                    encrypted = self.cipher.seal(json.dumps(settings), identifier)
+                    payload["settings"], payload["configuredSecrets"] = redact_settings(
+                        settings, schema
+                    )
+                    now = datetime.now(UTC)
+                    current = Resource(
+                        id=identifier,
+                        kind="tool",
+                        owner_id=account.user_id,
+                        name=str(definition["name"]),
+                        description=str(definition.get("description", "")),
+                        enabled=bool(definition.get("enabled", True)),
+                        published=bool(definition.get("published", False)),
+                        version=1,
+                        payload=payload,
+                        secret_ciphertext=encrypted,
+                        created_at=now,
+                        updated_at=now,
+                    )
+                    await tx.save(current, public_resource(current))
+                    added[str(definition["key"])] = identifier
+                    changed += 1
+                    continue
                 if (
-                    current is None
-                    or current.deleted
+                    current.deleted
                     or not current.enabled
                     or current.owner_id != account.user_id
                     or current.kind != "tool"
@@ -157,7 +192,74 @@ class ResourceService:
                 current.updated_at = datetime.now(UTC)
                 await tx.save(current, public_resource(current))
                 changed += 1
+            for definition in definitions:
+                if not isinstance(definition, dict) or definition.get("kind") != "agent":
+                    continue
+                tool_keys = definition.get("toolIds", [])
+                if not isinstance(tool_keys, list):
+                    raise RuntimeError("默认智能体工具声明无效")
+                additions = [
+                    added[key] for key in tool_keys if isinstance(key, str) and key in added
+                ]
+                if not additions:
+                    continue
+                identifier = str(
+                    uuid5(
+                        NAMESPACE_URL,
+                        account.user_id + ":" + package_id + ":" + str(definition["key"]),
+                    )
+                )
+                agent = await self._owned(tx, bootstrap, identifier, "agent")
+                if not agent.enabled or agent.payload.get("product") != definition.get("product"):
+                    raise DomainError(409, "预置助手已停用或移出产品，已有配置保持不变")
+                existing = agent.payload.get("toolIds", [])
+                if not isinstance(existing, list):
+                    raise DomainError(409, "预置助手工具配置无效，已有配置保持不变")
+                # 只追加本次新装工具；用户删掉的旧引用、说明和其他自定义设置均保留。
+                agent.payload = {
+                    **agent.payload,
+                    "toolIds": [
+                        *existing,
+                        *(value for value in additions if value not in existing),
+                    ],
+                }
+                await self._validate_references(tx, bootstrap, "agent", agent.payload, agent.id)
+                agent.version += 1
+                agent.updated_at = datetime.now(UTC)
+                await tx.save(agent, public_resource(agent))
         return changed
+
+    async def validate_product_binding(
+        self, account: Account, package: dict[str, object], binding: dict[str, object]
+    ) -> None:
+        """预置会话启动前检查缺失的新工具与冻结实现；只提示显式更新，不修改绑定。"""
+        definition = binding.get("definition")
+        definitions = package.get("resources")
+        if not isinstance(definition, dict) or not isinstance(definitions, list):
+            return
+        for item in definitions:
+            if not isinstance(item, dict) or item.get("kind") != "agent":
+                continue
+            prefix = account.user_id + ":" + str(package["id"]) + ":"
+            if definition.get("id") != str(uuid5(NAMESPACE_URL, prefix + str(item["key"]))):
+                continue
+            tool_keys = item.get("toolIds", [])
+            tools = binding.get("tools", [])
+            if not isinstance(tool_keys, list) or not isinstance(tools, list):
+                raise DomainError(409, "预置助手工具绑定无效，请更新助手工具")
+            expected = {str(uuid5(NAMESPACE_URL, prefix + str(key))) for key in tool_keys}
+            actual = {str(tool.get("id")) for tool in tools if isinstance(tool, dict)}
+            if expected - actual:
+                raise DomainError(
+                    409,
+                    "预置助手缺少当前创作工具，请先更新助手工具；手工移除的工具需在工具管理中恢复",
+                    "tool_implementation_changed",
+                )
+            for tool in tools:
+                reference = tool.get("implementation") if isinstance(tool, dict) else None
+                if isinstance(reference, dict) and self.implementations is not None:
+                    await self.implementations.bind(account, reference)
+            return
 
     async def package_status(
         self, account: Account, package: dict[str, object]

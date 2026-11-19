@@ -14,6 +14,7 @@ from app.modules.studio.entity.do.foundation_do import StudioCommand
 from app.modules.studio.entity.do.models import MediaJob
 from app.modules.studio.entity.vo.preparation_vo import AdoptPreparation, PreparationJob
 from app.modules.studio.entity.vo.studio_vo import AssetInput, identifier
+from app.modules.studio.service.series_access_service import assert_episode_editable
 
 if TYPE_CHECKING:
     from app.modules.studio.service.media_jobs import MediaJobs
@@ -77,6 +78,7 @@ class PreparationMediaService:
                 return {"job": job_view(existing)}
             if project.revision != body.revision:
                 raise DomainError(409, "工程已更新，请重新确认试做范围")
+            await assert_episode_editable(session, account, project)
             document = await self.media.studio.documents.read(session, project_id)
             assets = {
                 a.id: a
@@ -226,6 +228,7 @@ class PreparationMediaService:
                 return prior.result
             if project.lifecycle == "archived" or project.revision != body.revision:
                 raise DomainError(409, "工程已更新，请重新选择采用目标")
+            await assert_episode_editable(session, account, project)
             job = await dao.locked_job(project, body.job)
             purpose = job.payload.get("purpose")
             document = await self.media.studio.documents.read(session, project_id)

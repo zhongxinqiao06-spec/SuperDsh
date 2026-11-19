@@ -61,6 +61,8 @@ def provider(request: httpx.Request) -> httpx.Response:
         if "video" in request.url.path:
             identity = uuid4().hex
             prompt = data["input"]["prompt"]
+            if "受理未知" in prompt:
+                raise httpx.ReadTimeout("隔离供应商未返回受理回执", request=request)
             tasks[identity] = (
                 "FAILED"
                 if "受控失败" in prompt

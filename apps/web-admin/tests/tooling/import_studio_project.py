@@ -24,10 +24,13 @@ if TYPE_CHECKING:
 
 # 根对象先插入；current_version 延迟外键在全部行完成后显式验证。
 IMPORT_ORDER = (
+    "studio_series",
+    "studio_series_setting_versions",
     "studio_projects",
     "web_file_entries",
     "studio_entities",
     "studio_asset_families",
+    "studio_entity_variants",
     "studio_entity_versions",
     "studio_media_jobs",
     "studio_asset_versions",
@@ -47,6 +50,8 @@ IMPORT_ORDER = (
     "studio_stage_reviews",
     "studio_proposals",
     "studio_job_actions",
+    "studio_library_bindings",
+    "studio_series_episodes",
     "web_file_references",
 )
 OWNER_FIELDS = {"owner", "owner_id", "actor_id"}
@@ -62,10 +67,10 @@ class Transfer:
     files: list[dict[str, Any]]
 
 
-def check_file_references(values: dict[str, list[dict[str, Any]]], project: str) -> None:
+def check_file_references(values: dict[str, list[dict[str, Any]]], project: str | set[str]) -> None:
     """文件域部分关联没有数据库外键，迁移时必须独立验证范围闭包。"""
     files = {item["id"] for item in values.get("web_file_entries", [])}
-    resources = {project}
+    resources = {project} if isinstance(project, str) else set(project)
     for table in (
         "studio_media_jobs",
         "studio_entities",
@@ -111,10 +116,14 @@ def digest(path: Path) -> str:
 def load_bundle(root: Path) -> Transfer:
     """只接受导出白名单和清单内校验通过的文件，不执行包内代码。"""
     from tooling.export_studio_project import ALLOWLIST, sanitized
+    from tooling.studio_transfer_scope import check_logical_references, project_scope
 
     root = root.resolve()
     manifest = json.loads((root / "manifest.json").read_text(encoding="utf-8"))
-    if manifest.get("format") != "superdsh-studio-project-transfer":
+    if manifest.get("format") not in {
+        "superdsh-studio-project-transfer",
+        "superdsh-studio-work-transfer",
+    }:
         raise ValueError("不是受支持的作品迁移包")
     if sum(entry.get("path") == "rows.json" for entry in manifest.get("dataFiles", [])) != 1:
         raise ValueError("迁移包必须包含 rows.json 的唯一摘要记录")
@@ -133,11 +142,11 @@ def load_bundle(root: Path) -> Transfer:
     if redacted:
         raise ValueError("迁移包仍包含非空密钥、密文或执行租约")
     projects = values.get("studio_projects", [])
-    if len(projects) != 1 or projects[0]["id"] != manifest.get("projectId"):
-        raise ValueError("迁移包必须且只能包含指定作品")
-    owner, project = manifest["sourceOwnerId"], manifest["projectId"]
-    check_file_references(values, project)
-    if projects[0]["owner"] != owner:
+    project_ids = project_scope(manifest, values)
+    owner = manifest["sourceOwnerId"]
+    check_file_references(values, project_ids)
+    check_logical_references(values)
+    if any(row["owner"] != owner for row in [*projects, *values.get("studio_series", [])]):
         raise ValueError("作品所有者与清单不一致")
     for table in IMPORT_ORDER:
         for item in values.get(table, []):
@@ -145,7 +154,7 @@ def load_bundle(root: Path) -> Transfer:
                 if item.get(key) not in (None, owner):
                     raise ValueError("迁移包包含其他账号记录")
             for key in ("project", "project_id"):
-                if item.get(key) not in (None, project):
+                if item.get(key) not in project_ids | {None}:
                     raise ValueError("迁移包包含其他作品记录")
     jobs = values.get("studio_media_jobs", [])
     if any(job["state"] != "ready" or job.get("provider_id") is not None for job in jobs):
@@ -212,6 +221,11 @@ def remap(value: Any, source: str, owner: str, bindings: dict[str, str]) -> Any:
             result.update(
                 voice_configuration_id=new_id, voice_configuration_revision=int(new_revision)
             )
+    elif configuration and "configurationId" in result:
+        # 快速草稿只有配置身份，没有冻结模型修订；显式 ID 映射，不伪造修订号。
+        result["configurationId"] = bindings.get(str(configuration), str(configuration)).split(
+            "@", 1
+        )[0]
     return result
 
 
@@ -227,7 +241,8 @@ def prepare_rows(
         )
         for table in IMPORT_ORDER
     }
-    result["studio_projects"][0]["session_id"] = None
+    for project in result["studio_projects"]:
+        project["session_id"] = None
     for row in result["studio_media_jobs"]:
         row["provider_id"] = None
         row["cancel_requested"] = False
@@ -251,7 +266,9 @@ async def preflight(
     transfer: Transfer,
     owner: str,
     values: dict[str, list[dict[str, Any]]],
-) -> MetaData:
+    *,
+    reuse_identical: bool = False,
+) -> tuple[MetaData, dict[str, set[str]]]:
     """检查目标账号、schema、ID 冲突和全部外键；不导入账号或更改权限。"""
     schema = await connection.scalar(text("SELECT version_num FROM alembic_version"))
     if not transfer.manifest.get("schemaRevision") or schema != transfer.manifest["schemaRevision"]:
@@ -278,6 +295,7 @@ async def preflight(
     if not {"products.entertainment", "studio.projects.read", "studio.projects.write"} <= grants:
         raise ValueError("目标账号缺少娱乐作品权限")
     metadata = MetaData()
+    reused: dict[str, set[str]] = {name: set() for name in IMPORT_ORDER}
     await connection.run_sync(lambda sync: metadata.reflect(sync, only=list(IMPORT_ORDER)))
     for table_name, records in values.items():
         table = metadata.tables[table_name]
@@ -286,8 +304,15 @@ async def preflight(
             primary = and_(
                 *(table.c[column.name] == row[column.name] for column in table.primary_key)
             )
-            if await connection.scalar(select(1).select_from(table).where(primary).limit(1)):
-                raise ValueError("目标存在同 ID 记录，拒绝覆盖：" + table_name)
+            existing = (
+                (await connection.execute(select(table).where(primary))).mappings().one_or_none()
+            )
+            if existing is not None:
+                if not reuse_identical or any(
+                    existing.get(key) != value for key, value in row.items()
+                ):
+                    raise ValueError("目标存在同 ID 记录或基线不一致，拒绝覆盖：" + table_name)
+                reused[table_name].add(row_identity(table, row))
             for constraint in table.foreign_key_constraints:
                 parts = list(constraint.elements)
                 target = parts[0].column.table
@@ -333,7 +358,24 @@ async def preflight(
             or model["definition"].get("capability") != binding["capability"]
         ):
             raise ValueError("目标媒体模型绑定不可用：" + binding["configurationId"])
-    return metadata
+    for project in values["studio_projects"]:
+        configuration = (project.get("quick_draft") or {}).get("configurationId")
+        if not configuration:
+            continue
+        available = await connection.scalar(
+            text(
+                "SELECT 1 FROM model_configurations WHERE id=:id AND enabled=true AND capability='video.generate'"
+            ),
+            {"id": configuration},
+        )
+        if not available:
+            raise ValueError("目标快速视频模型配置不可用：" + configuration)
+    return metadata, reused
+
+
+def row_identity(table: Table, row: dict[str, Any]) -> str:
+    """只用于本次预检结果索引，不生成或改写持久身份。"""
+    return json.dumps([row[column.name] for column in table.primary_key], default=str)
 
 
 def ordered(records: list[dict[str, Any]], parent_key: str) -> list[dict[str, Any]]:
@@ -395,6 +437,7 @@ async def import_bundle(
     *,
     apply: bool = False,
     bindings: dict[str, str] | None = None,
+    reuse_identical: bool = False,
 ) -> dict[str, Any]:
     """默认 dry-run。单事务导入；数据库失败回滚本轮新文件，既有数据不变。"""
     transfer = await asyncio.to_thread(load_bundle, source)
@@ -411,7 +454,9 @@ async def import_bundle(
                     text("SELECT pg_advisory_xact_lock(hashtextextended(:key,0))"),
                     {"key": "studio-import:" + transfer.manifest["projectId"]},
                 )
-            metadata = await preflight(connection, transfer, owner, values)
+            metadata, reused = await preflight(
+                connection, transfer, owner, values, reuse_identical=reuse_identical
+            )
             if apply:
                 await connection.execute(text("SET CONSTRAINTS ALL DEFERRED"))
                 for table_name in IMPORT_ORDER:
@@ -423,6 +468,8 @@ async def import_bundle(
                     if parent:
                         records = ordered(records, parent)
                     for row in records:
+                        if row_identity(metadata.tables[table_name], row) in reused[table_name]:
+                            continue
                         await connection.execute(
                             insert(metadata.tables[table_name]).values(
                                 **typed_row(metadata.tables[table_name], row)
@@ -451,6 +498,9 @@ async def import_bundle(
         "revision": transfer.manifest["revision"],
         "targetOwnerId": owner,
         "tables": {name: len(items) for name, items in values.items()},
+        "reusedRows": {name: len(items) for name, items in reused.items() if items},
+        "bundleSha256": digest(transfer.root / "manifest.json"),
+        "work": transfer.manifest.get("work"),
         "files": len(transfer.files),
         "newFiles": len(created),
         "directorSession": "lazy-create-new",
@@ -466,6 +516,11 @@ async def main() -> None:
     parser.add_argument("--owner", required=True)
     parser.add_argument("--model-map", type=Path)
     parser.add_argument("--apply", action="store_true")
+    parser.add_argument(
+        "--reuse-identical",
+        action="store_true",
+        help="仅复用所有导入列完全一致的目标记录；不允许覆盖",
+    )
     parser.add_argument("--development", action="store_true")
     options = parser.parse_args()
     from app.infrastructure.configuration import Settings
@@ -490,6 +545,7 @@ async def main() -> None:
             options.owner,
             apply=options.apply,
             bindings=mapping,
+            reuse_identical=options.reuse_identical,
         )
         print(json.dumps(report, ensure_ascii=False, indent=2))
     finally:

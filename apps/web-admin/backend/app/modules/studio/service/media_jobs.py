@@ -28,6 +28,8 @@ from app.modules.studio.service.media_source_service import MediaSourceService
 from app.modules.studio.service.personal_generation_service import PersonalGenerationService
 from app.modules.studio.service.preparation_media_service import PreparationMediaService
 from app.modules.studio.service.production_service import ProductionService
+from app.modules.studio.service.quick_service import QuickService
+from app.modules.studio.service.series_access_service import assert_episode_editable
 from app.modules.studio.service.studio_service import StudioService, job_view, validate_document
 from app.modules.studio.service.timeline_renderer import TimelineRenderer, export_canvas
 
@@ -54,6 +56,7 @@ class MediaJobs:
         self.production = ProductionService(self)
         self.personal = PersonalGenerationService(self)
         self.lifecycle = JobLifecycleService(self)
+        self.quick = QuickService(self)
 
     @staticmethod
     def plan_hash(items: list[dict]) -> str:
@@ -100,6 +103,7 @@ class MediaJobs:
                 return [job_view(j) for j in prior]
             if project.revision != batch.revision:
                 raise DomainError(409, "工程已更新，请重新确认生成方案")
+            await assert_episode_editable(session, account, project)
             document = Document.model_validate((await dao.snapshot(project)).document)
             asset_rows = await dao.assets(account.user_id, project.id)
             validate_document(document, asset_rows, jobs)

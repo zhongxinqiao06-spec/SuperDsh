@@ -13,6 +13,7 @@ from app.modules.studio.entity.do.foundation_do import ProjectSnapshot
 from app.modules.studio.entity.do.models import StudioProject
 from app.modules.studio.entity.vo.studio_vo import Document
 from app.modules.studio.service.asset_service import StudioAssetService
+from app.modules.studio.service.series_access_service import assert_episode_editable
 
 
 class ProjectDocumentService:
@@ -34,6 +35,7 @@ class ProjectDocumentService:
         label: str,
     ) -> Document:
         """持有项目行锁后调用；当前行与只读历史在一次事务提交。"""
+        await assert_episode_editable(session, account, project)
         document = document.model_copy(deep=True)
         dao = StudioDao(session)
         catalog = {row.id: row for row in await dao.assets(account.user_id, project.id)}
@@ -106,4 +108,5 @@ def brief_view(project: StudioProject) -> dict[str, object]:
         "language": project.language,
         "styleBrief": project.style_brief,
         "lifecycle": project.lifecycle,
+        "creationMode": project.creation_mode,
     }

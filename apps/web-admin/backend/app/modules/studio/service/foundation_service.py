@@ -18,6 +18,7 @@ from app.modules.studio.entity.vo.foundation_vo import (
 )
 from app.modules.studio.entity.vo.studio_vo import Document, identifier
 from app.modules.studio.service.document_service import brief_view
+from app.modules.studio.service.series_access_service import assert_episode_editable
 
 if TYPE_CHECKING:
     from app.modules.studio.service.studio_service import StudioService
@@ -47,7 +48,11 @@ class StudioFoundationService:
     async def create(self, account: Account, body: CreateProject) -> dict:
         authorize(account, "projects.write")
         key = body.requestKey or identifier()
-        fingerprint = content_hash(body.model_dump(exclude={"requestKey"}))
+        creation = body.model_dump(exclude={"requestKey"})
+        if body.creationMode == "storyboard":
+            # 旧客户端不传模式；升级后仍识别以前的幂等创建回执。
+            creation.pop("creationMode")
+        fingerprint = content_hash(creation)
         async with self.studio.database.sessions.begin() as session:
             dao = FoundationDao(session)
             previous = await dao.creation(account.user_id, key)
@@ -62,6 +67,7 @@ class StudioFoundationService:
                 revision=0,
                 creation_key=key,
                 creation_hash=fingerprint,
+                creation_mode=body.creationMode,
             )
             apply_brief(project, body)
             dao.add_project(project)
@@ -84,6 +90,7 @@ class StudioFoundationService:
                 return prior.result
             if project.revision != body.revision:
                 raise DomainError(409, "作品已在其他页面更新，请重新载入后合并")
+            await assert_episode_editable(session, account, project)
             if isinstance(body, ArchiveProject):
                 project.lifecycle = "archived" if body.archived else "active"
                 project.archived_at = datetime.now(UTC) if body.archived else None

@@ -114,6 +114,21 @@ export const router = createRouter({
           meta: { product: 'office', landing: true },
         },
         {
+          path: '/entertainment/quick/:id',
+          component: () => import('@/views/studio/StudioQuickPage.vue'),
+          meta: { product: 'entertainment', moduleId: 'studio.projects' },
+        },
+        {
+          path: '/entertainment/series/new',
+          component: () => import('@/views/studio/StudioSeriesCreate.vue'),
+          meta: { product: 'entertainment', moduleId: 'studio.projects' },
+        },
+        {
+          path: '/entertainment/series/:id',
+          component: () => import('@/views/studio/StudioSeriesPage.vue'),
+          meta: { product: 'entertainment', moduleId: 'studio.projects' },
+        },
+        {
           path: '/entertainment/:project',
           component: () => import('@/views/studio/StudioEditor.vue'),
           meta: {

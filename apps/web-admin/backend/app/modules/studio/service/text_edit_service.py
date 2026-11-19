@@ -207,6 +207,9 @@ class TextEditService:
                 before = document.script[start:end]
                 document.script = document.script[:start] + replacement + document.script[end:]
                 replaced_ranges(document.scenes, start, end, len(replacement))
+                if project.creation_mode == "quick":
+                    # 快速提示词和正文镜像同事务更新，采用/撤回不需要浏览器二次回写。
+                    project.quick_draft = {**(project.quick_draft or {}), "prompt": document.script}
                 if body.action == "apply":
                     row.applied = {
                         "text": document.script,

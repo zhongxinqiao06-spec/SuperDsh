@@ -15,6 +15,7 @@ const props = defineProps<{
   allowed: boolean
   save: () => Promise<void>
   reload: () => Promise<void>
+  title?: string
 }>()
 const emit = defineEmits<{ busy: [boolean]; draft: [boolean]; close: [] }>()
 const {
@@ -51,7 +52,7 @@ const states = {
 <template>
   <AppDrawer
     :model-value="active"
-    title="AI 剧本编辑"
+    :title="title ?? 'AI 剧本编辑'"
     size="min(680px, 100vw)"
     :close-on-click-modal="!busy"
     :close-on-press-escape="!busy"

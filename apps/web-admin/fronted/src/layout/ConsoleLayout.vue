@@ -191,7 +191,7 @@ function toggleGroup(id: string): void {
         </nav>
         <router-view
           v-if="vm.permitted.value"
-          :key="`${vm.auth.generation}:${vm.product.value}:${vm.module.value?.id}:${$route.params.project ?? ''}`"
+          :key="`${vm.auth.generation}:${vm.product.value}:${vm.module.value?.id}:${$route.params.project ?? $route.params.id ?? ''}`"
         />
         <div v-else class="console-route-message" role="alert">
           <h1>{{ vm.module.value ? '403' : '404' }}</h1>

@@ -39,11 +39,13 @@ PROJECT_TABLES = {
     "studio_text_edits": "project_id",
     "studio_generation_plans": "project",
     "studio_media_jobs": "project",
+    "studio_library_bindings": "project_id",
 }
 EXTRA_TABLES = {
     "studio_projects",
     "studio_entities",
     "studio_entity_versions",
+    "studio_entity_variants",
     "studio_asset_families",
     "studio_asset_versions",
     "studio_entity_version_assets",
@@ -54,6 +56,12 @@ EXTRA_TABLES = {
     "web_conversation_items",
     "web_conversation_events",
     "web_conversation_receipts",
+    "studio_series",
+    "studio_series_setting_versions",
+    "studio_series_episodes",
+    "studio_series_commands",
+    "studio_series_proposals",
+    "studio_series_structure_plans",
 }
 ALLOWLIST = frozenset(PROJECT_TABLES) | EXTRA_TABLES
 SENSITIVE_KEYS = {
@@ -85,6 +93,10 @@ REFERENCE_KEYS = {
     "references",
     "role",
     "music",
+    "asset_version_ids",
+    "imported_version_id",
+    "published_version_id",
+    "project_version_id",
 }
 
 
@@ -114,6 +126,8 @@ def references(value: Any) -> set[str]:
     found: set[str] = set()
     if isinstance(value, dict):
         for key, item in value.items():
+            if key == "field_versions" and isinstance(item, dict):
+                found.update(part for part in item.values() if isinstance(part, str) and part)
             if key in REFERENCE_KEYS:
                 if isinstance(item, str) and item:
                     found.add(item)
@@ -223,6 +237,9 @@ async def asset_closure(
             "studio_entities": entities,
             "studio_asset_families": families,
             "studio_entity_versions": list(entity_versions.values()),
+            "studio_entity_variants": await rows(
+                session, "studio_entity_variants", "entity_id", [item["id"] for item in entities]
+            ),
             "studio_asset_versions": list(asset_versions.values()),
             "studio_entity_version_assets": links,
         }
@@ -230,16 +247,26 @@ async def asset_closure(
 
 
 async def collect(
-    session: AsyncSession, project_id: str, history: list[dict[str, Any]] | None = None
+    session: AsyncSession,
+    project_id: str,
+    history: list[dict[str, Any]] | None = None,
+    *,
+    series_scope: str | None = None,
+    extra_references: list[str] | None = None,
 ) -> tuple[dict[str, list[dict[str, Any]]], list[dict[str, Any]], str]:
     """在调用方的只读一致性事务内收集单个工程及显式依赖。"""
     projects = await rows(session, "studio_projects", "id", [project_id])
     if len(projects) != 1:
         raise ValueError("指定作品不存在")
+    episodes = await rows(session, "studio_series_episodes", "project_id", [project_id])
+    if episodes and (not series_scope or episodes[0]["series_id"] != series_scope):
+        raise ValueError("该工程属于系列短剧，请导出整剧，不能丢失分集归属")
     owner = str(projects[0]["owner"])
     data = {"studio_projects": projects}
     for table, column in PROJECT_TABLES.items():
         data[table] = await rows(session, table, column, [project_id])
+    if any(job.get("lease_token") or job.get("lease_until") for job in data["studio_media_jobs"]):
+        raise ValueError("作品仍有执行租约；先停止执行并核对状态")
     if any(job["state"] != "ready" for job in data["studio_media_jobs"]):
         if history is None or any(
             job["state"] not in {"ready", "failed", "cancelled", "unknown", "paused", "unaccepted"}
@@ -253,35 +280,9 @@ async def collect(
         data["studio_media_jobs"] = [
             job for job in data["studio_media_jobs"] if job["state"] == "ready"
         ]
-    await asset_closure(session, data, owner, project_id)
-    job_ids = {job["id"] for job in data["studio_media_jobs"]}
-    source_jobs = {
-        item["source_job_id"] for item in data["studio_asset_versions"] if item.get("source_job_id")
-    }
-    if source_jobs - job_ids:
-        raise ValueError("存在项目外生成来源，需要明确扩展依赖后再导出")
-    data["studio_job_actions"] = await rows(session, "studio_job_actions", "job", list(job_ids))
-    files: dict[str, dict[str, Any]] = {}
-    frontier = {item["file_id"] for item in data["studio_asset_versions"] if item.get("file_id")}
-    while frontier:
-        found = await rows(session, "web_file_entries", "id", list(frontier))
-        if {item["id"] for item in found} != frontier:
-            raise ValueError("素材引用的文件记录缺失")
-        owned(found, owner, project_id)
-        files.update((item["id"], item) for item in found)
-        frontier = {
-            item["previous_file_id"] for item in found if item.get("previous_file_id")
-        } - files.keys()
-    data["web_file_entries"] = list(files.values())
-    resource_ids = {project_id, *job_ids, *references(data)}
-    resource_ids.update(
-        item["id"] for table in ("studio_entities", "studio_asset_families") for item in data[table]
-    )
-    data["web_file_references"] = [
-        item
-        for item in await rows(session, "web_file_references", "file_id", list(files))
-        if item["owner_id"] == owner and item["resource_id"] in resource_ids
-    ]
+    data["_extra_references"] = [{"references": extra_references or []}]
+    await complete_dependencies(session, data, owner, project_id)
+    data.pop("_extra_references")
     sessions = {projects[0]["session_id"]} - {None}
     sessions.update(
         item["target"].get("sessionId")
@@ -315,6 +316,55 @@ async def collect(
         ).mappings()
     ]
     return data, evidence, owner
+
+
+async def complete_dependencies(
+    session: AsyncSession, data: dict[str, list[dict[str, Any]]], owner: str, project_id: str
+) -> None:
+    """为单作品或整剧的个人设定闭包补齐素材、来源文件与引用；不扩展到其他作品。"""
+    await asset_closure(session, data, owner, project_id)
+    job_ids = {job["id"] for job in data["studio_media_jobs"]}
+    source_jobs = {
+        item["source_job_id"] for item in data["studio_asset_versions"] if item.get("source_job_id")
+    }
+    if source_jobs - job_ids:
+        # 个人库独立生成结果可以作为静态依赖；不携带其他作品或未完成的执行来源。
+        personal = await rows(session, "studio_media_jobs", "id", list(source_jobs - job_ids))
+        entities = {item["id"] for item in data["studio_entities"]}
+        if {job["id"] for job in personal} != source_jobs - job_ids or any(
+            job.get("owner") != owner
+            or job.get("project") is not None
+            or job.get("library_entity") not in entities
+            or job["state"] != "ready"
+            or job.get("lease_token")
+            or job.get("lease_until")
+            for job in personal
+        ):
+            raise ValueError("存在项目外或未完成生成来源，需要明确扩展依赖后再导出")
+        data["studio_media_jobs"].extend(personal)
+        job_ids.update(job["id"] for job in personal)
+    data["studio_job_actions"] = await rows(session, "studio_job_actions", "job", list(job_ids))
+    files: dict[str, dict[str, Any]] = {}
+    frontier = {item["file_id"] for item in data["studio_asset_versions"] if item.get("file_id")}
+    while frontier:
+        found = await rows(session, "web_file_entries", "id", list(frontier))
+        if {item["id"] for item in found} != frontier:
+            raise ValueError("素材引用的文件记录缺失")
+        owned(found, owner, project_id)
+        files.update((item["id"], item) for item in found)
+        frontier = {
+            item["previous_file_id"] for item in found if item.get("previous_file_id")
+        } - files.keys()
+    data["web_file_entries"] = list(files.values())
+    resource_ids = {project_id, *job_ids, *references(data)}
+    resource_ids.update(
+        item["id"] for table in ("studio_entities", "studio_asset_families") for item in data[table]
+    )
+    data["web_file_references"] = [
+        item
+        for item in await rows(session, "web_file_references", "file_id", list(files))
+        if item["owner_id"] == owner and item["resource_id"] in resource_ids
+    ]
 
 
 def copy_checked(source_root: Path, relative: str, destination: Path) -> dict[str, Any]:
@@ -375,6 +425,7 @@ def write_bundle(
     destination: Path,
     schema_revision: str | None,
     history: list[dict[str, Any]] | None = None,
+    scope: dict[str, Any] | None = None,
 ) -> dict[str, Any]:
     """事务结束后在线程中复制已冻结数据；manifest 最后写入表示本地打包完整。"""
     destination.mkdir(parents=True)
@@ -426,7 +477,7 @@ def write_bundle(
         "createdAt": datetime.now(UTC).isoformat(),
         "projectId": project,
         "sourceOwnerId": owner,
-        "revision": data["studio_projects"][0]["revision"],
+        "revision": scope["revision"] if scope else data["studio_projects"][0]["revision"],
         "schemaRevision": schema_revision,
         "status": "review-required-not-imported",
         "tableAllowlist": sorted(ALLOWLIST),
@@ -467,6 +518,8 @@ def write_bundle(
             "other_projects",
         ],
     }
+    if scope:
+        manifest.update(format="superdsh-studio-work-transfer", work=scope)
     write("manifest.json", manifest)
     return manifest
 

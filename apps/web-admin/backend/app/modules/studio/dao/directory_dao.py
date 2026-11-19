@@ -23,7 +23,9 @@ class DirectoryDao:
         rows = await self.session.execute(query.offset((page - 1) * size).limit(size))
         return list(rows), int(count or 0)
 
-    def projects(self, owner: str, search: str, lifecycle: str = "active") -> Select:
+    def projects(
+        self, owner: str, search: str, lifecycle: str = "active", mode: str = "all"
+    ) -> Select:
         # 封面沿剪辑顺序选择同镜生成结果或本人已引用的媒体版本，两者不可串权。
         shots = (
             func.jsonb_array_elements(StudioRevision.document["shots"])
@@ -63,17 +65,33 @@ class DirectoryDao:
         )
         cover = cover_sources.scalar_subquery()
         asset_cover = cover_sources.with_only_columns(StudioAsset.id).scalar_subquery()
+        quick_cover = (
+            select(MediaJob.id)
+            .where(
+                MediaJob.project == StudioProject.id,
+                MediaJob.kind == "video",
+                MediaJob.state == "ready",
+                MediaJob.subject == "quick_" + StudioProject.id,
+            )
+            .order_by(MediaJob.updated.desc(), MediaJob.id)
+            .limit(1)
+            .correlate(StudioProject)
+            .scalar_subquery()
+        )
         return (
             select(
                 StudioProject.id,
                 StudioProject.title,
                 StudioProject.lifecycle,
+                StudioProject.creation_mode.label("creationMode"),
                 StudioProject.aspect_width.label("aspectWidth"),
                 StudioProject.aspect_height.label("aspectHeight"),
                 StudioProject.target_duration_ms.label("targetDurationMs"),
                 StudioProject.revision,
                 StudioProject.updated,
-                cover.label("coverJobId"),
+                case((StudioProject.creation_mode == "quick", quick_cover), else_=cover).label(
+                    "coverJobId"
+                ),
                 asset_cover.label("coverAssetId"),
                 func.jsonb_array_length(StudioRevision.document["shots"]).label("shots"),
                 func.jsonb_array_length(
@@ -97,6 +115,7 @@ class DirectoryDao:
                 StudioProject.owner == owner,
                 StudioProject.lifecycle == lifecycle,
                 StudioProject.title.icontains(search, autoescape=True),
+                literal(True) if mode == "all" else StudioProject.creation_mode == mode,
             )
             .order_by(StudioProject.updated.desc(), StudioProject.id)
         )

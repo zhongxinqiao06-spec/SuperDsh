@@ -18,6 +18,7 @@ from app.modules.studio.entity.do.asset_do import (
 )
 from app.modules.studio.entity.do.models import StudioAsset
 from app.modules.studio.entity.vo.studio_vo import AssetInput, identifier
+from app.modules.studio.service.series_access_service import assert_episode_editable
 
 
 class StudioAssetService:
@@ -39,9 +40,10 @@ class StudioAssetService:
         """调用者先校验文件；同范围追加版本，跨范围引用创建独立实体。"""
         dao = AssetDao(session)
         if body.project:
-            project = await StudioDao(session).project(account.user_id, body.project)
+            project = await StudioDao(session).project(account.user_id, body.project, lock=True)
             if project.lifecycle == "archived":
                 raise DomainError(409, "请先恢复作品，再继续编辑")
+            await assert_episode_editable(session, account, project)
         parent = await dao.version(body.parent) if body.parent else None
         if body.parent and (
             not parent

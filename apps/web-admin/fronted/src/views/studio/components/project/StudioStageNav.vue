@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { useRoute } from 'vue-router'
-import { nextTick, onMounted, onScopeDispose, ref, watch } from 'vue'
+import { ref } from 'vue'
+import { useActiveNavigation } from '@/composables/use-active-navigation'
 import type { StageState } from '@/types/studio/preparation'
 /** 作品阶段导航与服务端确认状态共用一份展示，手机采用横向滚动。 */
 const props = defineProps<{
@@ -10,26 +11,7 @@ const props = defineProps<{
 }>()
 const route = useRoute()
 const navigation = ref<HTMLElement>()
-// 只移动步骤栏自身，避免切换步骤时顺带滚动整个工程页面。
-async function revealActive() {
-  await nextTick()
-  const nav = navigation.value
-  const current = nav?.querySelector<HTMLElement>('[aria-current="page"]')
-  if (nav && current)
-    nav.scrollLeft =
-      current.offsetLeft -
-      nav.offsetLeft -
-      (nav.clientWidth - current.clientWidth) / 2
-}
-watch(() => props.active, revealActive, { immediate: true })
-let observer: ResizeObserver | undefined
-onMounted(() => {
-  observer = new ResizeObserver(() => {
-    void revealActive()
-  })
-  if (navigation.value) observer.observe(navigation.value)
-})
-onScopeDispose(() => observer?.disconnect())
+useActiveNavigation(navigation, () => props.active)
 const labels: Record<string, string> = {
   confirmed: '已确认',
   skipped: '已略过',

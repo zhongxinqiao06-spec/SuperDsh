@@ -19,6 +19,7 @@ from app.modules.studio.entity.do.library_do import LibraryBinding, LibraryOpera
 from app.modules.studio.entity.do.models import StudioAsset, StudioProject
 from app.modules.studio.entity.vo.library_vo import ArchiveLibrary, CollectLibrary, ImportLibrary
 from app.modules.studio.entity.vo.studio_vo import AssetInput, Document, identifier
+from app.modules.studio.service.series_access_service import assert_episode_editable
 
 if TYPE_CHECKING:
     from app.modules.studio.service.media_jobs import MediaJobs
@@ -166,6 +167,10 @@ class StudioLibraryService:
                 prior = await self.replay(session, account, body.requestKey, operation)
                 if prior:
                     return prior
+            if body.project:
+                # 与工程保存/设定采用保持同一锁序，避免先锁素材族后等待项目形成死锁。
+                project = await StudioDao(session).project(account.user_id, body.project, lock=True)
+                await assert_episode_editable(session, account, project)
             if body.parent:
                 source = await StudioDao(session).owned_asset(account.user_id, body.parent)
                 await AssetDao(session).lock_family(source.family)

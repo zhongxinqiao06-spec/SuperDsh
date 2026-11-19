@@ -63,10 +63,13 @@ import StudioWorkspace from './components/StudioWorkspace.vue'
 import StudioFilmstrip from './components/StudioFilmstrip.vue'
 import StudioRecovery from './components/StudioRecovery.vue'
 import StudioProductionWorkspace from './components/project/StudioProductionWorkspace.vue'
+import SeriesEpisodeContext from './components/series/SeriesEpisodeContext.vue'
+import { useEpisodeContext } from '@/composables/studio/use-episode-context'
 const auth = useAuthStore()
 const route = useRoute()
 const router = useRouter()
 const id = String(route.params.project)
+const episodeContext = useEpisodeContext(id)
 const {
   project: p,
   catalog,
@@ -275,7 +278,10 @@ function locatePreparation(target: string) {
   else castWorkspace.value?.locate(target)
 }
 const readonly = computed(
-  () => p.value?.lifecycle === 'archived' || !auth.can('studio.projects.write'),
+  () =>
+    p.value?.lifecycle === 'archived' ||
+    !auth.can('studio.projects.write') ||
+    episodeContext.locked.value,
 )
 const sectionLink = (key: Section) => ({
   path: route.path,
@@ -696,6 +702,23 @@ const shotCards = computed(() => {
         </template>
       </div>
     </header>
+    <SeriesEpisodeContext
+      v-if="episodeContext.context.value"
+      :context="episodeContext.context.value"
+      :project="id"
+      @open="
+        router.push({ path: '/entertainment/' + $event, query: { section } })
+      "
+    />
+    <el-alert
+      v-if="episodeContext.error.value"
+      :title="'暂时无法读取作品归属，编辑已暂停。' + episodeContext.error.value"
+      type="error"
+      :closable="false"
+      ><el-button @click="episodeContext.reload"
+        >重试归属检查</el-button
+      ></el-alert
+    >
     <ResourceStatus
       v-if="!p"
       :loading="busy"
@@ -715,7 +738,13 @@ const shotCards = computed(() => {
         :title="
           p.lifecycle === 'archived'
             ? '作品已归档，恢复后可继续编辑。'
-            : '当前账号可查看作品，编辑需要创作权限。'
+            : episodeContext.context.value?.archived
+              ? '这是已移除或拆合前的历史分集，工程与成果以只读方式保留。'
+              : episodeContext.context.value?.locked
+                ? '本集已锁定。请回到整剧的分集编排中解锁后再修改。'
+                : episodeContext.loading.value
+                  ? '正在检查作品归属与编辑状态。'
+                  : '当前账号可查看作品，编辑需要创作权限。'
         "
         type="info"
         :closable="false"
