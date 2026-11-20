@@ -159,8 +159,17 @@
       "contextual": true
     },
     {
-      "id": "studio.projects",
+      "id": "studio.create",
       "route": "#/entertainment",
+      "title": "首页",
+      "icon": "house",
+      "home": true,
+      "permissions": ["studio.projects.read"],
+      "product": "entertainment"
+    },
+    {
+      "id": "studio.projects",
+      "route": "#/entertainment/works",
       "title": "我的作品",
       "icon": "folder",
       "permissions": ["studio.projects.read"],
@@ -325,6 +334,7 @@
     }
   ],
   "icons": [
+    "house",
     "gauge",
     "users",
     "shield",
@@ -338,6 +348,7 @@
     "paintbrush",
     "smartphone",
     "folder",
+    "box",
     "book-open",
     "sparkles",
     "wrench"

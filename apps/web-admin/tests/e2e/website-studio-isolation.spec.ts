@@ -61,10 +61,21 @@ for (const theme of ['light', 'dark']) {
           return route.fulfill({
             json: { configurations: [], defaults: [], agents: [] },
           })
-        if (path.endsWith('/projects'))
+        if (path.endsWith('/works'))
           return route.fulfill({
             json: {
-              items: [{ ...project, shots: 0, adopted: 0 }],
+              items: [
+                {
+                  id: project.id,
+                  title: project.title,
+                  revision: project.revision,
+                  updated: project.updated,
+                  kind: 'storyboard',
+                  lifecycle: 'active',
+                  shots: 0,
+                  adopted: 0,
+                },
+              ],
               total: 1,
               page: 1,
               pageSize: 10,
@@ -78,6 +89,7 @@ for (const theme of ['light', 'dark']) {
       '让想象',
     )
     await page.getByRole('link', { name: '进入创作台', exact: true }).click()
+    await page.getByRole('link', { name: '查看我的作品', exact: true }).click()
     await page.getByRole('link', { name: project.title, exact: true }).click()
     await page.getByRole('button', { name: '导演助手', exact: true }).click()
     const panel = page.getByRole('dialog', { name: '作品导演助手' })

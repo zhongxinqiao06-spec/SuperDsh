@@ -26,16 +26,16 @@ test('新建规格、场次与分镜自动保存，冲突不覆盖草稿，归�
     authorization: 'Bearer ' + (await (await signed).json()).accessToken,
   }
   await page.getByRole('link', { name: /星桥娱乐/ }).click()
-  await page.getByRole('button', { name: '新建作品' }).click()
-  await page.getByRole('menuitem', { name: /分镜创作/ }).click()
-  const dialog = page.getByRole('dialog', { name: '新建分镜作品' })
+
+  await page.getByRole('link', { name: '分镜创作', exact: true }).click()
+  const dialog = page.getByRole('region', { name: '新建分镜作品', exact: true })
   await dialog
     .getByLabel('作品名称', { exact: true })
     .fill('雨后站台 · 基础验收')
   await dialog.getByLabel('故事构想').fill('小林与小禾在雨后的站台重逢')
   await dialog.getByLabel('视觉风格').fill('写实雨夜、克制叙事')
   await dialog.getByLabel('目标时长').fill('90')
-  await dialog.getByRole('button', { name: '创建并进入' }).click()
+  await dialog.getByRole('button', { name: '创建并编辑故事' }).click()
   await expect(
     page.getByRole('heading', { name: '雨后站台 · 基础验收', exact: true }),
   ).toBeVisible()
@@ -132,7 +132,7 @@ test('新建规格、场次与分镜自动保存，冲突不覆盖草稿，归�
     }
   }
   await page.setViewportSize({ width: 1440, height: 960 })
-  await page.getByRole('link', { name: '作品首页' }).click()
+  await page.getByRole('link', { name: '返回我的作品' }).click()
   await page.getByRole('button', { name: '归档作品' }).click()
   await page
     .getByRole('dialog', { name: '归档作品' })

@@ -657,8 +657,8 @@ const shotCards = computed(() => {
     <header class="studio-project-header">
       <PageHeader :title="p?.title ?? '作品工作台'" />
       <div class="toolbar studio-project-actions">
-        <router-link to="/entertainment" class="studio-back"
-          ><AppIcon name="arrow-left" />作品首页</router-link
+        <router-link to="/entertainment/works" class="studio-back"
+          ><AppIcon name="arrow-left" />返回我的作品</router-link
         >
         <template v-if="p">
           <span class="toolbar-spacer" />

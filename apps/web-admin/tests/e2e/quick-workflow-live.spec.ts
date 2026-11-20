@@ -88,14 +88,15 @@ test('作品分类与快速视频：预检、候选、恢复、收藏和进入�
     sessionStorage.clear()
   })
   headers = await login(page, username, password)
-  await page.goto('/#/entertainment')
+  await page.goto('/#/entertainment/works')
   await expect(
     page.getByRole('heading', { name: '我的作品', exact: true }),
   ).toBeVisible()
   await page.getByRole('tab', { name: '快速视频', exact: true }).click()
   await expect(page.getByText('此分类暂无作品', { exact: false })).toBeVisible()
-  await page.getByRole('button', { name: '新建作品' }).click()
-  await page.getByRole('menuitem', { name: /快速创作/ }).click()
+
+  await page.goto('/#/entertainment')
+  await page.getByRole('link', { name: '快速创作', exact: true }).click()
   await expect(
     page.getByRole('heading', { name: '快速创作', exact: true }),
   ).toBeVisible()
@@ -274,7 +275,7 @@ test('作品分类与快速视频：预检、候选、恢复、收藏和进入�
     },
   })
   expect(series.ok(), await series.text()).toBeTruthy()
-  await page.goto('/#/entertainment')
+  await page.goto('/#/entertainment/works')
   await expect(page.getByText('隔离快速视频', { exact: true })).toBeVisible()
   await screenshotMatrix(page, 'works-classification')
   await page.getByRole('tab', { name: '快速视频', exact: true }).click()

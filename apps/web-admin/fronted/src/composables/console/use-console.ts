@@ -16,6 +16,7 @@ import type {
 } from '@/types/console/navigation'
 import {
   consoleTabGroups,
+  homeFirst,
   navigationGroups,
 } from '@/utils/console/navigation-display'
 import { productHome, productOf } from '@/utils/studio/products'
@@ -65,6 +66,7 @@ export function useConsole() {
     Boolean(
       auth.authenticated &&
       (!product.value || auth.can('products.' + product.value)) &&
+      (!route.meta.studioCreation || auth.can('studio.projects.write')) &&
       (route.meta.landing ||
         (module.value &&
           canOpenModule(
@@ -75,11 +77,13 @@ export function useConsole() {
     ),
   )
   const items = computed(() =>
-    visibleNavigation(
-      navigation.data.value?.items ?? [],
-      auth.session?.permissions ?? [],
-      auth.session?.roles ?? [],
-      product.value,
+    homeFirst(
+      visibleNavigation(
+        navigation.data.value?.items ?? [],
+        auth.session?.permissions ?? [],
+        auth.session?.roles ?? [],
+        product.value,
+      ),
     ),
   )
   const tabGroup = computed(() =>
@@ -162,10 +166,16 @@ export function useConsole() {
     [
       () => module.value?.id,
       () => activeItem.value?.parentId,
-      () =>
-        route.meta.landing
-          ? items.value.find((item) => item.moduleId === 'workbench')?.parentId
-          : null,
+      () => {
+        const workspace = route.meta.landing
+          ? 'workbench'
+          : module.value?.id === 'studio.create'
+            ? 'studio.projects'
+            : null
+        return workspace
+          ? items.value.find((item) => item.moduleId === workspace)?.parentId
+          : null
+      },
     ],
     ([, parentId, landingGroup]) => {
       expanded.value = parentId ?? landingGroup ?? null

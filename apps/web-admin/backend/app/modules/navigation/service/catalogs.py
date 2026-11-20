@@ -11,8 +11,8 @@ def menu_node(source: dict[str, Any], parent: str | None, order: int) -> dict[st
     identifier = source["id"]
     return {
         "id": identifier,
-        "kind": "page" if parent else "group",
-        "moduleId": identifier if parent else None,
+        "kind": "page" if "route" in source else "group",
+        "moduleId": identifier if "route" in source else None,
         "parentId": parent,
         "title": source["title"],
         "icon": source["icon"],
@@ -34,7 +34,7 @@ def product_catalogs(config: dict[str, Any]) -> dict[Product, MenuCatalog]:
                 permissions.append(f"products.{product}.{action}.manage")
             modules.append({**source, "permissions": permissions})
         by_id = {module["id"]: module for module in modules}
-        defaults: list[dict[str, object]] = []
+        defaults = [menu_node(module, None, 0) for module in modules if module.get("home")]
         for group in config["groups"]:
             if group.get("product", product) != product:
                 continue
@@ -42,6 +42,6 @@ def product_catalogs(config: dict[str, Any]) -> dict[Product, MenuCatalog]:
             defaults.extend(
                 menu_node(by_id[key], group["id"], pos) for pos, key in enumerate(group["pages"])
             )
-        validate_items(defaults, modules, config["icons"])
+        validate_items(defaults, modules)
         result[product] = MenuCatalog(modules, defaults)
     return result

@@ -58,9 +58,9 @@ test('系列短剧创建、编排、锁定、单集上下文与结构拆合导�
   ).toBeTruthy()
 
   await page.goto('/#/entertainment')
-  await page.getByRole('button', { name: /新建作品/ }).click()
-  await page.getByRole('menuitem', { name: /系列短剧/ }).click()
-  const createDialog = page.getByRole('dialog', {
+
+  await page.getByRole('link', { name: '系列短剧', exact: true }).click()
+  const createDialog = page.getByRole('region', {
     name: '新建系列短剧',
     exact: true,
   })
@@ -77,7 +77,7 @@ test('系列短剧创建、编排、锁定、单集上下文与结构拆合导�
   ).toBeVisible()
   await page.getByRole('button', { name: '继续编辑', exact: true }).click()
   await expect(createDialog).toBeVisible()
-  await expect(page).toHaveURL(/\/entertainment(?:\?[^#]*)?$/)
+  await expect(page).toHaveURL(/\/entertainment\/series\/new$/)
   await expect(
     page.getByRole('spinbutton', { name: '初始集数', exact: true }),
   ).toHaveValue('2')

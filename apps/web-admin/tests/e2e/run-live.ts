@@ -38,6 +38,8 @@ export async function runLiveBrowser(
     'studio.spec.ts',
     'studio-script.spec.ts',
     'studio-controls.spec.ts',
+    'studio-creation.spec.ts',
+    'studio-creation-live.spec.ts',
     'native-controls.spec.ts',
     'product-navigation.spec.ts',
     'website-products.spec.ts',

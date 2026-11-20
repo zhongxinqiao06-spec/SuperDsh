@@ -63,7 +63,7 @@ for (const theme of ['light', 'dark']) {
       chapterNav.getByRole('button', { name: '创作类型', exact: true }),
     ).toHaveAttribute('aria-current', 'step')
     await page.locator('#studio-creations').press('Home')
-    const image = page.getByRole('button', { name: '查看水下幻想画面' })
+    const image = page.getByRole('button', { name: '查看故事短片画面' })
     await image.click()
     await expect(page.getByRole('dialog')).toBeVisible()
     await page.keyboard.press('Escape')
@@ -96,8 +96,6 @@ async function expectNoOverflow(page: Page) {
 test('匿名访客切镜、切换产品并核对 CSV，刷新与历史可续接', async ({ page }) => {
   const state = await installFoundationFixture(page)
   await page.goto('/#/website')
-  const productsNav = page.getByRole('navigation', { name: '浏览产品' })
-  const office = productsNav.getByRole('link', { name: '星桥办公' })
   const preview = page.getByRole('region', { name: '雨后站台分镜预览' })
   await expect(preview.locator('.preview-view img')).toHaveAttribute(
     'src',
@@ -112,7 +110,14 @@ test('匿名访客切镜、切换产品并核对 CSV，刷新与历史可续接'
     'src',
     '/images/website/shot-3.webp',
   )
-  await office.click()
+  await page.getByRole('button', { name: '打开导航' }).click()
+  await page
+    .getByRole('navigation', { name: '官网导航' })
+    .getByRole('link', { name: '星桥办公' })
+    .click()
+  const office = page
+    .getByRole('navigation', { name: '浏览产品' })
+    .getByRole('link', { name: '星桥办公' })
   await expect(office).toHaveAttribute('aria-current', 'page')
   await page.reload()
   await expect(page.getByRole('heading', { level: 1 })).toContainText('简报')

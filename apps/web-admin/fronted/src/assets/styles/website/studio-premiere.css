@@ -1,0 +1,735 @@
+/* 公开娱乐首屏：文字、样片和案例共享官网语义色，不给私有创作台注册全局样式。 */
+:where(.studio-landing) .studio-intro .premiere {
+  container-type: inline-size;
+  --outer-gutter: clamp(40px, 3.6vw, 80px);
+  max-width: none;
+  width: calc(100% - 2 * var(--outer-gutter));
+  gap: 6px;
+  margin: auto;
+}
+:where(.studio-landing) .premiere-lead {
+  display: grid;
+  align-items: center;
+  isolation: isolate;
+  position: relative;
+  grid-template-columns: minmax(0, 39fr) minmax(0, 61fr);
+  grid-template-rows: minmax(min-content, 62fr) minmax(0, 38fr);
+  grid-template-areas: 'copy .' '. .';
+  height: max(450px, calc(100dvh - 158px));
+}
+:where(.studio-landing) .premiere-copy {
+  position: relative;
+  z-index: 4;
+  grid-area: copy;
+}
+:where(.studio-landing) .premiere-eyebrow {
+  display: flex;
+  align-items: center;
+  gap: 1em;
+  color: var(--showcase-muted);
+  font-size: clamp(11px, 1.17cqw, 17px);
+  letter-spacing: 0.13em;
+  font-weight: 600;
+}
+:where(.studio-landing) .premiere-eyebrow i {
+  width: 1.6em;
+  height: 1px;
+  background: var(--showcase-accent);
+  transform: rotate(-42deg);
+}
+:where(.studio-landing) .premiere-copy h1 {
+  margin: 0.27em 0 0.25em;
+  font: 700 clamp(30px, min(4.7cqw, 8.25dvh), 108px)/1.15
+    var(--showcase-display-font);
+  font-synthesis: weight;
+  letter-spacing: -0.055em;
+  color: var(--showcase-ink);
+}
+:where(.studio-landing) .premiere-copy h1 span {
+  display: block;
+  animation: premiere-title-in 0.82s cubic-bezier(0.2, 0.8, 0.2, 1) backwards;
+}
+:where(.studio-landing) .premiere-copy h1 span + span {
+  animation-delay: 0.12s;
+}
+:where(.studio-landing) .premiere-copy h1 em {
+  color: var(--showcase-primary);
+  background: var(--showcase-keyword);
+  background-clip: text;
+  -webkit-text-fill-color: transparent;
+}
+:where(.studio-landing) .premiere-desc {
+  font-size: clamp(13px, 1.45cqw, 21px);
+  line-height: 1.75;
+  color: var(--showcase-muted);
+  letter-spacing: 0.025em;
+}
+:where(.studio-landing) .premiere-actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 12px clamp(16px, 2.2vw, 32px);
+  margin-top: clamp(15px, 2.4cqw, 38px);
+}
+:where(.studio-landing) .premiere-actions .studio-button {
+  font-size: clamp(14px, 1.48cqw, 21px);
+  padding: 0.76em 1.35em;
+  gap: 1.1em;
+  border-radius: 8px;
+  box-shadow: var(--showcase-shadow);
+}
+:where(.studio-landing) .premiere-watch {
+  display: inline-flex;
+  align-items: center;
+  border: 0;
+  background: transparent;
+  font: inherit;
+  font-size: clamp(14px, 1.3cqw, 19px);
+  color: var(--showcase-ink);
+  min-height: 46px;
+  gap: 8px;
+  padding: 0 4px;
+}
+:where(.studio-landing) .premiere-watch b {
+  font-weight: 600;
+  position: relative;
+  line-height: 1.3;
+}
+:where(.studio-landing) .premiere-stage {
+  position: absolute;
+  min-width: 0;
+  z-index: 3;
+  left: 39%;
+  top: 23%;
+  width: 45%;
+  height: 57%;
+  pointer-events: auto;
+}
+:where(.studio-landing) .premiere-projector {
+  overflow: hidden;
+  position: relative;
+  border: 1px solid var(--showcase-accent);
+  border-radius: clamp(12px, 1.5cqw, 22px);
+  background: var(--showcase-projector);
+  width: 100%;
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+  box-shadow: 0 22px 35px -13px
+    color-mix(in srgb, var(--showcase-projector) 62%, transparent);
+}
+:where(.studio-landing) .premiere-frame {
+  position: relative;
+  isolation: isolate;
+  overflow: hidden;
+  flex: 1 1 auto;
+  min-height: 0;
+}
+:where(.studio-landing) .premiere-frame > img {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  object-position: 50% 38%;
+}
+:where(.studio-landing) .premiere-pencil {
+  clip-path: inset(0 calc(100% - var(--seam)) 0 0);
+}
+:where(.studio-landing) .premiere-cursor {
+  position: absolute;
+  left: var(--seam);
+  height: 100%;
+  width: 2px;
+  background: var(--showcase-playhead);
+  pointer-events: none;
+}
+:where(.studio-landing) .premiere-cursor span {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  transform: translate(-50%, -50%);
+  border-radius: 100px;
+  border: 1px solid var(--showcase-playhead);
+  background: var(--showcase-primary-hover);
+  color: var(--showcase-white);
+  padding: 1px 6px;
+  white-space: nowrap;
+  font:
+    600 18px/1.15 Georgia,
+    serif;
+}
+:where(.studio-landing) .premiere-drag {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  opacity: 0;
+  cursor: ew-resize;
+  touch-action: pan-y;
+  margin: 0;
+}
+:where(.studio-landing) .premiere-frame:focus-within {
+  outline: 3px solid var(--showcase-playhead);
+  outline-offset: -4px;
+}
+:where(.studio-landing) .premiere-script {
+  position: absolute;
+  inset: 0;
+  display: grid;
+  align-content: center;
+  padding: 7%;
+  background: linear-gradient(
+    95deg,
+    var(--showcase-pencil-paper),
+    color-mix(in srgb, var(--showcase-pencil-paper) 86%, transparent) 56%,
+    transparent
+  );
+  color: var(--showcase-poster-ink);
+  font-family: var(--showcase-display-font);
+}
+:where(.studio-landing) .premiere-script p {
+  font-size: clamp(18px, 2.5cqw, 34px);
+  line-height: 1.65;
+  margin: 0.4em 0;
+}
+:where(.studio-landing) .premiere-script :is(small, span) {
+  font-size: clamp(12px, 1.1cqw, 16px);
+}
+:where(.studio-landing) .premiere-transport {
+  position: relative;
+  display: flex;
+  padding: 0 5% 7px;
+  color: var(--showcase-projection-ink);
+  flex: none;
+}
+:where(.studio-landing) .premiere-transport button {
+  flex: 1;
+  border: 0;
+  background: transparent;
+  color: inherit;
+  min-height: 42px;
+  font-size: clamp(13px, 1.2cqw, 17px);
+}
+:where(.studio-landing) .premiere-transport button[aria-pressed='true'] {
+  font-weight: 700;
+  color: var(--showcase-playhead);
+}
+:where(.studio-landing) .premiere-transport button:focus-visible {
+  outline: 2px solid var(--showcase-playhead);
+  outline-offset: -3px;
+}
+:where(.studio-landing) .premiere-timeline {
+  position: absolute;
+  bottom: 6px;
+  left: 20%;
+  right: 20%;
+  height: 1px;
+  background: color-mix(
+    in srgb,
+    var(--showcase-projection-ink) 52%,
+    transparent
+  );
+  pointer-events: none;
+}
+:where(.studio-landing) .premiere-timeline i {
+  display: block;
+  position: relative;
+  width: var(--progress);
+  height: 2px;
+  background: var(--showcase-playhead);
+}
+:where(.studio-landing) .premiere-timeline i::after {
+  content: '';
+  position: absolute;
+  top: 50%;
+  right: 0;
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: var(--showcase-playhead);
+  transform: translate(50%, -50%);
+}
+:where(.studio-landing) .premiere-examples {
+  position: absolute;
+  inset: 0;
+  z-index: 1;
+}
+:where(.studio-landing) .premiere-examples button {
+  position: absolute;
+  pointer-events: auto;
+  min-width: 0;
+  padding: 0;
+  background: transparent;
+  border: 0;
+  border-radius: clamp(8px, 1cqw, 16px);
+  text-align: left;
+  rotate: var(--tilt);
+  min-height: 0;
+}
+/* 点击区固定，内层画片可以从主样片后探出；标签和相框一起移动。 */
+:where(.studio-landing) .premiere-print {
+  position: absolute;
+  inset: 0;
+  display: block;
+  border-radius: inherit;
+  overflow: hidden;
+  border: 2px solid var(--showcase-poster-canvas);
+  background: var(--showcase-film);
+  box-shadow: 0 10px 16px -10px
+    color-mix(in srgb, var(--showcase-projector) 56%, transparent);
+}
+:where(.studio-landing) .premiere-examples img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  transition: transform 0.5s;
+}
+:where(.studio-landing) .premiere-examples button:last-child img {
+  object-position: 50% 38%;
+}
+:where(.studio-landing) .premiere-print::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: var(--showcase-scrim);
+}
+:where(.studio-landing) .premiere-examples button:hover img {
+  transform: scale(1.04);
+}
+:where(.studio-landing) .premiere-caption {
+  position: absolute;
+  z-index: 1;
+  left: 5.5%;
+  bottom: 9%;
+  color: var(--showcase-white);
+  font: 600 clamp(14px, 1.7cqw, 25px)/1.5 var(--showcase-display-font);
+}
+:where(.studio-landing) .premiere-caption::after {
+  content: '';
+  display: block;
+  width: 1.4em;
+  height: 2px;
+  margin-top: 3px;
+  background: var(--showcase-playhead);
+}
+:where(.studio-landing) .premiere-discover {
+  margin: 0 auto;
+  border: 0;
+  background: transparent;
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  min-height: 36px;
+  font-size: 13px;
+  color: var(--showcase-primary);
+}
+.studio-landing .premiere-start {
+  min-height: 36px;
+  gap: 6px;
+  padding: 7px 14px;
+}
+:where(.studio-landing) .premiere-login {
+  font-size: 14px;
+  white-space: nowrap;
+}
+@keyframes premiere-title-in {
+  from {
+    clip-path: inset(0 0 100%);
+    transform: translateY(0.15em);
+  }
+  to {
+    clip-path: inset(0);
+    transform: none;
+  }
+}
+/* 胶片沿同一条闭合曲线贯穿样片与案例；图标、文字和操作轨道保持水平。 */
+.studio-landing .studio-intro.studio-chapter {
+  padding: clamp(10px, 1.6dvh, 20px) 0 6px;
+}
+.studio-landing .mast-inner {
+  max-width: none;
+  width: calc(100% - 2 * clamp(40px, 3.6vw, 80px));
+}
+:where(.studio-landing) .premiere-wall {
+  --travel: clamp(12px, 1.9cqw, 32px);
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+}
+:where(.studio-landing) .premiere-film-loop {
+  position: absolute;
+  inset: 0;
+  display: block;
+  width: 100%;
+  height: 100%;
+  pointer-events: none;
+  opacity: 0.6;
+  overflow: visible;
+  z-index: 0;
+}
+:where(.studio-landing) .premiere-watch svg,
+:where(.studio-landing) .premiere-motion-switch svg {
+  display: block;
+  flex: none;
+  width: 1.55em;
+  height: 1.55em;
+  color: var(--showcase-primary);
+}
+:where(.studio-landing) .premiere-watch b::after {
+  content: '';
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: -3px;
+  height: 1px;
+  background: var(--showcase-accent);
+}
+:where(.studio-landing) .premiere-examples button:first-child {
+  --tilt: -2deg;
+  --drift-x: var(--travel);
+  --drift-y: calc(-0.24 * var(--travel));
+  --swing: 0.8deg;
+  --period: 7s;
+  --phase: -2.8s;
+  left: 1%;
+  bottom: 2.5%;
+  width: 53%;
+  height: 34%;
+}
+:where(.studio-landing) .premiere-examples button:nth-child(2) {
+  --tilt: -4deg;
+  --drift-x: calc(-0.65 * var(--travel));
+  --drift-y: calc(-0.65 * var(--travel));
+  --swing: -1.8deg;
+  --period: 4.8s;
+  --phase: -1.8s;
+  left: 42%;
+  top: 3%;
+  width: 29%;
+  height: 32%;
+}
+:where(.studio-landing) .premiere-examples button:nth-child(3) {
+  --tilt: 3deg;
+  --drift-x: calc(-0.48 * var(--travel));
+  --drift-y: calc(0.48 * var(--travel));
+  --swing: 2.3deg;
+  --period: 5.8s;
+  --phase: -7.5s;
+  right: 1.8%;
+  top: 5%;
+  width: 24.5%;
+  height: 57%;
+}
+:where(.studio-landing)
+  .premiere-examples
+  button:nth-child(n + 2)
+  .premiere-print::after {
+  background: linear-gradient(
+    to bottom,
+    color-mix(in srgb, var(--showcase-film) 60%, transparent),
+    transparent 40%
+  );
+}
+:where(.studio-landing)
+  .premiere-examples
+  button:nth-child(n + 2)
+  .premiere-caption {
+  top: 7%;
+  bottom: auto;
+}
+:where(.studio-landing)
+  .premiere-examples
+  button:nth-child(3)
+  .premiere-caption {
+  left: auto;
+  right: 7%;
+}
+:where(.studio-landing) .premiere-caption {
+  rotate: calc(0deg - var(--tilt));
+}
+:where(.studio-landing) .premiere-examples button:first-child img {
+  animation: premiere-pan 12s ease-in-out infinite alternate;
+}
+:where(.studio-landing) .premiere-examples button:is(:focus-visible, :hover) {
+  z-index: 2;
+}
+:where(.studio-landing)
+  .premiere-examples
+  button:is(:hover, :focus-visible)
+  .premiere-print {
+  animation-play-state: paused;
+}
+:where(.studio-landing) .premiere-glints {
+  position: absolute;
+  left: 26%;
+  top: 47%;
+  width: 5px;
+  height: 5px;
+  border-radius: 50%;
+  pointer-events: none;
+  background: var(--showcase-playhead);
+  box-shadow:
+    3.5em -0.6em 4px var(--showcase-playhead),
+    6em 1.1em 2px var(--showcase-playhead);
+  animation: premiere-fireflies 5.6s ease-in-out infinite alternate;
+}
+:where(.studio-landing) .premiere-reflection {
+  position: absolute;
+  inset: -16% -55%;
+  pointer-events: none;
+  background: linear-gradient(
+    108deg,
+    transparent 43%,
+    color-mix(in srgb, var(--showcase-projection-ink) 26%, transparent) 50%,
+    transparent 57%
+  );
+  animation: premiere-rain-light 7s ease-in-out infinite;
+}
+:where(.studio-landing) .premiere-backprint {
+  --drift-x: calc(-0.8 * var(--travel));
+  --drift-y: calc(0.28 * var(--travel));
+  --swing: -1.3deg;
+  --period: 6.4s;
+  --phase: -9s;
+  position: absolute;
+  right: 1.4%;
+  bottom: 3%;
+  width: 27%;
+  height: 34%;
+  rotate: -2.5deg;
+  object-fit: cover;
+  object-position: 58% 45%;
+  border: 2px solid var(--showcase-poster-canvas);
+  border-radius: clamp(8px, 1cqw, 16px);
+  box-shadow: var(--showcase-shadow);
+  pointer-events: none;
+  z-index: 1;
+}
+:where(.studio-landing) .premiere-foot {
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 40px;
+}
+:where(.studio-landing) .premiere-motion-switch {
+  position: absolute;
+  right: 0;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  min-height: 40px;
+  padding: 0 6px;
+  background: none;
+  border: 0;
+  color: var(--showcase-muted);
+  font-size: 12px;
+}
+:where(.studio-landing)
+  .premiere[data-motion='paused']
+  :is(
+    .premiere-glints,
+    .premiere-reflection,
+    .premiere-print,
+    .premiere-backprint,
+    .premiere-examples button:first-child img
+  ) {
+  animation-play-state: paused;
+}
+@keyframes premiere-pan {
+  from {
+    transform: scale(1.045) translateX(-1%);
+  }
+  to {
+    transform: scale(1.12) translateX(1.8%);
+  }
+}
+@media (prefers-reduced-motion: no-preference) {
+  :where(.studio-landing) :is(.premiere-print, .premiere-backprint) {
+    animation: premiere-drift var(--period) ease-in-out var(--phase) infinite
+      alternate;
+  }
+  @keyframes premiere-drift {
+    from {
+      transform: none;
+    }
+    to {
+      transform: translate(var(--drift-x), var(--drift-y)) rotate(var(--swing));
+    }
+  }
+  :where(.studio-landing) .premiere-projector {
+    animation: premiere-aperture 750ms cubic-bezier(0.2, 0.7, 0.2, 1) backwards;
+  }
+  @keyframes premiere-aperture {
+    from {
+      clip-path: inset(10% 0 round 16px);
+    }
+    to {
+      clip-path: inset(0 round 0);
+    }
+  }
+}
+@keyframes premiere-fireflies {
+  0% {
+    opacity: 0.08;
+    transform: translate(-9px, 8px);
+  }
+  60% {
+    opacity: 0.9;
+  }
+  100% {
+    opacity: 0.2;
+    transform: translate(12px, -11px);
+  }
+}
+@keyframes premiere-rain-light {
+  0%,
+  40% {
+    transform: translateX(-53%);
+    opacity: 0;
+  }
+  52% {
+    opacity: 0.85;
+  }
+  85%,
+  100% {
+    transform: translateX(50%);
+    opacity: 0;
+  }
+}
+@media (min-width: 901px) and (max-height: 720px) {
+  :where(.studio-landing) .premiere-copy h1 {
+    font-size: clamp(34px, 6.8dvh, 50px);
+  }
+  :where(.studio-landing) .premiere-desc {
+    font-size: 15px;
+    line-height: 1.55;
+  }
+  :where(.studio-landing) .premiere-actions {
+    margin-top: 14px;
+  }
+  :where(.studio-landing) .premiere-examples button:first-child {
+    height: 29%;
+  }
+}
+@media (max-width: 900px) {
+  .studio-landing .mast-inner {
+    display: flex;
+    flex-wrap: nowrap;
+    justify-content: space-between;
+    gap: 8px;
+  }
+  .studio-landing .premiere-nav {
+    display: none;
+  }
+  .studio-landing .public-actions {
+    gap: clamp(6px, 2vw, 15px);
+  }
+}
+@media (max-width: 900px) {
+  .studio-landing .mast-inner {
+    width: calc(100% - 32px);
+  }
+  :where(.studio-landing) .studio-intro .premiere {
+    --outer-gutter: 16px;
+    gap: clamp(12px, 2.8dvh, 24px);
+  }
+  .studio-landing .studio-intro.studio-chapter {
+    padding: 12px 0 8px;
+  }
+  :where(.studio-landing) .premiere-lead {
+    display: block;
+    height: auto;
+  }
+  :where(.studio-landing) .premiere-copy {
+    padding: 0 4px;
+  }
+  :where(.studio-landing) .premiere-copy h1 {
+    font-size: clamp(34px, 10vw, 60px);
+    line-height: 1.13;
+    margin: 8px 0 10px;
+  }
+  :where(.studio-landing) .premiere-wall {
+    --travel: clamp(7px, 2cqw, 13px);
+    position: relative;
+    isolation: isolate;
+    height: clamp(252px, min(89cqw, 43dvh), 414px);
+    margin: clamp(14px, 3dvh, 26px) 2px 0;
+  }
+  :where(.studio-landing) .premiere-print {
+    border-width: 1.5px;
+  }
+  :where(.studio-landing) .premiere-examples button:first-child {
+    left: 0;
+    bottom: 8%;
+    width: 36%;
+    height: 48%;
+    --tilt: 2deg;
+  }
+  :where(.studio-landing) .premiere-examples button:nth-child(2) {
+    top: 5%;
+    left: 3%;
+    width: 30%;
+    height: 42%;
+    --tilt: 4deg;
+  }
+  :where(.studio-landing) .premiere-examples button:nth-child(3) {
+    top: 2%;
+    right: 1%;
+    width: 29%;
+    height: 54%;
+    --tilt: -3deg;
+  }
+  :where(.studio-landing) .premiere-caption {
+    font-size: clamp(11px, 2.6cqw, 15px);
+    bottom: 8%;
+    left: 6%;
+  }
+  :where(.studio-landing) .premiere-stage {
+    left: 20%;
+    top: auto;
+    bottom: 8%;
+    width: 60%;
+    height: min(64%, 50cqw);
+  }
+  :where(.studio-landing) .premiere-projector {
+    border-radius: 9px;
+  }
+  :where(.studio-landing) .premiere-transport {
+    padding-inline: 0;
+  }
+  :where(.studio-landing) .premiere-transport button {
+    min-height: 40px;
+    font-size: 12px;
+  }
+  :where(.studio-landing) .premiere-timeline {
+    left: 16.67%;
+    right: 16.67%;
+  }
+  :where(.studio-landing) .premiere-script {
+    padding: 7%;
+  }
+  :where(.studio-landing) .premiere-script p {
+    font-size: clamp(14px, 3.6cqw, 19px);
+    line-height: 1.5;
+  }
+  :where(.studio-landing) .premiere-script :is(small, span) {
+    font-size: 10px;
+  }
+  :where(.studio-landing) .premiere-backprint {
+    right: 0;
+    bottom: 3%;
+    width: 31%;
+    height: 41%;
+    rotate: -4deg;
+    object-position: 60% center;
+    border-radius: 7px;
+  }
+  :where(.studio-landing) .premiere-foot {
+    border-top: 1px solid var(--showcase-border);
+  }
+  :where(.studio-landing) .premiere-discover {
+    min-height: 44px;
+  }
+}

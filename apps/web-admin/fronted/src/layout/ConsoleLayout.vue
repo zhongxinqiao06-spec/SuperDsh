@@ -129,8 +129,21 @@ function toggleGroup(id: string): void {
             }}</span>
             <span class="breadcrumb-separator" aria-hidden="true">/</span>
           </template>
-          <template v-if="$route.meta.projectEditor">
-            <router-link to="/entertainment">{{ vm.title.value }}</router-link>
+          <template v-if="$route.meta.studioCreation">
+            <router-link :to="vm.home.value">{{ vm.title.value }}</router-link>
+            <span class="breadcrumb-separator" aria-hidden="true">/</span>
+            <span class="breadcrumb-current" aria-current="page">{{
+              $route.meta.studioCreation === 'series'
+                ? vm.preferences.tr('新建系列短剧', 'New series')
+                : $route.meta.studioCreation === 'storyboard'
+                  ? vm.preferences.tr('新建分镜作品', 'New storyboard')
+                  : vm.preferences.tr('快速创作', 'Quick creation')
+            }}</span>
+          </template>
+          <template v-else-if="$route.meta.projectEditor">
+            <router-link to="/entertainment/works">{{
+              vm.title.value
+            }}</router-link>
             <span class="breadcrumb-separator" aria-hidden="true">/</span>
             <span class="breadcrumb-current" aria-current="page">{{
               vm.preferences.tr('作品工作台', 'Project workspace')
@@ -191,7 +204,7 @@ function toggleGroup(id: string): void {
         </nav>
         <router-view
           v-if="vm.permitted.value"
-          :key="`${vm.auth.generation}:${vm.product.value}:${vm.module.value?.id}:${$route.params.project ?? $route.params.id ?? ''}`"
+          :key="`${vm.auth.generation}:${vm.product.value}:${vm.module.value?.id}:${$route.meta.studioCreation ?? ''}:${$route.params.project ?? $route.params.id ?? ''}`"
         />
         <div v-else class="console-route-message" role="alert">
           <h1>{{ vm.module.value ? '403' : '404' }}</h1>

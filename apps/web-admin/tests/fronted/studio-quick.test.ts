@@ -408,6 +408,17 @@ describe('快速作品保存与任务恢复', () => {
     expect(workLocation(work)).toBe(
       '/entertainment/series/series-a?episode=episode-a&resume=1',
     )
+    expect(workLocation({ ...work, hasEpisodeProgress: false })).toBe(
+      '/entertainment/series/series-a?section=episodes',
+    )
+    expect(
+      workLocation({
+        ...work,
+        currentEpisodeId: null,
+        episodeCount: 2,
+        deliveredCount: 2,
+      }),
+    ).toBe('/entertainment/series/series-a?section=delivery')
     expect(workLocation({ ...work, kind: 'storyboard' })).toBe(
       '/entertainment/series-a',
     )

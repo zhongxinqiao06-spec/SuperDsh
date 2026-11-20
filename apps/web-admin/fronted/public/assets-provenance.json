@@ -123,6 +123,78 @@
       "source": "OpenAI Image Gen / 2026-11-18 / user-approved orange Starbridge Studio homepage art direction",
       "owner": "SuperDsh original generated concept artwork",
       "usage": "Public visual illustration; not a customer production or real user asset"
+    },
+    {
+      "path": "images/website/premiere-color.webp",
+      "source": "OpenAI Image Gen / Starbridge premiere homepage / exec-634b61e6-13f1-4098-b6a5-2896f4aa7489",
+      "owner": "SuperDsh original generated concept artwork",
+      "usage": "Public storyboard-to-film demonstration and examples"
+    },
+    {
+      "path": "images/website/premiere-board.webp",
+      "source": "OpenAI Image Gen / Starbridge premiere homepage / exec-c25e69e4-6e79-4d85-ab65-e84c0a4b12e6",
+      "owner": "SuperDsh original generated concept artwork",
+      "usage": "Public storyboard-to-film demonstration and examples"
+    },
+    {
+      "path": "images/website/premiere-ribbon.webp",
+      "source": "OpenAI Image Gen / Starbridge premiere homepage / exec-3de56c5f-e8f1-4f38-8d3e-eefe64055360",
+      "owner": "SuperDsh original generated concept artwork",
+      "usage": "Public storyboard-to-film demonstration and examples"
+    },
+    {
+      "path": "images/website/premiere-forest.webp",
+      "source": "OpenAI Image Gen / Starbridge premiere homepage / exec-1cf934aa-2847-454b-a870-8a6b4515f80f",
+      "owner": "SuperDsh original generated concept artwork",
+      "usage": "Public storyboard-to-film demonstration and examples"
+    },
+    {
+      "path": "images/website/creation-expression-study.webp",
+      "source": "OpenAI Image Gen / Starbridge Studio chapters / exec-c5b52ad9-4b92-4ed4-b82e-8530c1d64d00",
+      "owner": "SuperDsh original generated concept artwork",
+      "usage": "Public studio website illustration"
+    },
+    {
+      "path": "images/website/creation-crystal-city.webp",
+      "source": "OpenAI Image Gen / Starbridge Studio chapters / exec-5a3a79dc-524f-465a-aa4d-3a5c8a5b410f",
+      "owner": "SuperDsh original generated concept artwork",
+      "usage": "Public studio website illustration"
+    },
+    {
+      "path": "images/website/creation-rain-portrait.webp",
+      "source": "OpenAI Image Gen / Starbridge Studio chapters / exec-73a9f391-9ec3-4b0a-8ae7-25dbcc1cb49c",
+      "owner": "SuperDsh original generated concept artwork",
+      "usage": "Public studio website illustration"
+    },
+    {
+      "path": "images/website/process-station-boards.webp",
+      "source": "OpenAI Image Gen / Starbridge Studio chapters / exec-5ef436a5-61a8-48c3-be1a-f6fe8d96d35d",
+      "owner": "SuperDsh original generated concept artwork",
+      "usage": "Public studio website illustration"
+    },
+    {
+      "path": "images/website/process-script-paper.webp",
+      "source": "OpenAI Image Gen / Starbridge Studio chapters / exec-0d0baf9e-b277-422b-9549-14fa94a0cd0c",
+      "owner": "SuperDsh original generated concept artwork",
+      "usage": "Public studio website illustration"
+    },
+    {
+      "path": "images/website/advantage-medium-take.webp",
+      "source": "OpenAI Image Gen / Starbridge Studio chapters / exec-41951d7a-0bdf-4ed8-a108-dee153f48a99",
+      "owner": "SuperDsh original generated concept artwork",
+      "usage": "Public studio website illustration"
+    },
+    {
+      "path": "images/website/advantage-revision-slip.webp",
+      "source": "OpenAI Image Gen / Starbridge Studio chapters / exec-49fd1c0b-6d17-43af-85aa-6c0b43607206",
+      "owner": "SuperDsh original generated concept artwork",
+      "usage": "Public studio website illustration"
+    },
+    {
+      "path": "images/website/closing-cloud.webp",
+      "source": "OpenAI Image Gen / Starbridge Studio chapters / exec-58609345-49e8-46a4-b689-636facfdd38a",
+      "owner": "SuperDsh original generated concept artwork",
+      "usage": "Public studio website illustration"
     }
   ]
 }

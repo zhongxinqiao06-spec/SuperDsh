@@ -18,9 +18,11 @@ export function workLocation(work: WorkSummary): string {
     return (
       '/entertainment/series/' +
       encodeURIComponent(work.id) +
-      (work.currentEpisodeId
+      (work.currentEpisodeId && work.hasEpisodeProgress !== false
         ? '?episode=' + encodeURIComponent(work.currentEpisodeId) + '&resume=1'
-        : '?section=episodes')
+        : work.episodeCount > 0 && work.deliveredCount === work.episodeCount
+          ? '?section=delivery'
+          : '?section=episodes')
     )
   return (
     '/entertainment/' +
@@ -28,11 +30,15 @@ export function workLocation(work: WorkSummary): string {
     encodeURIComponent(work.id)
   )
 }
-export function workAction(work: WorkSummary): string {
-  if (work.kind === 'series')
-    return work.currentEpisodeNumber
+export function workAction(work: WorkSummary, canEdit: boolean): string {
+  if (!canEdit || work.lifecycle === 'archived') return '查看作品'
+  if (work.kind === 'series') {
+    if (work.episodeCount > 0 && work.deliveredCount === work.episodeCount)
+      return '查看成片'
+    return work.currentEpisodeNumber && work.hasEpisodeProgress !== false
       ? `继续第 ${work.currentEpisodeNumber} 集`
-      : '编排第一集'
-  if (work.kind === 'quick') return '查看与继续生成'
-  return '进入作品'
+      : '编排分集'
+  }
+  if (work.kind === 'quick') return work.coverJobId ? '查看结果' : '继续编辑'
+  return '继续制作'
 }

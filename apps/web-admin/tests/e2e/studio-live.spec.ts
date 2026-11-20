@@ -19,20 +19,20 @@ test('真实账号切换产品并重新打开作品', async ({ page }) => {
     .fill(process.env.WEB_ADMIN_E2E_PASSWORD!)
   await page.getByRole('button', { name: '登录 ↵', exact: true }).click()
   await page.getByRole('link', { name: /星桥娱乐/ }).click()
-  await page.getByRole('button', { name: '新建作品' }).click()
-  await page.getByRole('menuitem', { name: /分镜创作/ }).click()
+
+  await page.getByRole('link', { name: '分镜创作', exact: true }).click()
   await page
-    .getByRole('dialog', { name: '新建分镜作品' })
+    .getByRole('region', { name: '新建分镜作品', exact: true })
     .getByLabel('作品名称', { exact: true })
     .fill(title)
-  await page.getByRole('button', { name: '创建并进入' }).click()
+  await page.getByRole('button', { name: '创建并编辑故事' }).click()
   await expect(page.getByRole('heading', { name: title })).toBeVisible()
   await page.getByLabel('剧本正文').fill('小林和小禾在雨夜车站重逢。')
   await page.getByRole('button', { name: '保存工程' }).click()
   await expect(
     page.getByRole('status').filter({ hasText: '已自动保存' }),
   ).toBeVisible()
-  await page.getByRole('link', { name: '作品首页' }).click()
+  await page.getByRole('link', { name: '返回我的作品' }).click()
   await page.getByRole('link', { name: new RegExp(title) }).click()
   await page
     .getByRole('navigation', { name: '作品工作区' })
@@ -205,7 +205,7 @@ test('真实三镜剪辑切换雨夜候选，刷新保留第三镜的台词音�
     third.lines.map((l) => ({ ...l, subtitleStart: null })),
   )
   expect(final.document.shots[2]?.references).toEqual([role])
-  await page.getByRole('link', { name: '作品首页' }).click()
+  await page.getByRole('link', { name: '返回我的作品' }).click()
   await expect(
     page.getByRole('link', { name: title, exact: true }).locator('video'),
   ).toHaveAttribute('src', new RegExp(before + '$'))

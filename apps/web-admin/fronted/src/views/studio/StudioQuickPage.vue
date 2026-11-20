@@ -157,7 +157,10 @@ onScopeDispose(() => window.removeEventListener('beforeunload', beforeUnload))
         @click="save"
         >保存草稿</el-button
       >
-      <router-link to="/entertainment">返回我的作品</router-link>
+      <router-link v-if="!vm.id.value" to="/entertainment"
+        >返回创作中心</router-link
+      >
+      <router-link v-else to="/entertainment/works">返回我的作品</router-link>
       <span class="studio-meta quick-status-line" role="status">{{
         vm.dirty.value ? '有未保存的修改' : vm.notice.value
       }}</span>

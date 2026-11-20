@@ -7,10 +7,12 @@ from app.modules.identity.entity.bo.models import Account
 
 
 def validate_items(
-    items: list[dict[str, object]], modules: list[dict[str, object]], icons: list[str]
+    items: list[dict[str, object]], modules: list[dict[str, object]]
 ) -> None:
     """拒绝循环、重复页面、非法模块及不可识别字段。"""
-    if len(items) > 128:
+    # 娱乐端拆分了既有作品入口，已配满的历史菜单仍能保存原先的全部自定义项。
+    limit = 129 if any(module["id"] == "studio.create" for module in modules) else 128
+    if len(items) > limit:
         raise DomainError(422, "too many menu items")
     ids: set[str] = set()
     pages: set[str] = set()
@@ -28,7 +30,8 @@ def validate_items(
         ids.add(identifier)
         if (
             item.get("kind") not in ("group", "page")
-            or item.get("icon") not in icons
+            # 图标名称允许自由配置；未知名称由前端统一回退，不影响启动或保存。
+            or not isinstance(item.get("icon"), str)
             or not isinstance(item.get("visible"), bool)
             or type(item.get("order")) is not int
             or not 0 <= int(str(item["order"])) <= 10000

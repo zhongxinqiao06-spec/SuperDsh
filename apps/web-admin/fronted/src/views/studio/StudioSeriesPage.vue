@@ -324,7 +324,7 @@ async function confirmStructure(plan: SeriesStructurePlan) {
   <section class="page stack studio-series">
     <PageHeader :title="data?.title ?? '系列短剧'" />
     <div class="toolbar">
-      <router-link to="/entertainment">← 我的作品</router-link
+      <router-link to="/entertainment/works">← 我的作品</router-link
       ><span v-if="data" class="studio-meta series-grow"
         >{{ data.narrativeMode === 'continuous' ? '连续剧情' : '单元故事' }} ·
         计划{{ data.plannedEpisodes }}集 · 每集约{{
@@ -446,7 +446,7 @@ async function confirmStructure(plan: SeriesStructurePlan) {
       :error="mutation.error.value"
       :submit-disabled="!brief.title.trim()"
       @submit="saveBrief"
-      ><StudioBriefFields v-model="brief" /><label class="field"
+      ><StudioBriefFields v-model="brief" per-episode /><label class="field"
         >计划集数<el-input-number
           v-model="brief.plannedEpisodes"
           :min="1"

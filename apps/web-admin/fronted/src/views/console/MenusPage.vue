@@ -182,12 +182,23 @@ const { tr } = usePreferences()
           }}<el-input v-model="vm.editing.value.title" maxlength="100" /></label
         ><label class="field"
           >{{ tr('图标', 'Icon')
-          }}<el-select v-model="vm.editing.value.icon"
+          }}<el-select
+            v-model="vm.editing.value.icon"
+            filterable
+            allow-create
+            default-first-option
             ><el-option
               v-for="icon in vm.resource.data.value?.icons ?? []"
               :key="icon"
               :value="icon"
-              :label="icon" /></el-select></label
+              :label="icon"
+          /></el-select>
+          <small class="muted">{{
+            tr(
+              '可选择或输入图标名称，未知图标使用默认图标。',
+              'Choose or enter an icon name. Unknown names use the default icon.',
+            )
+          }}</small></label
         ><label v-if="vm.editing.value.kind === 'page'" class="field"
           >{{ tr('所属分组', 'Group')
           }}<el-select v-model="vm.editing.value.parentId" clearable

@@ -53,6 +53,10 @@ async function checkWorkspace(
       nav.getByRole('button', { name: title, exact: true }),
     ).toHaveCount(allowed ? 1 : 0)
   }
+  if (product === 'entertainment')
+    await expect(nav.locator(':scope > :first-child')).toHaveAccessibleName(
+      '首页',
+    )
   const sections: Record<string, string[]> = {
     [name]:
       product === 'office'
@@ -66,7 +70,7 @@ async function checkWorkspace(
     ],
   }
   if (product === 'entertainment')
-    sections['素材中心'] = ['角色库', '场景与道具', '媒体素材']
+    sections['素材中心'] = ['角色库', '场景库', '道具库', '媒体库']
   if (manager) {
     sections['能力管理'] = ['智能体', '知识库', '技能', '工具', '默认模型']
     sections['产品管理'] = ['产品成员', '菜单配置']

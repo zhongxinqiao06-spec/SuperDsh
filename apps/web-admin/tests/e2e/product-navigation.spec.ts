@@ -189,19 +189,15 @@ test('同一登录可切换工作台，娱乐的共享管理和账号链接在�
   await page.goto('/#/products')
   await page.getByRole('link', { name: /星桥娱乐/ }).click()
   const nav = sidebar(page)
-  for (const name of ['作品项目', '素材库', '制作任务']) {
+  for (const [name, title] of [
+    ['首页', '创作中心'],
+    ['作品项目', '我的作品'],
+    ['素材库', '媒体库'],
+    ['制作任务', '制作任务'],
+  ] as const) {
     const item = nav.getByRole('link', { name, exact: true })
     await item.click()
-    await expect(
-      heading(
-        page,
-        name === '作品项目'
-          ? '我的作品'
-          : name === '素材库'
-            ? '媒体素材'
-            : name,
-      ),
-    ).toBeVisible()
+    await expect(heading(page, title)).toBeVisible()
     await expect(item).toHaveAttribute('aria-current', 'page')
   }
   await expect(nav.getByRole('link', { name: '智能对话' })).toHaveCount(0)
@@ -300,23 +296,22 @@ test('娱乐单产品账号在窄屏通过抽屉进入三页，拒绝办公工�
   state.signedIn = true
   await page.goto('/#/workspace')
   await expect(page).toHaveURL(/#\/entertainment$/)
-  for (const name of ['素材库', '制作任务', '作品项目']) {
+  for (const [name, title] of [
+    ['素材库', '媒体库'],
+    ['制作任务', '制作任务'],
+    ['作品项目', '我的作品'],
+    ['首页', '创作中心'],
+  ] as const) {
     await page.getByRole('button', { name: '打开导航' }).click()
     const nav = sidebar(page)
+    await expect(nav.locator(':scope > :first-child')).toHaveAccessibleName(
+      '首页',
+    )
     await expect(nav.getByRole('link', { name: '智能对话' })).toHaveCount(0)
     await expect(nav.getByRole('button', { name: '用户与权限' })).toHaveCount(0)
     await expect(page.getByRole('link', { name: '切换产品' })).toHaveCount(0)
     await nav.getByRole('link', { name, exact: true }).click()
-    await expect(
-      heading(
-        page,
-        name === '作品项目'
-          ? '我的作品'
-          : name === '素材库'
-            ? '媒体素材'
-            : name,
-      ),
-    ).toBeVisible()
+    await expect(heading(page, title)).toBeVisible()
     await expect(nav).toBeHidden()
     expect(
       await page.evaluate(

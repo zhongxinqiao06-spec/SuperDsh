@@ -103,7 +103,11 @@ const roots = computed(() => props.items.filter((item) => !item.parentId))
           v-else
           :to="item.path"
           class="nav-link"
-          :class="{ active: item.active }"
+          :class="{
+            active: item.active,
+            'studio-home-link':
+              product === 'entertainment' && item.path === home,
+          }"
           :aria-current="item.active ? 'page' : undefined"
           @click="$emit('navigate')"
         >

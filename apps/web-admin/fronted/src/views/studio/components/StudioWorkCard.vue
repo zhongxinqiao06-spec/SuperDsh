@@ -17,7 +17,7 @@ const emit = defineEmits<{ archive: [] }>()
     :project="work"
     :to="workLocation(work)"
     :kind-label="workModeLabels[work.kind]"
-    :action-label="workAction(work)"
+    :action-label="workAction(work, canEdit)"
     :cover-project-id="work.coverProjectId"
     :can-edit="canEdit"
     :busy="busy"
@@ -29,14 +29,17 @@ const emit = defineEmits<{ archive: [] }>()
           >{{ work.episodeCount }} 集 · 已交付
           {{ work.deliveredCount }} 集</span
         >
-        <span v-if="work.currentEpisodeNumber"
+        <span
+          v-if="work.currentEpisodeNumber && work.hasEpisodeProgress !== false"
           >当前：第 {{ work.currentEpisodeNumber }} 集<span
             v-if="work.currentStage"
           >
             · {{ workStageLabels[work.currentStage] ?? '继续制作' }}</span
           ></span
         >
-        <span v-else>从整剧构想开始，逐集确认故事与制作。</span>
+        <span v-else-if="work.deliveredCount === 0"
+          >从整剧构想开始，逐集确认故事与制作。</span
+        >
       </template>
       <template v-else>
         <span v-if="work.kind === 'storyboard'"

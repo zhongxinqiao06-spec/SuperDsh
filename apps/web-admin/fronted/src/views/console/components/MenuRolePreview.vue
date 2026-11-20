@@ -1,5 +1,6 @@
 <script setup lang="ts">
-import { ref, watch } from 'vue'
+import { computed, ref, watch } from 'vue'
+import { homeFirst } from '@/utils/console/navigation-display'
 import { navigationApi } from '@/api/console/navigation-api'
 import { useResource } from '@/composables/use-resource'
 import { usePreferences } from '@/store/modules/preferences'
@@ -26,6 +27,7 @@ const roleId = ref(
 const preview = useResource((signal) =>
   navigationApi.preview(props.product, roleId.value, signal),
 )
+const items = computed(() => homeFirst(preview.data.value?.items ?? []))
 watch(roleId, () => {
   preview.data.value = null
   void preview.reload()
@@ -55,19 +57,12 @@ watch(roleId, () => {
       empty-title="该角色没有可见菜单"
       @retry="preview.reload"
     />
-    <ul v-if="preview.data.value?.items.length" class="menu-preview-tree">
-      <li
-        v-for="root in preview.data.value.items.filter(
-          (item) => !item.parentId,
-        )"
-        :key="root.id"
-      >
+    <ul v-if="items.length" class="menu-preview-tree">
+      <li v-for="root in items.filter((item) => !item.parentId)" :key="root.id">
         <strong>{{ root.title }}</strong>
         <ul v-if="root.kind === 'group'">
           <li
-            v-for="child in preview.data.value.items.filter(
-              (item) => item.parentId === root.id,
-            )"
+            v-for="child in items.filter((item) => item.parentId === root.id)"
             :key="child.id"
           >
             {{ child.title }}

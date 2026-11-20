@@ -17,6 +17,8 @@ export interface WorkSummary {
   aspectHeight: number | null
   episodeCount: number
   deliveredCount: number
+  /** 系列是否已有分集内容或制作进度，兼容省略此字段的旧摘要。 */
+  hasEpisodeProgress?: boolean
   currentEpisodeId: string | null
   currentEpisodeNumber: number | null
   currentStage: string | null

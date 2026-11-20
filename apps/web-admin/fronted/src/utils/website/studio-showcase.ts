@@ -8,6 +8,17 @@ export const studioChapters = [
 ] as const
 
 export const studioArtwork = {
+  crystalCity: '/images/website/creation-crystal-city.webp',
+  expressions: '/images/website/creation-expression-study.webp',
+  rainPortrait: '/images/website/creation-rain-portrait.webp',
+  stationBoards: '/images/website/process-station-boards.webp',
+  scriptPaper: '/images/website/process-script-paper.webp',
+  mediumTake: '/images/website/advantage-medium-take.webp',
+  cloud: '/images/website/closing-cloud.webp',
+  premiere: '/images/website/premiere-color.webp',
+  board: '/images/website/premiere-board.webp',
+  ribbon: '/images/website/premiere-ribbon.webp',
+  forest: '/images/website/premiere-forest.webp',
   underwater: '/images/website/studio-underwater.webp',
   world: '/images/website/studio-world.webp',
   character: '/images/website/studio-character.webp',

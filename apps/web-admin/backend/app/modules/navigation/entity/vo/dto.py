@@ -9,7 +9,7 @@ class MenuInput(InputModel):
     """菜单更新必须携带当前配置版本。"""
 
     version: int = Field(ge=1)
-    items: list[dict[str, object]] = Field(default_factory=list, max_length=128)
+    items: list[dict[str, object]] = Field(default_factory=list, max_length=129)
 
 
 class MenuResetInput(InputModel):

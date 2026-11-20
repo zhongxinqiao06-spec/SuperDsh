@@ -265,7 +265,7 @@ test('作品步骤可直达、后退和刷新，剧本、分镜与剪辑共用�
     .getByRole('dialog', { name: '项目素材与个人库' })
     .locator('.el-drawer__close-btn')
     .click()
-  await page.getByRole('link', { name: '作品首页' }).click()
+  await page.getByRole('link', { name: '返回我的作品' }).click()
   await expect(page.getByRole('dialog', { name: '确认操作' })).toBeVisible()
   await page.getByRole('button', { name: '取消', exact: true }).click()
   await expect(step('角色与场景')).toHaveAttribute('aria-current', 'page')
@@ -414,7 +414,7 @@ test('仅有娱乐权限可以编剧本和分镜，独立的会话、模型和�
     .getByRole('dialog', { name: '项目素材与个人库' })
     .locator('.el-drawer__close-btn')
     .click()
-  await page.getByRole('link', { name: '作品首页' }).click()
+  await page.getByRole('link', { name: '返回我的作品' }).click()
   await page
     .getByRole('dialog', { name: '确认操作' })
     .getByRole('button', { name: '取消' })
@@ -715,7 +715,7 @@ test('作品目录采用真实电影封面、标题空封面和分页搜索', as
   await page.route('**/api/studio/projects/film/media/ready', (route) =>
     route.fulfill({ status: 204 }),
   )
-  await page.goto('/#/entertainment')
+  await page.goto('/#/entertainment/works')
   const card = page.getByRole('link', { name: entry.title, exact: true })
   await expect.poll(() => grants).toBe(1)
   const bounds = await card.boundingBox()

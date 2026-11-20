@@ -68,6 +68,14 @@ class WorkDirectoryService:
                         "coverAssetId": cover["coverAssetId"] if cover else None,
                         "episodeCount": detail["episodeCount"],
                         "deliveredCount": detail["deliveredCount"],
+                        # 自动建立的空白分集尚无创作进度，作品库应从分集编排打开。
+                        "hasEpisodeProgress": any(
+                            ep["storyRevision"] > 1
+                            or ep["stage"] != "script"
+                            or ep["shots"]
+                            or any(ep["story"].values())
+                            for ep in episodes
+                        ),
                         "currentEpisodeId": current["id"] if current else None,
                         "currentEpisodeNumber": current["number"] if current else None,
                         "currentStage": current["stage"] if current else None,

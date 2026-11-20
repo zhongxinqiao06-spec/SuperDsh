@@ -3,7 +3,7 @@ import { computed } from 'vue'
 import type { ProjectBrief } from '@/types/studio/foundation'
 /** 新建和编辑共享规格表单；分钟秒数仅为展示，接口统一使用毫秒。 */
 const model = defineModel<ProjectBrief>({ required: true })
-defineProps<{ disabled?: boolean }>()
+defineProps<{ disabled?: boolean; perEpisode?: boolean }>()
 const ratio = computed({
   get: () =>
     model.value.aspectWidth && model.value.aspectHeight
@@ -35,6 +35,7 @@ const seconds = computed({
         maxlength="120"
         aria-label="作品名称"
     /></label>
+    <slot name="after-title" />
     <label class="field"
       >故事构想<el-input
         v-model="model.brief"
@@ -45,6 +46,7 @@ const seconds = computed({
         placeholder="讲谁的故事、发生什么、希望观众感受到什么"
         aria-label="故事构想"
     /></label>
+    <slot name="after-story" />
     <div class="brief-grid">
       <label class="field"
         >画幅<el-select
@@ -62,13 +64,13 @@ const seconds = computed({
             value="1:1" /></el-select
       ></label>
       <label class="field"
-        >目标时长（秒）<el-input-number
+        >{{ perEpisode ? '每集目标时长' : '目标时长' }}（秒）<el-input-number
           v-model="seconds"
           :disabled="disabled"
           :min="1"
           :max="3600"
           :precision="0"
-          aria-label="目标时长"
+          :aria-label="perEpisode ? '每集目标时长' : '目标时长'"
       /></label>
     </div>
     <label class="field"

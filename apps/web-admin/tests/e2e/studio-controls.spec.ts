@@ -94,7 +94,7 @@ async function installControlsFixture(page: Page, readonly = false) {
 }
 
 for (const theme of ['light', 'dark']) {
-  test(`创作控件 ${theme}：八步骤、画幅筛选、原生表单与新建弹窗`, async ({
+  test(`创作控件 ${theme}：八步骤、画幅筛选、原生表单与独立创建页`, async ({
     page,
   }) => {
     test.setTimeout(180_000)
@@ -211,9 +211,9 @@ for (const theme of ['light', 'dark']) {
       }
     }
     await page.goto('/#/entertainment')
-    await page.getByRole('button', { name: '新建作品', exact: true }).click()
-    await page.getByRole('menuitem', { name: /分镜创作/ }).click()
-    const dialog = page.getByRole('dialog', {
+
+    await page.getByRole('link', { name: '分镜创作', exact: true }).click()
+    const dialog = page.getByRole('region', {
       name: '新建分镜作品',
       exact: true,
     })
@@ -230,6 +230,10 @@ for (const theme of ['light', 'dark']) {
     )
     await expectControlAppearance(dialog)
     await dialog.getByRole('button', { name: '取消', exact: true }).click()
+    await page.getByRole('button', { name: '放弃修改', exact: true }).click()
+    await expect(
+      page.getByRole('heading', { name: '创作中心', exact: true }),
+    ).toBeVisible()
     expect(writes).toEqual([])
     expect(state.missing).toEqual([])
     expect(errors).toEqual([])

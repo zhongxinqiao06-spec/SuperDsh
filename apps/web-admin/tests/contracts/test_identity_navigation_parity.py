@@ -327,7 +327,7 @@ async def test_navigation_differential(
     for case in cast(list[dict[str, object]], oracle["validation"]):
         status = 200
         try:
-            validate_items(cast(list[dict[str, object]], case["items"]), modules, icons)
+            validate_items(cast(list[dict[str, object]], case["items"]), modules)
         except DomainError as error:
             status = error.status
         evidence.append(

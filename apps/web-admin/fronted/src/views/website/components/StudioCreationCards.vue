@@ -1,103 +1,99 @@
 <script setup lang="ts">
+import { computed, ref } from 'vue'
 import AppIcon from '@/components/base/AppIcon.vue'
+import StudioFilmLoop from './StudioFilmLoop.vue'
 import { usePreferences } from '@/store/modules/preferences'
 import { studioArtwork as art } from '@/utils/website/studio-showcase'
-const { tr } = usePreferences()
+
+/** 三种作品分别以宽银幕、角色设定页和竖幅展出，预览只读取公开配图。 */
+defineProps<{ playing: boolean }>()
 defineEmits<{ preview: [src: string, title: string] }>()
+const { tr } = usePreferences()
+const frames = [
+  [art.crystalCity, '水晶城远景', 'Crystal city'],
+  [art.premiere, '旅人近景', 'The traveller'],
+  ['/images/website/shot-2.webp', '车票特写', 'The ticket'],
+] as const
+const selected = ref(0)
+const frame = computed(() => frames[selected.value] ?? frames[0])
 </script>
 
 <template>
-  <div class="studio-creation-grid">
-    <button
-      class="studio-creation-card studio-story-card"
-      @click="$emit('preview', art.story, tr('故事短片', 'Narrative films'))"
-    >
-      <img :src="art.story" alt="" loading="lazy" />
-      <span class="studio-card-index"
-        >01 / {{ tr('故事短片', 'NARRATIVE FILMS') }}</span
+  <div class="creation-exhibition">
+    <StudioFilmLoop gallery :playing="playing" />
+    <article class="creation-film studio-print">
+      <button
+        class="creation-film-cover"
+        type="button"
+        :aria-label="tr('放大故事短片', 'Enlarge narrative still')"
+        @click="$emit('preview', frame[0], tr('故事短片', 'Narrative film'))"
       >
-      <div class="studio-poster-copy">
-        <span>A STORY WORTH TELLING</span>
-        <h3>
-          {{ tr('把一句话，', 'One idea.') }}<br />{{
-            tr('讲成一个故事。', 'A whole story.')
-          }}
-        </h3>
-        <p>
-          {{
-            tr(
-              '让情绪有画面，让对白有回响。',
-              'Give emotion a scene and dialogue a voice.',
-            )
-          }}
-        </p>
-      </div>
-      <span
-        class="studio-card-open"
-        :aria-label="tr('查看画面', 'View artwork')"
-        ><AppIcon name="arrow-up"
-      /></span>
-    </button>
-    <button
-      class="studio-creation-card studio-animation-card"
-      @click="
-        $emit('preview', art.animation, tr('角色动画', 'Character animation'))
-      "
-    >
-      <div class="studio-animation-image">
-        <img :src="art.animation" alt="" loading="lazy" /><span
-          class="studio-card-index"
-          >02 / {{ tr('角色动画', 'ANIMATION') }}</span
+        <img :src="frame[0]" :alt="tr(frame[1], frame[2])" loading="lazy" />
+        <span class="creation-film-title">{{
+          tr('故事短片', 'Story films')
+        }}</span>
+      </button>
+      <div
+        class="studio-contact-strip"
+        role="group"
+        :aria-label="tr('故事短片镜头', 'Narrative stills')"
+      >
+        <button
+          v-for="([src, zh, en], index) in frames"
+          :key="src"
+          type="button"
+          :aria-label="tr(zh, en)"
+          :aria-pressed="selected === index"
+          @click="selected = index"
         >
+          <img :src="src" alt="" loading="lazy" />
+        </button>
       </div>
-      <div class="studio-animation-caption">
-        <div>
-          <span>MEET YOUR CHARACTERS</span>
-          <h3>
-            {{ tr('让想象中的它，', 'Let your character') }}<br />{{
-              tr('有自己的世界。', 'find their world.')
-            }}
-          </h3>
-          <p>
-            {{
-              tr(
-                '从角色设定，到一段鲜活的冒险。',
-                'From a character sketch to a living adventure.',
-              )
-            }}
-          </p>
-        </div>
-        <AppIcon name="arrow-right" />
-      </div>
-    </button>
+    </article>
     <button
-      class="studio-creation-card studio-portrait-card"
+      class="creation-sheet"
+      type="button"
+      :aria-label="tr('放大角色动画', 'Enlarge character artwork')"
       @click="
-        $emit('preview', art.portrait, tr('竖屏内容', 'Vertical stories'))
+        $emit('preview', art.forest, tr('角色动画', 'Character animation'))
       "
     >
-      <span class="studio-card-index"
-        >03 / {{ tr('竖屏内容', 'VERTICAL STORIES') }}</span
-      >
-      <div class="studio-portrait-copy">
-        <span>SMALL SCREEN, BIG STORIES</span>
-        <h3>
-          {{ tr('小屏幕，', 'Small screen.') }}<br />{{
-            tr('也有大故事。', 'Big stories.')
-          }}
-        </h3>
-        <p>
-          {{ tr('为竖屏设计节奏，', 'Find a vertical rhythm.') }}<br />{{
-            tr('把精彩留在每一帧。', 'Make every frame count.')
-          }}
-        </p>
-        <span class="studio-format"><AppIcon name="smartphone" /> 9:16</span>
-      </div>
-      <div class="studio-phone-frame">
-        <img :src="art.portrait" alt="" loading="lazy" /><span
-          >STORY 003 <i
+      <span class="sheet-surface studio-print">
+        <span class="creation-sheet-head">{{
+          tr('角色动画', 'Character animation')
+        }}</span>
+        <img class="creation-forest" :src="art.forest" alt="" loading="lazy" />
+        <img
+          class="creation-study"
+          :src="art.expressions"
+          :alt="tr('角色铅笔表情稿', 'Character expression sketches')"
+          loading="lazy"
+        />
+        <span class="creation-swatches" aria-hidden="true"
+          ><i /><i /><i
         /></span>
-      </div>
+      </span>
+    </button>
+    <button
+      class="creation-vertical"
+      type="button"
+      :aria-label="tr('放大竖屏内容', 'Enlarge vertical still')"
+      @click="
+        $emit('preview', art.rainPortrait, tr('竖屏内容', 'Vertical story'))
+      "
+    >
+      <span class="vertical-surface studio-print">
+        <img :src="art.rainPortrait" alt="" loading="lazy" />
+        <span class="creation-vertical-head"
+          >{{ tr('竖屏内容', 'Vertical stories') }}<small>9:16</small></span
+        >
+        <span class="creation-subtitle">{{
+          tr('雨停之前，再走一站。', 'One more stop before the rain ends.')
+        }}</span>
+        <span class="creation-enlarge"
+          ><AppIcon name="arrow-up" />{{ tr('查看画面', 'View still') }}</span
+        >
+      </span>
     </button>
   </div>
 </template>

@@ -63,7 +63,9 @@ MODEL_MODULES = (
 )
 config = context.config
 if config.config_file_name:
-    fileConfig(config.config_file_name)
+    # 开发入口在迁移前已导入 Uvicorn；关闭既有 logger 会吞掉启动错误，
+    # 只剩热重载父进程存活，页面持续 502 却没有故障原因。
+    fileConfig(config.config_file_name, disable_existing_loggers=False)
 url = os.environ["WEB_ADMIN_DATABASE_URL"]
 if not url.startswith("postgresql+asyncpg://"):
     raise RuntimeError("迁移必须显式使用独立 PostgreSQL asyncpg 数据库")

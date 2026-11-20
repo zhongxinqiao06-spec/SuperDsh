@@ -11,6 +11,34 @@ export type IconNode = readonly [
 ]
 
 export const lucideIcons = {
+  house: [
+    ['path', { d: 'M15 21v-8a1 1 0 0 0-1-1h-4a1 1 0 0 0-1 1v8' }],
+    [
+      'path',
+      {
+        d: 'M3 10a2 2 0 0 1 .709-1.528l7-6a2 2 0 0 1 2.582 0l7 6A2 2 0 0 1 21 10v9a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z',
+      },
+    ],
+  ],
+  // 兼容已保存的道具库菜单；来源：https://github.com/lucide-icons/lucide/blob/main/icons/box.svg
+  box: [
+    [
+      'path',
+      {
+        d: 'M21 8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16Z',
+      },
+    ],
+    ['path', { d: 'm3.3 7 8.7 5 8.7-5' }],
+    ['path', { d: 'M12 22V12' }],
+  ],
+  'circle-play': [
+    ['circle', { cx: 12, cy: 12, r: 10 }],
+    ['polygon', { points: '10,8 16,12 10,16' }],
+  ],
+  'circle-pause': [
+    ['circle', { cx: 12, cy: 12, r: 10 }],
+    ['path', { d: 'M10 8v8m4-8v8' }],
+  ],
   'arrow-left-right': [
     ['path', { d: 'm16 3 5 5-5 5M21 8H3m5 13-5-5 5-5M3 16h18' }],
   ],

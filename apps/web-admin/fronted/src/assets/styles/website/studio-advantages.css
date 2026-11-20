@@ -1,0 +1,263 @@
+/* 对照的两张画片独立选取；下方保留角色声音与人工定稿两份创作证据。 */
+.studio-landing .benefits-spread {
+  display: grid;
+  grid-template-rows: minmax(0, 3fr) minmax(min-content, 1fr);
+  gap: clamp(10px, 2.8dvh, 30px);
+  min-height: clamp(320px, 50dvh, 620px);
+}
+.studio-landing .benefit-lead {
+  position: relative;
+  isolation: isolate;
+  display: grid;
+  grid-template-columns: minmax(0, 29fr) minmax(0, 71fr);
+  align-items: center;
+  gap: 1.2%;
+}
+.studio-landing .benefit-lead::before {
+  content: '';
+  pointer-events: none;
+  position: absolute;
+  z-index: -1;
+  inset: 63% 50% 0 -4%;
+  background: url('/images/website/premiere-ribbon.webp') center 65% / 100% 240%
+    no-repeat;
+  opacity: 0.42;
+  mix-blend-mode: multiply;
+  mask-image: linear-gradient(transparent, black 28%, black 73%, transparent);
+  animation: studio-loop-drift 10s ease-in-out infinite alternate;
+  animation-play-state: var(--chapter-play);
+}
+.dark .studio-landing .benefit-lead::before {
+  filter: invert(1) grayscale(1) sepia(1) saturate(3);
+  mix-blend-mode: screen;
+}
+@keyframes studio-loop-drift {
+  to {
+    transform: translate(2%, -3%) rotate(1deg);
+  }
+}
+.studio-landing .benefit-statement h3,
+.studio-landing .benefit-notes h3 {
+  font: 700 clamp(26px, min(3.9cqw, 6.2dvh), 65px)/1.19
+    var(--showcase-display-font);
+  color: var(--showcase-ink);
+  letter-spacing: -0.045em;
+  margin: 0;
+}
+.studio-landing .benefit-statement::before {
+  content: '';
+  display: block;
+  width: 48px;
+  height: 2px;
+  background: var(--showcase-accent);
+  margin: 0 0 1.4em;
+}
+.studio-landing .benefit-statement p {
+  margin: 1em 0 0;
+  font: 500 clamp(14px, 1.35cqw, 22px)/1.6 var(--showcase-display-font);
+  color: var(--showcase-muted);
+}
+.studio-landing .benefit-comparison {
+  position: relative;
+  min-height: 200px;
+  height: 100%;
+  isolation: isolate;
+}
+.studio-landing .benefit-take {
+  position: absolute;
+  left: 1%;
+  bottom: 5%;
+  width: 54%;
+  height: 81%;
+  padding: 0;
+  background: var(--showcase-film);
+  color: var(--showcase-white);
+  rotate: 2deg;
+  transition:
+    transform 0.45s,
+    box-shadow 0.45s,
+    border-color 0.25s;
+}
+.studio-landing .benefit-take:last-child {
+  left: auto;
+  right: 0.6%;
+  bottom: 7%;
+  width: 57%;
+  height: 89%;
+  rotate: -2deg;
+}
+.studio-landing .benefit-take[aria-pressed='true'] {
+  z-index: 2;
+  transform: translateY(-3px) scale(1.015);
+  border: 3px solid var(--showcase-accent);
+  box-shadow: 0 16px 26px -11px
+    color-mix(in srgb, var(--showcase-projector) 52%, transparent);
+}
+.studio-landing .benefit-take img {
+  display: block;
+  object-fit: cover;
+  object-position: 50% 42%;
+  width: 100%;
+  height: 100%;
+}
+.studio-landing .benefit-take:last-child img {
+  object-position: 48% 35%;
+}
+.studio-landing .take-caption {
+  position: absolute;
+  left: 5%;
+  bottom: 5%;
+  font: 600 clamp(16px, 1.65cqw, 26px)/1.5 var(--showcase-display-font);
+  border-bottom: 2px solid var(--showcase-playhead);
+  text-shadow: 0 1px 6px var(--showcase-film);
+}
+.studio-landing .take-selected {
+  position: absolute;
+  right: 3%;
+  top: 4%;
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 5px 9px;
+  border-radius: 5px;
+  background: var(--showcase-primary-hover);
+  color: var(--showcase-white);
+  font-size: clamp(11px, 0.95cqw, 15px);
+}
+.studio-landing .take-selected svg {
+  width: 1em;
+  height: 1em;
+}
+.studio-landing .benefit-notes {
+  border-top: 1px solid var(--showcase-border);
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  align-items: center;
+  gap: clamp(12px, 2cqw, 36px);
+  padding: 6px 0;
+}
+.studio-landing .benefit-notes h3 {
+  font-size: clamp(18px, 2.1cqw, 35px);
+  flex: none;
+}
+.studio-landing .benefit-reuse,
+.studio-landing .benefit-direction {
+  display: flex;
+  align-items: center;
+  gap: clamp(8px, 1.4cqw, 20px);
+  min-width: 0;
+}
+.studio-landing .reuse-portraits {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  min-width: 0;
+}
+.studio-landing .reuse-portraits img {
+  width: clamp(28px, 5.2cqw, 85px);
+  aspect-ratio: 0.84;
+  min-width: 0;
+  object-fit: cover;
+  border-radius: 5px;
+}
+.studio-landing .reuse-wave {
+  flex: 1;
+  min-width: 25px;
+  max-width: 110px;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  height: clamp(18px, 3.1cqw, 46px);
+}
+.studio-landing .reuse-wave i {
+  width: 3px;
+  border-radius: 4px;
+  background: var(--showcase-accent);
+  animation: studio-wave-level 1.9s ease-in-out var(--delay) infinite alternate;
+  animation-play-state: var(--chapter-play);
+}
+@keyframes studio-wave-level {
+  to {
+    transform: scaleY(0.52);
+  }
+}
+.studio-landing .benefit-direction {
+  border-left: 1px solid var(--showcase-border);
+  padding-left: clamp(12px, 2cqw, 30px);
+}
+.studio-landing .revision-slip {
+  flex: 1;
+  position: relative;
+  text-align: left;
+  min-width: 0;
+  min-height: clamp(65px, 8.5cqw, 128px);
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  padding: 3% 6% 3% 5%;
+  gap: clamp(2px, 0.6cqw, 10px);
+  color: var(--showcase-poster-ink);
+  font: 500 clamp(12px, 1.15cqw, 17px)/1.55 var(--showcase-display-font);
+  background: url('/images/website/advantage-revision-slip.webp') center / 100%
+    100% no-repeat;
+}
+.studio-landing .revision-slip small {
+  font-size: 0.82em;
+}
+.studio-landing .revision-slip ins {
+  color: var(--entertainment-primary);
+  text-decoration: none;
+  border-bottom: 1px solid currentColor;
+  margin: 0 0.1em;
+}
+@media (max-width: 850px) {
+  .studio-landing .benefits-spread {
+    grid-template-rows: minmax(0, 1fr) auto;
+  }
+  .studio-landing .benefit-lead {
+    grid-template-columns: 1fr;
+    grid-template-rows: auto minmax(110px, 1fr);
+    gap: 4px;
+  }
+  .studio-landing .benefit-statement h3 {
+    font-size: clamp(22px, 4.5vw, 33px);
+  }
+  .studio-landing .benefit-statement h3 br {
+    display: none;
+  }
+  .studio-landing .benefit-statement::before {
+    display: none;
+  }
+  .studio-landing .benefit-statement p {
+    margin: 0.22em 0 0;
+    font-size: 14px;
+  }
+  .studio-landing .benefit-comparison {
+    min-height: clamp(140px, 27dvh, 305px);
+  }
+  .studio-landing .benefit-notes {
+    grid-template-columns: 1fr;
+    gap: 8px;
+  }
+  .studio-landing .benefit-notes h3 {
+    font-size: clamp(16px, 3.6vw, 23px);
+  }
+  .studio-landing .benefit-direction {
+    border-left: 0;
+    padding: 5px 0 0;
+    border-top: 1px solid var(--showcase-border);
+  }
+  .studio-landing .benefit-reuse,
+  .studio-landing .benefit-direction {
+    justify-content: space-between;
+    gap: 10px;
+  }
+  .studio-landing .reuse-portraits img {
+    width: clamp(30px, 8.5vw, 50px);
+  }
+  .studio-landing .revision-slip {
+    max-width: 65%;
+    min-height: 65px;
+    padding: 10px 6% 9px;
+  }
+}

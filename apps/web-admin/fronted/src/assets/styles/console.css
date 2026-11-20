@@ -148,6 +148,13 @@
   margin-left: auto;
   transition: transform 150ms;
 }
+.console-navigation > .studio-home-link {
+  font-weight: 650;
+  margin-bottom: var(--field-gap);
+}
+.studio-home-link:not(.active) {
+  color: var(--brand-ink);
+}
 .nav-chevron-closed {
   transform: rotate(-90deg);
 }

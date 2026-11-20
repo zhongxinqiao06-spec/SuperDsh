@@ -102,7 +102,7 @@ async def test_product_menu_access_and_independent_revisions(
         if item["id"] == "studio.tasks":
             item["roleIds"] = ["admin"]
         if item["id"] == "studio.projects":
-            item.update(title="我的片单", order=2)
+            item.update(title="我的片单", order=2, icon="custom-works-icon")
         if item["id"] == "studio.library":
             item["order"] = 0
     body = {"items": draft, "version": studio["version"]}
@@ -116,6 +116,7 @@ async def test_product_menu_access_and_independent_revisions(
     pages = [i for i in personal["items"] if i["id"].startswith("studio.")]
     assert {i["id"] for i in pages} == {
         "studio.library",
+        "studio.create",
         "studio.projects",
         "studio.characters",
         "studio.environments",
@@ -123,6 +124,7 @@ async def test_product_menu_access_and_independent_revisions(
         "studio.deliveries",
     }
     assert next(i for i in pages if i["id"] == "studio.projects")["title"] == "我的片单"
+    assert next(i for i in pages if i["id"] == "studio.projects")["icon"] == "custom-works-icon"
     assert "workbench" not in {i["id"] for i in personal["items"]}
     assert (await client.get(menus + "?product=office")).json() == office
     illegal = deepcopy(draft)
@@ -146,6 +148,7 @@ async def test_product_menu_access_and_independent_revisions(
     assert sorted(r.status_code for r in responses) == [200, 409]
     restored = (await client.get("/api/navigation?product=entertainment", headers=reader)).json()
     assert {i["id"] for i in restored["items"] if i["id"].startswith("studio.")} == {
+        "studio.create",
         "studio.projects",
         "studio.library",
         "studio.tasks",

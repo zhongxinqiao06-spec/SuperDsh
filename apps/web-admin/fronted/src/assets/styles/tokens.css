@@ -37,6 +37,13 @@
   --showcase-button: linear-gradient(110deg, #bf5226, #b84c20);
   --showcase-scrim: linear-gradient(180deg, transparent 38%, #101a27c9);
   --showcase-shadow: 0 18px 48px #76351012;
+  --showcase-display-font:
+    'Songti SC', 'STSong', 'SimSun', 'Noto Serif CJK SC', serif;
+  --showcase-projector: #39271d;
+  --showcase-projection-ink: #f5e5d3;
+  --showcase-playhead: #ffcc89;
+  --showcase-pencil-paper: #fff0db;
+  --showcase-keyword: linear-gradient(105deg, #a93b12, #c65819);
   --rail-width: 248px;
   --navigation-drawer-width: 280px;
   color-scheme: light;
@@ -178,6 +185,7 @@
 }
 .dark {
   --showcase-canvas: #211d1a;
+  --showcase-keyword: linear-gradient(105deg, #eba16c, #ffd2a2);
   --showcase-soft: #2b2521;
   --showcase-peach: #3c2d22;
   --showcase-primary: #edaa78;

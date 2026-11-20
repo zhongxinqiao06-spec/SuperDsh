@@ -1,3 +1,28 @@
+import type { MenuNode } from '@/types/console/navigation'
+
+/** 在已授权的菜单上置顶首页。旧分组仍参与权限过滤，角色预览与实际侧栏共用此顺序。 */
+export function homeFirst(items: MenuNode[]): MenuNode[] {
+  const home = items.find((item) => item.moduleId === 'studio.create')
+  if (!home) return items
+  const siblings = items.filter((item) => item !== home)
+  return [
+    {
+      ...home,
+      parentId: null,
+      title: home.title === '创作中心' ? '首页' : home.title,
+      icon:
+        home.title === '创作中心' && home.icon === 'sparkles'
+          ? 'house'
+          : home.icon,
+    },
+    ...siblings.filter(
+      (item) =>
+        item.id !== home.parentId ||
+        siblings.some((child) => child.parentId === item.id),
+    ),
+  ]
+}
+
 /** 只翻译原始默认名称，自定义名称保持用户配置。 */
 export const navigationGroups: Readonly<
   Record<string, readonly [string, string]>

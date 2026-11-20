@@ -6,11 +6,12 @@ import type { StudioPage, StudioPageQuery } from '@/types/studio/studio'
 export function useStudioDirectory<T>(
   load: (query: StudioPageQuery, signal: AbortSignal) => Promise<StudioPage<T>>,
   filters: WatchSource[] = [],
+  initial?: StudioPageQuery,
 ) {
-  const page = ref(1),
-    pageSize = ref(10),
-    query = ref(''),
-    search = ref('')
+  const page = ref(initial?.page ?? 1),
+    pageSize = ref(initial?.pageSize ?? 10),
+    query = ref(initial?.search ?? ''),
+    search = ref(query.value)
   const resource = useResource((signal) =>
     load(
       { page: page.value, pageSize: pageSize.value, search: search.value },

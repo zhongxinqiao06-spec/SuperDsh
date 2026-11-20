@@ -16,7 +16,8 @@ const pages: Record<string, RouteRecordRaw['component']> = {
   'product.members': () => import('@/views/products/ProductMembersPage.vue'),
   'product.defaults': () => import('@/views/products/ProductDefaultsPage.vue'),
   'platform.extensions': () => import('@/views/tools/ExtensionsPage.vue'),
-  'studio.projects': () => import('@/views/studio/StudioHome.vue'),
+  'studio.create': () => import('@/views/studio/StudioCreationCenter.vue'),
+  'studio.projects': () => import('@/views/studio/StudioWorksPage.vue'),
   'studio.library': () => import('@/views/studio/StudioLibraryPage.vue'),
   'studio.characters': () => import('@/views/studio/StudioLibraryPage.vue'),
   'studio.environments': () => import('@/views/studio/StudioLibraryPage.vue'),
@@ -114,18 +115,29 @@ export const router = createRouter({
           meta: { product: 'office', landing: true },
         },
         {
+          path: '/entertainment/quick/new',
+          component: () => import('@/views/studio/StudioQuickPage.vue'),
+          meta: {
+            product: 'entertainment',
+            moduleId: 'studio.create',
+            studioCreation: true,
+          },
+        },
+        {
           path: '/entertainment/quick/:id',
           component: () => import('@/views/studio/StudioQuickPage.vue'),
           meta: { product: 'entertainment', moduleId: 'studio.projects' },
         },
-        {
-          path: '/entertainment/series/new',
-          redirect: (to) => ({
-            path: '/entertainment',
-            query: { ...to.query, create: 'series' },
-          }),
-          meta: { product: 'entertainment', moduleId: 'studio.projects' },
-        },
+        ...(['storyboard', 'series'] as const).map((mode) => ({
+          path: `/entertainment/${mode}/new`,
+          component: () => import('@/views/studio/StudioCreatePage.vue'),
+          props: { mode },
+          meta: {
+            product: 'entertainment',
+            moduleId: 'studio.create',
+            studioCreation: mode,
+          },
+        })),
         {
           path: '/entertainment/series/:id',
           component: () => import('@/views/studio/StudioSeriesPage.vue'),
@@ -193,6 +205,14 @@ router.beforeEach(async (to, from) => {
     !auth.can('products.' + to.meta.product)
   )
     return home
+  // 旧作品目录的新建参数只在入口消费，保留其他查询及作品直达链接。
+  if (to.path === '/entertainment' && to.query.create === 'series') {
+    const query = { ...to.query }
+    delete query.create
+    return { path: '/entertainment/series/new', query, replace: true }
+  }
+  if (to.meta.studioCreation && !auth.can('studio.projects.write'))
+    return { path: '/entertainment/works', replace: true }
   // 公共模块共用原路径，显式带上娱乐上下文，让刷新、复制链接和浏览器回退得到同一套菜单。
   if (to.meta.console && !to.meta.product) {
     const declared = productOf(to.query.product)

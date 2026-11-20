@@ -45,7 +45,7 @@ class NavigationService:
                 elif self.baseline:
                     items = upgrade_items(previous.items, product, catalog, self.baseline)
                     if items != previous.items:
-                        validate_items(items, catalog.modules, self.icons)
+                        validate_items(items, catalog.modules)
                         await tx.save(Navigation(previous.version + 1, items), None)
 
     async def catalog(
@@ -89,6 +89,7 @@ class NavigationService:
             "modules": catalog.modules
             if not admin or global_access
             else [m for m in catalog.modules if any(i["moduleId"] == m["id"] for i in items)],
+            # 仅作为编辑器的图标建议，不限制管理员保存其他名称。
             "icons": self.icons,
         }
 
@@ -115,7 +116,7 @@ class NavigationService:
                 if global_access
                 else merge_product_changes(previous.items, items, catalog, account)
             )
-            validate_items(value, catalog.modules, self.icons)
+            validate_items(value, catalog.modules)
             old = {str(item["id"]): item for item in previous.items}
             new = {str(item["id"]): item for item in value}
             for key, node in new.items():

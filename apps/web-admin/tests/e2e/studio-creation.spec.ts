@@ -6,8 +6,8 @@ import type {
   StudioSeries,
 } from '../../fronted/src/types/studio/series'
 
-/** 全部接口为内存契约替身；只验证弹窗交互，不连接用户数据库或模型供应商。 */
-async function installSeriesDialogFixture(page: Page, readonly = false) {
+/** 全部接口为内存契约替身；只验证创建页交互，不连接用户数据库或模型供应商。 */
+async function installSeriesCreationFixture(page: Page, readonly = false) {
   const state = await installFoundationFixture(page, [
     'products.entertainment',
     'studio.projects.read',
@@ -76,19 +76,11 @@ async function installSeriesDialogFixture(page: Page, readonly = false) {
   return { state, attempts, release: () => release?.() }
 }
 
-const dialogFor = (page: Page) =>
-  page.getByRole('dialog', { name: '新建系列短剧', exact: true })
-async function openFromDirectory(page: Page) {
-  await page.getByRole('button', { name: '新建作品', exact: true }).click()
-  await page.getByRole('menuitem', { name: /系列短剧/ }).click()
-  await expect(dialogFor(page)).toBeVisible()
-  await expect(
-    dialogFor(page).getByLabel('主要语言', { exact: true }),
-  ).toHaveValue('zh-CN')
-}
+const formPanel = (page: Page) =>
+  page.getByRole('region', { name: '新建系列短剧', exact: true })
 
 for (const theme of ['light', 'dark']) {
-  test(`新建系列弹窗 ${theme}：四档布局、取消保稿、失败重试和提交去重`, async ({
+  test(`创作中心和系列创建页 ${theme}：布局、草稿保护、重试和提交去重`, async ({
     page,
   }) => {
     test.setTimeout(180_000)
@@ -96,27 +88,51 @@ for (const theme of ['light', 'dark']) {
       (value) => localStorage.setItem('starbridge.theme', value),
       theme,
     )
-    const fixture = await installSeriesDialogFixture(page)
+    const fixture = await installSeriesCreationFixture(page)
     const errors: string[] = []
     page.on('pageerror', (error) => errors.push(error.message))
-    // 旧收藏入口仍可用，但背景已是作品目录，不再出现独立的新建页面。
-    await page.goto('/#/entertainment', {
-      waitUntil: 'domcontentloaded',
-      timeout: 90_000,
-    })
-    await expect(
-      page.getByRole('heading', { name: '我的作品', exact: true }),
-    ).toBeVisible({ timeout: 30_000 })
-    await page.goto('/#/entertainment/series/new', {
-      waitUntil: 'domcontentloaded',
-      timeout: 90_000,
-    })
-    const dialog = dialogFor(page)
+    await page.goto('/#/entertainment')
+    const modes = page.getByRole('group', { name: '选择创作模式' })
+    await expect(modes.getByRole('link')).toHaveCount(3)
+    for (const width of [390, 768, 1280, 1440]) {
+      await page.setViewportSize({ width, height: width === 390 ? 844 : 1000 })
+      await expect(
+        page.getByRole('heading', { name: '创作中心', exact: true }),
+      ).toBeInViewport()
+      await expect(
+        page.getByRole('link', { name: '查看我的作品' }),
+      ).toBeInViewport()
+      await expect
+        .poll(() =>
+          page.evaluate(
+            () => document.documentElement.scrollWidth <= innerWidth + 1,
+          ),
+        )
+        .toBe(true)
+      await modes
+        .locator('img')
+        .evaluateAll(async (images) =>
+          Promise.all(
+            images.map((image) => (image as HTMLImageElement).decode()),
+          ),
+        )
+      const cards = await modes
+        .getByRole('link')
+        .evaluateAll((links) =>
+          links.map((link) => link.getBoundingClientRect().toJSON()),
+        )
+      if (width === 390)
+        expect(cards[1].top).toBeGreaterThanOrEqual(cards[0].bottom)
+      else expect(cards[1].top).toBe(cards[0].top)
+      await captureDesign(page, `creation-center-${theme}-${width}.png`)
+    }
+    await page.goto('/#/entertainment?create=series')
+    const dialog = formPanel(page)
     await expect(dialog).toBeVisible()
     await expect(
-      page.getByRole('heading', { name: '我的作品', exact: true }),
+      page.getByRole('heading', { name: '新建系列短剧', exact: true }),
     ).toBeVisible()
-    await expect(page).toHaveURL(/\/entertainment(?:\?[^#]*)?$/)
+    await expect(page).toHaveURL(/\/entertainment\/series\/new$/)
     await expect(dialog.getByLabel('主要语言', { exact: true })).toHaveValue(
       'zh-CN',
     )
@@ -125,9 +141,14 @@ for (const theme of ['light', 'dark']) {
     ).toBeDisabled()
     await expect(dialog.getByRole('radio', { name: /连续剧情$/ })).toBeChecked()
 
-    for (const width of [390, 768, 1280, 1440]) {
-      await page.setViewportSize({ width, height: width === 390 ? 844 : 1000 })
-      // 等待开场/宽度适配动画结束后再取基准，避免将过渡位移误判为标题随正文滚动。
+    for (const [width, height] of [
+      [390, 844],
+      [768, 1000],
+      [1280, 600],
+      [1440, 1000],
+    ] as const) {
+      await page.setViewportSize({ width, height })
+      // 矮屏同样保留标题和底栏，长表单仅在正文中滚动。
       await expect
         .poll(() =>
           page.evaluate(
@@ -139,7 +160,7 @@ for (const theme of ['light', 'dark']) {
           ),
         )
         .toBe(0)
-      const body = dialog.locator('.el-dialog__body')
+      const body = dialog.locator('.scroll-panel__body')
       await body.evaluate((element) => {
         element.scrollTop = 0
       })
@@ -150,14 +171,12 @@ for (const theme of ['light', 'dark']) {
           ),
         )
         .toBe(true)
-      const header = await dialog.locator('.el-dialog__header').boundingBox()
-      const footer = await dialog.locator('.el-dialog__footer').boundingBox()
+      const header = await page.locator('.create-heading').boundingBox()
+      const footer = await dialog.locator('.scroll-panel__footer').boundingBox()
       const bounds = await dialog.boundingBox()
       expect(bounds!.x).toBeGreaterThanOrEqual(0)
       expect(bounds!.x + bounds!.width).toBeLessThanOrEqual(width + 1)
-      expect(footer!.y + footer!.height).toBeLessThanOrEqual(
-        (width === 390 ? 844 : 1000) + 1,
-      )
+      expect(footer!.y + footer!.height).toBeLessThanOrEqual(height + 1)
       await captureDesign(page, `series-create-${theme}-${width}-top.png`)
       const hasOverflow = await body.evaluate(
         (element) => element.scrollHeight > element.clientHeight + 1,
@@ -169,16 +188,14 @@ for (const theme of ['light', 'dark']) {
         await expect
           .poll(() => body.evaluate((element) => element.scrollTop))
           .toBeGreaterThan(0)
-      const afterHeader = await dialog
-        .locator('.el-dialog__header')
-        .boundingBox()
+      const afterHeader = await page.locator('.create-heading').boundingBox()
       const afterFooter = await dialog
-        .locator('.el-dialog__footer')
+        .locator('.scroll-panel__footer')
         .boundingBox()
       expect(Math.abs(afterHeader!.y - header!.y)).toBeLessThanOrEqual(1)
       expect(Math.abs(afterFooter!.y - footer!.y)).toBeLessThanOrEqual(1)
       await expect(
-        dialog.getByRole('spinbutton', { name: '初始集数', exact: true }),
+        dialog.getByLabel('主要语言', { exact: true }),
       ).toBeInViewport()
       await captureDesign(page, `series-create-${theme}-${width}-bottom.png`)
     }
@@ -208,18 +225,10 @@ for (const theme of ['light', 'dark']) {
     await expect(page).toHaveURL(/\/entertainment$/)
     expect(fixture.attempts).toHaveLength(0)
     // 使用真实导航链接建立 Router 历史，检查返回不会卸载提交中的表单。
-    await page.getByRole('link', { name: '制作任务', exact: true }).click()
-    await expect(
-      page.getByRole('heading', { name: '制作任务', exact: true }),
-    ).toBeVisible()
-    await page.getByRole('link', { name: '作品项目', exact: true }).click()
-    await expect(
-      page.getByRole('heading', { name: '我的作品', exact: true }),
-    ).toBeVisible()
-    await openFromDirectory(page)
+    await page.getByRole('link', { name: '系列短剧', exact: true }).click()
     await expect(count).toHaveValue(initialCount)
 
-    await dialog.getByLabel('作品名称', { exact: true }).fill('合成弹窗短剧')
+    await dialog.getByLabel('作品名称', { exact: true }).fill('合成系列短剧')
     await dialog
       .getByLabel('故事构想', { exact: true })
       .fill('两只小狗追随一张旧星图，前往遥远的星球。')
@@ -233,7 +242,7 @@ for (const theme of ['light', 'dark']) {
       '暂时无法保存',
     )
     await expect(dialog.getByLabel('作品名称', { exact: true })).toHaveValue(
-      '合成弹窗短剧',
+      '合成系列短剧',
     )
     await expect(count).toHaveValue('2')
     expect(fixture.attempts).toHaveLength(1)
@@ -266,7 +275,7 @@ for (const theme of ['light', 'dark']) {
       /\/entertainment\/series\/synthetic-series\?section=episodes$/,
     )
     await expect(
-      page.getByRole('heading', { name: '合成弹窗短剧', exact: true }),
+      page.getByRole('heading', { name: '合成系列短剧', exact: true }),
     ).toBeVisible()
     expect(errors).toEqual([])
     expect(
@@ -278,7 +287,12 @@ for (const theme of ['light', 'dark']) {
 }
 
 test('只读账号不能通过新建系列旧链接绕过权限', async ({ page }) => {
-  const fixture = await installSeriesDialogFixture(page, true)
+  const fixture = await installSeriesCreationFixture(page, true)
+  await page.goto('/#/entertainment')
+  const modes = page.getByRole('group', { name: '选择创作模式' })
+  await expect(modes.getByRole('article')).toHaveCount(3)
+  await expect(modes.getByRole('link')).toHaveCount(0)
+  await expect(page.getByRole('link', { name: '查看我的作品' })).toBeVisible()
   await page.goto('/#/entertainment/series/new', {
     waitUntil: 'domcontentloaded',
     timeout: 90_000,

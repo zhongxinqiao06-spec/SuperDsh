@@ -26,9 +26,12 @@ test('创作准备页面与真实接口对应，采用候选并保留局部编�
     authorization: 'Bearer ' + (await (await signed).json()).accessToken,
   }
   await page.getByRole('link', { name: /星桥娱乐/ }).click()
-  await page.getByRole('button', { name: '新建作品' }).click()
-  await page.getByRole('menuitem', { name: /分镜创作/ }).click()
-  const creating = page.getByRole('dialog', { name: '新建分镜作品' })
+
+  await page.getByRole('link', { name: '分镜创作', exact: true }).click()
+  const creating = page.getByRole('region', {
+    name: '新建分镜作品',
+    exact: true,
+  })
   await creating
     .getByLabel('作品名称', { exact: true })
     .fill('雨后站台 · 创作准备')
@@ -36,7 +39,7 @@ test('创作准备页面与真实接口对应，采用候选并保留局部编�
     .getByLabel('故事构想')
     .fill('两人在雨后的站台重逢，决定一起出发')
   await creating.getByLabel('视觉风格').fill('写实空镜，克制的蓝灰与暖光')
-  await creating.getByRole('button', { name: '创建并进入' }).click()
+  await creating.getByRole('button', { name: '创建并编辑故事' }).click()
   await expect(page.getByLabel('剧本正文')).toBeVisible()
   const id = page.url().match(/entertainment\/([^?]+)/u)![1]!
   const path = '/api/studio/projects/' + id

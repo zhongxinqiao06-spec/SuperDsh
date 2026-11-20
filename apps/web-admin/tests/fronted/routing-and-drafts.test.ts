@@ -1,6 +1,8 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { createPinia, setActivePinia } from 'pinia'
 import { canonicalPath, consoleContinuation } from '@/utils/console/routes'
+import { homeFirst } from '@/utils/console/navigation-display'
+import type { MenuNode } from '@/types/console/navigation'
 import {
   canOpenModule,
   consoleModules,
@@ -32,6 +34,7 @@ describe('路由、菜单和账号草稿', () => {
       'studio.environments',
       'studio.props',
       'studio.characters',
+      'studio.create',
       'studio.projects',
       'studio.library',
       'studio.tasks',
@@ -77,6 +80,14 @@ describe('路由、菜单和账号草稿', () => {
     expect(consoleContinuation('/entertainment/work-id?section=timeline')).toBe(
       '/entertainment/work-id?section=timeline',
     )
+    for (const path of [
+      '/entertainment/storyboard/new',
+      '/entertainment/quick/new',
+      '/entertainment/series/new',
+      '/entertainment/quick/record',
+      '/entertainment/series/record?section=episodes',
+    ])
+      expect(consoleContinuation(path)).toBe(path)
     expect(consoleContinuation('/settings?product=entertainment')).toBe(
       '/account/profile?product=entertainment',
     )
@@ -122,6 +133,40 @@ describe('路由、菜单和账号草稿', () => {
     expect(visibleNavigation(items, ['users.read'], ['member'])).toEqual([])
     expect(visibleNavigation(items, ['users.read'], ['admin'])).toEqual(items)
     expect(canonicalPath('/access/users', ['users.read'])).toBe('/access/users')
+  })
+
+  it('旧分组先过滤角色，再把允许访问的首页提升到首项', () => {
+    const group: MenuNode = {
+      id: 'studio-workspace',
+      kind: 'group',
+      moduleId: null,
+      parentId: null,
+      title: '创作工作台',
+      icon: 'folder',
+      order: 0,
+      visible: true,
+      roleIds: ['entertainment_creator'],
+    }
+    const home: MenuNode = {
+      ...group,
+      id: 'studio.create',
+      kind: 'page',
+      moduleId: 'studio.create',
+      parentId: group.id,
+      title: '创作中心',
+      icon: 'sparkles',
+      roleIds: [],
+    }
+    const permissions = ['products.entertainment', 'studio.projects.read']
+    const display = (role: string) =>
+      homeFirst(
+        visibleNavigation([group, home], permissions, [role], 'entertainment'),
+      )
+    expect(display('member')).toEqual([])
+    expect(display('entertainment_creator')).toEqual([
+      { ...home, parentId: null, title: '首页', icon: 'house' },
+    ])
+    expect(home.parentId).toBe(group.id)
   })
 
   it('同账号切页保留File，换代际清空并撤销所有预览', () => {

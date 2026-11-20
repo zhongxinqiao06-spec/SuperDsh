@@ -38,6 +38,11 @@ const sections = computed(() =>
       ),
 )
 const studio = ref<InstanceType<typeof StudioShowcase>>()
+const studioLinks = [
+  ['film-case', '创作方式', 'Process', 2],
+  ['studio-advantages', '创作优势', 'Why Studio', 3],
+  ['studio-creations', '作品示例', 'Examples', 1],
+] as const
 const menu = ref<HTMLElement>()
 const menuButton = ref<HTMLButtonElement>()
 const menuOpen = ref(false)
@@ -104,8 +109,29 @@ onBeforeUnmount(() => document.removeEventListener('pointerdown', outside))
     >
     <header class="masthead">
       <div class="mast-inner">
-        <PublicBrand />
+        <PublicBrand
+          :label="
+            product === 'entertainment'
+              ? tr('星桥娱乐', 'Starbridge Studio')
+              : undefined
+          "
+        />
         <nav
+          v-if="product === 'entertainment'"
+          class="product-nav premiere-nav"
+          :aria-label="tr('创作导航', 'Explore Studio')"
+        >
+          <a
+            v-for="[id, zh, en, index] in studioLinks"
+            :key="id"
+            :href="`#${id}`"
+            :aria-current="studio?.active === index ? 'location' : undefined"
+            @click.prevent="jump(id)"
+            >{{ tr(zh, en) }}</a
+          >
+        </nav>
+        <nav
+          v-else
           class="product-nav"
           :aria-label="tr('浏览产品', 'Browse products')"
         >
@@ -125,7 +151,18 @@ onBeforeUnmount(() => document.removeEventListener('pointerdown', outside))
           </router-link>
         </nav>
         <div class="public-actions">
-          <router-link class="mast-cta" to="/products"
+          <template v-if="product === 'entertainment'">
+            <router-link class="premiere-login" to="/login">{{
+              tr('登录', 'Sign in')
+            }}</router-link>
+            <router-link
+              class="studio-button premiere-start"
+              to="/entertainment"
+              >{{ tr('开始创作', 'Start creating')
+              }}<AppIcon class="diagonal-arrow" name="arrow-right"
+            /></router-link>
+          </template>
+          <router-link v-else class="mast-cta" to="/products"
             ><AppIcon name="panel-left" /><span>{{
               tr('选择工作台', 'Workspaces')
             }}</span></router-link
@@ -155,6 +192,16 @@ onBeforeUnmount(() => document.removeEventListener('pointerdown', outside))
               class="utility-menu"
               :aria-label="tr('官网导航', 'Website navigation')"
             >
+              <template v-if="product === 'entertainment'">
+                <router-link
+                  :to="productLocation('office')"
+                  @click="closeMenu()"
+                  >{{ tr('星桥办公', 'Starbridge Office') }}</router-link
+                >
+                <router-link to="/products">{{
+                  tr('选择工作台', 'Workspaces')
+                }}</router-link>
+              </template>
               <a
                 v-for="[id, zh, en] in sections"
                 :key="id"

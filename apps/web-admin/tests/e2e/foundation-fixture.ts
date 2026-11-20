@@ -129,7 +129,8 @@ export async function installFoundationFixture(
     },
   ]
   const studioPages: [string, string, string, string][] = [
-    ['studio.projects', '作品项目', '#/entertainment', 'folder'],
+    ['studio.create', '首页', '#/entertainment', 'house'],
+    ['studio.projects', '作品项目', '#/entertainment/works', 'folder'],
     ['studio.library', '素材库', '#/entertainment/library', 'book-open'],
     ['studio.tasks', '制作任务', '#/entertainment/tasks', 'history'],
   ]

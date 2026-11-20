@@ -1,5 +1,7 @@
 <script setup lang="ts">
-import { ref } from 'vue'
+import { computed, onBeforeUnmount, onMounted, ref } from 'vue'
+import StudioChapterFoot from './StudioChapterFoot.vue'
+import StudioMotionToggle from './StudioMotionToggle.vue'
 import AppIcon from '@/components/base/AppIcon.vue'
 import ManagementDialog from '@/components/overlay/ManagementDialog.vue'
 import { usePreferences } from '@/store/modules/preferences'
@@ -8,6 +10,7 @@ import {
   studioArtwork as art,
   studioChapters,
 } from '@/utils/website/studio-showcase'
+import StudioPremiere from './StudioPremiere.vue'
 import StudioCreationCards from './StudioCreationCards.vue'
 import StudioProcessCards from './StudioProcessCards.vue'
 import StudioAdvantages from './StudioAdvantages.vue'
@@ -17,17 +20,41 @@ const viewport = ref<HTMLElement>()
 const { active, jump, onKeydown } = useShowcaseScroll(viewport)
 const preview = ref({ src: '', title: '' })
 const previewOpen = ref(false)
+// 全站展示共享同一动效开关；离屏、切走标签或查看大图时停止背景运动。
+const ambient = ref(true)
+const media = window.matchMedia('(prefers-reduced-motion: reduce)')
+const reduced = ref(media.matches)
+const hidden = ref(document.hidden)
+const visible = computed(() => !hidden.value && !previewOpen.value)
+const animating = computed(
+  () => visible.value && ambient.value && !reduced.value,
+)
+function syncPreference() {
+  reduced.value = media.matches
+}
+function syncVisibility() {
+  hidden.value = document.hidden
+}
+onMounted(() => {
+  media.addEventListener('change', syncPreference)
+  document.addEventListener('visibilitychange', syncVisibility)
+})
+onBeforeUnmount(() => {
+  media.removeEventListener('change', syncPreference)
+  document.removeEventListener('visibilitychange', syncVisibility)
+})
 function showPreview(src: string, title: string) {
   preview.value = { src, title }
   previewOpen.value = true
 }
-defineExpose({ jump })
+defineExpose({ jump, active })
 </script>
 
 <template>
   <div
     ref="viewport"
     class="studio-pages"
+    :data-motion="animating ? 'running' : 'paused'"
     tabindex="0"
     :aria-label="tr('星桥娱乐分屏展示', 'Starbridge Studio chapters')"
     @keydown="onKeydown"
@@ -39,277 +66,145 @@ defineExpose({ jump })
       tabindex="-1"
       aria-labelledby="studio-title"
     >
-      <div class="studio-chapter-inner">
-        <div class="studio-hero-grid">
-          <div class="studio-hero-copy">
-            <p class="studio-eyebrow"><i /> STARBRIDGE STUDIO</p>
-            <h1 id="studio-title">
-              {{ tr('让想象，', 'Let imagination') }}<br /><em>{{
-                tr('有声有色', 'come to life')
-              }}</em
-              >{{ tr('地发生。', '.') }}
-            </h1>
-            <p class="studio-lede">
-              {{
-                tr(
-                  '从一个想法、一段剧本或一本故事开始，',
-                  'Start with an idea, a script or a story.',
-                )
-              }}<br />{{
-                tr(
-                  '创作有角色、有对白、有情绪的影片。',
-                  'Create films with characters, voices and emotion.',
-                )
-              }}
-            </p>
-            <div class="studio-actions">
-              <router-link class="studio-button" to="/entertainment"
-                >{{ tr('进入创作台', 'Open Studio') }}
-                <AppIcon name="arrow-right"
-              /></router-link>
-              <button
-                class="studio-button studio-button-outline"
-                @click="jump('film-case')"
-              >
-                {{ tr('看看怎样创作', 'See how it works') }}
-                <AppIcon name="arrow-right" />
-              </button>
-            </div>
-            <div class="studio-hero-note">
-              <b>01 — 08</b
-              ><span>{{
-                tr(
-                  '让故事、镜头与声音，在同一个作品中相遇。',
-                  'Story, shots and sound. Together in one project.',
-                )
-              }}</span>
-            </div>
-          </div>
-          <div class="studio-hero-art">
-            <button
-              class="studio-art-main"
-              :aria-label="
-                tr('查看水下幻想画面', 'View underwater fantasy artwork')
-              "
-              @click="
-                showPreview(
-                  art.underwater,
-                  tr('水下幻想', 'Underwater fantasy'),
-                )
-              "
-            >
-              <img :src="art.underwater" alt="" fetchpriority="high" /><span
-                >01 / {{ tr('想象，不设边界', 'Beyond the everyday') }}</span
-              >
-            </button>
-            <button
-              class="studio-art-world"
-              :aria-label="tr('查看未来世界画面', 'View future world artwork')"
-              @click="showPreview(art.world, tr('未来世界', 'Future worlds'))"
-            >
-              <img :src="art.world" alt="" /><span
-                >{{ tr('构建一个世界', 'Build a world') }} ↗</span
-              >
-            </button>
-            <button
-              class="studio-art-character"
-              :aria-label="
-                tr('查看古风角色画面', 'View period character artwork')
-              "
-              @click="
-                showPreview(
-                  art.character,
-                  tr('让角色鲜活', 'Bring characters to life'),
-                )
-              "
-            >
-              <img :src="art.character" alt="" /><span
-                >{{ tr('让角色鲜活', 'Give characters life') }} ↗</span
-              >
-            </button>
-            <div class="studio-art-label">
-              <span>STORY TO SCREEN</span
-              ><b>{{
-                tr('你的故事，值得被看见。', 'Your story deserves a screen.')
-              }}</b>
-            </div>
-          </div>
-        </div>
-        <div class="studio-chapter-foot">
-          <span>{{
-            tr(
-              '原创视觉示意 · 探索你的创作可能',
-              'Original concept artwork · Explore the possibilities',
-            )
-          }}</span
-          ><button @click="jump('studio-creations')">
-            {{ tr('向下探索', 'Scroll to explore') }}
-            <AppIcon name="arrow-up" />
-          </button>
-        </div>
-      </div>
+      <StudioPremiere
+        v-model="ambient"
+        :visible="active === 0 && visible"
+        :reduced="reduced"
+        @preview="showPreview"
+        @process="jump('film-case')"
+      />
     </section>
     <section
       id="studio-creations"
       class="studio-chapter studio-creations"
       data-chapter
+      :data-active="active === 1"
       tabindex="-1"
       aria-labelledby="creations-title"
     >
-      <div class="studio-chapter-inner">
-        <div class="studio-section-head">
-          <div>
-            <p class="studio-eyebrow">
-              01 / {{ tr('创作，不止一种可能', 'MADE FOR YOUR IMAGINATION') }}
-            </p>
-            <h2 id="creations-title">
-              {{
-                tr(
-                  '你的故事，不止一种样子。',
-                  'One story. Endless possibilities.',
-                )
-              }}
-            </h2>
-          </div>
+      <div class="studio-chapter-inner editorial-page">
+        <header class="studio-section-head">
+          <h2 id="creations-title">
+            {{ tr('你的', 'Your ') }}<em>{{ tr('故事', 'story') }}</em
+            >{{ tr('，不止一种样子。', ', in more than one form.') }}
+          </h2>
           <p>
             {{
               tr(
-                '有故事想讲，有角色想创造，',
-                'A story to tell. A character to create.',
-              )
-            }}<br />{{
-              tr(
-                '就从你最喜欢的表达开始。',
-                'Start with the format that feels like you.',
+                '选一种表达，让故事开场。',
+                'Choose a format and let the story begin.',
               )
             }}
           </p>
-        </div>
-        <StudioCreationCards @preview="showPreview" />
-        <div class="studio-chapter-foot">
-          <span>{{
-            tr(
-              '故事短片 / 角色动画 / 竖屏内容',
-              'Narrative films / Character animation / Vertical stories',
-            )
-          }}</span
-          ><button @click="jump('film-case')">
-            {{ tr('从灵感，到成片', 'From idea to film') }}
-            <AppIcon name="arrow-up" />
-          </button>
-        </div>
+        </header>
+        <StudioCreationCards
+          :playing="active === 1 && animating"
+          @preview="showPreview"
+        />
+        <StudioChapterFoot
+          v-model="ambient"
+          :show-motion="!reduced && active === 1"
+          :label="tr('从灵感，到成片', 'From idea to film')"
+          @next="jump('film-case')"
+        />
       </div>
     </section>
     <section
       id="film-case"
       class="studio-chapter studio-process"
       data-chapter
+      :data-active="active === 2"
       tabindex="-1"
       aria-labelledby="process-title"
     >
-      <div class="studio-chapter-inner">
-        <div class="studio-section-head">
+      <div class="studio-chapter-inner editorial-page">
+        <header class="studio-section-head">
           <div>
-            <p class="studio-eyebrow">02 / STORY TO SCREEN</p>
-            <h2 id="process-title">
+            <p class="studio-eyebrow">
               {{
-                tr(
-                  '一个故事，怎样成为一部短片。',
-                  'How a story becomes a film.',
-                )
+                tr('《雨后站台》制作手记', 'After the Rain · Production notes')
               }}
+            </p>
+            <h2 id="process-title">
+              {{ tr('一个故事，怎样成为一部', 'How a story becomes a ')
+              }}<em>{{ tr('短片', 'film') }}</em
+              >{{ tr('。', '.') }}
             </h2>
           </div>
-          <p>
-            {{
-              tr(
-                '八个步骤，四段创作旅程。',
-                'Eight steps. Four creative chapters.',
-              )
-            }}<br />{{
-              tr(
-                '每一次选择，都朝你的想象更近一点。',
-                'Every choice brings your vision closer.',
-              )
-            }}
-          </p>
-        </div>
-        <StudioProcessCards @preview="showPreview" />
-        <div class="studio-chapter-foot">
-          <span>{{
-            tr(
-              '从剧本到导出，创作过程连贯可回看。',
-              'A connected, reviewable journey from script to export.',
-            )
-          }}</span
-          ><button @click="jump('studio-advantages')">
-            {{ tr('为什么值得开始', 'Why start here') }}
-            <AppIcon name="arrow-up" />
-          </button>
-        </div>
+        </header>
+        <StudioProcessCards
+          :playing="active === 2 && animating"
+          @preview="showPreview"
+        />
+        <StudioChapterFoot
+          v-model="ambient"
+          :show-motion="!reduced && active === 2"
+          :label="tr('为什么值得开始', 'Why start here')"
+          @next="jump('studio-advantages')"
+        />
       </div>
     </section>
     <section
       id="studio-advantages"
       class="studio-chapter studio-advantages"
       data-chapter
+      :data-active="active === 3"
       tabindex="-1"
       aria-labelledby="advantages-title"
     >
-      <div class="studio-chapter-inner">
-        <div class="studio-section-head">
+      <div class="studio-chapter-inner editorial-page">
+        <header class="studio-section-head">
           <div>
-            <p class="studio-eyebrow">03 / YOUR STORY, YOUR CHOICE</p>
+            <p class="studio-eyebrow">
+              03 / {{ tr('创作优势', 'Creative advantages') }}
+            </p>
             <h2 id="advantages-title">
-              {{
-                tr(
-                  '把精力，留给真正想讲的故事。',
-                  'Keep your focus on the story.',
-                )
-              }}
+              {{ tr('把精力，留给真正想讲的', 'Focus on the ')
+              }}<em>{{ tr('故事', 'story') }}</em
+              >{{ tr('。', ' you want to tell.') }}
             </h2>
           </div>
-          <p>
-            {{
-              tr(
-                'AI 提供可能，你决定表达。',
-                'AI opens possibilities. You make the choices.',
-              )
-            }}<br />{{
-              tr(
-                '试得更轻松，做得更连贯。',
-                'Explore freely. Create with continuity.',
-              )
-            }}
-          </p>
-        </div>
-        <StudioAdvantages @preview="showPreview" />
-        <div class="studio-chapter-foot">
-          <span>{{
-            tr(
-              '少一些重复准备，多一些创作空间。',
-              'Less repeated setup. More room to create.',
-            )
-          }}</span
-          ><button @click="jump('studio-start')">
-            {{ tr('开启我的故事', 'Start my story') }}
-            <AppIcon name="arrow-up" />
-          </button>
-        </div>
+        </header>
+        <StudioAdvantages />
+        <StudioChapterFoot
+          v-model="ambient"
+          :show-motion="!reduced && active === 3"
+          :label="tr('开启我的故事', 'Start my story')"
+          @next="jump('studio-start')"
+        />
       </div>
     </section>
     <section
       id="studio-start"
       class="studio-chapter studio-start"
+      :data-active="active === 4"
       data-chapter
       tabindex="-1"
       aria-labelledby="start-title"
     >
       <div class="studio-chapter-inner">
         <div class="studio-closing-panel">
-          <img :src="art.mountains" alt="" loading="lazy" />
+          <img
+            class="closing-panorama"
+            :src="art.mountains"
+            alt=""
+            loading="lazy"
+          />
+          <img class="closing-mist" :src="art.cloud" alt="" loading="lazy" />
+          <div class="closing-contact" aria-hidden="true">
+            <img
+              v-for="(src, index) in [
+                art.mountains,
+                art.crystalCity,
+                art.mountains,
+              ]"
+              :key="index"
+              :src="src"
+              alt=""
+              loading="lazy"
+            />
+          </div>
           <div class="studio-closing-copy">
-            <p class="studio-eyebrow">04 / EVERY STORY STARTS SOMEWHERE</p>
             <h2 id="start-title">
               {{ tr('你的下一个故事，', 'Your next story') }}<br /><em>{{
                 tr('从这里开场。', 'starts here.')
@@ -318,8 +213,8 @@ defineExpose({ jump })
             <p>
               {{
                 tr(
-                  '不必等一切准备好。先把心里的那个画面，写下来。',
-                  'You don’t need every answer. Start with the scene in your mind.',
+                  '先把心里的那个画面，写下来。',
+                  'Write down the scene in your mind.',
                 )
               }}
             </p>
@@ -332,6 +227,10 @@ defineExpose({ jump })
         <footer class="studio-footer">
           <b>星桥 <span>STARBRIDGE</span></b>
           <div>
+            <StudioMotionToggle
+              v-if="!reduced && active === 4"
+              v-model="ambient"
+            />
             <router-link :to="{ query: { product: 'office' } }">{{
               tr('星桥办公', 'Starbridge Office')
             }}</router-link

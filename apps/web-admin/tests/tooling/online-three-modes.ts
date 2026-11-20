@@ -225,7 +225,7 @@ try {
     { width: 390, dark: true },
   ]) {
     step = `catalog-${width}`
-    await visit('/entertainment')
+    await visit('/entertainment/works')
     await expect(
       page.getByRole('heading', { name: '我的作品', exact: true }),
     ).toBeVisible()

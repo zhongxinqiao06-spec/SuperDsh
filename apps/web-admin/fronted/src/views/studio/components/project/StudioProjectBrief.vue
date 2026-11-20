@@ -55,9 +55,10 @@ async function save() {
       type="error"
       :closable="false"
     />
-    <el-form :disabled="disabled || mutation.busy.value"
-      ><StudioBriefFields v-model="form"
-    /></el-form>
+    <StudioBriefFields
+      v-model="form"
+      :disabled="disabled || mutation.busy.value"
+    />
     <div class="toolbar">
       <el-button
         type="primary"

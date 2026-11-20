@@ -47,7 +47,9 @@ export function canonicalPath(
     return null
   if (
     ['/products', '/office', '/entertainment'].includes(path) ||
-    /^\/entertainment\/[\w-]+$/.test(path)
+    /^\/entertainment\/[\w-]+$/.test(path) ||
+    /^\/entertainment\/(quick|series)\/[\w-]+$/.test(path) ||
+    path === '/entertainment/storyboard/new'
   )
     return path
   if (aliases[path]) return aliases[path]

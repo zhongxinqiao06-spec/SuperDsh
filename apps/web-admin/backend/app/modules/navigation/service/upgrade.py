@@ -10,7 +10,11 @@ def upgrade_items(
     items: list[dict[str, object]], product: Product, catalog: MenuCatalog, baseline: dict[str, Any]
 ) -> list[dict[str, object]]:
     if any(i["moduleId"] == "product.members" for i in items):
-        return items
+        if product != "entertainment":
+            return items
+        if not any(i["moduleId"] == "studio.create" for i in items):
+            return add_creation_center(items, catalog)
+        return upgrade_studio_home(items)
     defaults = {str(i["id"]): deepcopy(i) for i in catalog.defaults}
     source = list(baseline["office"])
     if product == "entertainment":
@@ -79,4 +83,51 @@ def upgrade_items(
         target_parent = defaults[key]["parentId"]
         if target_parent and str(target_parent) not in defaults:
             defaults[str(target_parent)] = deepcopy(previous[str(target_parent)])
+    if product == "entertainment":
+        # 早期目录同样可能限制作品入口；先迁移原字段，再由该入口派生创作中心。
+        del defaults["studio.create"]
+        return add_creation_center(list(defaults.values()), catalog)
     return list(defaults.values())
+
+
+def add_creation_center(
+    items: list[dict[str, object]], catalog: MenuCatalog
+) -> list[dict[str, object]]:
+    """从原作品入口继承分组、角色及可见性，已有自定义排序和名称继续生效。"""
+    result = deepcopy(items)
+    occupied = {i["id"] for i in result}
+    if "studio.create" in occupied:
+        # 保留管理员自定义的同名分组和它的子项，给新内置模块让出固定 ID。
+        suffix = 1
+        while f"legacy-studio-create-{suffix}" in occupied:
+            suffix += 1
+        for item in result:
+            for field in ("id", "parentId"):
+                if item[field] == "studio.create":
+                    item[field] = f"legacy-studio-create-{suffix}"
+    works = next(i for i in result if i["moduleId"] == "studio.projects")
+    entry = next(i for i in catalog.defaults if i["moduleId"] == "studio.create")
+    # 先继承原入口的可见范围，再提升默认分组里的首页。
+    result.append({**entry, **{k: works[k] for k in ("parentId", "order", "roleIds", "visible")}})
+    return upgrade_studio_home(result, added=True)
+
+
+def upgrade_studio_home(
+    items: list[dict[str, object]], *, added: bool = False
+) -> list[dict[str, object]]:
+    """旧默认入口提升到顶层，保留自定义名称、图标及来自原分组的可见范围。"""
+    home = next(i for i in items if i["moduleId"] == "studio.create")
+    if home["title"] != "创作中心" and not added:
+        return items
+    updated = dict(home)
+    if home["title"] == "创作中心":
+        updated["title"] = "首页"
+    if home["icon"] == "sparkles":
+        updated["icon"] = "house"
+    if home["parentId"] == "studio-workspace":
+        group = next(i for i in items if i["id"] == home["parentId"])
+        if group["visible"] and not group["roleIds"]:
+            updated.update(parentId=None, order=0)
+    if home == updated:
+        return items
+    return [updated if item is home else item for item in items]
