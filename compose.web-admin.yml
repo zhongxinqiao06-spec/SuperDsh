@@ -162,6 +162,45 @@ services:
     ports: ['${WEB_ADMIN_FRONTED_PORT:-5174}:8080']
     depends_on:
       backend: { condition: service_healthy }
+  gateway:
+    profiles: [https]
+    # 网关复用本次发布的前端 Nginx 镜像，通过独立挂载加载域名配置。
+    image: starbridge-web-admin-fronted:${WEB_ADMIN_SOURCE_COMMIT:-local}
+    pull_policy: never
+    entrypoint: [/usr/sbin/nginx]
+    command: ['-g', 'daemon off;']
+    restart: unless-stopped
+    depends_on:
+      fronted: { condition: service_healthy }
+    ports: ['80:80', '443:443']
+    volumes:
+      - type: bind
+        source: ./apps/web-admin/deployment/gateway
+        target: /etc/nginx/conf.d
+        read_only: true
+        bind: { create_host_path: false }
+      - type: bind
+        source: /etc/nginx/ssl/starbridgeagentplatform.com
+        target: /etc/nginx/ssl/starbridgeagentplatform.com
+        read_only: true
+        bind: { create_host_path: false }
+    # 镜像自带的探针使用前端 8080。域名入口须验证 TLS、证书链和后端就绪状态。
+    healthcheck:
+      test:
+        [
+          CMD,
+          curl,
+          -fsS,
+          --noproxy,
+          '*',
+          --resolve,
+          'starbridgeagentplatform.com:443:127.0.0.1',
+          'https://starbridgeagentplatform.com/api/health/ready',
+        ]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 10s
 volumes:
   postgres-auth:
   redis-auth:

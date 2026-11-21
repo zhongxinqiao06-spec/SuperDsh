@@ -230,6 +230,23 @@ docker run --rm --read-only --network none --user nginx -i --entrypoint sh "$FRO
 
 该检查也纳入现有生产镜像生命周期验收。后端会真实打开 Alembic 配置、迁移、业务 JSON 和引擎入口；前端以 Nginx worker 身份检查所有文件，覆盖复制进来的字体与图片，避免仅检查文件存在却漏掉启动权限或静态资源 403。可选 workspace 断链单列为 `danglingLinks`；权限检查不替代 DSH 启动和工具执行验收，不代表完整引擎已可用。
 
+### 星桥正式域名与 HTTPS
+
+在生产服务器的仓库根目录使用同一个 `docker compose` 管理网关、前端、后端和数据服务。生产 `.env` 设置 `COMPOSE_FILE=compose.yml`、`COMPOSE_PROFILES=https`、`WEB_ADMIN_PUBLIC_ORIGIN=https://starbridgeagentplatform.com`，并在 `WEB_ADMIN_ALLOWED_ORIGINS` 的 JSON 数组中包含该地址。使用预构建镜像时，`WEB_ADMIN_SOURCE_COMMIT` 取服务器上已发布的前后端镜像标签，`WEB_ADMIN_APP_PULL_POLICY=never`。本机开发沿用默认 HTTP 入口。
+
+域名转发规则在 [gateway/starbridgeagentplatform.com.conf](deployment/gateway/starbridgeagentplatform.com.conf)。服务器将证书链 `starbridgeagentplatform.com_bundle.crt` 和私钥 `starbridgeagentplatform.com.key` 存放在 `/etc/nginx/ssl/starbridgeagentplatform.com/`，目录权限为 `0700`，私钥权限为 `0600`，均由 root 持有。Compose 将配置和证书目录只读挂载到网关。HTTP 和 HTTPS 的 `www` 入口跳转到 HTTPS 根域名，并保留请求路径与参数。
+
+在前后端已经就绪的服务器上，可以单独检查和更新网关：
+
+```sh
+docker compose run --rm --no-deps gateway -t
+docker compose up -d --no-deps gateway
+docker compose ps
+curl -fsS https://starbridgeagentplatform.com/api/health/ready
+```
+
+续签时，在同一目录替换证书链和匹配的私钥，执行 `docker compose exec gateway nginx -t && docker compose exec gateway nginx -s reload`。若域名规则有更新，拉取代码后也可用这组命令热加载。
+
 ## 服务端 Agent 执行栅栏恢复
 
 办公、作品导演与剧本编辑助手按用户复用同一受管 DSH。`runtime_recovery_required` 表示旧执行者尚未确认退出；更换容器后，新的 PID 命名空间不能证明旧进程已结束。普通刷新或重启不会自动删除跨机器栅栏，也不能把 PostgreSQL 锁空闲视为旧进程退出证明。
