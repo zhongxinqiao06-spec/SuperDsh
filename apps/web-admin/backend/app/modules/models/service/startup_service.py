@@ -75,6 +75,8 @@ class StartupModelService:
         if provider is not None and provider.owner_id is not None:
             raise RuntimeError("启动连接标识与个人供应商冲突，拒绝接管")
         row = await dao.connection(body.id)
+        if row is not None and row.admin_managed:
+            return row, False
         if (
             row is not None
             and (row.adapter != body.adapter or row.base_url != body.baseUrl)
@@ -120,10 +122,12 @@ class StartupModelService:
     async def _configuration(
         self, dao: ModelDao, body: StartupConfiguration, connection: ModelConnectionRow
     ) -> bool:
+        row = await dao.configuration(body.id)
+        if row is not None and row.admin_managed:
+            return False
         parameters = validate_parameters(
             connection.adapter, body.capability, body.modelId, body.parameters, connection.base_url
         )
-        row = await dao.configuration(body.id)
         if row is not None and (
             row.connection_id != body.connectionId or row.capability != body.capability
         ):

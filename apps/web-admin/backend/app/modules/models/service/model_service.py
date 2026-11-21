@@ -104,6 +104,13 @@ class ModelService:
                 row = ModelProviderRow(id=identifier, owner_id=owner, created_at=now)
                 dao.add(row)
             key = body.apiKey.get_secret_value() if body.apiKey else ""
+            if (
+                not personal
+                and row.credential
+                and row.base_url != body.baseUrl
+                and not (key or body.clearApiKey)
+            ):
+                raise DomainError(409, "更换 API 地址时请重新输入或清除密钥")
             if key:
                 row.credential = self.cipher.seal(key, identifier)
             elif body.clearApiKey:

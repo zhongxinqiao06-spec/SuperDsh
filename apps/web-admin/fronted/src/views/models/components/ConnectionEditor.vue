@@ -1,11 +1,17 @@
 <script setup lang="ts">
-import type { ConnectionDraft } from '@/types/models/models'
+import type {
+  ConnectionDraft,
+  SupplierSubscription,
+} from '@/types/models/models'
 /** 连接编辑不会把旧密钥写进输入框，复用连接的能力类型由服务端约束。 */
 const props = defineProps<{ draft: ConnectionDraft; keyConfigured: boolean }>()
 const emit = defineEmits<{ 'update:draft': [value: ConnectionDraft] }>()
 /** 只发布新草稿，由父级用例保存；不修改传入对象及其嵌套字段。 */
 function patch(value: Partial<ConnectionDraft>): void {
   emit('update:draft', { ...props.draft, ...value })
+}
+function subscription(value: Partial<SupplierSubscription>): void {
+  patch({ subscription: { ...props.draft.subscription, ...value } })
 }
 </script>
 
@@ -44,6 +50,36 @@ function patch(value: Partial<ConnectionDraft>): void {
       maxlength="100"
       @update:model-value="patch({ region: $event })"
   /></label>
+  <fieldset class="stack">
+    <legend>套餐与额度登记</legend>
+    <label class="field"
+      >套餐名称<el-input
+        :model-value="draft.subscription?.plan"
+        maxlength="100"
+        @update:model-value="subscription({ plan: $event })"
+    /></label>
+    <label class="field"
+      >计量单位<el-input
+        :model-value="draft.subscription?.unit"
+        placeholder="如 Credits、AFP、CNY"
+        maxlength="32"
+        @update:model-value="subscription({ unit: $event })"
+    /></label>
+    <label class="field"
+      >套餐总额度<el-input-number
+        :model-value="draft.subscription?.quota ?? undefined"
+        :min="0"
+        :controls="false"
+        @update:model-value="subscription({ quota: $event ?? null })"
+    /></label>
+    <label class="field"
+      >剩余额度（人工登记）<el-input-number
+        :model-value="draft.subscription?.remaining ?? undefined"
+        :min="0"
+        :controls="false"
+        @update:model-value="subscription({ remaining: $event ?? null })"
+    /></label>
+  </fieldset>
   <label class="field"
     >API Key<el-input
       :model-value="draft.apiKey"

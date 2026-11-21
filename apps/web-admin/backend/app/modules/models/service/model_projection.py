@@ -48,6 +48,7 @@ async def synchronize_provider(dao: ModelDao, provider: ModelProviderRow) -> Non
         provider.updated_at,
     )
     connection.revision += 1
+    connection.admin_managed = True
     await dao.session.flush()
     configurations = await dao.configurations(provider.id)
     for model in provider.models:

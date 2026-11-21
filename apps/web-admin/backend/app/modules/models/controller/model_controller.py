@@ -1,11 +1,14 @@
 """模型管理协议适配；授权、凭据和持久化均由领域服务负责。"""
 
 from datetime import UTC, datetime
+from ipaddress import ip_address
 from typing import Annotated
 
-from fastapi import APIRouter, Depends, Request
+from fastapi import APIRouter, Depends, Request, Response
+from pydantic import SecretStr
 
 from app.api.dependencies import current_account
+from app.infrastructure.errors import DomainError
 from app.modules.identity.entity.bo.models import Account
 from app.modules.identity.entity.bo.product_roles import Product
 from app.modules.models.entity.vo.model_vo import (
@@ -13,6 +16,7 @@ from app.modules.models.entity.vo.model_vo import (
     ConfigurationInput,
     ConnectionInput,
     DefaultInput,
+    KeyConfirmation,
     ProductDefaultInput,
     ProviderInput,
 )
@@ -31,6 +35,36 @@ def service(request: Request) -> ModelService:
 def configurations(request: Request) -> ConfigurationService:
     """能力配置与供应商共享加密和外部连接策略。"""
     return request.app.state.services.model_configurations
+
+
+def require_key_transport(request: Request) -> None:
+    """公网入口覆盖转发协议，明文凭据仅允许 HTTPS 或本机回环直连。"""
+    forwarded = request.headers.get("x-forwarded-proto")
+    if request.url.scheme == "https":
+        return
+    if forwarded == "https" and request.client:
+        try:
+            if ip_address(request.client.host).is_private:
+                return
+        except ValueError:
+            pass
+    if (
+        not forwarded
+        and request.client
+        and request.client.host in {"::1", "127.0.0.1"}
+        and request.url.hostname in {"::1", "localhost", "127.0.0.1"}
+    ):
+        return
+    raise DomainError(403, "管理 API Key 请使用 HTTPS 或本机安全隧道")
+
+
+async def confirm_key(
+    request: Request, account: Account, proof: SecretStr | None, target: str
+) -> None:
+    require_key_transport(request)
+    await request.app.state.services.identity.confirm_model_key(
+        account, proof.get_secret_value() if proof else "", target
+    )
 
 
 @router.get("/admin/products/{product}/model-defaults")
@@ -69,12 +103,16 @@ def provider_routes(prefix: str, personal: bool) -> APIRouter:
     async def create_provider(
         body: ProviderInput, request: Request, account: AccountDep
     ) -> dict[str, object]:
+        if not personal and body.apiKey:
+            require_key_transport(request)
         return await service(request).save_provider(account, body, personal=personal)
 
     @child.patch("/providers/{provider_id}")
     async def update_provider(
         provider_id: str, body: ProviderInput, request: Request, account: AccountDep
     ) -> dict[str, object]:
+        if not personal and (body.apiKey or body.clearApiKey):
+            await confirm_key(request, account, body.passwordVerifier, provider_id)
         return await service(request).save_provider(account, body, provider_id, personal)
 
     @child.delete("/providers/{provider_id}")
@@ -131,6 +169,8 @@ async def connection_create(
     body: ConnectionInput, request: Request, account: AccountDep
 ) -> dict[str, object]:
     """创建一个可复用的供应商连接。"""
+    if body.apiKey:
+        require_key_transport(request)
     return await configurations(request).save_connection(account, body)
 
 
@@ -139,7 +179,31 @@ async def connection_update(
     identifier: str, body: ConnectionInput, request: Request, account: AccountDep
 ) -> dict[str, object]:
     """按修订更新连接，密钥为空时保留。"""
+    if body.apiKey or body.clearApiKey:
+        await confirm_key(request, account, body.passwordVerifier, identifier)
     return await configurations(request).save_connection(account, body, identifier)
+
+
+@router.post("/admin/models/connections/{identifier}/reveal-key")
+async def reveal_connection_key(
+    identifier: str,
+    body: KeyConfirmation,
+    request: Request,
+    response: Response,
+    account: AccountDep,
+) -> dict[str, str]:
+    """仅向刚复核密码的管理员返回此连接密钥，禁止浏览器与代理缓存。"""
+    await confirm_key(request, account, body.passwordVerifier, identifier)
+    response.headers["Cache-Control"] = "no-store, private"
+    return {"apiKey": await configurations(request).reveal_key(account, identifier)}
+
+
+@router.post("/admin/models/connections/{identifier}/inspect")
+async def inspect_connection(
+    identifier: str, request: Request, account: AccountDep
+) -> dict[str, object]:
+    """只读查询供应商公布的目录及余额，不调用生成接口。"""
+    return await configurations(request).inspect_connection(account, identifier)
 
 
 @router.post("/admin/models/configurations")

@@ -6,6 +6,21 @@ import {
 } from '@/utils/auth/password-verifier'
 import { sessionController } from '@/store/session-controller'
 
+/** 为一次登录或密钥操作派生验证值，不写入账号状态。 */
+export async function passwordProof(
+  identifier: string,
+  password: string,
+  signal?: AbortSignal,
+): Promise<string> {
+  const { salt } = await request<{ salt: string }>('/auth/password-salt', {
+    method: 'POST',
+    body: { identifier: identifier.trim().toLowerCase() },
+    auth: false,
+    signal,
+  })
+  return derivePasswordVerifier(password, salt)
+}
+
 /** 认证资源接口；所有路径相对统一API入口。 */
 export const authApi = {
   authorize: (body: Record<string, string>) =>
@@ -23,19 +38,13 @@ export const authApi = {
   ): Promise<AuthResponse> {
     await sessionController.beforeLogin()
     const normalized = identifier.trim().toLowerCase()
-    const { salt } = await request<{ salt: string }>('/auth/password-salt', {
-      method: 'POST',
-      body: { identifier: normalized },
-      auth: false,
-      signal,
-    })
     return request<AuthResponse>('/auth/login', {
       method: 'POST',
       auth: false,
       signal,
       body: {
         identifier: normalized,
-        passwordVerifier: await derivePasswordVerifier(password, salt),
+        passwordVerifier: await passwordProof(normalized, password, signal),
       },
     })
   },

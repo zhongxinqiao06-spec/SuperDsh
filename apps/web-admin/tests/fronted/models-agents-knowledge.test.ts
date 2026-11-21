@@ -294,6 +294,7 @@ describe('模型只读检测结论', () => {
         baseUrl: 'https://synthetic.invalid',
       }),
       undefined,
+      undefined,
     )
   })
 

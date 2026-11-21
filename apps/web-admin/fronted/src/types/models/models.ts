@@ -47,7 +47,21 @@ export interface ModelSelection {
   providerId: string
   modelId: string
 }
+export interface SupplierSubscription {
+  plan?: string
+  unit?: string
+  quota?: number | null
+  remaining?: number | null
+}
+export interface SupplierInspection {
+  checkedAt: string
+  models: string[]
+  modelError: string
+  balances: { currency: string; amount: string }[]
+  balanceError: string
+}
 export interface ConnectionDraft {
+  subscription?: SupplierSubscription
   name: string
   adapter: ModelAdapter
   baseUrl: string

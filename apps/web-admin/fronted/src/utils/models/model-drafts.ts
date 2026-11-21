@@ -34,6 +34,7 @@ export function connectionDraft(value?: ModelConnection): ConnectionDraft {
   return {
     name: value?.name ?? '',
     adapter: value?.adapter ?? 'openai-completions',
+    subscription: { ...value?.subscription },
     baseUrl: value?.baseUrl ?? '',
     region: value?.region ?? '',
     enabled: value?.enabled ?? true,

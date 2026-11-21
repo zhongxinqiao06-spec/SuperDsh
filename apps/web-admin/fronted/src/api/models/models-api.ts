@@ -1,4 +1,5 @@
 import { request } from '@/utils/request'
+import type { SupplierInspection } from '@/types/models/models'
 import type {
   Capability,
   ConfigurationDraft,
@@ -11,6 +12,15 @@ import type {
   ModelVerification,
   ProviderDraft,
 } from '@/types/models/models'
+
+/** 直接通过公网 IP 的 HTTP 页面也可管理模型列表，密钥操作需要加密传输。 */
+export function checkKeyTransport(): void {
+  if (
+    location.protocol !== 'https:' &&
+    !['localhost', '127.0.0.1', '[::1]'].includes(location.hostname)
+  )
+    throw new Error('查看或更换 API Key 请使用 HTTPS 管理入口')
+}
 
 /** 模型页面只调用无版本业务路径；密钥编辑空值由服务端保留。 */
 export const modelsApi = {
@@ -46,10 +56,24 @@ export const modelsApi = {
     ),
   catalog: (signal?: AbortSignal) =>
     request<ModelCatalog>('/admin/models/configurations', { signal }),
-  saveConnection: (draft: ConnectionDraft, id?: string) =>
+  revealKey: (id: string, passwordVerifier: string, signal: AbortSignal) =>
+    request<{ apiKey: string }>(
+      '/admin/models/connections/' + encodeURIComponent(id) + '/reveal-key',
+      { method: 'POST', body: { passwordVerifier }, signal },
+    ),
+  inspectConnection: (id: string, signal: AbortSignal) =>
+    request<SupplierInspection>(
+      '/admin/models/connections/' + encodeURIComponent(id) + '/inspect',
+      { method: 'POST', signal },
+    ),
+  saveConnection: (
+    draft: ConnectionDraft,
+    id?: string,
+    passwordVerifier?: string,
+  ) =>
     request<ModelConnection>(
       `/admin/models/connections${id ? '/' + encodeURIComponent(id) : ''}`,
-      { method: id ? 'PATCH' : 'POST', body: draft },
+      { method: id ? 'PATCH' : 'POST', body: { ...draft, passwordVerifier } },
     ),
   saveConfiguration: (draft: ConfigurationDraft, id?: string) =>
     request<ModelConfiguration>(

@@ -79,6 +79,7 @@ class ProviderInput(ModelInput):
     models: list[ModelDefinitionInput] = Field(min_length=1, max_length=100)
     enabled: bool = True
     apiKey: SecretStr | None = None
+    passwordVerifier: SecretStr | None = Field(default=None, max_length=128, exclude=True)
     clearApiKey: bool = False
 
     _address = field_validator("baseUrl")(canonical_address)
@@ -104,6 +105,21 @@ class DefaultInput(ModelInput):
     selection: Selection | None = None
 
 
+class SupplierSubscription(ModelInput):
+    """平台人工登记的套餐与额度，不替代供应商实时账单。"""
+
+    plan: str = Field(default="", max_length=100)
+    unit: str = Field(default="", max_length=32)
+    quota: float | None = Field(default=None, ge=0, allow_inf_nan=False)
+    remaining: float | None = Field(default=None, ge=0, allow_inf_nan=False)
+
+
+class KeyConfirmation(ModelInput):
+    """复用登录密码挑战，校验材料不进入响应与审计记录。"""
+
+    passwordVerifier: SecretStr = Field(min_length=1, max_length=128, exclude=True)
+
+
 class ConnectionInput(ModelInput):
     name: str = Field(min_length=1, max_length=100)
     adapter: Adapter
@@ -112,6 +128,8 @@ class ConnectionInput(ModelInput):
     revision: int | None = Field(default=None, ge=1)
     enabled: bool = True
     apiKey: SecretStr | None = None
+    passwordVerifier: SecretStr | None = Field(default=None, max_length=128, exclude=True)
+    subscription: SupplierSubscription | None = None
     clearApiKey: bool = False
     _address = field_validator("baseUrl")(canonical_address)
 

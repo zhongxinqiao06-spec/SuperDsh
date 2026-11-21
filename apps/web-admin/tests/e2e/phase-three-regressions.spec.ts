@@ -87,18 +87,16 @@ test('内置角色只读，不显示保存也不发修改请求', async ({ page 
   ).toBe(false)
 })
 
-test('模型供应商列表是独立弹窗，关闭后保留模型搜索', async ({ page }) => {
+test('供应商总览支持直接新增连接，关闭后保留模型搜索', async ({ page }) => {
   await installParityFixture(page)
   await page.goto('/#/models')
   await page
     .getByRole('textbox', { name: '搜索模型配置' })
     .fill('synthetic-search')
-  await page.getByRole('button', { name: '供应商连接', exact: true }).click()
+  await page.getByRole('button', { name: '新增连接', exact: true }).click()
   const dialog = page.getByRole('dialog', { name: '供应商连接', exact: true })
   await expect(dialog).toBeVisible()
-  await expect(
-    dialog.getByRole('button', { name: '新增连接', exact: true }),
-  ).toBeVisible()
+  await expect(dialog.getByRole('textbox', { name: '连接名称' })).toBeVisible()
   await page.keyboard.press('Escape')
   await expect(dialog).not.toBeVisible()
   await expect(page.getByRole('textbox', { name: '搜索模型配置' })).toHaveValue(

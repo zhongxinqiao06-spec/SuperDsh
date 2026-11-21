@@ -38,6 +38,8 @@ class ModelConnectionRow(Base):
     """多模态与聊天共用连接，编辑不向客户端返回旧密钥。"""
 
     __tablename__ = "model_connections"
+    subscription: Mapped[dict] = mapped_column(JSONB, default=dict, server_default="{}")
+    admin_managed: Mapped[bool] = mapped_column(Boolean, default=False, server_default="false")
     id: Mapped[str] = mapped_column(String(100), primary_key=True)
     name: Mapped[str] = mapped_column(String(100))
     adapter: Mapped[str] = mapped_column(String(50))
@@ -54,6 +56,7 @@ class ModelConfigurationRow(Base):
     """能力配置当前状态决定授权，历史版本决定被冻结执行参数。"""
 
     __tablename__ = "model_configurations"
+    admin_managed: Mapped[bool] = mapped_column(Boolean, default=False, server_default="false")
     id: Mapped[str] = mapped_column(String(100), primary_key=True)
     connection_id: Mapped[str] = mapped_column(ForeignKey("model_connections.id"), index=True)
     name: Mapped[str] = mapped_column(String(100))

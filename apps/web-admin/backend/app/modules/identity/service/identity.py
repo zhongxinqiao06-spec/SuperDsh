@@ -2,6 +2,7 @@
 
 import hmac
 import secrets
+from collections.abc import Awaitable, Callable
 from dataclasses import dataclass
 from datetime import UTC, datetime, timedelta
 from uuid import uuid4
@@ -83,8 +84,10 @@ class IdentityService:
         security: IdentitySecurity,
         setup_token: str,
         setup_expires_at: datetime | None = None,
+        confirmation_attempt: Callable[[str], Awaitable[None]] | None = None,
     ) -> None:
         self.repository = repository
+        self.confirmation_attempt = confirmation_attempt
         self.security = security
         self.setup_token = setup_token
         self.setup_expires_at = setup_expires_at or datetime.fromtimestamp(0, UTC)
@@ -298,6 +301,32 @@ class IdentityService:
                 and ("@" not in identifier or user.email_verified_at)
                 else secrets.token_urlsafe(16)
             )
+
+    async def confirm_model_key(self, account: Account, verifier: str, target: str) -> None:
+        """每次敏感操作复核当前会话、平台管理员角色和本账号密码，不签发可跨操作复用的授权。"""
+        account.require("models.manage")
+        if "admin" not in account.roles or not verifier:
+            raise DomainError(403, "需要平台管理员再次确认本人的账号密码")
+        if self.confirmation_attempt:
+            await self.confirmation_attempt(account.user_id)
+        async with self.repository.transaction() as tx:
+            current = await current_actor(tx, account, "models.manage")
+            session = await tx.session(account.session_id)
+            user = await tx.user(account.user_id)
+            if (
+                "admin" not in current.roles
+                or not user
+                or not session
+                or session.revoked_at
+                or session.user_id != account.user_id
+                or session.auth_version != current.auth_version
+                or session.expires_at <= datetime.now(UTC)
+            ):
+                raise DomainError(403, "管理员会话已失效")
+            ok = await self.security.verify(user.password_hash, None, verifier)
+            await tx.audit(account.user_id, "models.key.confirm", target, {"accepted": ok})
+        if not ok:
+            raise DomainError(403, "管理员账号密码不正确")
 
     async def login(
         self, identifier: str, password: str | None, verifier: str | None, client_name: str

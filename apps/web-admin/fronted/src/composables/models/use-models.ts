@@ -1,6 +1,7 @@
 import { computed, onScopeDispose, reactive, ref, watch } from 'vue'
 import { useRoute } from 'vue-router'
-import { modelsApi } from '@/api/models/models-api'
+import { checkKeyTransport, modelsApi } from '@/api/models/models-api'
+import { passwordProof } from '@/api/auth/auth-api'
 import { accessApi } from '@/api/access/access-api'
 import { useResource } from '@/composables/use-resource'
 import { useMutation } from '@/composables/use-mutation'
@@ -121,6 +122,15 @@ export function useModels() {
     connection = reactive(connectionDraft()),
     configuration = reactive(configurationDraft())
   const deleting = ref<ModelProvider | null>(null)
+  const keyPassword = ref('')
+  watch(
+    editingConnection,
+    () => {
+      keyPassword.value = ''
+      connection.apiKey = ''
+    },
+    { flush: 'sync' },
+  )
   const configurations = computed(() =>
     (catalog.data.value?.configurations ?? []).filter(
       (item) =>
@@ -329,9 +339,31 @@ export function useModels() {
       return
     }
     const scope = route.meta.moduleId
+    const generation = auth.generation
+    const changingKey =
+      value !== 'new' &&
+      Boolean(connection.apiKey.trim() || connection.clearApiKey)
+    if (changingKey && !keyPassword.value) {
+      mutation.error.value = '请输入当前管理员的账号密码'
+      return
+    }
     if (
-      (await mutation.run(() =>
-        modelsApi.saveConnection(
+      (await mutation.run(async () => {
+        if (connection.apiKey.trim() || connection.clearApiKey)
+          checkKeyTransport()
+        const proof = changingKey
+          ? await passwordProof(
+              auth.session?.username ?? auth.session?.email ?? '',
+              keyPassword.value,
+            )
+          : undefined
+        if (
+          generation !== auth.generation ||
+          scope !== route.meta.moduleId ||
+          editingConnection.value !== value
+        )
+          throw new Error('账号或连接已切换，请重新打开')
+        return modelsApi.saveConnection(
           {
             ...connection,
             name: connection.name.trim(),
@@ -340,8 +372,9 @@ export function useModels() {
             apiKey: connection.clearApiKey ? '' : connection.apiKey.trim(),
           },
           value === 'new' ? undefined : value.id,
-        ),
-      )) &&
+          proof,
+        )
+      })) &&
       route.meta.moduleId === scope
     ) {
       editingConnection.value = null
@@ -473,6 +506,7 @@ export function useModels() {
     configurations,
     editingProvider,
     editingConnection,
+    keyPassword,
     editingConfiguration,
     provider,
     connection,

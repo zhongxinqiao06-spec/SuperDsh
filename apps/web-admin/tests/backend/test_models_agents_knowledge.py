@@ -66,7 +66,8 @@ async def test_provider_secret_scope_default_and_configuration_projection(
     assert (await client.put("/api/admin/models/default", json=selected)).status_code == 200
     assert (
         await client.patch(
-            "/api/admin/models/providers/" + identifier, json={**body, "enabled": False}
+            "/api/admin/models/providers/" + identifier,
+            json={**body, "apiKey": "", "enabled": False},
         )
     ).status_code == 422
     preserved = await client.patch(

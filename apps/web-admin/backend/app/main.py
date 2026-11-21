@@ -152,6 +152,18 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     database = Database(settings.database_url)
     redis: Redis = Redis.from_url(settings.redis_url, socket_connect_timeout=5, socket_timeout=5)
     security = PasswordSecurity(settings.secret.get_secret_value())
+
+    async def confirmation_attempt(user_id: str) -> None:
+        """按账号原子限制短时间内的密钥密码复核，所有进程共用计数。"""
+        count = await redis.execute_command(
+            "EVAL",
+            "local n=redis.call('INCR',KEYS[1]); if n==1 then redis.call('EXPIRE',KEYS[1],60) end; return n",
+            1,
+            "model-key-confirm:" + user_id,
+        )
+        if int(count) > 12:
+            raise DomainError(429, "密码确认过于频繁，请稍后重试")
+
     identity_repository = SqlIdentityRepository(database)
     identity = IdentityService(
         identity_repository,
@@ -160,6 +172,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
         datetime.fromisoformat(settings.setup_token_expires_at)
         if settings.setup_token_expires_at
         else None,
+        confirmation_attempt=confirmation_attempt,
     )
     resource_catalog = json.loads(
         (Path(__file__).parents[1] / "resources" / "navigation.json").read_text(encoding="utf-8")

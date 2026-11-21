@@ -59,11 +59,11 @@ test('四条模型的工具栏、直接操作和内容区底部分页', async ({
   await expect(main.locator('.page-heading')).toHaveText('聊天模型')
   await expect(main.getByText(/已配置.*个供应商连接/u)).toHaveCount(0)
   const bar = main.getByRole('search')
-  await expect(bar.locator('input,button')).toHaveCount(3)
+  await expect(bar.locator('input,button')).toHaveCount(2)
   await expect(bar.locator('input,button').first()).toHaveAccessibleName(
     '搜索模型配置',
   )
-  await expect(bar.getByRole('button')).toHaveText(['新增配置', '供应商连接'])
+  await expect(bar.getByRole('button')).toHaveText(['新增配置'])
   const row = main
     .getByRole('row')
     .filter({ has: page.getByText('模型 1', { exact: true }) })
@@ -111,9 +111,11 @@ test('四条模型的工具栏、直接操作和内容区底部分页', async ({
       })
   }
   await page.setViewportSize({ width: 1280, height: 800 })
-  await bar.getByRole('button', { name: '供应商连接' }).click()
-  const dialog = page.getByRole('dialog', { name: '供应商连接' })
-  await expect(dialog.getByRole('heading', { name: '测试连接' })).toBeVisible()
+  await main.getByRole('button', { name: '套餐、额度与模型' }).click()
+  const dialog = page.getByRole('dialog', { name: '测试连接 · 供应商详情' })
+  await expect(
+    dialog.getByRole('heading', { name: '已配置模型' }),
+  ).toBeVisible()
   await dialog.getByRole('button', { name: '关闭此对话框' }).click()
   await row.getByRole('button', { name: '清除默认' }).click()
   await expect(row.getByRole('button', { name: '设为默认' })).toBeEnabled()

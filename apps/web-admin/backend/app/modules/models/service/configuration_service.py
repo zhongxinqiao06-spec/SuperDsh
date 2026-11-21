@@ -29,6 +29,7 @@ from app.modules.models.service.catalog_verification import verify_model_catalog
 from app.modules.models.service.model_projection import project_connection
 from app.modules.models.service.model_service import Audit, ProductRoles
 from app.modules.models.service.provider_transport import ProviderTransport
+from app.modules.models.service.supplier_inspection import inspect_supplier
 
 
 def connection_view(row: ModelConnectionRow) -> dict[str, object]:
@@ -42,6 +43,7 @@ def connection_view(row: ModelConnectionRow) -> dict[str, object]:
         "enabled": row.enabled,
         "revision": row.revision,
         "credentialConfigured": bool(row.credential),
+        "subscription": row.subscription or {},
         "scope": "platform",
     }
 
@@ -97,6 +99,31 @@ class ConfigurationService:
                 ],
             }
 
+    async def reveal_key(self, account: Account, identifier: str) -> str:
+        """路由已逐次复核密码；普通目录接口永不解密。"""
+        account.require("models.manage")
+        if "admin" not in account.roles:
+            raise DomainError(403, "需要平台管理员权限")
+        async with self.database.sessions() as session:
+            row = await ModelDao(session).connection(identifier)
+            if not row or not row.credential:
+                raise DomainError(404, "此连接没有已保存的密钥")
+            key = self.cipher.open(row.credential, row.id)
+        if self.audit:
+            await self.audit(account.user_id, "models.key.reveal", identifier, {})
+        return key
+
+    async def inspect_connection(self, account: Account, identifier: str) -> dict[str, object]:
+        """不持有数据库连接等待外部模型服务。"""
+        account.require("models.manage")
+        async with self.database.sessions() as session:
+            row = await ModelDao(session).connection(identifier)
+            if not row:
+                raise DomainError(404, "模型连接不存在")
+            url, adapter = row.base_url, row.adapter
+            key = self.cipher.open(row.credential, row.id) if row.credential else ""
+        return await inspect_supplier(self.transport, url, adapter, key)
+
     async def save_connection(
         self, account: Account, body: ConnectionInput, identifier: str | None = None
     ) -> dict[str, object]:
@@ -122,6 +149,8 @@ class ConfigurationService:
                 row = ModelConnectionRow(id=identifier, created_at=now, revision=0)
                 dao.add(row)
             key = body.apiKey.get_secret_value() if body.apiKey else ""
+            if row.credential and row.base_url != body.baseUrl and not (key or body.clearApiKey):
+                raise DomainError(409, "更换 API 地址时请重新输入或清除密钥")
             if key:
                 row.credential = self.cipher.seal(key, identifier)
             elif body.clearApiKey:
@@ -133,6 +162,9 @@ class ConfigurationService:
                 body.region,
             )
             row.enabled, row.updated_at, row.revision = body.enabled, now, row.revision + 1
+            row.admin_managed = True
+            if body.subscription is not None:
+                row.subscription = body.subscription.model_dump()
             await session.flush()
             await project_connection(dao, row)
             result = connection_view(row)
@@ -193,6 +225,7 @@ class ConfigurationService:
                 row.revision + 1,
             )
             result = configuration_view(row)
+            row.admin_managed = True
             await session.flush()
             dao.add(
                 ModelConfigurationVersionRow(

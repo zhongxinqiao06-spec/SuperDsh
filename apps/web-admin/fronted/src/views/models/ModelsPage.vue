@@ -4,7 +4,7 @@ import RowActions from '@/components/management/RowActions.vue'
 import PageHeader from '@/components/layout/PageHeader.vue'
 import FilterBar from '@/components/management/FilterBar.vue'
 import DataTable from '@/components/management/DataTable.vue'
-import { ref } from 'vue'
+import SupplierDirectory from './components/SupplierDirectory.vue'
 import ManagementPagination from '@/components/management/ManagementPagination.vue'
 import { useModels } from '@/composables/models/use-models'
 import ResourceStatus from '@/components/feedback/ResourceStatus.vue'
@@ -15,7 +15,14 @@ import ConfigurationEditor from '@/views/models/components/ConfigurationEditor.v
 import PersonalProviderCard from '@/views/models/components/PersonalProviderCard.vue'
 /** 聊天、多模态和个人模型共用协议组件，作用域权限由页面用例固定。 */
 const vm = useModels()
-const connectionsOpen = ref(false)
+function addSupplierModel(connectionId: string, modelId: string) {
+  vm.editConfiguration('new')
+  vm.configuration.connectionId = connectionId
+  if (modelId) {
+    vm.configuration.modelId = modelId
+    vm.configuration.name = modelId
+  }
+}
 </script>
 
 <template>
@@ -174,7 +181,14 @@ const connectionsOpen = ref(false)
         >
       </el-dialog>
     </template>
-    <template v-else-if="!vm.personal.value">
+    <template v-else-if="!vm.personal.value && vm.allowed.value">
+      <SupplierDirectory
+        :key="String(vm.multimodal.value)"
+        :connections="vm.catalog.data.value?.connections ?? []"
+        :configurations="vm.catalog.data.value?.configurations ?? []"
+        @edit="vm.editConnection"
+        @add-model="addSupplierModel"
+      />
       <FilterBar class="toolbar models-search">
         <el-input
           v-model="vm.query.value"
@@ -187,12 +201,6 @@ const connectionsOpen = ref(false)
           type="primary"
           @click="vm.editConfiguration('new')"
           >新增配置</el-button
-        >
-
-        <el-button
-          v-if="!vm.personal.value && vm.allowed.value"
-          @click="connectionsOpen = true"
-          >供应商连接</el-button
         >
       </FilterBar>
       <ManagementList :page="vm.page.value" :page-size="vm.pageSize.value">
@@ -285,43 +293,6 @@ const connectionsOpen = ref(false)
           />
         </template>
       </ManagementList>
-
-      <el-dialog
-        v-model="connectionsOpen"
-        title="供应商连接"
-        width="min(800px,94vw)"
-        class="management-dialog"
-      >
-        <div class="stack">
-          <div class="toolbar">
-            <el-button @click="vm.reload">刷新</el-button
-            ><el-button type="primary" @click="vm.editConnection('new')"
-              >新增连接</el-button
-            >
-          </div>
-          <div class="connection-grid">
-            <article
-              v-for="connection in vm.catalog.data.value?.connections ?? []"
-              :key="connection.id"
-              class="model-card"
-            >
-              <h3>{{ connection.name }}</h3>
-              <p>
-                {{ connection.adapter }} ·
-                {{ connection.enabled ? '启用' : '停用' }}
-              </p>
-              <p>
-                {{
-                  connection.credentialConfigured ? '密钥已配置' : '未配置密钥'
-                }}
-              </p>
-              <el-button @click="vm.editConnection(connection)"
-                >编辑连接</el-button
-              >
-            </article>
-          </div>
-        </div>
-      </el-dialog>
     </template>
     <ManagementDialog
       :model-value="Boolean(vm.editingProvider.value)"
@@ -349,10 +320,12 @@ const connectionsOpen = ref(false)
         @update:draft="vm.updateProvider"
     /></ManagementDialog>
     <ManagementDialog
+      v-if="vm.editingConnection.value"
       :model-value="Boolean(vm.editingConnection.value)"
       title="供应商连接"
       :busy="vm.mutation.busy.value"
       :error="vm.mutation.error.value"
+      @close="vm.editingConnection.value = null"
       @update:model-value="vm.editingConnection.value = null"
       @submit="vm.saveConnection"
       ><ConnectionEditor
@@ -365,7 +338,18 @@ const connectionsOpen = ref(false)
           )
         "
         @update:draft="vm.updateConnection"
-    /></ManagementDialog>
+      /><label
+        v-if="
+          vm.editingConnection.value !== 'new' &&
+          (vm.connection.apiKey || vm.connection.clearApiKey)
+        "
+        class="field"
+        >当前管理员账号密码<el-input
+          v-model="vm.keyPassword.value"
+          type="password"
+          autocomplete="current-password"
+      /></label>
+    </ManagementDialog>
     <ManagementDialog
       :model-value="Boolean(vm.editingConfiguration.value)"
       title="模型能力配置"
@@ -416,38 +400,7 @@ const connectionsOpen = ref(false)
   border-radius: 14px;
   color: var(--muted-foreground);
 }
-.model-card {
-  display: flex;
-  flex-direction: column;
-  align-items: flex-start;
-  gap: 12px;
-  min-width: 0;
-  border: 1px solid var(--el-border-color);
-  border-radius: 14px;
-  padding: 20px;
-  margin: 0;
-  background: var(--el-bg-color);
-  overflow-wrap: anywhere;
-}
-.model-card h3,
-.model-card p {
-  margin: 0;
-}
-.model-card h3 {
-  font-size: 16px;
-  line-height: 24px;
-}
-.model-card p {
-  line-height: 20px;
-}
-.model-card > .el-button {
-  margin-top: auto;
-}
-.connection-grid {
-  display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(min(100%, 240px), 1fr));
-  gap: 16px;
-}
+
 small {
   display: block;
   color: var(--el-text-color-secondary);
