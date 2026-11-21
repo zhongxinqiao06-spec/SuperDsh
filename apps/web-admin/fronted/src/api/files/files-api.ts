@@ -1,3 +1,4 @@
+import { requestSignal } from '@/utils/request-timeout'
 import { sha256 } from '@noble/hashes/sha2.js'
 import { bytesToHex } from '@noble/hashes/utils.js'
 import { request } from '@/utils/request'
@@ -26,7 +27,7 @@ export const filesApi = {
   migrate: (id: string, targetStorageId: string) =>
     request<{ state: string; migrationId?: string }>(
       `/files/${encodeURIComponent(id)}/migrate`,
-      { method: 'POST', body: { targetStorageId }, timeoutMs: 120_000 },
+      { method: 'POST', body: { targetStorageId } },
     ),
 }
 
@@ -38,7 +39,7 @@ export async function downloadFile(
   const generation = sessionController.generation,
     token = sessionController.current?.accessToken
   if (!token) throw new Error('请先登录')
-  const signal = AbortSignal.any([cancellation, AbortSignal.timeout(120_000)])
+  const signal = requestSignal(cancellation)
   const active = () => {
     signal.throwIfAborted()
     if (generation !== sessionController.generation)

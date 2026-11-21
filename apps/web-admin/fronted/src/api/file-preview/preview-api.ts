@@ -1,3 +1,4 @@
+import { requestSignal } from '@/utils/request-timeout'
 import {
   workspaceApi,
   downloadWorkspaceTransfer,
@@ -23,7 +24,7 @@ export const previewApi = {
       const response = await fetch(
         previewSourceUrl(location.sourceUrl, window.location.origin),
         {
-          signal: AbortSignal.any([signal, AbortSignal.timeout(70_000)]),
+          signal: requestSignal(signal),
           redirect: 'error',
           credentials: 'same-origin',
           headers: token ? { Authorization: `Bearer ${token}` } : {},

@@ -27,14 +27,13 @@ export const storageApi = {
   check: (id: string) =>
     request<{ ok: boolean }>(
       `/admin/storage/connections/${encodeURIComponent(id)}/check`,
-      { method: 'POST', timeoutMs: 60_000 },
+      { method: 'POST' },
     ),
   cleanup: () =>
     request<{ removed: number; pending: number; scheduled: number }>(
       '/admin/storage/cleanup',
       {
         method: 'POST',
-        timeoutMs: 120_000,
       },
     ),
 }

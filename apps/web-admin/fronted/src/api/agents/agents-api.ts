@@ -42,7 +42,6 @@ export function createAgentsApi(product: Product) {
       ),
     initialize: (copyLatest = false) =>
       request('/admin/agents/initialize', {
-        timeoutMs: 90_000,
         method: 'POST',
         body: { copyLatest },
       }),
@@ -50,7 +49,6 @@ export function createAgentsApi(product: Product) {
       request<{ asset: AgentAsset }>('/admin/agents/assets', {
         method: 'POST',
         body: { name, kind, contentBase64 },
-        timeoutMs: 40_000,
       }),
     download: (id: string, signal?: AbortSignal) =>
       request<AssetContent>(
@@ -60,7 +58,7 @@ export function createAgentsApi(product: Product) {
     preview: (id: string, signal?: AbortSignal) =>
       request<AssetContent>(
         `/admin/agents/assets/${encodeURIComponent(id)}/preview`,
-        { signal, timeoutMs: 90_000 },
+        { signal },
       ),
   }
 }

@@ -1,3 +1,4 @@
+import { requestSignal } from '@/utils/request-timeout'
 import { request } from '@/utils/request'
 import { apiUrl } from '@/utils/api-config'
 import { sha256 } from '@noble/hashes/sha2.js'
@@ -122,9 +123,7 @@ export async function downloadWorkspaceTransfer(
   transfer: WorkspaceTransfer,
   signal?: AbortSignal,
 ): Promise<Blob> {
-  const bounded = signal
-    ? AbortSignal.any([signal, AbortSignal.timeout(70_000)])
-    : AbortSignal.timeout(70_000)
+  const bounded = requestSignal(signal)
   const response = await fetch(
     apiUrl(
       `/connectors/${encodeURIComponent(connector)}/fs/transfers/${encodeURIComponent(transfer.transferId)}`,

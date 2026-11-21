@@ -73,7 +73,6 @@ export const toolsApi = {
     platformRequest('/admin/extensions/install', {
       method: 'POST',
       body: { contentBase64, revision, expectedSourceId },
-      timeoutMs: 120_000,
     }),
   updateSource: (
     id: string,
@@ -84,24 +83,20 @@ export const toolsApi = {
     platformRequest(`/admin/extensions/${encodeURIComponent(id)}`, {
       method: 'PUT',
       body: { revision, enabled, version },
-      timeoutMs: 60_000,
     }),
   checkSource: (id: string, version: string) =>
     platformRequest(`/admin/extensions/${encodeURIComponent(id)}/check`, {
       method: 'POST',
       body: { version },
-      timeoutMs: 60_000,
     }),
   discover: (body: Pick<McpDraft, 'endpoint' | 'token'> & { id?: string }) =>
     platformRequest<McpDiscovery>('/admin/extensions/mcp/discover', {
       method: 'POST',
       body,
-      timeoutMs: 60_000,
     }),
   connect: (body: McpDraft) =>
     platformRequest('/admin/extensions/mcp', {
       method: 'POST',
       body,
-      timeoutMs: 60_000,
     }),
 }

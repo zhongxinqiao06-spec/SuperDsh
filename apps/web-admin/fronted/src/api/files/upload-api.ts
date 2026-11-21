@@ -1,3 +1,4 @@
+import { requestSignal } from '@/utils/request-timeout'
 import { createUuid } from '@/utils/uuid'
 import { request } from '@/utils/request'
 import { apiUrl } from '@/utils/api-config'
@@ -72,9 +73,7 @@ export async function uploadFile(
             'content-type': 'application/octet-stream',
           },
           body: file.slice((part - 1) * state.partSize, part * state.partSize),
-          signal: signal
-            ? AbortSignal.any([signal, AbortSignal.timeout(60000)])
-            : AbortSignal.timeout(60000),
+          signal: requestSignal(signal),
           credentials: 'same-origin',
         },
       )

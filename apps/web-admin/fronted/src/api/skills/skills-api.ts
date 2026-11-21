@@ -58,7 +58,6 @@ export function createSkillsApi(product: Product) {
       request('/admin/skills/import', {
         method: 'POST',
         body: { contentBase64, requiredToolIds, id, version },
-        timeoutMs: 60_000,
       }),
     importExtension: (
       sourceId: string,
@@ -78,7 +77,6 @@ export function createSkillsApi(product: Product) {
           id,
           version,
         },
-        timeoutMs: 60_000,
       }),
   }
 }

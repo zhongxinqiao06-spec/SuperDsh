@@ -1,4 +1,5 @@
 import { apiUrl } from '@/utils/api-config'
+import { requestSignal } from '@/utils/request-timeout'
 import { ApiError, responseError } from '@/utils/errors'
 import { sessionController } from '@/store/session-controller'
 
@@ -31,13 +32,7 @@ export async function request<T>(
     headers.set('authorization', `Bearer ${token}`)
   if (options.body !== undefined)
     headers.set('content-type', 'application/json')
-  const timeout = Math.max(
-    1_000,
-    Math.min(options.timeoutMs ?? 20_000, 300_000),
-  )
-  const signal = options.signal
-    ? AbortSignal.any([options.signal, AbortSignal.timeout(timeout)])
-    : AbortSignal.timeout(timeout)
+  const signal = requestSignal(options.signal, options.timeoutMs)
   const init: RequestInit = {
     method: options.method ?? 'GET',
     headers,
@@ -49,6 +44,7 @@ export async function request<T>(
   }
   const url = apiUrl(path, options.query)
   let response: Response
+  let content: string
   try {
     response = await fetch(url, init)
     if (
@@ -70,6 +66,7 @@ export async function request<T>(
         response = await fetch(url, init)
       }
     }
+    content = response.status === 204 ? '' : await response.text()
   } catch (error) {
     if (signal.aborted)
       throw new ApiError(
@@ -88,7 +85,6 @@ export async function request<T>(
     throw new ApiError('账号状态已变化，请重新操作', 0, 'identity_changed')
   }
   if (response.status === 204) return undefined as T
-  const content = await response.text()
   let payload: unknown
   try {
     payload = content ? JSON.parse(content) : null

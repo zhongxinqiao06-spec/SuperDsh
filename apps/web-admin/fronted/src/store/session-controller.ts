@@ -1,3 +1,4 @@
+import { requestSignal } from '@/utils/request-timeout'
 import { apiUrl } from '@/utils/api-config'
 import { responseError } from '@/utils/errors'
 import type { AuthResponse, Identity } from '@/types/auth/auth'
@@ -78,7 +79,7 @@ export class SessionController {
         credentials: 'same-origin',
         headers: { ...deferredHeaders, 'content-type': 'application/json' },
         body: '{}',
-        signal: AbortSignal.timeout(15_000),
+        signal: requestSignal(),
       })
       if (revision !== this.revision) return this.current
       if (response.status === 401 || response.status === 403) {
@@ -123,7 +124,7 @@ export class SessionController {
           ...deferredHeaders,
           ...(token ? { authorization: `Bearer ${token}` } : {}),
         },
-        signal: AbortSignal.timeout(15_000),
+        signal: requestSignal(),
       })
       if (!response.ok && response.status !== 401)
         throw responseError(await response.json(), response.status)

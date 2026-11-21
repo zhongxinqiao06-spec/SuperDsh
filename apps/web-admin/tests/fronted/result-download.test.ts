@@ -16,7 +16,7 @@ describe('附件下载协议', () => {
     const result = await resultApi.attachment('session/a', 'file#b', signal)
     expect(request).toHaveBeenCalledWith(
       '/sessions/session%2Fa/attachments/file%23b',
-      { signal, timeoutMs: 60000 },
+      { signal },
     )
     expect(result.type).toBe('text/plain')
     expect(result.size).toBe(2)

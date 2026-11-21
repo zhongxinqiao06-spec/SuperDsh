@@ -52,7 +52,6 @@ export function createKnowledgeApi(product: Product) {
     status: (signal?: AbortSignal) =>
       request<KnowledgeStatus>('/admin/knowledge-bases/search-status', {
         signal,
-        timeoutMs: 40_000,
       }),
     documents: (id: string, signal?: AbortSignal) =>
       request<{ items: DocumentStatus[] }>(

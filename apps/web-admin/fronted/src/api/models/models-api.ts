@@ -42,7 +42,7 @@ export const modelsApi = {
   verifyProvider: (personal: boolean, id: string) =>
     request<ModelVerification>(
       `${personal ? '/models/personal' : '/admin/models'}/providers/${encodeURIComponent(id)}/verify`,
-      { method: 'POST', timeoutMs: 35_000 },
+      { method: 'POST' },
     ),
   catalog: (signal?: AbortSignal) =>
     request<ModelCatalog>('/admin/models/configurations', { signal }),
@@ -59,7 +59,7 @@ export const modelsApi = {
   verifyConfiguration: (id: string) =>
     request<ModelVerification>(
       `/admin/models/configurations/${encodeURIComponent(id)}/verify`,
-      { method: 'POST', timeoutMs: 35_000 },
+      { method: 'POST' },
     ),
   setDefault: (
     capability: Capability,

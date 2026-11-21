@@ -64,13 +64,11 @@ export const devicesApi = {
   discover: (id: string) =>
     request(`${devicePath(id)}/runtime-types/discover`, {
       method: 'POST',
-      timeoutMs: 60_000,
     }),
   createRuntime: (id: string, body: RuntimeDraft) =>
     request<DeviceRuntime>(`${devicePath(id)}/runtimes`, {
       method: 'POST',
       body,
-      timeoutMs: 60_000,
     }),
   config: (
     id: string,
@@ -80,18 +78,15 @@ export const devicesApi = {
     request<DeviceRuntime>(`${runtimePath(id, runtime.runtimeId)}/config`, {
       method: 'PUT',
       body: { config, revision: runtime.revision },
-      timeoutMs: 60_000,
     }),
   clearConfig: (id: string, runtime: DeviceRuntime) =>
     request<DeviceRuntime>(`${runtimePath(id, runtime.runtimeId)}/config`, {
       method: 'DELETE',
-      timeoutMs: 60_000,
     }),
   active: (id: string, runtime: DeviceRuntime) =>
     request<DeviceRuntime>(`${runtimePath(id, runtime.runtimeId)}/active`, {
       method: 'PUT',
       body: { active: !runtime.active, revision: runtime.revision },
-      timeoutMs: 60_000,
     }),
   renameRuntime: (id: string, runtime: DeviceRuntime, name: string) =>
     request<DeviceRuntime>(runtimePath(id, runtime.runtimeId), {

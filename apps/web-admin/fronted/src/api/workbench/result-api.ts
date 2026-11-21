@@ -1,3 +1,4 @@
+import { requestSignal } from '@/utils/request-timeout'
 import { request } from '@/utils/request'
 import { apiUrl } from '@/utils/api-config'
 import { sessionController } from '@/store/session-controller'
@@ -63,7 +64,6 @@ export const resultApi = {
         contentType?: string
       }>(`${path(session)}/attachments/${encodeURIComponent(file)}`, {
         signal,
-        timeoutMs: 60_000,
       }),
     ),
   artifact: (session: string, artifact: string, signal?: AbortSignal) =>
@@ -79,9 +79,7 @@ async function download(resource: string, signal?: AbortSignal): Promise<Blob> {
   const token = sessionController.current?.accessToken
   if (!token) throw new ApiError('请先登录', 401)
   const options = {
-    signal: signal
-      ? AbortSignal.any([signal, AbortSignal.timeout(60_000)])
-      : AbortSignal.timeout(60_000),
+    signal: requestSignal(signal),
     headers: { authorization: `Bearer ${token}` },
   }
   let response = await fetch(apiUrl(resource), options)
