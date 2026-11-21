@@ -350,15 +350,15 @@ async def test_proxy_single_session_revocation_interrupts_waiting_stream_and_clo
 async def test_provider_rejects_private_targets_redirects_and_malformed_json() -> None:
     transport = ProviderTransport()
     with pytest.raises(DomainError) as denied:
-        await transport._target("http://127.0.0.1/private", {})
+        await transport._targets("http://127.0.0.1/private", {})
     assert denied.value.status == 403
     # 即使启用百炼分桶的代理 DNS 支持，内网目标仍不能作为媒体下载地址。
     with pytest.raises(DomainError):
-        await transport._target("https://127.0.0.1/media", {}, allow_proxy_dns=True)
+        await transport._targets("https://127.0.0.1/media", {}, allow_proxy_dns=True)
     with pytest.raises(DomainError):
-        await transport._target("https://198.18.0.8/media", {})
-    target, _, _ = await transport._target("https://198.18.0.8/media", {}, allow_proxy_dns=True)
-    assert target.host == "198.18.0.8"
+        await transport._targets("https://198.18.0.8/media", {})
+    target, _, _ = await transport._targets("https://198.18.0.8/media", {}, allow_proxy_dns=True)
+    assert [url.host for url in target] == ["198.18.0.8"]
 
     async def redirect(request: httpx.Request) -> httpx.Response:
         return httpx.Response(302, headers={"Location": "http://127.0.0.1/secret"})
