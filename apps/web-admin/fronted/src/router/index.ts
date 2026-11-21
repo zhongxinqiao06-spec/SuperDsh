@@ -69,12 +69,13 @@ export const router = createRouter({
       component: () => import('@/views/website/WebsitePage.vue'),
       meta: { public: true },
     },
-    {
-      path: '/login',
-      alias: ['/bootstrap', '/register'],
+    // 注册是同一表单的独立步骤；别名会让相同 returnTo 的站内切换被判为重复导航。
+    ...['/login', '/register'].map((path) => ({
+      path,
+      alias: path === '/login' ? '/bootstrap' : [],
       component: () => import('@/views/auth/LoginPage.vue'),
       meta: { public: true },
-    },
+    })),
     {
       path: '/privacy',
       component: () => import('@/views/website/PrivacyPage.vue'),

@@ -34,6 +34,7 @@ export async function runLiveBrowser(
   input: NodeJS.ProcessEnv,
   specifications: readonly string[] = [
     'foundation-live.spec.ts',
+    'login-presentation.spec.ts',
     'studio-live.spec.ts',
     'studio.spec.ts',
     'studio-script.spec.ts',

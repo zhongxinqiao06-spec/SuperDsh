@@ -11,6 +11,11 @@ export type IconNode = readonly [
 ]
 
 export const lucideIcons = {
+  globe: [
+    ['circle', { cx: 12, cy: 12, r: 10 }],
+    ['path', { d: 'M2 12h20' }],
+    ['ellipse', { cx: 12, cy: 12, rx: 4, ry: 10 }],
+  ],
   house: [
     ['path', { d: 'M15 21v-8a1 1 0 0 0-1-1h-4a1 1 0 0 0-1 1v8' }],
     [

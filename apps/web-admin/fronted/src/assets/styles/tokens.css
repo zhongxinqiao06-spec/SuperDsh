@@ -44,6 +44,18 @@
   --showcase-playhead: #ffcc89;
   --showcase-pencil-paper: #fff0db;
   --showcase-keyword: linear-gradient(105deg, #a93b12, #c65819);
+  /* 双产品共享的公开认证纸面，铜橙按钮在两种外观下均承载浅色文字。 */
+  --auth-ink: #312820;
+  --auth-muted: #6d6055;
+  --auth-accent: #92482d;
+  --auth-rule: #b9a89b;
+  --auth-paper:
+    radial-gradient(ellipse at 100% 19%, #eee1d392, transparent 43%),
+    linear-gradient(122deg, #faf6f1, #f8f4ef 64%, #f3ece4);
+  --auth-button:
+    radial-gradient(ellipse at 31% -45%, #e6a16c4d, transparent 63%),
+    linear-gradient(170deg, #a9532d, #944726 48%, #803d23);
+  --auth-button-edge: #793c23;
   --rail-width: 248px;
   --navigation-drawer-width: 280px;
   color-scheme: light;
@@ -184,6 +196,11 @@
     0 24px 64px -16px rgb(0 0 0 / 22%), 0 4px 16px rgb(0 0 0 / 6%);
 }
 .dark {
+  --auth-ink: #f4e9de;
+  --auth-muted: #c3b3a6;
+  --auth-accent: #efad7e;
+  --auth-rule: #79685a;
+  --auth-paper: linear-gradient(122deg, #272321, #221f1d 64%, #2c241f);
   --showcase-canvas: #211d1a;
   --showcase-keyword: linear-gradient(105deg, #eba16c, #ffd2a2);
   --showcase-soft: #2b2521;
