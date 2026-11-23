@@ -40,8 +40,7 @@ async def inspect_supplier(
     address = urlsplit(url)
     balance_endpoint = address.scheme == "https" and address.netloc.lower() == "api.deepseek.com"
     catalog_call = read(url.rstrip("/") + "/models")
-    credits: list[dict[str, object]] = []
-    quota_error = ""
+    quota: dict[str, object] = {"quotaItems": [], "quotaError": ""}
     if balance_endpoint:
         (catalog, model_error), (wallet, balance_error) = await asyncio.gather(
             catalog_call, read("https://api.deepseek.com/user/balance")
@@ -50,7 +49,7 @@ async def inspect_supplier(
         address.scheme == "https"
         and address.netloc.lower() == "token-plan.cn-beijing.maas.aliyuncs.com"
     ):
-        (catalog, model_error), (credits, quota_error) = await asyncio.gather(
+        (catalog, model_error), quota = await asyncio.gather(
             catalog_call, read_quota(transport, quota_file, connection_id)
         )
         wallet, balance_error = {}, ""
@@ -89,8 +88,7 @@ async def inspect_supplier(
         "models": models,
         "modelError": model_error,
         "balances": balances,
-        "quotaItems": credits,
-        "quotaError": quota_error,
+        **quota,
         "balanceError": balance_error,
         "checkedAt": datetime.now(UTC).isoformat(),
     }

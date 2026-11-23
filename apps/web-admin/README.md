@@ -177,7 +177,7 @@ Linux/macOS 将解释器路径换为 `.venv/bin/python`。部署只安装运行�
 
 ## 独立 Docker 部署
 
-「供应商与模型」中，阿里云 Token Plan 的「查询上游」使用绑定连接的 RAM 凭据查询订阅席位 Credits。开发配置文件为 `.superdsh-work/web-admin-dev/config/aliyun-token-plan.json`，生产配置文件为后端持久配置卷中的 `/data/config/aliyun-token-plan.json`。文件包含 `connectionId`、`accessKeyId`、`accessKeySecret` 三个字符串字段，由后端账号私有读取，独立于模型推理 Key，轮换后下次查询生效。该接口需要 `modelstudio:GetSubscriptionStats` 权限，按阿里云返回的席位类型展示。个人版在接口未返回席位时可通过百炼控制台核对用量。[官方额度查询接口](https://help.aliyun.com/zh/model-studio/get-subscription-stats)
+「供应商与模型」按连接读取百炼 Token Plan 用量。开发配置文件为 `.superdsh-work/web-admin-dev/config/aliyun-token-plan.json`，生产配置文件为后端持久配置卷中的 `/data/config/aliyun-token-plan.json`。文件包含 `connectionId`、`accessKeyId`、`accessKeySecret`，由后端账号私有读取，轮换后下次查询生效。个人版设置 `"edition": "personal"`。管理员点击「查询上游」后，后端通过 `GenerateCLIAccessToken` 换取临时令牌，调用百炼 CLI 的个人用量接口，展示当月已用比例和北京时间的重置时间。RAM 用户需在百炼控制台获得所属组织的订阅套餐权限。准确的剩余 Credits 通过旁边的「我的订阅」查看。省略 `edition` 的既有配置继续使用 `GetSubscriptionStats` 读取席位额度。[官方个人用量命令](https://help.aliyun.com/zh/model-studio/cli/usage-quota) · [席位额度接口](https://help.aliyun.com/zh/model-studio/get-subscription-stats)
 
 在仓库根执行 `docker compose up -d`。首次启动会构建 Vue 前端与 FastAPI 后端，生成并持久保存服务凭据，启动 Ollama 后校验中文检索模型。默认端口为 5174，使用服务器 IP 或域名时，将 `WEB_ADMIN_PUBLIC_ORIGIN` 设为实际公开地址。空库初始账号取自 `deployment/initial-admin.json`。
 

@@ -85,7 +85,7 @@ class ProviderTransport:
         method: str,
         url: str,
         headers: dict[str, str],
-        body: dict[str, object] | None,
+        body: dict[str, object] | bytes | None,
         allow_proxy_dns: bool,
         read_timeout: float,
     ) -> AsyncIterator[httpx.Response]:
@@ -113,7 +113,8 @@ class ProviderTransport:
                             method,
                             target,
                             headers=headers,
-                            json=body,
+                            json=None if isinstance(body, bytes) else body,
+                            content=body if isinstance(body, bytes) else None,
                             extensions=extensions,
                             timeout=timeout,
                         )
@@ -132,7 +133,7 @@ class ProviderTransport:
         method: str,
         url: str,
         headers: dict[str, str],
-        body: dict[str, object] | None = None,
+        body: dict[str, object] | bytes | None = None,
         *,
         preserve_status: bool = False,
         allow_proxy_dns: bool = False,
@@ -196,7 +197,7 @@ class ProviderTransport:
         method: str,
         url: str,
         headers: dict[str, str],
-        body: dict[str, object] | None = None,
+        body: dict[str, object] | bytes | None = None,
         *,
         read_timeout: float = 60,
     ) -> dict[str, object]:

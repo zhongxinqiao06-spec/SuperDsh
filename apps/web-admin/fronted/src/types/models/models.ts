@@ -54,6 +54,7 @@ export interface SupplierSubscription {
   remaining?: number | null
 }
 export interface SupplierInspection {
+  personalUsage?: { usedRatio: number | null; resetAtMs: number | null }
   quotaItems?: { type: string; quota: number; remaining: number }[]
   quotaError?: string
   checkedAt: string

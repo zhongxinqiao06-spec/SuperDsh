@@ -25,6 +25,25 @@ const selected = ref('')
 const row = computed(() =>
   props.connections.find((c) => c.id === selected.value),
 )
+const isAliyunPlan = computed(
+  () =>
+    row.value &&
+    new URL(row.value.baseUrl).origin ===
+      'https://token-plan.cn-beijing.maas.aliyuncs.com',
+)
+const percent = new Intl.NumberFormat('zh-CN', {
+  style: 'percent',
+  maximumFractionDigits: 2,
+})
+const beijingTime = new Intl.DateTimeFormat('zh-CN', {
+  timeZone: 'Asia/Shanghai',
+  year: 'numeric',
+  month: '2-digit',
+  day: '2-digit',
+  hour: '2-digit',
+  minute: '2-digit',
+  hourCycle: 'h23',
+})
 const configured = computed(() =>
   props.configurations.filter((c) => c.connectionId === selected.value),
 )
@@ -71,7 +90,7 @@ function provider(c: ModelConnection) {
       plan: 'Token Plan',
       unit: 'Credits',
       docs: 'https://help.aliyun.com/zh/model-studio/token-plan-usage-quota',
-      note: '查询上游可读取此连接绑定的阿里云账户席位额度。个人套餐用量可在百炼「我的订阅」核对。',
+      note: '',
     }
   if (
     url.hostname === 'ark.cn-beijing.volces.com' &&
@@ -219,6 +238,66 @@ function add(id: string, model: string) {
           >官方说明 ↗</a
         >
       </div>
+      <section
+        v-if="isAliyunPlan"
+        class="personal-usage"
+        aria-label="Token Plan 用量"
+      >
+        <div class="supplier-title">
+          <h3>
+            {{
+              inspection?.personalUsage ? '个人版月度用量' : 'Token Plan 用量'
+            }}
+          </h3>
+          <a
+            href="https://bailian.console.aliyun.com/cn-beijing/subscription/token-plan"
+            title="在百炼查看剩余 Credits"
+            target="_blank"
+            rel="noopener noreferrer"
+            >我的订阅<span aria-hidden="true"> ↗</span></a
+          >
+        </div>
+        <dl v-if="inspection?.personalUsage" class="supplier-quota">
+          <div>
+            <dt>本月已用</dt>
+            <dd>
+              {{
+                inspection.personalUsage.usedRatio == null
+                  ? '暂无数据'
+                  : percent.format(inspection.personalUsage.usedRatio)
+              }}
+            </dd>
+            <progress
+              v-if="inspection.personalUsage.usedRatio != null"
+              max="1"
+              :value="inspection.personalUsage.usedRatio"
+              aria-label="本月已用比例"
+            />
+          </div>
+          <div>
+            <dt>重置时间（北京时间）</dt>
+            <dd>
+              {{
+                inspection.personalUsage.resetAtMs == null
+                  ? '暂无数据'
+                  : beijingTime.format(inspection.personalUsage.resetAtMs)
+              }}
+            </dd>
+          </div>
+        </dl>
+        <p v-if="inspection?.quotaError" role="status">
+          {{ inspection.quotaError }}
+        </p>
+        <div class="supplier-title">
+          <el-button :loading="busy" @click="query">查询上游</el-button>
+          <small v-if="inspection"
+            >更新于
+            {{
+              beijingTime.format(new Date(inspection.checkedAt))
+            }}（北京时间）</small
+          >
+        </div>
+      </section>
       <dl class="supplier-quota">
         <div>
           <dt>套餐总额度 · 人工登记</dt>
@@ -249,10 +328,12 @@ function add(id: string, model: string) {
       <p v-else>尚未配置模型。</p>
       <div class="toolbar">
         <h3>供应商实时数据</h3>
-        <el-button :loading="busy" @click="query">查询上游</el-button>
+        <el-button v-if="!isAliyunPlan" :loading="busy" @click="query"
+          >查询上游</el-button
+        >
       </div>
       <template v-if="inspection"
-        ><small
+        ><small v-if="!isAliyunPlan"
           >查询时间 {{ new Date(inspection.checkedAt).toLocaleString() }}</small
         >
         <p v-for="b in inspection.balances" :key="b.currency">
@@ -270,7 +351,9 @@ function add(id: string, model: string) {
             </dd>
           </div>
         </dl>
-        <p v-if="inspection.quotaError">{{ inspection.quotaError }}</p>
+        <p v-if="!isAliyunPlan && inspection.quotaError">
+          {{ inspection.quotaError }}
+        </p>
         <p v-if="inspection.modelError">
           模型目录：{{ inspection.modelError }}
         </p>
@@ -291,6 +374,21 @@ function add(id: string, model: string) {
 .supplier-directory {
   display: grid;
   gap: var(--space-3, 12px);
+}
+.personal-usage {
+  display: grid;
+  gap: var(--space-3, 12px);
+  border-block: 1px solid var(--border);
+  padding-block: var(--space-4, 16px);
+}
+.personal-usage h3,
+.personal-usage p {
+  margin: 0;
+}
+.personal-usage progress {
+  width: 100%;
+  height: 6px;
+  accent-color: var(--el-color-primary);
 }
 .supplier-directory h2,
 .supplier-title h3,

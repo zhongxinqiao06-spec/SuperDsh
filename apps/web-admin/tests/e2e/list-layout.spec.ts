@@ -4,7 +4,11 @@ import { installResourceFixture } from '../parity/resource-fixture'
 import type { ModelCatalog } from '../../fronted/src/types/models/models'
 
 /** 合成模型目录只在浏览器上下文中生效，用于验证行权限、默认操作和分页。 */
-async function installCatalog(page: Page, count: number) {
+async function installCatalog(
+  page: Page,
+  count: number,
+  baseUrl = 'https://synthetic.invalid',
+) {
   await installParityFixture(page)
   const catalog: ModelCatalog = {
     configurations: Array.from({ length: count }, (_, index) => ({
@@ -26,7 +30,7 @@ async function installCatalog(page: Page, count: number) {
         adapter: 'openai-completions',
         enabled: true,
         region: '',
-        baseUrl: 'https://synthetic.invalid',
+        baseUrl,
         revision: 1,
         scope: 'platform',
         credentialConfigured: true,
@@ -153,6 +157,45 @@ test('四条模型的工具栏、直接操作和内容区底部分页', async ({
   await bar.getByRole('textbox').fill('无匹配项')
   await expect(pager).toBeHidden()
   await expect(main.getByText(/搜索条件/u)).toBeVisible()
+})
+
+test('阿里云个人版用量显示真实零值、北京时间和订阅入口', async ({ page }) => {
+  await installCatalog(
+    page,
+    1,
+    'https://token-plan.cn-beijing.maas.aliyuncs.com/compatible-mode/v1',
+  )
+  let usedRatio: number | null = 0
+  await page.route('**/api/admin/models/connections/local/inspect', (route) =>
+    route.fulfill({
+      json: {
+        models: [],
+        modelError: '',
+        balances: [],
+        balanceError: '',
+        checkedAt: '2026-11-23T02:00:00Z',
+        personalUsage: {
+          usedRatio,
+          resetAtMs: Date.parse('2026-12-01T16:00:00Z'),
+        },
+        quotaError: '',
+      },
+    }),
+  )
+  await page.goto('/#/models')
+  await page.getByRole('button', { name: '套餐、额度与模型' }).click()
+  const usage = page.getByRole('region', { name: 'Token Plan 用量' })
+  await expect(usage.getByRole('link', { name: '我的订阅' })).toHaveAttribute(
+    'href',
+    'https://bailian.console.aliyun.com/cn-beijing/subscription/token-plan',
+  )
+  await usage.getByRole('button', { name: '查询上游' }).click()
+  await expect(usage.getByText('0%', { exact: true })).toBeVisible()
+  await expect(usage.getByText(/2026\/12\/02\s+00:00/)).toBeVisible()
+  usedRatio = null
+  await usage.getByRole('button', { name: '查询上游' }).click()
+  await expect(usage.getByText('暂无数据', { exact: true })).toBeVisible()
+  await expect(usage.getByRole('progressbar')).toHaveCount(0)
 })
 
 test('多页数据在列表内滚动，末行在页脚上方，切页回到列表顶部', async ({
