@@ -250,7 +250,7 @@ function add(id: string, model: string) {
             }}
           </h3>
           <a
-            href="https://bailian.console.aliyun.com/cn-beijing/subscription/token-plan"
+            href="https://bailian.console.aliyun.com/cn-beijing/subscription/token-plan/personal"
             title="在百炼查看剩余 Credits"
             target="_blank"
             rel="noopener noreferrer"

@@ -187,7 +187,7 @@ test('阿里云个人版用量显示真实零值、北京时间和订阅入口',
   const usage = page.getByRole('region', { name: 'Token Plan 用量' })
   await expect(usage.getByRole('link', { name: '我的订阅' })).toHaveAttribute(
     'href',
-    'https://bailian.console.aliyun.com/cn-beijing/subscription/token-plan',
+    'https://bailian.console.aliyun.com/cn-beijing/subscription/token-plan/personal',
   )
   await usage.getByRole('button', { name: '查询上游' }).click()
   await expect(usage.getByText('0%', { exact: true })).toBeVisible()
