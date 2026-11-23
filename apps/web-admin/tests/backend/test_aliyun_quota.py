@@ -7,12 +7,86 @@ from urllib.parse import parse_qs
 import httpx
 import pytest
 
-from app.modules.models.service.aliyun_personal_usage import TOKEN_PATH, USAGE_API
-from app.modules.models.service.aliyun_quota import HOST, PATH
+from app.modules.models.service.aliyun_personal_usage import LOGIN_API, TOKEN_PATH, USAGE_API
+from app.modules.models.service.aliyun_quota import HOST, PATH, read_quota
 from app.modules.models.service.provider_transport import ProviderTransport
 from app.modules.models.service.supplier_inspection import inspect_supplier
 
 ORIGIN = "https://token-plan.cn-beijing.maas.aliyuncs.com/compatible-mode/v1"
+
+
+@pytest.mark.parametrize("state", ["missing", "owner", "other", "expired", "ok", "denied"])
+async def test_bound_cli_verifies_ram_before_reading_usage(tmp_path: Path, state: str) -> None:
+    config = tmp_path / "quota.json"
+    config.write_text(
+        json.dumps(
+            {
+                "connectionId": "plan",
+                "edition": "personal",
+                "cliRamAccount": {"name": "tester", "userId": "22", "ownerId": "11"},
+            }
+        )
+    )
+    if state != "missing":
+        directory = tmp_path / "aliyun-personal-cli"
+        directory.mkdir()
+        (directory / "config.json").write_text(
+            json.dumps(
+                {
+                    "access_token": "fixture-console",
+                    "api_key": "fixture-ordinary",
+                    "console_switch_agent": "42",
+                }
+            )
+        )
+    calls = []
+
+    def respond(request: httpx.Request) -> httpx.Response:
+        assert request.url.host == "bailian-cs.console.aliyun.com"
+        assert request.headers["authorization"] == "Bearer fixture-console"
+        payload = json.loads(parse_qs(request.content.decode())["params"][0])
+        assert payload["Data"]["cornerstoneParam"]["switchAgent"] == 42
+        assert "fixture-ordinary" not in request.content.decode()
+        api = request.url.params["api"]
+        calls.append(api)
+        if api == LOGIN_API:
+            if state == "expired":
+                return httpx.Response(401)
+            uid = "11" if state == "owner" else "33" if state == "other" else "22"
+            return httpx.Response(
+                200,
+                json={
+                    "data": {
+                        "success": True,
+                        "DataV2": {"data": {"data": {"aliyun": {"uid": uid, "parentUid": "11"}}}},
+                    }
+                },
+            )
+        assert api == USAGE_API and state in ("ok", "denied")
+        if state == "denied":
+            return httpx.Response(
+                200,
+                json={"data": {"success": False, "errorCode": "BailianGateway.Team.NotAuthorised"}},
+            )
+        return httpx.Response(
+            200, json={"data": {"per1MonthPercentage": 0, "per1MonthResetTime": 1800000000000}}
+        )
+
+    result = await read_quota(
+        ProviderTransport(transport=httpx.MockTransport(respond)), config, "plan"
+    )
+    verified = state in ("ok", "denied")
+    assert calls == (
+        [LOGIN_API, USAGE_API] if verified else [] if state == "missing" else [LOGIN_API]
+    )
+    assert result["cliRamAccount"] == {"name": "tester", "verified": verified}
+    assert result["personalUsage"] == (
+        {"usedRatio": 0, "resetAtMs": 1800000000000}
+        if state == "ok"
+        else {"usedRatio": None, "resetAtMs": None}
+    )
+    assert bool(result["quotaError"]) == (state != "ok")
+    assert "fixture" not in json.dumps(result)
 
 
 @pytest.mark.parametrize("status", [200, 403])

@@ -10,7 +10,14 @@ from pathlib import Path
 from uuid import uuid4
 
 from app.infrastructure.errors import DomainError
-from app.modules.models.service.aliyun_personal_usage import TOKEN_PATH, personal_usage
+from app.modules.models.service.aliyun_personal_usage import (
+    TOKEN_PATH,
+    USAGE_API,
+    console_read,
+    monthly_usage,
+    personal_usage,
+    verified_cli_session,
+)
 from app.modules.models.service.provider_transport import ProviderTransport
 
 HOST = "modelstudio.cn-beijing.aliyuncs.com"
@@ -57,6 +64,30 @@ async def read_quota(
         personal = config.get("edition") == "personal"
         if personal:
             reply["personalUsage"] = {"usedRatio": None, "resetAtMs": None}
+            if "cliRamAccount" in config:
+                binding = config["cliRamAccount"]
+                if not isinstance(binding, dict):
+                    raise DomainError(422, "百炼 CLI 的 RAM 账号绑定无效")
+                name, uid, owner = (binding.get(k) for k in ("name", "userId", "ownerId"))
+                if (
+                    not isinstance(name, str)
+                    or not name.strip()
+                    or len(name) > 128
+                    or not isinstance(uid, str)
+                    or not isinstance(owner, str)
+                    or uid == owner
+                    or not all(v.isascii() and v.isdigit() and len(v) <= 32 for v in (uid, owner))
+                ):
+                    raise DomainError(422, "请配置独立的 RAM 用户及其主账号 ID")
+                account = {"name": name.strip(), "verified": False}
+                reply["cliRamAccount"] = account
+                async with asyncio.timeout(20):
+                    token, agent = await verified_cli_session(transport, file.parent, uid, owner)
+                    account["verified"] = True
+                    reply["personalUsage"] = monthly_usage(
+                        await console_read(transport, USAGE_API, token, agent)
+                    )
+                return reply
         key_id, secret = config.get("accessKeyId"), config.get("accessKeySecret")
         if not isinstance(key_id, str) or not key_id or not isinstance(secret, str) or not secret:
             return {**reply, "quotaError": "额度查询凭据不完整"}

@@ -179,6 +179,8 @@ Linux/macOS 将解释器路径换为 `.venv/bin/python`。部署只安装运行�
 
 「供应商与模型」按连接读取百炼 Token Plan 用量。开发配置文件为 `.superdsh-work/web-admin-dev/config/aliyun-token-plan.json`，生产配置文件为后端持久配置卷中的 `/data/config/aliyun-token-plan.json`。文件包含 `connectionId`、`accessKeyId`、`accessKeySecret`，由后端账号私有读取，轮换后下次查询生效。个人版设置 `"edition": "personal"`。管理员点击「查询上游」后，后端通过 `GenerateCLIAccessToken` 换取临时令牌，调用百炼 CLI 的个人用量接口，展示当月已用比例和北京时间的重置时间。RAM 用户需在百炼控制台获得所属组织的订阅套餐权限。准确的剩余 Credits 通过旁边的「我的订阅」查看。省略 `edition` 的既有配置继续使用 `GetSubscriptionStats` 读取席位额度。[官方个人用量命令](https://help.aliyun.com/zh/model-studio/cli/usage-quota) · [席位额度接口](https://help.aliyun.com/zh/model-studio/get-subscription-stats)
 
+需要绑定个人版 CLI 登录时，在上述私有配置中添加 `cliRamAccount` 对象，填写 `name`（展示名）、`userId`（RAM 用户 ID 字符串）和 `ownerId`（所属主账号 ID 字符串）。将百炼官方 CLI 的 `BAILIAN_CONFIG_DIR` 设为配置文件同目录下的 `aliyun-personal-cli`，用指定 RAM 用户执行 `bl auth login --console`。生产使用仅后端及部署账号可读的目录和会话配置。每次查询使用同一令牌和组织上下文先核对百炼返回的两个 ID，再读取月度用量。会话缺失、过期或账号不符时，管理页显示原因；重新授权后可直接查询。[CLI 登录说明](https://help.aliyun.com/zh/model-studio/cli/config)
+
 在仓库根执行 `docker compose up -d`。首次启动会构建 Vue 前端与 FastAPI 后端，生成并持久保存服务凭据，启动 Ollama 后校验中文检索模型。默认端口为 5174，使用服务器 IP 或域名时，将 `WEB_ADMIN_PUBLIC_ORIGIN` 设为实际公开地址。空库初始账号取自 `deployment/initial-admin.json`。
 
 模型配置使用普通 JSON。默认挂载仓库中的 `deployment/model-defaults.json`，其中包括供应商地址、模型参数和默认选项。填写供应商密钥时，在根 `.env` 设置 `WEB_ADMIN_MODEL_DEFAULTS_SOURCE=/etc/superdsh/web-admin/model-defaults.json` 后，容器会只读挂载该原文。包含供应商密钥的文件由服务器保管，容器用户 UID 1000 需要读取权限。

@@ -49,6 +49,7 @@ const configured = computed(() =>
 )
 const inspection = ref<SupplierInspection>(),
   mode = ref<'detail' | 'key'>('detail')
+const usage = computed(() => inspection.value?.personalUsage)
 const password = ref(''),
   key = ref(''),
   error = ref(''),
@@ -126,6 +127,7 @@ async function query() {
         hideTimer = setTimeout(close, 45000)
       }
     } else {
+      if (isAliyunPlan.value) inspection.value = undefined
       const result = await modelsApi.inspectConnection(id, controller.signal)
       if (!controller.signal.aborted) inspection.value = result
     }
@@ -242,13 +244,10 @@ function add(id: string, model: string) {
         v-if="isAliyunPlan"
         class="personal-usage"
         aria-label="Token Plan 用量"
+        :aria-busy="busy"
       >
         <div class="supplier-title">
-          <h3>
-            {{
-              inspection?.personalUsage ? '个人版月度用量' : 'Token Plan 用量'
-            }}
-          </h3>
+          <h3>{{ usage ? '个人版月度用量' : 'Token Plan 用量' }}</h3>
           <a
             href="https://bailian.console.aliyun.com/cn-beijing/subscription/token-plan/personal"
             title="在百炼查看剩余 Credits"
@@ -257,20 +256,36 @@ function add(id: string, model: string) {
             >我的订阅<span aria-hidden="true"> ↗</span></a
           >
         </div>
-        <dl v-if="inspection?.personalUsage" class="supplier-quota">
+        <div v-if="inspection?.cliRamAccount" class="usage-account">
+          <span
+            >百炼 CLI · RAM 账号
+            <strong>{{ inspection.cliRamAccount.name }}</strong></span
+          >
+          <el-tag
+            size="small"
+            :type="inspection.cliRamAccount.verified ? 'success' : 'info'"
+            >{{
+              inspection.cliRamAccount.verified ? '身份已核验' : '身份待核验'
+            }}</el-tag
+          >
+        </div>
+        <small v-else-if="usage" class="usage-meta"
+          >百炼 · AccessKey 查询</small
+        >
+        <dl v-if="usage" class="usage-metrics">
           <div>
             <dt>本月已用</dt>
-            <dd>
+            <dd :class="{ 'usage-value': usage.usedRatio != null }">
               {{
-                inspection.personalUsage.usedRatio == null
+                usage.usedRatio == null
                   ? '暂无数据'
-                  : percent.format(inspection.personalUsage.usedRatio)
+                  : percent.format(usage.usedRatio)
               }}
             </dd>
             <progress
-              v-if="inspection.personalUsage.usedRatio != null"
+              v-if="usage.usedRatio != null"
               max="1"
-              :value="inspection.personalUsage.usedRatio"
+              :value="usage.usedRatio"
               aria-label="本月已用比例"
             />
           </div>
@@ -278,24 +293,27 @@ function add(id: string, model: string) {
             <dt>重置时间（北京时间）</dt>
             <dd>
               {{
-                inspection.personalUsage.resetAtMs == null
+                usage.resetAtMs == null
                   ? '暂无数据'
-                  : beijingTime.format(inspection.personalUsage.resetAtMs)
+                  : beijingTime.format(usage.resetAtMs)
               }}
             </dd>
           </div>
         </dl>
-        <p v-if="inspection?.quotaError" role="status">
+        <p v-if="inspection?.quotaError" class="usage-note" role="status">
           {{ inspection.quotaError }}
         </p>
         <div class="supplier-title">
           <el-button :loading="busy" @click="query">查询上游</el-button>
-          <small v-if="inspection"
-            >更新于
+          <small v-if="inspection" class="usage-meta"
+            >本次查询
             {{
               beijingTime.format(new Date(inspection.checkedAt))
             }}（北京时间）</small
           >
+          <small v-else class="usage-meta" role="status">{{
+            busy ? '正在查询百炼…' : error ? '本次查询失败' : '尚未查询'
+          }}</small>
         </div>
       </section>
       <dl class="supplier-quota">
@@ -378,8 +396,54 @@ function add(id: string, model: string) {
 .personal-usage {
   display: grid;
   gap: var(--space-3, 12px);
-  border-block: 1px solid var(--border);
-  padding-block: var(--space-4, 16px);
+  min-width: 0;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-card);
+  padding: var(--space-4);
+  background: var(--card);
+}
+.usage-account {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-2);
+}
+.usage-account,
+.usage-meta,
+.usage-metrics dt,
+.usage-note {
+  color: var(--muted-foreground);
+  font-size: var(--font-size-meta);
+}
+.usage-account strong {
+  color: var(--foreground);
+  overflow-wrap: anywhere;
+}
+.usage-metrics {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 185px), 1fr));
+  gap: var(--space-4);
+  margin: 0;
+}
+.usage-metrics > div {
+  display: grid;
+  align-content: start;
+  gap: var(--space-2);
+  min-width: 0;
+}
+.usage-metrics dd {
+  margin: 0;
+  font-variant-numeric: tabular-nums;
+  font-weight: 600;
+}
+.usage-metrics .usage-value {
+  font-size: 1.5rem;
+  line-height: 1.2;
+  color: var(--primary);
+}
+.usage-note {
+  padding-inline-start: var(--space-3);
+  border-inline-start: 2px solid var(--border);
 }
 .personal-usage h3,
 .personal-usage p {

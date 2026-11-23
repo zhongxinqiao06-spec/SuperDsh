@@ -54,6 +54,8 @@ export interface SupplierSubscription {
   remaining?: number | null
 }
 export interface SupplierInspection {
+  /** 配置的 CLI 查询账号；verified 只代表本次请求已通过百炼身份核验。 */
+  cliRamAccount?: { name: string; verified: boolean }
   personalUsage?: { usedRatio: number | null; resetAtMs: number | null }
   quotaItems?: { type: string; quota: number; remaining: number }[]
   quotaError?: string

@@ -8,8 +8,9 @@ async function installCatalog(
   page: Page,
   count: number,
   baseUrl = 'https://synthetic.invalid',
+  bothProducts = false,
 ) {
-  await installParityFixture(page)
+  await installParityFixture(page, { bothProducts })
   const catalog: ModelCatalog = {
     configurations: Array.from({ length: count }, (_, index) => ({
       id: 'model-' + index,
@@ -159,13 +160,17 @@ test('四条模型的工具栏、直接操作和内容区底部分页', async ({
   await expect(main.getByText(/搜索条件/u)).toBeVisible()
 })
 
-test('阿里云个人版用量显示真实零值、北京时间和订阅入口', async ({ page }) => {
+test('阿里云个人版用量显示真实零值、北京时间和订阅入口', async ({
+  page,
+}, info) => {
   await installCatalog(
     page,
     1,
     'https://token-plan.cn-beijing.maas.aliyuncs.com/compatible-mode/v1',
+    true,
   )
   let usedRatio: number | null = 0
+  let verified = true
   await page.route('**/api/admin/models/connections/local/inspect', (route) =>
     route.fulfill({
       json: {
@@ -174,28 +179,57 @@ test('阿里云个人版用量显示真实零值、北京时间和订阅入口',
         balances: [],
         balanceError: '',
         checkedAt: '2026-11-23T02:00:00Z',
+        cliRamAccount: { name: 'ram-fixture', verified },
         personalUsage: {
           usedRatio,
-          resetAtMs: Date.parse('2026-12-01T16:00:00Z'),
+          resetAtMs: verified ? Date.parse('2026-12-01T16:00:00Z') : null,
         },
-        quotaError: '',
+        quotaError: verified ? '' : '当前 CLI 登录身份与绑定的 RAM 账号不符',
       },
     }),
   )
-  await page.goto('/#/models')
+  await page.goto('/#/models?product=entertainment')
   await page.getByRole('button', { name: '套餐、额度与模型' }).click()
   const usage = page.getByRole('region', { name: 'Token Plan 用量' })
+  await expect(usage.getByText('尚未查询')).toBeVisible()
   await expect(usage.getByRole('link', { name: '我的订阅' })).toHaveAttribute(
     'href',
     'https://bailian.console.aliyun.com/cn-beijing/subscription/token-plan/personal',
   )
   await usage.getByRole('button', { name: '查询上游' }).click()
   await expect(usage.getByText('0%', { exact: true })).toBeVisible()
+  await expect(usage.getByText('身份已核验')).toBeVisible()
+  await expect(usage.getByText('ram-fixture')).toBeVisible()
   await expect(usage.getByText(/2026\/12\/02\s+00:00/)).toBeVisible()
+  usedRatio = 0.56
+  await usage.getByRole('button', { name: '查询上游' }).click()
+  await expect(usage.getByText('56%', { exact: true })).toBeVisible()
+  for (const width of [1440, 1280, 768, 390]) {
+    await page.setViewportSize({ width, height: width === 390 ? 844 : 940 })
+    expect(
+      await usage.evaluate((el) => el.scrollWidth <= el.clientWidth + 1),
+    ).toBe(true)
+    if (width === 1440 || width === 390)
+      await usage.screenshot({
+        path: info.outputPath(`personal-usage-${width}.png`),
+        animations: 'disabled',
+      })
+  }
   usedRatio = null
   await usage.getByRole('button', { name: '查询上游' }).click()
   await expect(usage.getByText('暂无数据', { exact: true })).toBeVisible()
   await expect(usage.getByRole('progressbar')).toHaveCount(0)
+  verified = false
+  await usage.getByRole('button', { name: '查询上游' }).click()
+  await expect(usage.getByText('身份待核验')).toBeVisible()
+  await expect(usage.getByText(/登录身份与绑定的 RAM 账号不符/)).toBeVisible()
+  await expect(usage.getByText('暂无数据', { exact: true })).toHaveCount(2)
+  await page.emulateMedia({ colorScheme: 'dark' })
+  await expect(page.locator('html')).toHaveClass(/dark/)
+  await usage.screenshot({
+    path: info.outputPath('personal-usage-dark.png'),
+    animations: 'disabled',
+  })
 })
 
 test('多页数据在列表内滚动，末行在页脚上方，切页回到列表顶部', async ({
