@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { computed, onScopeDispose, ref, watch } from 'vue'
 import ManagementDialog from '@/components/overlay/ManagementDialog.vue'
+import BailianAuthorization from './BailianAuthorization.vue'
 import { checkKeyTransport, modelsApi } from '@/api/models/models-api'
 import { passwordProof } from '@/api/auth/auth-api'
 import { useAuthStore } from '@/store/modules/auth-store'
@@ -50,6 +51,7 @@ const configured = computed(() =>
 const inspection = ref<SupplierInspection>(),
   mode = ref<'detail' | 'key'>('detail')
 const usage = computed(() => inspection.value?.personalUsage)
+const authorizationOpen = ref(false)
 const password = ref(''),
   key = ref(''),
   error = ref(''),
@@ -63,6 +65,7 @@ function clear() {
   key.value = ''
   password.value = ''
   inspection.value = undefined
+  authorizationOpen.value = false
   error.value = ''
   busy.value = false
 }
@@ -143,6 +146,10 @@ async function query() {
 function add(id: string, model: string) {
   close()
   emit('addModel', id, model)
+}
+function toggleAuthorization() {
+  authorizationOpen.value = !authorizationOpen.value
+  if (authorizationOpen.value && !inspection.value) void query()
 }
 </script>
 <template>
@@ -256,22 +263,59 @@ function add(id: string, model: string) {
             >我的订阅<span aria-hidden="true"> ↗</span></a
           >
         </div>
-        <div v-if="inspection?.cliRamAccount" class="usage-account">
-          <span
+        <div
+          v-if="!inspection || inspection.cliRamAccount"
+          class="usage-account"
+        >
+          <span v-if="inspection?.cliRamAccount"
             >百炼 CLI · RAM 账号
             <strong>{{ inspection.cliRamAccount.name }}</strong></span
           >
           <el-tag
+            v-if="inspection?.cliRamAccount"
+            disable-transitions
             size="small"
             :type="inspection.cliRamAccount.verified ? 'success' : 'info'"
             >{{
               inspection.cliRamAccount.verified ? '身份已核验' : '身份待核验'
             }}</el-tag
           >
+          <el-button
+            v-if="auth.session?.roles.includes('admin')"
+            size="small"
+            plain
+            type="primary"
+            :aria-expanded="authorizationOpen"
+            @click="toggleAuthorization"
+            >{{
+              authorizationOpen
+                ? '收起授权步骤'
+                : inspection?.cliRamAccount?.verified
+                  ? '重新授权百炼账号'
+                  : '授权百炼账号'
+            }}</el-button
+          >
         </div>
         <small v-else-if="usage" class="usage-meta"
           >百炼 · AccessKey 查询</small
         >
+        <p
+          v-if="authorizationOpen && inspection && !inspection.cliRamAccount"
+          class="usage-note"
+          role="status"
+        >
+          此连接尚未绑定用于个人订阅查询的 RAM 账号。
+        </p>
+        <BailianAuthorization
+          v-if="
+            authorizationOpen &&
+            (!inspection || inspection.cliRamAccount) &&
+            auth.session?.roles.includes('admin')
+          "
+          :account="inspection?.cliRamAccount"
+          :busy="busy"
+          @verify="query"
+        />
         <dl v-if="usage" class="usage-metrics">
           <div>
             <dt>本月已用</dt>

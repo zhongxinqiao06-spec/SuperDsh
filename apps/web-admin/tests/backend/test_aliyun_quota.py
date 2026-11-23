@@ -7,12 +7,42 @@ from urllib.parse import parse_qs
 import httpx
 import pytest
 
+from app.infrastructure.errors import DomainError
+from app.modules.models.service.aliyun_cli_install import install
 from app.modules.models.service.aliyun_personal_usage import LOGIN_API, TOKEN_PATH, USAGE_API
 from app.modules.models.service.aliyun_quota import HOST, PATH, read_quota
 from app.modules.models.service.provider_transport import ProviderTransport
 from app.modules.models.service.supplier_inspection import inspect_supplier
 
 ORIGIN = "https://token-plan.cn-beijing.maas.aliyuncs.com/compatible-mode/v1"
+
+
+async def test_install_keeps_previous_session_until_ram_verified(tmp_path: Path) -> None:
+    (tmp_path / "aliyun-token-plan.json").write_text(
+        json.dumps(
+            {
+                "edition": "personal",
+                "cliRamAccount": {"name": "tester", "userId": "22", "ownerId": "11"},
+            }
+        )
+    )
+    previous = tmp_path / "aliyun-personal-cli" / "config.json"
+    previous.parent.mkdir()
+    previous.write_text('{"access_token":"old"}')
+    uid = "11"
+
+    def identity(request: httpx.Request) -> httpx.Response:
+        assert request.url.params["api"] == LOGIN_API
+        return httpx.Response(200, json={"data": {"aliyun": {"uid": uid, "parentUid": "11"}}})
+
+    transport = ProviderTransport(transport=httpx.MockTransport(identity))
+    profile = {"access_token": "new", "api_key": "ordinary", "access_key_secret": "extra"}
+    with pytest.raises(DomainError, match="身份与绑定的 RAM 账号不符"):
+        await install(tmp_path, profile, transport)
+    assert json.loads(previous.read_text()) == {"access_token": "old"}
+    uid = "22"
+    await install(tmp_path, profile, transport)
+    assert json.loads(previous.read_text()) == {"access_token": "new"}
 
 
 @pytest.mark.parametrize("state", ["missing", "owner", "other", "expired", "ok", "denied"])
@@ -79,7 +109,11 @@ async def test_bound_cli_verifies_ram_before_reading_usage(tmp_path: Path, state
     assert calls == (
         [LOGIN_API, USAGE_API] if verified else [] if state == "missing" else [LOGIN_API]
     )
-    assert result["cliRamAccount"] == {"name": "tester", "verified": verified}
+    assert result["cliRamAccount"] == {
+        "name": "tester",
+        "loginName": "tester@11.onaliyun.com",
+        "verified": verified,
+    }
     assert result["personalUsage"] == (
         {"usedRatio": 0, "resetAtMs": 1800000000000}
         if state == "ok"

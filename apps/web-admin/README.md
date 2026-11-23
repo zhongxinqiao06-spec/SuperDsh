@@ -181,6 +181,8 @@ Linux/macOS 将解释器路径换为 `.venv/bin/python`。部署只安装运行�
 
 需要绑定个人版 CLI 登录时，在上述私有配置中添加 `cliRamAccount` 对象，填写 `name`（展示名）、`userId`（RAM 用户 ID 字符串）和 `ownerId`（所属主账号 ID 字符串）。将百炼官方 CLI 的 `BAILIAN_CONFIG_DIR` 设为配置文件同目录下的 `aliyun-personal-cli`，用指定 RAM 用户执行 `bl auth login --console`。生产使用仅后端及部署账号可读的目录和会话配置。每次查询使用同一令牌和组织上下文先核对百炼返回的两个 ID，再读取月度用量。会话缺失、过期或账号不符时，管理页显示原因；重新授权后可直接查询。[CLI 登录说明](https://help.aliyun.com/zh/model-studio/cli/config)
 
+线上从供应商详情点击「授权百炼账号」。可在绑定配置中用 `loginName` 指定自定义域名的完整 RAM 登录名。部署主机需安装与架构匹配的百炼官方 CLI，部署操作者在项目根目录执行 `sh apps/web-admin/deployment/authorize-bailian.sh`。在授权电脑通过 SSH 将 CLI 链接中的同一端口从本机回环转发到服务器回环；管理员在该电脑先登录指定 RAM 账号，再从管理页打开 CLI 生成的一次性链接。脚本在独立临时目录运行官方 CLI，仅在用户和主账号均核验成功后替换用量会话。回到页面点击「核验账号并刷新用量」。管理页账号和部署 SSH 权限独立，可由部署人员协助准备终端和转发。
+
 在仓库根执行 `docker compose up -d`。首次启动会构建 Vue 前端与 FastAPI 后端，生成并持久保存服务凭据，启动 Ollama 后校验中文检索模型。默认端口为 5174，使用服务器 IP 或域名时，将 `WEB_ADMIN_PUBLIC_ORIGIN` 设为实际公开地址。空库初始账号取自 `deployment/initial-admin.json`。
 
 模型配置使用普通 JSON。默认挂载仓库中的 `deployment/model-defaults.json`，其中包括供应商地址、模型参数和默认选项。填写供应商密钥时，在根 `.env` 设置 `WEB_ADMIN_MODEL_DEFAULTS_SOURCE=/etc/superdsh/web-admin/model-defaults.json` 后，容器会只读挂载该原文。包含供应商密钥的文件由服务器保管，容器用户 UID 1000 需要读取权限。

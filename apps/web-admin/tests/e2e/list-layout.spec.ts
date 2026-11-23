@@ -179,7 +179,11 @@ test('阿里云个人版用量显示真实零值、北京时间和订阅入口',
         balances: [],
         balanceError: '',
         checkedAt: '2026-11-23T02:00:00Z',
-        cliRamAccount: { name: 'ram-fixture', verified },
+        cliRamAccount: {
+          name: 'ram-fixture',
+          loginName: 'ram-fixture@example.onaliyun.com',
+          verified,
+        },
         personalUsage: {
           usedRatio,
           resetAtMs: verified ? Date.parse('2026-12-01T16:00:00Z') : null,
@@ -224,6 +228,34 @@ test('阿里云个人版用量显示真实零值、北京时间和订阅入口',
   await expect(usage.getByText('身份待核验')).toBeVisible()
   await expect(usage.getByText(/登录身份与绑定的 RAM 账号不符/)).toBeVisible()
   await expect(usage.getByText('暂无数据', { exact: true })).toHaveCount(2)
+  await usage.getByRole('button', { name: '授权百炼账号' }).click()
+  const authorization = usage.getByRole('region', { name: '百炼账号授权' })
+  await expect(
+    authorization.getByRole('link', { name: '打开 RAM 登录页' }),
+  ).toHaveAttribute(
+    'href',
+    'https://signin.aliyun.com/login.htm?username=ram-fixture%40example.onaliyun.com',
+  )
+  const input = authorization.getByLabel('CLI 生成的一次性授权链接')
+  const launch = authorization.getByRole('link', { name: '打开百炼授权窗口' })
+  await input.fill(
+    'https://example.org/console-login?notice=127.0.0.1:45555?state=test',
+  )
+  await expect(launch).toHaveCount(0)
+  const official =
+    'https://bailian.console.aliyun.com/console-login?notice=127.0.0.1:45555?state=test&needapikey=true'
+  await input.fill(official)
+  await expect(launch).toHaveAttribute('href', official)
+  verified = true
+  usedRatio = 0.42
+  await authorization
+    .getByRole('button', { name: '核验账号并刷新用量' })
+    .click()
+  await expect(usage.getByText('42%', { exact: true })).toBeVisible()
+  await expect(usage.getByText('身份已核验')).toBeVisible()
+  await usage.getByRole('button', { name: '收起授权步骤' }).click()
+  await usage.getByRole('button', { name: '重新授权百炼账号' }).click()
+  await expect(input).toHaveValue('')
   await page.emulateMedia({ colorScheme: 'dark' })
   await expect(page.locator('html')).toHaveClass(/dark/)
   await usage.screenshot({

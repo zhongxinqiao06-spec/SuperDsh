@@ -79,7 +79,11 @@ async def read_quota(
                     or not all(v.isascii() and v.isdigit() and len(v) <= 32 for v in (uid, owner))
                 ):
                     raise DomainError(422, "请配置独立的 RAM 用户及其主账号 ID")
-                account = {"name": name.strip(), "verified": False}
+                # RAM 控制台可自定义默认域名，保留部署方登记的完整登录名。
+                login_name = binding.get("loginName") or f"{name.strip()}@{owner}.onaliyun.com"
+                if not isinstance(login_name, str) or len(login_name) > 256:
+                    raise DomainError(422, "百炼 RAM 登录名称无效")
+                account = {"name": name.strip(), "loginName": login_name, "verified": False}
                 reply["cliRamAccount"] = account
                 async with asyncio.timeout(20):
                     token, agent = await verified_cli_session(transport, file.parent, uid, owner)
