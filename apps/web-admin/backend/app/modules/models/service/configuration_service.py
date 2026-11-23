@@ -2,6 +2,7 @@
 
 from collections.abc import Awaitable, Callable
 from datetime import UTC, datetime
+from pathlib import Path
 from uuid import uuid4
 
 from app.infrastructure.crypto import CredentialCipher
@@ -76,9 +77,11 @@ class ConfigurationService:
         audit: Audit | None = None,
         *,
         product_roles: ProductRoles,
+        aliyun_quota_file: Path | None = None,
     ) -> None:
         self.database, self.cipher, self.transport = database, cipher, transport
         self.role_exists, self.audit, self.product_roles = role_exists, audit, product_roles
+        self.aliyun_quota_file = aliyun_quota_file
 
     async def list(self, account: Account) -> dict[str, object]:
         """返回完整管理目录，未配置能力也有明确可用性说明。"""
@@ -122,7 +125,14 @@ class ConfigurationService:
                 raise DomainError(404, "模型连接不存在")
             url, adapter = row.base_url, row.adapter
             key = self.cipher.open(row.credential, row.id) if row.credential else ""
-        return await inspect_supplier(self.transport, url, adapter, key)
+        return await inspect_supplier(
+            self.transport,
+            url,
+            adapter,
+            key,
+            connection_id=identifier,
+            quota_file=self.aliyun_quota_file,
+        )
 
     async def save_connection(
         self, account: Account, body: ConnectionInput, identifier: str | None = None

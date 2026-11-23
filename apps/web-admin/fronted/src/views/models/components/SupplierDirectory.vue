@@ -71,7 +71,7 @@ function provider(c: ModelConnection) {
       plan: 'Token Plan',
       unit: 'Credits',
       docs: 'https://help.aliyun.com/zh/model-studio/token-plan-usage-quota',
-      note: '套餐用量可在百炼控制台核对，登记值由管理员维护。',
+      note: '查询上游可读取此连接绑定的阿里云账户席位额度。个人套餐用量可在百炼「我的订阅」核对。',
     }
   if (
     url.hostname === 'ark.cn-beijing.volces.com' &&
@@ -261,6 +261,16 @@ function add(id: string, model: string) {
         <p v-if="inspection.balanceError">
           余额查询：{{ inspection.balanceError }}
         </p>
+        <dl v-if="inspection.quotaItems?.length" class="supplier-quota">
+          <div v-for="item in inspection.quotaItems" :key="item.type">
+            <dt>{{ item.type }} 席位 · 剩余 / 总额度</dt>
+            <dd>
+              {{ item.remaining.toLocaleString() }} /
+              {{ item.quota.toLocaleString() }} Credits
+            </dd>
+          </div>
+        </dl>
+        <p v-if="inspection.quotaError">{{ inspection.quotaError }}</p>
         <p v-if="inspection.modelError">
           模型目录：{{ inspection.modelError }}
         </p>

@@ -54,6 +54,8 @@ export interface SupplierSubscription {
   remaining?: number | null
 }
 export interface SupplierInspection {
+  quotaItems?: { type: string; quota: number; remaining: number }[]
+  quotaError?: string
   checkedAt: string
   models: string[]
   modelError: string

@@ -248,6 +248,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
         identity.role_exists,
         identity.audit,
         product_roles=identity.product_role_ids,
+        aliyun_quota_file=settings.data_dir.parent / "config" / "aliyun-token-plan.json",
     )
     resources.tool_binding_resolver = ToolModelBindingService(model_configurations).freeze
     files = FileService(database, settings.data_dir, cipher)
