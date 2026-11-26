@@ -102,6 +102,37 @@
 .management-page > .toolbar .el-input {
   width: min(360px, 100%);
 }
+/* 目录筛选使用短字段宽度，表单和弹层内的选择框仍按字段布局。 */
+.filter-bar > .el-select {
+  width: min(9rem, 100%);
+}
+.filter-query,
+.filter-actions {
+  display: flex;
+  align-items: center;
+  gap: var(--control-gap);
+  min-width: 0;
+  max-width: 100%;
+}
+.filter-query {
+  flex: 0 1 19rem;
+}
+.filter-bar .filter-query > .el-input {
+  flex: 1;
+  min-width: 0;
+}
+.filter-actions {
+  flex-wrap: wrap;
+  margin-inline-start: auto;
+}
+@media (max-width: 600px) {
+  .filter-query {
+    flex-basis: 100%;
+  }
+  .filter-actions {
+    margin-inline-start: 0;
+  }
+}
 .toolbar .el-button + .el-button,
 .filter-bar .el-button + .el-button {
   margin-left: 0;
@@ -619,6 +650,21 @@
 .management-list > .management-pagination {
   flex: none;
   border-top: 1px solid var(--border);
+}
+/* 矮窗口让内容区承担纵向滚动，长筛选栏和分页不再挤压数据。 */
+@media (max-height: 720px) {
+  [data-console-product] .page.paged-page {
+    flex: 1 0 auto;
+    gap: var(--field-gap);
+    padding-block: var(--field-gap);
+  }
+  .paged-page > .management-list,
+  .paged-page > .management-list > .management-list-body {
+    flex: 1 0 auto;
+  }
+  .paged-page > .management-list > .management-list-body {
+    overflow: visible;
+  }
 }
 .pagination-controls {
   display: flex;

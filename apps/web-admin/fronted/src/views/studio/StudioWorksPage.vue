@@ -144,7 +144,6 @@ async function archive(project: WorkSummary) {
   </section>
 </template>
 
-<style scoped src="../../assets/styles/studio-directory.css"></style>
 <style scoped>
 .studio-gallery {
   display: grid;

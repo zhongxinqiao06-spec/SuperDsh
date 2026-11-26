@@ -143,16 +143,19 @@ function closeBatch() {
         name="project"
     /></el-tabs>
     <FilterBar @submit="filter">
-      <el-input
-        v-model="query"
-        maxlength="120"
-        :placeholder="
-          scope === 'personal'
-            ? '搜索' + section.singular + '名称'
-            : '搜索' + section.singular + '或作品名称'
-        "
-        aria-label="搜索素材"
-      />
+      <div class="filter-query">
+        <el-input
+          v-model="query"
+          maxlength="120"
+          :placeholder="
+            scope === 'personal'
+              ? '搜索' + section.singular + '名称'
+              : '搜索' + section.singular + '或作品名称'
+          "
+          aria-label="搜索素材"
+        />
+        <el-button native-type="submit">搜索</el-button>
+      </div>
       <el-select
         v-if="category === 'media'"
         v-model="kind"
@@ -164,7 +167,6 @@ function closeBatch() {
           :value="key"
           :label="label"
       /></el-select>
-      <el-button native-type="submit">搜索</el-button>
       <el-select
         v-if="scope === 'personal'"
         v-model="archived"
@@ -173,31 +175,33 @@ function closeBatch() {
           :value="true"
           label="已归档素材"
       /></el-select>
-      <el-button
-        v-if="scope === 'personal' && auth.can('studio.assets.write')"
-        type="primary"
-        @click="creating = true"
-        >{{
-          category === 'media' ? '上传素材' : '创建' + section.singular
-        }}</el-button
-      >
-      <el-button
-        v-if="scope === 'personal' && auth.can('studio.assets.write')"
-        @click="scope = 'project'"
-        >从作品收藏</el-button
-      >
-      <el-button
-        v-if="scope === 'project' && auth.can('studio.assets.write')"
-        :disabled="!checked.length"
-        @click="
-          batch = data?.items.filter((asset) => checked.includes(asset.id))
-        "
-        >收藏选中 {{ checked.length || '' }}</el-button
-      >
-      <el-radio-group v-model="layout" aria-label="素材展示方式"
-        ><el-radio-button value="cards">卡片</el-radio-button
-        ><el-radio-button value="list">列表</el-radio-button></el-radio-group
-      >
+      <div class="filter-actions">
+        <el-button
+          v-if="scope === 'personal' && auth.can('studio.assets.write')"
+          type="primary"
+          @click="creating = true"
+          >{{
+            category === 'media' ? '上传素材' : '创建' + section.singular
+          }}</el-button
+        >
+        <el-button
+          v-if="scope === 'personal' && auth.can('studio.assets.write')"
+          @click="scope = 'project'"
+          >从作品收藏</el-button
+        >
+        <el-button
+          v-if="scope === 'project' && auth.can('studio.assets.write')"
+          :disabled="!checked.length"
+          @click="
+            batch = data?.items.filter((asset) => checked.includes(asset.id))
+          "
+          >收藏选中 {{ checked.length || '' }}</el-button
+        >
+        <el-radio-group v-model="layout" aria-label="素材展示方式"
+          ><el-radio-button value="cards">卡片</el-radio-button
+          ><el-radio-button value="list">列表</el-radio-button></el-radio-group
+        >
+      </div>
     </FilterBar>
     <ManagementList :page="page" :page-size="pageSize">
       <ResourceStatus
@@ -379,26 +383,3 @@ function closeBatch() {
   </section>
 </template>
 <style scoped src="../../assets/styles/studio-library.css"></style>
-<style scoped>
-.library-list-view {
-  grid-template-columns: minmax(0, 1fr);
-}
-.library-list-view :deep(.library-card) {
-  flex-direction: row;
-}
-.library-list-view :deep(.library-card-cover) {
-  flex: 0 0 180px;
-  height: auto;
-  min-height: 180px;
-}
-@media (max-width: 600px) {
-  .library-list-view :deep(.library-card) {
-    flex-direction: column;
-  }
-  .library-list-view :deep(.library-card-cover) {
-    flex-basis: auto;
-    height: 160px;
-    min-height: 0;
-  }
-}
-</style>

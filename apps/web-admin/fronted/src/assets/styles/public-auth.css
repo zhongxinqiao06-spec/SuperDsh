@@ -266,10 +266,55 @@
   text-decoration: underline;
   text-underline-offset: 3px;
 }
+.login-create-account {
+  justify-self: center;
+  display: inline-flex;
+  align-items: center;
+  gap: var(--control-gap);
+  min-height: 48px;
+  padding-inline: var(--space-3);
+  border-radius: var(--radius-control);
+  color: var(--auth-accent);
+  font: 600 17px/1.4 var(--font-sans);
+  text-decoration: none;
+}
+.login-register-arrow {
+  display: grid;
+  width: 24px;
+  height: 24px;
+  place-items: center;
+  border-radius: 50%;
+  background: color-mix(in srgb, var(--auth-accent) 12%, transparent);
+}
+.login-create-account:focus-visible {
+  outline: 2px solid var(--auth-accent);
+  outline-offset: 3px;
+}
+@media (hover: hover) {
+  .login-create-account:hover .login-register-arrow {
+    background: var(--auth-accent);
+    color: var(--canvas);
+  }
+}
+@media (hover: hover) and (prefers-reduced-motion: no-preference) {
+  .login-register-arrow {
+    transition: transform var(--transition-ui);
+  }
+  .login-create-account:hover .login-register-arrow {
+    transform: translateX(3px);
+  }
+}
+.login-create-account + .login-legal {
+  margin-block-start: var(--space-1);
+}
 .login-legal {
   margin-bottom: var(--space-3);
   color: var(--auth-muted);
-  font-size: 11px;
+  font-size: var(--font-size-meta);
+}
+.login-legal a {
+  color: var(--auth-accent);
+  font-weight: 600;
 }
 .login-footer {
   margin-top: clamp(40px, 8.5vh, 96px);

@@ -95,7 +95,7 @@ test('开放注册和授权入口随服务器配置展开并保留返回地址',
   await page.setViewportSize({ width: 390, height: 690 })
   await page.goto('/#/login?returnTo=/entertainment')
   await expect(page.getByRole('button', { name: /Studio SSO/ })).toBeVisible()
-  await page.getByRole('link', { name: '创建账号' }).click()
+  await page.getByRole('link', { name: '去注册', exact: true }).click()
   await expect(page.getByLabel('设置密码')).toHaveCount(0)
   await expect(page.getByRole('button', { name: '发送验证码' })).toBeVisible()
   const back = page.getByRole('link', { name: '已有账号，登录' })

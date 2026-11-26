@@ -98,8 +98,51 @@ button.library-card-cover {
 .library-tabs {
   margin: 0;
 }
+/* 页签只用于切换范围，和下方工具栏的间距已经由页面提供。 */
+.library-tabs :deep(.el-tabs__header) {
+  margin-bottom: 0;
+}
 .library-tabs :deep(.el-tabs__content) {
   display: none;
+}
+.library-list-view {
+  grid-template-columns: minmax(0, 1fr);
+}
+.library-list-view .library-card {
+  flex-direction: row;
+  align-items: flex-start;
+  gap: var(--field-gap);
+  padding: var(--space-3);
+}
+.library-list-view :deep(.library-card-cover) {
+  flex: none;
+  width: clamp(64px, 7vw, 96px);
+  height: auto;
+  aspect-ratio: 1;
+  border-radius: var(--radius-control);
+}
+.library-list-view :deep(.library-card-content) {
+  padding: 0;
+}
+.library-list-view :deep(.library-card-placeholder) {
+  gap: var(--space-1);
+  padding: var(--space-1);
+}
+/* 缩略图旁已有完整标题，避免在小图中再次挤排素材名称。 */
+.library-list-view :deep(.library-card-placeholder strong) {
+  display: none;
+}
+.library-list-view :deep(.library-card-actions) {
+  padding-top: 0;
+}
+@media (max-width: 600px) {
+  .library-list-view .library-card {
+    gap: var(--space-3);
+  }
+  .library-list-view :deep(.library-card-actions) {
+    column-gap: var(--control-gap);
+    row-gap: 0;
+  }
 }
 .library-picker-grid {
   grid-template-columns: repeat(auto-fill, minmax(min(100%, 200px), 1fr));

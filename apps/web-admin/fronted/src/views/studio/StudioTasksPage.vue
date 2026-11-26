@@ -175,7 +175,6 @@ onScopeDispose(() => clearInterval(timer))
     </ManagementDialog>
   </section>
 </template>
-<style scoped src="../../assets/styles/studio-directory.css"></style>
 <style scoped>
 .studio-task-state {
   display: inline-flex;

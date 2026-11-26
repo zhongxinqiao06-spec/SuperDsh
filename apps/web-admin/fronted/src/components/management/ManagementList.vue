@@ -1,12 +1,25 @@
 <script setup lang="ts">
 import { ref, watch } from 'vue'
 
-/** 页面主列表单独滚动，分页留在可见区域；切页后从第一条记录开始阅读。 */
+/** 切页后回到新一页首条记录，兼容常规列表滚动与矮窗口的整页滚动。 */
 const props = defineProps<{ page: number; pageSize: number }>()
 const viewport = ref<HTMLElement>()
 watch(
   () => [props.page, props.pageSize],
-  () => viewport.value?.scrollTo({ top: 0 }),
+  () => {
+    const list = viewport.value
+    if (!list) return
+    if (getComputedStyle(list).overflowY !== 'visible') {
+      list.scrollTop = 0
+      return
+    }
+    const content = list.closest<HTMLElement>('.console-content')
+    if (
+      content &&
+      list.getBoundingClientRect().top < content.getBoundingClientRect().top
+    )
+      list.scrollIntoView({ block: 'start' })
+  },
   { flush: 'post' },
 )
 </script>

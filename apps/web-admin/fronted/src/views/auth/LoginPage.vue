@@ -246,7 +246,7 @@ const title = computed(() =>
                 !vm.initializationPending.value &&
                 vm.resource.data.value.registrationOpen
               "
-              class="login-register"
+              class="login-create-account"
               :to="{
                 path: '/register',
                 query: {
@@ -257,7 +257,10 @@ const title = computed(() =>
                 },
               }"
             >
-              {{ tr('创建账号', 'Create account') }}
+              <span>{{ tr('去注册', 'Sign up') }}</span>
+              <span class="login-register-arrow">
+                <AppIcon name="arrow-right" :size="15" />
+              </span>
             </router-link>
             <p class="login-legal">
               {{

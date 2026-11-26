@@ -234,7 +234,7 @@ for (const product of ['entertainment', 'office'] as const) {
       await expect(page).toHaveURL(
         new RegExp('#/login\\?product=' + product + '$'),
       )
-      await page.getByRole('link', { name: '创建账号', exact: true }).click()
+      await page.getByRole('link', { name: '去注册', exact: true }).click()
       await expect(page).toHaveURL(
         new RegExp('#/register\\?product=' + product + '$'),
       )
@@ -263,7 +263,7 @@ test('旧登录链接从个人资料的返回地址恢复注册产品', async ({
     '/#/login?returnTo=' +
       encodeURIComponent('/account/profile?product=entertainment'),
   )
-  await page.getByRole('link', { name: '创建账号', exact: true }).click()
+  await page.getByRole('link', { name: '去注册', exact: true }).click()
   await expect(page.locator('.login-intro--registration')).toContainText(
     '星桥娱乐 · 创作者账号',
   )

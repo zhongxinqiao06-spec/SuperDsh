@@ -325,7 +325,7 @@ test('多页数据在列表内滚动，末行在页脚上方，切页回到列�
   page,
 }) => {
   await installCatalog(page, 24)
-  await page.setViewportSize({ width: 1280, height: 620 })
+  await page.setViewportSize({ width: 1280, height: 800 })
   await page.goto('/#/models')
   const list = page.getByRole('region', { name: '列表内容' })
   const pager = page.getByRole('navigation', { name: '列表分页' })
@@ -341,6 +341,25 @@ test('多页数据在列表内滚动，末行在页脚上方，切页回到列�
   await pager.getByRole('button', { name: '下一页' }).click()
   await expect(pager).toContainText('11–20')
   await expect.poll(() => list.evaluate((el) => el.scrollTop)).toBe(0)
+})
+
+test('矮窗口沿整页浏览模型，能从分页返回新一页的首条操作', async ({ page }) => {
+  await installCatalog(page, 24, undefined, true)
+  await page.setViewportSize({ width: 1280, height: 600 })
+  await page.goto('/#/models?product=entertainment')
+  const list = page.getByRole('region', { name: '列表内容' })
+  const first = list.getByRole('row').filter({ hasText: 'synthetic-0' })
+  await expect(first.getByRole('button', { name: '编辑' })).toBeInViewport({
+    ratio: 1,
+  })
+  await expect(list).toHaveCSS('overflow-y', 'visible')
+  await captureDesign(page, 'models-short-window.png')
+  const pager = page.getByRole('navigation', { name: '列表分页' })
+  await pager.scrollIntoViewIfNeeded()
+  await expect(list.getByRole('row').last()).toBeInViewport({ ratio: 1 })
+  await pager.getByRole('button', { name: '下一页' }).click()
+  await expect(pager).toContainText('11–20')
+  await expect(list.getByRole('row').nth(1)).toBeInViewport({ ratio: 1 })
 })
 
 test('文件行直接提供管理动作，取消回收不写入，确认后可恢复', async ({
