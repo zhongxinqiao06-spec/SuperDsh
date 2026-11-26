@@ -209,6 +209,12 @@
       "usage": "Public studio website illustration"
     },
     {
+      "path": "images/membership/admin-wechat.jpg",
+      "source": "Project owner supplied WeChat contact card",
+      "owner": "Starbridge administrator",
+      "usage": "Manual membership enrollment and credit top-ups"
+    },
+    {
       "path": "images/membership/light.webp",
       "source": "OpenAI ImageGen / Starbridge membership collection",
       "owner": "SuperDsh original generated artwork",

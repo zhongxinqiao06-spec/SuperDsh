@@ -232,7 +232,7 @@ function saved(r: BillingOperation) {
                   >{{
                     a.state === 'active'
                       ? tr('续期', 'Renew')
-                      : tr('开通', 'Activate')
+                      : tr('发放会员', 'Grant membership')
                   }}</el-button
                 >
                 <el-button

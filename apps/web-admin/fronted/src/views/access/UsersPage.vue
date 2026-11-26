@@ -161,7 +161,7 @@ const { tr } = usePreferences()
                   {{
                     user.billing.state === 'active'
                       ? tr('续期', 'Renew')
-                      : tr('开通', 'Activate')
+                      : tr('发放会员', 'Grant membership')
                   }}</el-button
                 > </template
               ><span v-else>—</span>

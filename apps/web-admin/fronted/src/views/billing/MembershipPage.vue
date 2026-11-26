@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { ref } from 'vue'
+import { useRoute, useRouter } from 'vue-router'
 import { membershipApi } from '@/api/billing/membership-api'
 import ResourceStatus from '@/components/feedback/ResourceStatus.vue'
 import PageHeader from '@/components/layout/PageHeader.vue'
@@ -14,6 +15,8 @@ import CreditEntries from './components/CreditEntries.vue'
 import '@/assets/styles/billing.css'
 const { tr } = usePreferences()
 const { data, loading, error, reload } = useResource(membershipApi.wallet)
+const route = useRoute()
+const router = useRouter()
 const tab = ref('entries')
 const refreshKey = ref(0)
 function refresh() {
@@ -48,11 +51,21 @@ function refresh() {
               )
         "
       >
-        <template #action
-          ><el-button :disabled="loading" @click="refresh">{{
+        <template #action>
+          <el-button :disabled="loading" @click="refresh">{{
             tr('刷新', 'Refresh')
-          }}</el-button></template
-        >
+          }}</el-button>
+          <el-button
+            type="primary"
+            @click="
+              router.push({
+                path: '/account/plans',
+                query: { product: route.query.product },
+              })
+            "
+            >{{ tr('选购会员', 'Browse plans') }}</el-button
+          >
+        </template>
         <div class="billing-metrics">
           <div>
             <span>{{ tr('可用创作点', 'Available credits') }}</span

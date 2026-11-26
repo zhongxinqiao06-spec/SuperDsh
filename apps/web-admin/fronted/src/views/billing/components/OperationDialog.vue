@@ -229,6 +229,16 @@ const {
             {{ billingLabel(preview.quote.action, tr) }} ·
             {{ preview.quote.planName ?? tr('创作点', 'Credits') }}
           </dd>
+          <template v-if="member">
+            <dt>{{ tr('办理方式', 'Payment mode') }}</dt>
+            <dd>
+              {{
+                selectedPayment === 'complimentary'
+                  ? tr('赠送会员', 'Complimentary')
+                  : tr('线下实收', 'Offline payment')
+              }}
+            </dd>
+          </template>
           <dt>{{ tr('有效期', 'Period') }}</dt>
           <dd>
             {{ billingTime(preview.quote.startsAt) }} —

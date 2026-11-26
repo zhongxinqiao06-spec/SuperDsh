@@ -40,11 +40,14 @@ test('运营开通、续期和加额在本人账本生效', async ({
   await page.waitForURL((url) => !url.hash.startsWith('#/login'))
   await page.goto('/#/billing/subscriptions?userId=' + userId)
   const row = page.getByRole('row').filter({ hasText: username })
-  await row.getByRole('button', { name: '开通', exact: true }).click()
+  await row.getByRole('button', { name: '发放会员', exact: true }).click()
   let dialog = page.getByRole('dialog', { name: '会员办理' })
+  await expect(dialog.getByLabel('办理方式')).toHaveValue('complimentary')
   await dialog.getByLabel('办理商品').selectOption('light-1')
   await dialog.getByLabel('办理原因').fill('内测开通')
   await dialog.getByRole('button', { name: '预览办理' }).click()
+  await expect(dialog.getByText('赠送会员', { exact: true })).toBeVisible()
+  await expect(dialog.getByText('¥0', { exact: true })).toBeVisible()
   await expect(dialog.getByText('0 → 300')).toBeVisible()
   await page.setViewportSize({ width: 390, height: 844 })
   await captureDesign(page, 'manual-preview-390.png')
@@ -160,6 +163,9 @@ test('运营开通、续期和加额在本人账本生效', async ({
       ).ok(),
     ).toBe(true)
     await memberPage.goto('/#/account/membership')
+    await expect(
+      memberPage.getByRole('heading', { name: '轻享会员', exact: true }),
+    ).toBeVisible()
     await memberPage.getByRole('tab', { name: '我的额度卡' }).click()
     await expect(
       memberPage.getByText('500 点额度卡', { exact: true }),
@@ -176,6 +182,75 @@ test('运营开通、续期和加额在本人账本生效', async ({
         ),
       ).toBe(true)
     }
+    await memberPage.getByRole('button', { name: '选购会员' }).click()
+    await expect(
+      memberPage.getByRole('heading', { name: '套餐与加购' }),
+    ).toBeVisible()
+    const billingWrites: string[] = []
+    memberPage.on('request', (req) => {
+      if (
+        req.method() !== 'GET' &&
+        /billing|order|payment/i.test(new URL(req.url()).pathname)
+      )
+        billingWrites.push(req.url())
+    })
+    await memberPage.getByRole('button', { name: /创作会员/ }).click()
+    await memberPage
+      .getByRole('button', { name: '购买会员', exact: true })
+      .click()
+    const contact = memberPage.getByRole('dialog', { name: '联系管理员' })
+    await expect(
+      contact.getByText('支付功能暂未开通，请联系管理员获取会员。'),
+    ).toBeVisible()
+    await expect(contact.getByText('创作会员 · ¥69 · 800 创作点')).toBeVisible()
+    const code = contact.getByRole('img', { name: '管理员微信二维码' })
+    await expect
+      .poll(() => code.evaluate((el) => (el as HTMLImageElement).naturalWidth))
+      .toBe(972)
+    for (const width of [390, 768, 1280, 1440]) {
+      await memberPage.emulateMedia({
+        colorScheme: width === 768 || width === 1440 ? 'dark' : 'light',
+      })
+      await memberPage.setViewportSize({
+        width,
+        height: width === 1280 ? 600 : 844,
+      })
+      await expect(code.locator('..')).toBeInViewport({ ratio: 1 })
+      await expect(
+        contact.getByRole('link', { name: '保存二维码' }),
+      ).toBeInViewport()
+      await captureDesign(memberPage, 'membership-contact-' + width + '.png')
+    }
+    const [download] = await Promise.all([
+      memberPage.waitForEvent('download'),
+      contact.getByRole('link', { name: '保存二维码' }).click(),
+    ])
+    expect(download.suggestedFilename()).toBe('星桥会员管理员微信.jpg')
+    expect(await download.failure()).toBeNull()
+    await memberPage.keyboard.press('Escape')
+    await expect(contact).toBeHidden()
+    await memberPage
+      .getByRole('button', { name: /加购包/ })
+      .first()
+      .click()
+    await memberPage
+      .getByRole('button', { name: '购买加购包', exact: true })
+      .click()
+    await expect(
+      contact.getByText('支付功能暂未开通，请联系管理员办理额度加购。'),
+    ).toBeVisible()
+    await expect(contact.getByText('加购包 · ¥19 · 180 创作点')).toBeVisible()
+    await contact
+      .getByRole('button', { name: '关闭', exact: true })
+      .last()
+      .click()
+    await expect(contact).toBeHidden()
+    expect(billingWrites).toEqual([])
+    const wallet = await request.get('/api/me/billing', { headers: own })
+    expect(await wallet.json()).toMatchObject({
+      availablePoints: 1080,
+      subscription: { plan: { sku: 'light' } },
+    })
   } finally {
     await context.close()
   }
