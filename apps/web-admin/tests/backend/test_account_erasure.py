@@ -84,7 +84,7 @@ async def test_confirm_erase_and_register_again(platform: tuple[FastAPI, AsyncCl
     workspace = cleanup.runtime_root / hashlib.sha256(uid.encode()).hexdigest() / "workspace"
     workspace.mkdir(parents=True, exist_ok=True)
     (workspace / "private.txt").write_text("fixture")
-    body = {"confirm": True, "accountId": uid}
+    body = {"confirm": True, "accountId": uid, "product": "office"}
     url = "/api/auth/me"
     assert (
         await client.request("DELETE", url, headers={"Authorization": ""}, json=body)
@@ -101,10 +101,16 @@ async def test_confirm_erase_and_register_again(platform: tuple[FastAPI, AsyncCl
         await client.request("DELETE", url, json={**body, "accountId": admin["userId"]})
     ).status_code == 409
     assert (await client.get(url, headers=auth)).status_code == 200
+    stale = await client.request(
+        "DELETE", url, headers=auth, json={"confirm": True, "accountId": uid}
+    )
+    assert stale.status_code == 409 and stale.json()["code"] == "refresh_before_erasure"
+    assert (await client.get(url, headers=auth)).status_code == 200
     async with database.owner_io(uid) as active:
         assert active
         result = await client.request("DELETE", url, headers=auth, json=body)
         assert result.status_code == 202, result.text
+        assert result.json()["product"] == "entertainment"
         await cleanup.drain_one(services.runtime)
         assert workspace.is_dir() and physical.is_file()
     async with database.owner_io(uid) as active:

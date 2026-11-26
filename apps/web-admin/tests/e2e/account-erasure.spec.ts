@@ -21,6 +21,7 @@ for (const theme of ['light', 'dark'] as const) {
       expect(route.request().postDataJSON()).toEqual({
         accountId: 'fixture-admin',
         confirm: true,
+        product: theme === 'dark' ? 'entertainment' : 'office',
       })
       if (calls === 1)
         return route.fulfill({
@@ -28,7 +29,13 @@ for (const theme of ['light', 'dark'] as const) {
           json: { detail: '请先设置另一名可用管理员，再注销此账号。' },
         })
       state.signedIn = false
-      return route.fulfill({ status: 202, json: { status: 'closed' } })
+      return route.fulfill({
+        status: 202,
+        json: {
+          status: 'closed',
+          product: route.request().postDataJSON().product,
+        },
+      })
     })
     await page.goto(
       '/#/account/profile?product=' +
@@ -104,6 +111,26 @@ test('独立后端本人从资料页注销并撤销既有会话', async ({ page,
     ).status(),
   ).toBe(200)
   await open.click()
+  // 已打开的旧标签页发送上一版协议，后端必须先拒绝，再允许刷新后的页面注销。
+  await page.route('**/api/auth/me', async (route) => {
+    if (route.request().method() !== 'DELETE') return route.fallback()
+    const { accountId, confirm } = route.request().postDataJSON()
+    await route.continue({ postData: JSON.stringify({ accountId, confirm }) })
+  })
+  await dialog
+    .getByRole('button', { name: '确认注销账号', exact: true })
+    .click()
+  await expect(dialog.getByText(/页面已更新，账号仍然保留/)).toBeVisible()
+  expect(
+    (
+      await request.get('/api/auth/me', {
+        headers: { authorization: 'Bearer ' + token },
+      })
+    ).status(),
+  ).toBe(200)
+  await page.unroute('**/api/auth/me')
+  await page.reload()
+  await open.click()
   const result = page.waitForResponse(
     (r) =>
       r.url().endsWith('/api/auth/me') && r.request().method() === 'DELETE',
@@ -111,7 +138,9 @@ test('独立后端本人从资料页注销并撤销既有会话', async ({ page,
   await dialog
     .getByRole('button', { name: '确认注销账号', exact: true })
     .click()
-  expect((await result).status()).toBe(202)
+  const closed = await result
+  expect(closed.status()).toBe(202)
+  expect(await closed.json()).toEqual({ status: 'closed', product: 'office' })
   await expect(page).toHaveURL(/#\/login/)
   expect(
     (
@@ -205,7 +234,6 @@ for (const product of ['entertainment', 'office'] as const) {
       await expect(page).toHaveURL(
         new RegExp('#/login\\?product=' + product + '$'),
       )
-      await page.reload()
       await page.getByRole('link', { name: '创建账号', exact: true }).click()
       await expect(page).toHaveURL(
         new RegExp('#/register\\?product=' + product + '$'),

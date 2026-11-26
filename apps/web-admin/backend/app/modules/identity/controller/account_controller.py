@@ -6,9 +6,11 @@ from typing import Annotated
 from fastapi import APIRouter, Depends, Query, Request, Response
 
 from app.api.dependencies import current_account
+from app.infrastructure.errors import DomainError
 from app.infrastructure.query_parameters import query_integer
 from app.modules.identity.controller.routes import check_origin, login_payload, refresh_cookie
 from app.modules.identity.entity.bo.models import Account
+from app.modules.identity.entity.bo.product_roles import PRODUCTS
 from app.modules.identity.entity.vo.account_vo import (
     AvatarInput,
     CloseAccountInput,
@@ -36,10 +38,22 @@ async def close_account(
 ) -> dict[str, str]:
     """仅注销当前登录者；提交后撤销会话并清除浏览器刷新 Cookie。"""
     check_origin(request)
+    browser = "origin" in request.headers or "sec-fetch-mode" in request.headers
+    if browser and body.product is None:
+        # 已打开的旧网页不会随部署换版；在删除之前提示刷新，保留账号和额度。
+        raise DomainError(
+            409, "页面已更新，账号仍然保留。请刷新本页后重新确认注销。", "refresh_before_erasure"
+        )
+    products = [key for key in PRODUCTS if f"products.{key}" in account.permissions]
+    # 单产品账号按当前有效权限返回；双产品账号沿用用户正在操作的工作台。
+    product = products[0] if len(products) == 1 else body.product
     await accounts(request).close_account(account, body.accountId)
     refresh_cookie(request, response)
     response.headers["Cache-Control"] = "no-store"
-    return {"status": "closed"}
+    result = {"status": "closed"}
+    if body.product and product:
+        result["product"] = product
+    return result
 
 
 @router.put("/auth/me/profile")

@@ -1,5 +1,6 @@
 import { request } from '@/utils/request'
 import type { Identity } from '@/types/auth/auth'
+import type { Product } from '@/types/console/navigation'
 
 /** 登录会话只用于账号安全，不能替代设备或聊天会话。 */
 export interface LoginSession {
@@ -11,10 +12,10 @@ export interface LoginSession {
   lastSeenAt?: string | null
 }
 export const accountApi = {
-  close: (accountId: string) =>
-    request<{ status: 'closed' }>('/auth/me', {
+  close: (accountId: string, product: Product) =>
+    request<{ status: 'closed'; product: Product }>('/auth/me', {
       method: 'DELETE',
-      body: { accountId, confirm: true },
+      body: { accountId, confirm: true, product },
     }),
   profile: (displayName: string) =>
     request<Identity>('/auth/me/profile', {

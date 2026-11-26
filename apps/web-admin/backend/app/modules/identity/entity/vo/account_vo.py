@@ -6,6 +6,7 @@ from typing import Literal
 from pydantic import Field, field_validator
 
 from app.infrastructure.errors import DomainError
+from app.modules.identity.entity.bo.product_roles import Product
 from app.modules.identity.entity.bo.validation import display_name, email_address
 from app.modules.identity.entity.vo.dto import InputModel, PasswordInput
 
@@ -15,6 +16,7 @@ class CloseAccountInput(InputModel):
 
     confirm: Literal[True]
     accountId: str = Field(min_length=1, max_length=80)
+    product: Product | None = None
 
 
 class ProfileInput(InputModel):

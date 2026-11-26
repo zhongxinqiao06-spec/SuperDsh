@@ -35,9 +35,8 @@ async function confirm() {
   }
   error.value = ''
   busy.value = true
-  const product = currentProduct.value
   try {
-    await accountApi.close(id)
+    const { product } = await accountApi.close(id, currentProduct.value)
     try {
       localStorage.removeItem(`superdsh.announcement.${id}`)
       for (const key of Object.keys(localStorage)) {
