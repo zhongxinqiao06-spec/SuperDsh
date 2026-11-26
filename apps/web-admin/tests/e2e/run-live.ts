@@ -123,7 +123,9 @@ export async function runLiveBrowser(
               ].includes(name),
             )
           ? 'fixtures.studio_application'
-          : 'app.launcher',
+          : specifications.includes('account-erasure.spec.ts')
+            ? 'fixtures.registration_application'
+            : 'app.launcher',
       '--host',
       '127.0.0.1',
       '--port',

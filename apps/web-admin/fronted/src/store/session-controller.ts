@@ -103,11 +103,12 @@ export class SessionController {
     await this.refreshing?.catch(() => undefined)
   }
 
-  /** 先封锁本地身份，再等待刷新Cookie落地后撤销服务端会话。 */
-  signOut(): Promise<void> {
-    if (this.signingOut) return this.signingOut
-    const token = this.current?.accessToken
-    const refreshing = this.refreshing
+  /** 显式退出由发起者导航；自然过期由控制台保留原页面。 */
+  get explicitlySignedOut(): boolean {
+    return this.signedOut
+  }
+
+  clearForSignOut(): void {
     this.signedOut = true
     try {
       sessionStorage.setItem(signedOutKey, '1')
@@ -115,6 +116,14 @@ export class SessionController {
       /* 存储不可用时仍立即清除本地身份。 */
     }
     this.clear()
+  }
+
+  /** 先封锁本地身份，再等待刷新Cookie落地后撤销服务端会话。 */
+  signOut(): Promise<void> {
+    if (this.signingOut) return this.signingOut
+    const token = this.current?.accessToken
+    const refreshing = this.refreshing
+    this.clearForSignOut()
     this.signingOut = (async () => {
       await refreshing?.catch(() => undefined)
       const response = await this.fetcher(apiUrl('/auth/logout'), {

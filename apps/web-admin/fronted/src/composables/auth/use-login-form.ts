@@ -8,6 +8,7 @@ import { useAuthStore } from '@/store/modules/auth-store'
 import type { AuthResponse } from '@/types/auth/auth'
 import { signedInDestination } from '@/utils/auth/native-oauth'
 import { productOf } from '@/utils/studio/products'
+import { consoleContinuation } from '@/utils/console/routes'
 import { usePreferences } from '@/store/modules/preferences'
 import { ElNotification } from 'element-plus'
 
@@ -35,14 +36,19 @@ export function useLoginForm() {
   )
   const abort = new AbortController()
   const { tr } = usePreferences()
-  const product = computed(
-    () =>
-      productOf(route.query.product) ??
-      (typeof route.query.returnTo === 'string' &&
-      /^\/entertainment(?:\/|\?|$)/u.test(route.query.returnTo)
-        ? 'entertainment'
-        : 'office'),
-  )
+  const product = computed(() => {
+    const explicit = productOf(route.query.product)
+    if (explicit) return explicit
+    // 旧链接可能只在返回的个人资料地址中携带产品；仅解析已登记的站内目标。
+    const continuation = consoleContinuation(route.query.returnTo)
+    if (!continuation) return 'office'
+    const target = router.resolve(continuation)
+    return (
+      productOf(target.meta.product) ??
+      productOf(target.query.product) ??
+      'office'
+    )
+  })
   const mailAvailable = computed(
     () =>
       resource.data.value?.registrationEmailAvailable ??

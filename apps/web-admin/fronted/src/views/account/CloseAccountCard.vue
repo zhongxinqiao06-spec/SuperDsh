@@ -7,11 +7,13 @@ import ManagementDialog from '@/components/overlay/ManagementDialog.vue'
 import SettingsCard from '@/components/settings/SettingsCard.vue'
 import { sessionController } from '@/store/session-controller'
 import { usePreferences } from '@/store/modules/preferences'
+import { useCurrentProduct } from '@/composables/console/use-current-product'
 import { errorMessage } from '@/utils/errors'
 
 /** 弹窗锁定打开时的账号，取消和切换账号都不会提交注销。 */
 const { tr } = usePreferences()
 const router = useRouter()
+const currentProduct = useCurrentProduct()
 const owner = ref('')
 const label = ref('')
 const busy = ref(false)
@@ -33,6 +35,7 @@ async function confirm() {
   }
   error.value = ''
   busy.value = true
+  const product = currentProduct.value
   try {
     await accountApi.close(id)
     try {
@@ -46,8 +49,8 @@ async function confirm() {
     }
     owner.value = ''
     if (sessionController.current?.userId === id) {
-      sessionController.clear()
-      await router.replace('/login')
+      sessionController.clearForSignOut()
+      await router.replace({ path: '/login', query: { product } })
       ElMessage.success(tr('账号已注销', 'Account deleted'))
     }
   } catch (cause) {

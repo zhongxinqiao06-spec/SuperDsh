@@ -1,6 +1,7 @@
 import { computed, onMounted, onScopeDispose, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { useAuthStore } from '@/store/modules/auth-store'
+import { sessionController } from '@/store/session-controller'
 import { useResource } from '@/composables/use-resource'
 import { useMutation } from '@/composables/use-mutation'
 import { usePreferences } from '@/store/modules/preferences'
@@ -191,7 +192,11 @@ export function useConsole() {
     () => auth.authenticated,
     (value) => {
       // 身份过期时保留当前作品、文件或会话。主动退出则由退出流程返回独立登录页。
-      if (!value && !signingOut && route.meta.console)
+      if (
+        !value &&
+        !sessionController.explicitlySignedOut &&
+        route.meta.console
+      )
         void router.replace({
           path: '/login',
           query: { returnTo: route.fullPath },
