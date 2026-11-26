@@ -261,6 +261,12 @@ function saved(r: BillingOperation) {
                   @click="selected = { account: a, action: 'gift' }"
                   >{{ tr('加额度', 'Add credits') }}</el-button
                 >
+                <el-button
+                  v-if="!a.disabled && auth.can('billing.adjustments.create')"
+                  link
+                  @click="selected = { account: a, action: 'card' }"
+                  >{{ tr('发额度卡', 'Issue card') }}</el-button
+                >
               </div>
             </td>
           </tr>

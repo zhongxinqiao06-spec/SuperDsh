@@ -26,6 +26,7 @@ class Plan(BillingView):
 
 
 class Catalog(BillingView):
+    card_denominations: list[int]
     items: list[Plan]
     sale_open: bool
     sample_points_per_second: int
@@ -56,7 +57,26 @@ class Lot(BillingView):
     expires_at: datetime
 
 
+class CreditCard(BillingView):
+    """面额、剩余额度和占用分别展示，到期后的历史使用量仍可查询。"""
+
+    id: str
+    granted: int
+    available_points: int
+    used_points: int
+    held: int
+    issued_at: datetime
+    expires_at: datetime
+    status: Literal["available", "held", "spent", "expired"]
+
+
+class CreditCards(BillingView):
+    items: list[CreditCard]
+    has_more: bool
+
+
 class Wallet(BillingView):
+    card_points: int = 0
     plan_change: ChangeSummary | None = None
     as_of: datetime
     available_points: int

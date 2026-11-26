@@ -10,7 +10,9 @@ from pydantic.alias_generators import to_camel
 from app.modules.billing.entity.vo.changes import ChangeSummary
 from app.modules.billing.entity.vo.dto import BillingView
 
-Action = Literal["open", "renew", "gift", "compensation", "topup"]
+# 运营发卡面额由服务端校验，办理表单通过目录读取同一组数值。
+CARD_DENOMINATIONS = (100, 200, 500, 1000, 2000)
+Action = Literal["open", "renew", "gift", "compensation", "topup", "card"]
 Payment = Literal["complimentary", "offline"]
 
 
@@ -33,7 +35,9 @@ class OperationInput(BillingView):
 
     @model_validator(mode="after")
     def consistent(self) -> "OperationInput":
-        manual = self.action in {"gift", "compensation"}
+        if self.action == "card" and self.points not in CARD_DENOMINATIONS:
+            raise ValueError("请选择有效的额度卡面额")
+        manual = self.action in {"gift", "compensation", "card"}
         if manual and (
             self.points is None
             or self.valid_days is None

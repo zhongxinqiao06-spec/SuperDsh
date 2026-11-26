@@ -146,6 +146,91 @@ async def test_generation_wallet_blocks_before_enqueue_and_serializes_concurrent
     assert sum(e["availableDelta"] for e in entries if e["kind"] == "usage_release") == 100
 
 
+async def test_card_grants_and_wallet_first_generation(
+    platform: tuple[FastAPI, AsyncClient],
+) -> None:
+    """两卡有效期均早于普通额度，验证跨卡、原卡释放和余额不足回滚。"""
+    from uuid import uuid4
+
+    app, client = platform
+    owner = str((await bootstrap_studio(client, 40))["userId"])
+    media = app.state.services.media_jobs
+    await media.close()
+    values = (await client.get("/api/billing/catalog")).json()["cardDenominations"]
+    assert values == [100, 200, 500, 1000, 2000]
+    for points, days in [(99, 1), (100, 1), (200, 3)]:
+        request = dict(
+            userId=owner,
+            businessKey=str(uuid4()),
+            action="card",
+            reason="隔离测试",
+            points=points,
+            validDays=days,
+        )
+        preview = await client.post("/api/admin/billing/operation-previews", json=request)
+        if points == 99:
+            assert preview.status_code == 422
+            continue
+        assert preview.is_success, preview.text
+        confirm = dict(previewId=preview.json()["id"])
+        replies = await asyncio.gather(
+            *(client.post("/api/admin/billing/adjustments", json=confirm) for _ in range(2))
+        )
+        assert all(r.is_success for r in replies) and replies[0].json() == replies[1].json()
+
+    async def cards() -> dict[int, dict]:
+        rows = (await client.get("/api/me/billing/cards")).json()["items"]
+        assert len(rows) == 2
+        return {r["granted"]: r for r in rows}
+
+    assert (await client.get("/api/me/billing/cards?pageSize=1")).json()["hasMore"]
+    wallet = (await client.get("/api/me/billing")).json()
+    assert (wallet["availablePoints"], wallet["cardPoints"]) == (340, 300)
+    for i in range(5):
+        uri, saved = await create_quick(client, f"card-{i}")
+        plan = await make_plan(client, uri, saved["revision"], f"quote-card-{i}")
+        response = await client.post(
+            uri + "/quick/generation-plans/" + plan["id"] + "/confirm",
+            json={
+                "revision": plan["revision"],
+                "requestKey": f"card-job-{i}",
+                "planHash": plan["planHash"],
+            },
+        )
+        if i == 4:
+            assert response.status_code == 402
+            assert response.json()["context"]["availablePoints"] == 40
+            assert (await client.get(uri + "/quick")).json()["jobs"] == []
+            break
+        assert response.is_success, response.text
+        async with media.database.sessions() as db:
+            job = await db.get(MediaJob, response.json()["jobs"][0]["id"])
+            assert job is not None
+        if i == 0:
+            inventory = await cards()
+            assert (inventory[100]["held"], inventory[200]["held"]) == (60, 0)
+            await media.mark(job, "cancelled")
+            inventory = await cards()
+            assert (inventory[100]["availablePoints"], inventory[100]["usedPoints"]) == (100, 0)
+            continue
+        await media.mark(job, "ready")
+        await media.mark(job, "ready")
+    inventory = await cards()
+    assert inventory[100]["status"] == "spent" and inventory[200]["usedPoints"] == 160
+    async with media.database.sessions.begin() as db:
+        await db.execute(
+            text("UPDATE billing_credit_lots SET expires_at=now() WHERE id=:id"),
+            {"id": inventory[200]["id"]},
+        )
+    expired = (await cards())[200]
+    assert (expired["availablePoints"], expired["status"], expired["usedPoints"]) == (
+        0,
+        "expired",
+        160,
+    )
+    assert (await client.get("/api/me/billing")).json()["availablePoints"] == 0
+
+
 async def test_quick_quote_expiry_and_price_lock(platform: tuple[FastAPI, AsyncClient]) -> None:
     from datetime import UTC, datetime, timedelta
     from uuid import uuid4

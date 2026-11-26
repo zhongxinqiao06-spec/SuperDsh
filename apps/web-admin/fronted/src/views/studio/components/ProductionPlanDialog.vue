@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { computed } from 'vue'
+import CardFundingHint from '@/views/billing/components/CardFundingHint.vue'
 import ManagementDialog from '@/components/overlay/ManagementDialog.vue'
 import ExpandableText from '@/components/base/ExpandableText.vue'
 import type { GenerationPlan } from '@/types/studio/production'
@@ -118,6 +119,7 @@ const states: Record<string, string> = {
             new Date(plan.usageQuote.expiresAt).toLocaleTimeString()
           }}，确认后按此价格预留创作点。</small
         >
+        <CardFundingHint :points="plan.usageQuote.totalPoints" />
       </section>
       <p v-else class="studio-meta">
         视频共

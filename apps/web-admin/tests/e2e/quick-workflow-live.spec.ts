@@ -164,12 +164,34 @@ test('作品分类与快速视频：预检、候选、恢复、收藏和进入�
     'aria-pressed',
     'true',
   )
-  await grantCreationBudget(page.request, adminHeaders, user.userId, 360)
+  const cardPreview = await page.request.post(
+    '/api/admin/billing/operation-previews',
+    {
+      headers: adminHeaders,
+      data: {
+        userId: user.userId,
+        businessKey: randomUUID(),
+        action: 'card',
+        points: 500,
+        validDays: 30,
+        reason: '隔离创作额度卡',
+      },
+    },
+  )
+  expect(cardPreview.ok(), await cardPreview.text()).toBe(true)
+  const issued = await page.request.post('/api/admin/billing/adjustments', {
+    headers: adminHeaders,
+    data: { previewId: (await cardPreview.json()).id },
+  })
+  expect(issued.ok(), await issued.text()).toBe(true)
   await page.goto('/#/entertainment/quick/' + id)
   await expect(page.getByLabel('视频提示词')).toHaveValue(
     '雨后清晨，列车缓缓驶入安静的车站',
   )
   await page.getByRole('button', { name: '生成一条视频' }).click()
+  await expect(
+    plan.getByText('预计使用普通创作点 40 点，额度卡抵扣 60 点。'),
+  ).toBeVisible()
   await plan.getByRole('button', { name: '确认用量并提交' }).click()
   await expect
     .poll(async () => (await read()).jobs[0]?.state, { timeout: 30_000 })

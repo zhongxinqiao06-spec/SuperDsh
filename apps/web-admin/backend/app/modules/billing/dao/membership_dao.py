@@ -13,6 +13,8 @@ from app.modules.billing.entity.do.operation_do import BillingPeriodRow
 from app.modules.billing.entity.do.plan_do import PlanVersionRow, SubscriptionRow
 from app.modules.billing.entity.vo.dto import (
     BookedPlan,
+    CreditCard,
+    CreditCards,
     Entries,
     Entry,
     EntryDetail,
@@ -54,10 +56,11 @@ class MembershipRepository:
         available = case((lot.expires_at > now, lot.remaining - lot.held), else_=0)
         async with self.database.sessions() as session:
             await session.connection(execution_options={"isolation_level": "REPEATABLE READ"})
-            total, held, expiring = (
+            total, card_points, held, expiring = (
                 await session.execute(
                     select(
                         func.coalesce(func.sum(available), 0),
+                        func.coalesce(func.sum(available).filter(lot.is_card()), 0),
                         func.coalesce(func.sum(lot.held), 0),
                         func.coalesce(
                             func.sum(
@@ -128,6 +131,7 @@ class MembershipRepository:
                 plan_change=(await visible_changes(session, [owner], now)).get(owner),
                 as_of=now,
                 available_points=total,
+                card_points=card_points,
                 held_points=held,
                 expiring_points=expiring,
                 expiring_days=days,
@@ -145,6 +149,47 @@ class MembershipRepository:
                     for r in rows[:lot_limit]
                 ],
             )
+
+    async def cards(self, owner: str, now: datetime, page: int, size: int) -> CreditCards:
+        """仅查询本人的卡，保留过期、用尽或仍在结算中的历史卡。"""
+        lot = CreditLotRow
+        async with self.database.sessions() as session:
+            rows = (
+                await session.scalars(
+                    select(lot)
+                    .where(lot.user_id == owner, lot.is_card(), lot.created_at <= now)
+                    .order_by(
+                        (lot.expires_at > now).desc(),
+                        (lot.remaining > 0).desc(),
+                        lot.created_at.desc(),
+                        lot.id,
+                    )
+                    .offset((page - 1) * size)
+                    .limit(size + 1)
+                )
+            ).all()
+            items = []
+            for row in rows[:size]:
+                available = row.remaining - row.held if row.expires_at > now else 0
+                items.append(
+                    CreditCard(
+                        id=row.id,
+                        granted=row.granted,
+                        available_points=available,
+                        used_points=row.granted - row.remaining,
+                        held=row.held,
+                        issued_at=row.created_at,
+                        expires_at=row.expires_at,
+                        status="available"
+                        if available
+                        else "held"
+                        if row.held
+                        else "spent"
+                        if row.remaining == 0
+                        else "expired",
+                    )
+                )
+            return CreditCards(items=items, has_more=len(rows) > size)
 
     async def entries(
         self,

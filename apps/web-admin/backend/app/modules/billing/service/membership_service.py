@@ -5,7 +5,8 @@ from datetime import UTC, datetime
 from app.infrastructure.errors import DomainError
 from app.modules.billing.dao.membership_dao import MembershipRepository
 from app.modules.billing.dao.pricing_dao import active
-from app.modules.billing.entity.vo.dto import Catalog, Entries, EntryDetail, Wallet
+from app.modules.billing.entity.vo.dto import Catalog, CreditCards, Entries, EntryDetail, Wallet
+from app.modules.billing.entity.vo.operations import CARD_DENOMINATIONS
 from app.modules.billing.entity.vo.pricing import RateTerms, UsageItem
 from app.modules.billing.service.quote_service import price
 from app.modules.identity.entity.bo.models import Account
@@ -36,6 +37,7 @@ class MembershipService:
             row = await active(db, example, now)
         rate = RateTerms.model_validate(row.payload["terms"]) if row else None
         return Catalog(
+            card_denominations=list(CARD_DENOMINATIONS),
             items=await self.repository.plans(now),
             sale_open=False,
             sample_points_per_second=price(example.model_copy(update={"quantity": 1}), rate)[
@@ -48,6 +50,9 @@ class MembershipService:
 
     async def wallet(self, account: Account) -> Wallet:
         return await self.repository.wallet(self.owner(account), datetime.now(UTC), 7, 20)
+
+    async def cards(self, account: Account, page: int, size: int) -> CreditCards:
+        return await self.repository.cards(self.owner(account), datetime.now(UTC), page, size)
 
     async def entries(
         self,

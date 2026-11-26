@@ -44,7 +44,8 @@ async def reserve_jobs(db: AsyncSession, owner: str, charges: list[tuple[str, in
                 CreditLotRow.expires_at > now,
                 CreditLotRow.remaining > CreditLotRow.held,
             )
-            .order_by(CreditLotRow.expires_at, CreditLotRow.id)
+            # 普通额度优先，两组内均先用最早到期的批次，跨卡与钱包一次预留。
+            .order_by(CreditLotRow.is_card(), CreditLotRow.expires_at, CreditLotRow.id)
             .with_for_update()
         )
     ).all()

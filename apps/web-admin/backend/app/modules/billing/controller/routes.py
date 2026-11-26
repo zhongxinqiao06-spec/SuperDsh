@@ -6,7 +6,7 @@ from fastapi import APIRouter, Depends, Path, Query, Request
 from pydantic import AwareDatetime
 
 from app.api.dependencies import current_account
-from app.modules.billing.entity.vo.dto import Catalog, Entries, EntryDetail, Wallet
+from app.modules.billing.entity.vo.dto import Catalog, CreditCards, Entries, EntryDetail, Wallet
 from app.modules.billing.service.membership_service import MembershipService
 from app.modules.identity.entity.bo.models import Account
 
@@ -28,6 +28,17 @@ async def catalog(request: Request, account: AccountDep) -> Catalog:
 async def wallet(request: Request, account: AccountDep) -> Wallet:
     """查询本人当前周期、余额和最近到期的批次。"""
     return await service(request).wallet(account)
+
+
+@router.get("/me/billing/cards")
+async def cards(
+    request: Request,
+    account: AccountDep,
+    page: Annotated[int, Query(ge=1, le=1000000)] = 1,
+    size: Annotated[int, Query(ge=1, le=100, alias="pageSize")] = 10,
+) -> CreditCards:
+    """本人额度卡，包括已用尽或过期的卡。"""
+    return await service(request).cards(account, page, size)
 
 
 @router.get("/me/billing/entries")

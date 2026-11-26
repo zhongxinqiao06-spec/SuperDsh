@@ -4,7 +4,11 @@ import { loginIsolatedAccount } from './live-auth'
 import { captureDesign } from './design-capture'
 
 /** 独立平台真实办理，覆盖会员、延期与用户管理行内入账，再用本人身份核对。 */
-test('运营开通、续期和加额在本人账本生效', async ({ page, request }) => {
+test('运营开通、续期和加额在本人账本生效', async ({
+  page,
+  request,
+  browser,
+}) => {
   test.skip(process.env.WEB_ADMIN_E2E_LIVE !== '1', '仅运行于隔离后端')
   test.setTimeout(120000)
   const admin = process.env.WEB_ADMIN_E2E_USERNAME ?? 'foundation-admin',
@@ -99,6 +103,15 @@ test('运营开通、续期和加额在本人账本生效', async ({ page, reque
   await expect(dialog.getByText('400 → 580')).toBeVisible()
   await dialog.getByRole('button', { name: '确认办理' }).click()
   await expect(row.getByText('580', { exact: true })).toBeVisible()
+  await row.getByRole('button', { name: '发额度卡' }).click()
+  dialog = page.getByRole('dialog', { name: '发放额度卡' })
+  await dialog.getByLabel('卡面额').selectOption('500')
+  await expect(dialog.getByLabel('卡面额').locator('option')).toHaveCount(5)
+  await dialog.getByLabel('办理原因').fill('测试用额度卡')
+  await dialog.getByRole('button', { name: '预览办理' }).click()
+  await expect(dialog.getByText('580 → 1080')).toBeVisible()
+  await dialog.getByRole('button', { name: '确认办理' }).click()
+  await expect(dialog).toBeHidden()
   const first = await loginIsolatedAccount(request, username, pass)
   const changed = await request.post('/api/auth/change-password', {
     headers: { authorization: 'Bearer ' + (await first.json()).accessToken },
@@ -110,10 +123,60 @@ test('运营开通、续期和加额在本人账本生效', async ({ page, reque
   expect(
     (await (await request.get('/api/me/billing', { headers: own })).json())
       .availablePoints,
-  ).toBe(580)
+  ).toBe(1080)
   expect(
     (
       await request.get('/api/admin/billing/subscriptions', { headers: own })
     ).status(),
   ).toBe(403)
+  const grantAttempt = await request.post(
+    '/api/admin/billing/operation-previews',
+    {
+      headers: own,
+      data: {
+        action: 'card',
+        points: 500,
+        validDays: 1,
+        userId,
+        businessKey: randomUUID(),
+        reason: '越权测试',
+      },
+    },
+  )
+  expect(grantAttempt.status()).toBe(403)
+  expect(
+    (await (await request.get('/api/me/billing/cards', { headers })).json())
+      .items,
+  ).toHaveLength(0)
+  // 独立浏览器上下文模拟成员本人，不继承运营端的内存凭据和活动会话。
+  const context = await browser.newContext({
+    baseURL: process.env.WEB_ADMIN_E2E_BASE_URL,
+  })
+  try {
+    const memberPage = await context.newPage()
+    expect(
+      (
+        await loginIsolatedAccount(context.request, username, pass, 'browser')
+      ).ok(),
+    ).toBe(true)
+    await memberPage.goto('/#/account/membership')
+    await memberPage.getByRole('tab', { name: '我的额度卡' }).click()
+    await expect(
+      memberPage.getByText('500 点额度卡', { exact: true }),
+    ).toBeVisible()
+    await expect(
+      memberPage.getByText('可抵扣 500 点', { exact: true }),
+    ).toBeVisible()
+    for (const width of [390, 768, 1280, 1440]) {
+      await memberPage.setViewportSize({ width, height: 844 })
+      await captureDesign(memberPage, 'credit-cards-' + width + '.png')
+      expect(
+        await memberPage.evaluate(
+          () => document.documentElement.scrollWidth <= innerWidth,
+        ),
+      ).toBe(true)
+    }
+  } finally {
+    await context.close()
+  }
 })

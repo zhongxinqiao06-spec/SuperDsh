@@ -2,6 +2,7 @@
 import { ApiError } from '@/utils/errors'
 import { createUuid } from '@/utils/uuid'
 import { computed, ref, watch } from 'vue'
+import CardFundingHint from '@/views/billing/components/CardFundingHint.vue'
 import ManagementDialog from '@/components/overlay/ManagementDialog.vue'
 import ExpandableText from '@/components/base/ExpandableText.vue'
 import { preparationApi } from '@/api/studio/preparation-api'
@@ -210,11 +211,10 @@ async function submit() {
         <ExpandableText :text="preview.plan.text" label="制作内容" />
         <p class="studio-meta">
           本次生成需要
-          {{
-            preview.plan.quotedPoints
-          }}
+          {{ preview.plan.quotedPoints }}
           创作点。确认后预留，完成后结果进入候选区。
         </p>
+        <CardFundingHint :points="preview.plan.quotedPoints" />
         <el-button text :disabled="busy" @click="preview = undefined"
           >返回修改方案</el-button
         >

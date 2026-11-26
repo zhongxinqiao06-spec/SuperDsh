@@ -15,6 +15,8 @@ export function billingLabel(
       return tr('解除预留', 'Hold released')
     case 'membership_grant':
       return tr('会员周期发放', 'Membership credit')
+    case 'card':
+      return tr('额度卡发放', 'Credit card grant')
     case 'gift':
       return tr('运营赠送', 'Gift')
     case 'compensation':

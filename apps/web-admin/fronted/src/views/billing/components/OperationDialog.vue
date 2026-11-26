@@ -15,6 +15,8 @@ const emit = defineEmits<{ close: []; saved: [result: BillingOperation] }>()
 const { tr } = usePreferences()
 const {
   catalog,
+  cardPoints,
+  denominations,
   mutation,
   action,
   reason,
@@ -42,7 +44,9 @@ const {
     :title="
       member
         ? tr('会员办理', 'Manage membership')
-        : tr('人工加额', 'Grant credits')
+        : action === 'card'
+          ? tr('发放额度卡', 'Issue credit card')
+          : tr('人工加额', 'Grant credits')
     "
     :busy="mutation.busy.value"
     :error="mutation.error.value"
@@ -80,6 +84,9 @@ const {
             >
             <template v-else
               ><option value="gift">{{ tr('运营赠送', 'Gift') }}</option>
+              <option value="card">
+                {{ tr('发放额度卡', 'Issue credit card') }}
+              </option>
               <option value="compensation">
                 {{ tr('人工补偿', 'Compensation') }}
               </option>
@@ -89,8 +96,29 @@ const {
             >
           </select></label
         >
-        <template v-if="manual"
-          ><label class="field"
+        <template v-if="manual">
+          <template v-if="action === 'card'">
+            <ResourceStatus
+              :loading="catalog.loading.value"
+              :error="catalog.error.value"
+              @retry="catalog.reload"
+            />
+            <label class="field"
+              >{{ tr('卡面额', 'Card value') }}
+              <select v-model="cardPoints" class="native-control">
+                <option v-for="n in denominations" :key="n" :value="n">
+                  {{ n.toLocaleString() }} {{ tr('创作点', 'credits') }}
+                </option>
+              </select>
+            </label>
+            <small class="billing-note">{{
+              tr(
+                '每次发放一张，用户的普通创作点不足时自动抵扣差额。',
+                'Issues one card. It automatically covers any shortfall after regular credits.',
+              )
+            }}</small>
+          </template>
+          <label v-else class="field"
             >{{ tr('发放点数', 'Credits to grant')
             }}<el-input-number
               v-model="points"

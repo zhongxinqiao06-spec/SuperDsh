@@ -12,6 +12,7 @@ from sqlalchemy import (
     UniqueConstraint,
 )
 from sqlalchemy.orm import Mapped, mapped_column
+from sqlalchemy.sql.elements import ColumnElement
 
 from app.infrastructure.database import Base
 
@@ -44,6 +45,11 @@ class CreditLotRow(Base):
     held: Mapped[int]
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True))
     expires_at: Mapped[datetime] = mapped_column(DateTime(timezone=True))
+
+    @classmethod
+    def is_card(cls) -> ColumnElement[bool]:
+        """原单生成唯一 card: 来源，与历史钱包批次共用分摊和结算约束。"""
+        return cls.source_key.startswith("card:")
 
 
 class LedgerEntryRow(Base):

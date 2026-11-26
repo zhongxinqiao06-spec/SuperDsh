@@ -1,6 +1,7 @@
 import { request } from '@/utils/request'
 import type {
   Catalog,
+  CreditCard,
   Entries,
   EntryDetail,
   Wallet,
@@ -11,6 +12,11 @@ export const membershipApi = {
   wallet: (signal: AbortSignal) => request<Wallet>('/me/billing', { signal }),
   catalog: (signal: AbortSignal) =>
     request<Catalog>('/billing/catalog', { signal }),
+  cards: (page: number, signal: AbortSignal) =>
+    request<{ items: CreditCard[]; hasMore: boolean }>('/me/billing/cards', {
+      signal,
+      query: { page, pageSize: 10 },
+    }),
   entries: (
     cursor: string | null,
     kind: string,

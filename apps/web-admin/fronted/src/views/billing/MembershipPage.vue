@@ -9,6 +9,7 @@ import { usePreferences } from '@/store/modules/preferences'
 import { billingLabel } from '@/utils/billing/labels'
 
 import { billingTime, changeLabel } from '@/utils/billing/change-labels'
+import CreditCards from './components/CreditCards.vue'
 import CreditEntries from './components/CreditEntries.vue'
 import '@/assets/styles/billing.css'
 const { tr } = usePreferences()
@@ -56,6 +57,11 @@ function refresh() {
           <div>
             <span>{{ tr('可用创作点', 'Available credits') }}</span
             ><strong>{{ data.availablePoints.toLocaleString() }}</strong>
+            <small v-if="data.cardPoints"
+              >{{ tr('其中额度卡', 'From cards') }}
+              {{ data.cardPoints.toLocaleString() }}
+              {{ tr('点', 'credits') }}</small
+            >
           </div>
           <div>
             <span>{{ tr('任务占用', 'Held by tasks') }}</span
@@ -114,6 +120,9 @@ function refresh() {
         <el-tabs v-model="tab">
           <el-tab-pane :label="tr('额度明细', 'Ledger')" name="entries"
             ><CreditEntries :key="refreshKey"
+          /></el-tab-pane>
+          <el-tab-pane :label="tr('我的额度卡', 'My credit cards')" name="cards"
+            ><CreditCards v-if="tab === 'cards'" :key="refreshKey"
           /></el-tab-pane>
           <el-tab-pane :label="tr('来源批次', 'Credit lots')" name="lots">
             <ResourceStatus

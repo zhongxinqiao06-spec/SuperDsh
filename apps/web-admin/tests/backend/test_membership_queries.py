@@ -20,7 +20,7 @@ from app.modules.navigation.entity.do.models import NavigationRow
 async def test_personal_credit_queries(platform: tuple[FastAPI, AsyncClient]) -> None:
     app, client = platform
     path = "/api/me/billing"
-    for url in [path, path + "/entries", path + "/entries/nonexistent", "/api/billing/catalog"]:
+    for url in [path, path + "/entries", path + "/entries/nonexistent", path + "/cards", "/api/billing/catalog"]:
         assert (await client.get(url)).status_code == 401
     account = await bootstrap(client)
     owner = str(account["userId"])
@@ -78,7 +78,7 @@ async def test_personal_credit_queries(platform: tuple[FastAPI, AsyncClient]) ->
             )
         )
     wallet = (await client.get(path + "?userId=other")).json()
-    assert (wallet["availablePoints"], wallet["heldPoints"], wallet["expiringPoints"]) == (47, 5, 7)
+    assert (wallet["availablePoints"], wallet["heldPoints"], wallet["expiringPoints"]) == (207, 5, 7)
     assert wallet["lots"][0]["availablePoints"] == 0 and wallet["lots"][0]["held"] == 2
     assert wallet["subscription"]["plan"]["priceFen"] == 2900
     assert (await client.get(path + "/entries/" + foreign)).status_code == 404

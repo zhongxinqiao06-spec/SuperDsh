@@ -11,6 +11,7 @@ export interface Plan {
   points: number
 }
 export interface Catalog {
+  cardDenominations?: number[]
   items: Plan[]
   saleOpen: boolean
   samplePointsPerSecond: number
@@ -25,7 +26,19 @@ export interface CreditLot {
   expiresAt: string
 }
 /** 同一账号在两个产品下共用的本人账本快照。 */
+/** 额度卡由运营逐张发放，占用与用尽的卡都可以查回。 */
+export interface CreditCard {
+  id: string
+  granted: number
+  availablePoints: number
+  usedPoints: number
+  held: number
+  issuedAt: string
+  expiresAt: string
+  status: 'available' | 'held' | 'spent' | 'expired'
+}
 export interface Wallet {
+  cardPoints?: number
   planChange: ChangeSummary | null
   asOf: string
   availablePoints: number

@@ -1,7 +1,8 @@
 import type { ChangeSummary } from './changes'
 
 /** 管理端查看账号摘要与服务端冻结的办理试算。 */
-export type BillingAction = 'open' | 'renew' | 'gift' | 'compensation' | 'topup'
+export type BillingAction =
+  'open' | 'renew' | 'gift' | 'compensation' | 'topup' | 'card'
 export type PaymentMode = 'complimentary' | 'offline'
 export interface BillingAccount {
   revision: number

@@ -54,6 +54,7 @@ function nextPage() {
               'usage_charge',
               'usage_release',
               'gift',
+              'card',
               'compensation',
               'topup',
             ]"

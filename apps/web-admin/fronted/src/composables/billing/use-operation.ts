@@ -26,14 +26,31 @@ export function useOperation(
   const action = ref(initial),
     reason = ref(''),
     points = ref<number>(),
-    days = ref(30)
+    days = ref(initial === 'card' ? 365 : 30)
+  const cardPoints = ref<number>()
+  const denominations = computed(
+    () => catalog.data.value?.cardDenominations ?? [],
+  )
+  watch(
+    denominations,
+    (values) => {
+      if (!values.includes(cardPoints.value ?? 0)) cardPoints.value = values[0]
+    },
+    { immediate: true },
+  )
+  watch(action, (next, old) => {
+    if (next === 'card') days.value = 365
+    else if (old === 'card') days.value = 30
+  })
   const payment = ref<PaymentMode>('complimentary'),
     receipt = ref(''),
     amount = ref('')
   const planId = ref(''),
     preview = ref<BillingOperation | null>(null)
   const member = computed(() => ['open', 'renew'].includes(action.value))
-  const manual = computed(() => ['gift', 'compensation'].includes(action.value))
+  const manual = computed(() =>
+    ['gift', 'compensation', 'card'].includes(action.value),
+  )
   const plans = computed(
     () =>
       catalog.data.value?.items.filter((p) => {
@@ -79,8 +96,9 @@ export function useOperation(
     () =>
       !!reason.value.trim() &&
       (manual.value
-        ? Number.isInteger(points.value) &&
-          (points.value ?? 0) > 0 &&
+        ? (action.value === 'card'
+            ? denominations.value.includes(cardPoints.value ?? 0)
+            : Number.isInteger(points.value) && (points.value ?? 0) > 0) &&
           Number.isInteger(days.value) &&
           days.value > 0
         : !!activePlan.value) &&
@@ -115,7 +133,10 @@ export function useOperation(
       reason: reason.value.trim(),
       payment: selectedPayment.value,
       ...(manual.value
-        ? { points: points.value, validDays: days.value }
+        ? {
+            points: action.value === 'card' ? cardPoints.value : points.value,
+            validDays: days.value,
+          }
         : { planVersionId: planId.value }),
       ...(selectedPayment.value === 'offline'
         ? {
@@ -138,6 +159,8 @@ export function useOperation(
   }
   return {
     catalog,
+    cardPoints,
+    denominations,
     mutation,
     action,
     reason,
