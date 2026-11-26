@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import '@/assets/styles/billing.css'
 import ManagementDialog from '@/components/overlay/ManagementDialog.vue'
 import ResourceStatus from '@/components/feedback/ResourceStatus.vue'
 import { useOperation } from '@/composables/billing/use-operation'
@@ -10,7 +11,11 @@ import type {
   BillingAccount,
   BillingOperation,
 } from '@/types/billing/operations'
-const props = defineProps<{ account: BillingAccount; initial: BillingAction }>()
+const props = defineProps<{
+  account: BillingAccount
+  initial: BillingAction
+  cardOnly?: boolean
+}>()
 const emit = defineEmits<{ close: []; saved: [result: BillingOperation] }>()
 const { tr } = usePreferences()
 const {
@@ -67,7 +72,7 @@ const {
         {{ account.username }}</strong
       >
       <template v-if="!preview">
-        <label class="field"
+        <label v-if="!cardOnly" class="field"
           >{{ tr('办理类型', 'Action')
           }}<select
             v-model="action"
@@ -252,7 +257,13 @@ const {
           <dd>{{ preview.quote.points }}</dd>
           <dt>{{ tr('立即到账', 'Available immediately') }}</dt>
           <dd>+{{ preview.quote.immediatePoints }}</dd>
-          <dt>{{ tr('预计可用余额', 'Available balance') }}</dt>
+          <dt>
+            {{
+              account.unlimited
+                ? tr('点数账本余额', 'Credit ledger balance')
+                : tr('预计可用余额', 'Available balance')
+            }}
+          </dt>
           <dd>
             {{ preview.quote.availableBefore }} →
             {{ preview.quote.availableAfter }}

@@ -11,6 +11,7 @@ import ResourceStatus from '@/components/feedback/ResourceStatus.vue'
 import ManagementDialog from '@/components/overlay/ManagementDialog.vue'
 import { ref } from 'vue'
 import { useRoute } from 'vue-router'
+import AccountGrantActions from '@/views/billing/components/AccountGrantActions.vue'
 import OperationDialog from '@/views/billing/components/OperationDialog.vue'
 import type {
   BillingAccount,
@@ -127,43 +128,16 @@ const { tr } = usePreferences()
                 >
                 <small
                   >{{ tr('可用', 'Available') }}
-                  {{ user.billing.availablePoints }}</small
-                >
-                <el-button
-                  v-if="
-                    !user.disabled && vm.auth.can('billing.adjustments.create')
-                  "
-                  link
-                  @click="operate(user.billing, 'gift')"
-                  >{{ tr('加额度', 'Add credits') }}</el-button
-                >
-                <el-button
-                  v-if="
-                    !user.disabled && vm.auth.can('billing.adjustments.create')
-                  "
-                  link
-                  @click="operate(user.billing, 'card')"
-                  >{{ tr('发额度卡', 'Issue card') }}</el-button
-                >
-                <el-button
-                  v-if="
-                    !user.disabled &&
-                    vm.auth.can('billing.subscriptions.manage')
-                  "
-                  link
-                  @click="
-                    operate(
-                      user.billing,
-                      user.billing.state === 'active' ? 'renew' : 'open',
-                    )
-                  "
-                >
                   {{
-                    user.billing.state === 'active'
-                      ? tr('续期', 'Renew')
-                      : tr('发放会员', 'Grant membership')
-                  }}</el-button
-                > </template
+                    user.billing.unlimited
+                      ? tr('无限额度', 'Unlimited')
+                      : user.billing.availablePoints
+                  }}</small
+                >
+                <AccountGrantActions
+                  :account="user.billing"
+                  @operate="operate"
+                /> </template
               ><span v-else>—</span>
             </td>
             <td :data-label="tr('状态', 'Status')">

@@ -13,7 +13,7 @@ from sqlalchemy import select, text, update
 
 from app.infrastructure.crypto import CredentialCipher
 from app.infrastructure.errors import DomainError
-from app.modules.billing.dao.usage_credit import finish_job
+from app.modules.billing.service.usage_credit import finish_job
 from app.modules.identity.entity.bo.models import Account
 from app.modules.identity.service.identity import IdentityService
 from app.modules.models.entity.vo.model_vo import CapabilityBinding

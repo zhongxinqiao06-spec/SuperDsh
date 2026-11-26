@@ -114,7 +114,7 @@ test('娱乐邮箱注册保留错误草稿并可重新验证', async ({ page }, 
         needsBootstrap: false,
         registrationOpen: true,
         registrationEmailAvailable: true,
-        registrationGrant: { points: 40, validDays: 30 },
+        registrationGrant: { points: 200, validDays: 30 },
         emailVerificationRequired: false,
         oauthEnabled: false,
       },
@@ -159,7 +159,7 @@ test('娱乐邮箱注册保留错误草稿并可重新验证', async ({ page }, 
     waitUntil: 'domcontentloaded',
   })
   const send = page.getByRole('button', { name: '发送验证码' })
-  await expect(page.getByText(/验证邮箱后获 40 创作点/)).toBeVisible()
+  await expect(page.getByText(/验证邮箱后获 200 创作点/)).toBeVisible()
   for (const colorScheme of ['light', 'dark'] as const) {
     await page.emulateMedia({ colorScheme })
     for (const width of [390, 768, 1280, 1440]) {
@@ -267,7 +267,7 @@ test('注册重发、改邮箱和到账后直接返回办公台', async ({ page 
       permissions: ['products.office'],
       accessToken: 'synthetic-registered',
       tokenType: 'bearer',
-      registrationGrant: { points: 40, expiresAt: '2030-03-31T00:00:00Z' },
+      registrationGrant: { points: 200, expiresAt: '2030-03-31T00:00:00Z' },
     })
     return r.fulfill({ json: auth.identity })
   })
@@ -287,7 +287,7 @@ test('注册重发、改邮箱和到账后直接返回办公台', async ({ page 
   await code.fill('001236')
   await page.getByRole('button', { name: '验证并创建账号' }).click()
   await expect(page).toHaveURL(/#\/office(?:[/?]|$)/)
-  await expect(page.getByText(/体验额度已到账 40 点/)).toBeVisible()
+  await expect(page.getByText(/体验额度已到账 200 点/)).toBeVisible()
   await expect(
     page.getByRole('link', { name: '查看我的额度明细' }),
   ).toHaveAttribute('href', /#\/account\/membership$/)

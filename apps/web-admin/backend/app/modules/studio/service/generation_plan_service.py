@@ -3,8 +3,8 @@
 from typing import TYPE_CHECKING
 
 from app.infrastructure.errors import DomainError
-from app.modules.billing.dao.usage_credit import reserve_jobs
 from app.modules.billing.service.quote_service import lock_plan_quote
+from app.modules.billing.service.usage_credit import chargeable_points, reserve_jobs
 from app.modules.identity.entity.bo.models import Account
 from app.modules.studio.dao.production_dao import ProductionDao
 from app.modules.studio.dao.studio_dao import StudioDao
@@ -179,7 +179,9 @@ class GenerationPlans:
                     "owner": account.user_id,
                     "planId": plan.id,
                     "usageQuoteId": locked["id"],
-                    "quotedPoints": locked["items"][len(rows)]["points"],
+                    "quotedPoints": chargeable_points(
+                        locked["items"][len(rows)]["points"], unlimited=locked["unlimited"]
+                    ),
                     "creditMetered": True,
                     "inputHash": input_hash(item["kind"], item["payload"]),
                     "fingerprint": plan.request_hash,

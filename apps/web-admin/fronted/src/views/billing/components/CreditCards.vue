@@ -1,15 +1,19 @@
 <script setup lang="ts">
 import { ref, watch } from 'vue'
+import { operationsApi } from '@/api/billing/operations-api'
 import { membershipApi } from '@/api/billing/membership-api'
 import { useResource } from '@/composables/use-resource'
 import { usePreferences } from '@/store/modules/preferences'
 import { billingTime } from '@/utils/billing/change-labels'
 import ResourceStatus from '@/components/feedback/ResourceStatus.vue'
 /** 卡片独立分页，包括过期和用尽的卡；刷新余额时重新读取本人数据。 */
+const props = defineProps<{ owner?: string }>()
 const { tr } = usePreferences()
 const page = ref(1)
 const { data, loading, error, reload } = useResource((signal) =>
-  membershipApi.cards(page.value, signal),
+  props.owner
+    ? operationsApi.cards(props.owner, page.value, signal)
+    : membershipApi.cards(page.value, signal),
 )
 watch(page, () => {
   data.value = null

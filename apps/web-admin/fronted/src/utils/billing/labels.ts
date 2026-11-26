@@ -4,6 +4,8 @@ export function billingLabel(
   tr: (zh: string, en: string) => string,
 ) {
   switch (value.split(':')[0]) {
+    case 'registration_supplement':
+      return tr('注册额度补发', 'Registration credit adjustment')
     case 'registration':
     case 'registration_grant':
       return tr('注册赠额', 'Registration credit')

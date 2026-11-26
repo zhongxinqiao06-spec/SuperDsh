@@ -10,6 +10,7 @@ from app.modules.billing.entity.vo.operations import CARD_DENOMINATIONS
 from app.modules.billing.entity.vo.pricing import RateTerms, UsageItem
 from app.modules.billing.service.quote_service import price
 from app.modules.identity.entity.bo.models import Account
+from app.modules.identity.entity.bo.product_roles import UNLIMITED_CREDIT_ROLES
 
 
 class MembershipService:
@@ -49,7 +50,9 @@ class MembershipService:
         )
 
     async def wallet(self, account: Account) -> Wallet:
-        return await self.repository.wallet(self.owner(account), datetime.now(UTC), 7, 20)
+        wallet = await self.repository.wallet(self.owner(account), datetime.now(UTC), 7, 20)
+        wallet.unlimited = not UNLIMITED_CREDIT_ROLES.isdisjoint(account.roles)
+        return wallet
 
     async def cards(self, account: Account, page: int, size: int) -> CreditCards:
         return await self.repository.cards(self.owner(account), datetime.now(UTC), page, size)

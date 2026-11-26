@@ -139,7 +139,9 @@ async function submit() {
     :error="error"
     :submit-text="
       preview?.plan
-        ? `确认并预留 ${preview.plan.quotedPoints} 点`
+        ? preview.plan.unlimited
+          ? '确认生成 · 0 点'
+          : `确认并预留 ${preview.plan.quotedPoints} 点`
         : '检查本次方案'
     "
     :submit-disabled="
@@ -209,12 +211,18 @@ async function submit() {
         </p>
         <p v-else>生成 1 张画面 · {{ preview.plan.references }} 张参考图</p>
         <ExpandableText :text="preview.plan.text" label="制作内容" />
-        <p class="studio-meta">
+        <p v-if="preview.plan.unlimited" class="studio-meta">
+          管理员无限额度 · 本次扣 0 点
+        </p>
+        <p v-else class="studio-meta">
           本次生成需要
           {{ preview.plan.quotedPoints }}
           创作点。确认后预留，完成后结果进入候选区。
         </p>
-        <CardFundingHint :points="preview.plan.quotedPoints" />
+        <CardFundingHint
+          v-if="!preview.plan.unlimited"
+          :points="preview.plan.quotedPoints"
+        />
         <el-button text :disabled="busy" @click="preview = undefined"
           >返回修改方案</el-button
         >

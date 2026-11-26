@@ -25,7 +25,7 @@ test('运营开通、续期和加额在本人账本生效', async ({
       username,
       displayName: '会员联调账号',
       password: pass,
-      roles: ['member'],
+      roles: ['member', 'entertainment_creator'],
     },
   })
   expect(created.status(), await created.text()).toBe(201)
@@ -38,7 +38,21 @@ test('运营开通、续期和加额在本人账本生效', async ({
     page.getByRole('button', { name: '登录 ↵', exact: true }).click(),
   ])
   await page.waitForURL((url) => !url.hash.startsWith('#/login'))
-  await page.goto('/#/billing/subscriptions?userId=' + userId)
+  await page.goto('/#/account/membership?product=office')
+  await expect(page.getByText('无限额度', { exact: true })).toBeVisible()
+  for (const product of ['office', 'entertainment']) {
+    await page.goto('/#/product/members?product=' + product)
+    const member = page.getByRole('row').filter({ hasText: username })
+    await expect(
+      member.getByRole('button', { name: '加额度', exact: true }),
+    ).toBeVisible()
+    await expect(
+      member.getByRole('button', { name: '发额度卡', exact: true }),
+    ).toBeVisible()
+    await expect(
+      member.getByRole('button', { name: '发放会员', exact: true }),
+    ).toBeVisible()
+  }
   const row = page.getByRole('row').filter({ hasText: username })
   await row.getByRole('button', { name: '发放会员', exact: true }).click()
   let dialog = page.getByRole('dialog', { name: '会员办理' })
@@ -52,13 +66,14 @@ test('运营开通、续期和加额在本人账本生效', async ({
   await page.setViewportSize({ width: 390, height: 844 })
   await captureDesign(page, 'manual-preview-390.png')
   await dialog.getByRole('button', { name: '确认办理' }).click()
-  await expect(row.getByText('300', { exact: true })).toBeVisible()
+  await expect(row.getByText('可用 300', { exact: true })).toBeVisible()
   await row.getByRole('button', { name: '续期', exact: true }).click()
   await dialog.getByLabel('办理原因').fill('提前续期')
   await dialog.getByRole('button', { name: '预览办理' }).click()
   await expect(dialog.getByText('300 → 300')).toBeVisible()
   await dialog.getByRole('button', { name: '确认办理' }).click()
   await expect(dialog).toBeHidden()
+  await page.goto('/#/billing/subscriptions?userId=' + userId)
   for (const [width, theme] of [
     [390, 'light'],
     [768, 'dark'],
@@ -77,6 +92,8 @@ test('运营开通、续期和加额在本人账本生效', async ({
   await page.goto('/#/access/users')
   await page.getByRole('textbox', { name: '搜索用户' }).fill(username)
   await page.getByRole('button', { name: '搜索', exact: true }).click()
+  await expect(row.getByRole('button', { name: '加额度' })).toBeVisible()
+  await page.goto('/#/product/members?product=office')
   await row.getByRole('button', { name: '加额度' }).click()
   dialog = page.getByRole('dialog', { name: '人工加额' })
   await dialog.getByRole('spinbutton').first().fill('100')
@@ -106,6 +123,15 @@ test('运营开通、续期和加额在本人账本生效', async ({
   await expect(dialog.getByText('400 → 580')).toBeVisible()
   await dialog.getByRole('button', { name: '确认办理' }).click()
   await expect(row.getByText('580', { exact: true })).toBeVisible()
+  await page
+    .getByRole('navigation', { name: '平台导航' })
+    .getByRole('link', { name: '额度卡管理', exact: true })
+    .click()
+  await expect(
+    page.getByRole('heading', { name: '额度卡管理', exact: true }),
+  ).toBeVisible()
+  await page.getByRole('textbox', { name: '搜索账号' }).fill(username)
+  await page.getByRole('button', { name: '搜索', exact: true }).click()
   await row.getByRole('button', { name: '发额度卡' }).click()
   dialog = page.getByRole('dialog', { name: '发放额度卡' })
   await dialog.getByLabel('卡面额').selectOption('500')
@@ -115,6 +141,26 @@ test('运营开通、续期和加额在本人账本生效', async ({
   await expect(dialog.getByText('580 → 1080')).toBeVisible()
   await dialog.getByRole('button', { name: '确认办理' }).click()
   await expect(dialog).toBeHidden()
+  for (const [width, theme] of [
+    [390, 'light'],
+    [768, 'dark'],
+    [1280, 'light'],
+    [1440, 'dark'],
+  ] as const) {
+    await page.setViewportSize({ width, height: width === 1280 ? 560 : 844 })
+    await page.emulateMedia({ colorScheme: theme })
+    await expect(row.getByRole('button', { name: '查看额度卡' })).toBeVisible()
+    expect(
+      await page.evaluate(
+        () => document.documentElement.scrollWidth <= innerWidth,
+      ),
+    ).toBe(true)
+    await captureDesign(page, 'card-directory-' + width + '.png')
+  }
+  await row.getByRole('button', { name: '查看额度卡' }).click()
+  const cards = page.getByRole('dialog', { name: '查看额度卡 · ' + username })
+  await expect(cards.getByText('可抵扣 500 点', { exact: true })).toBeVisible()
+  await cards.getByRole('button', { name: '关闭', exact: true }).last().click()
   const first = await loginIsolatedAccount(request, username, pass)
   const changed = await request.post('/api/auth/change-password', {
     headers: { authorization: 'Bearer ' + (await first.json()).accessToken },
@@ -132,6 +178,29 @@ test('运营开通、续期和加额在本人账本生效', async ({
       await request.get('/api/admin/billing/subscriptions', { headers: own })
     ).status(),
   ).toBe(403)
+  expect(
+    (
+      await request.get('/api/admin/billing/accounts/' + userId + '/cards', {
+        headers: own,
+      })
+    ).status(),
+  ).toBe(403)
+  for (const product of ['office', 'entertainment']) {
+    const url = '/api/navigation?product=' + product
+    const memberMenus = (
+      await (await request.get(url, { headers: own })).json()
+    ).items.map((i: { id: string }) => i.id)
+    expect(memberMenus).toContain('account.cards')
+    expect(memberMenus).not.toContain('billing.cards')
+    expect((await (await request.get(url, { headers })).json()).items).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          id: 'billing.cards',
+          parentId: 'product-management',
+        }),
+      ]),
+    )
+  }
   const grantAttempt = await request.post(
     '/api/admin/billing/operation-previews',
     {
@@ -162,6 +231,17 @@ test('运营开通、续期和加额在本人账本生效', async ({
         await loginIsolatedAccount(context.request, username, pass, 'browser')
       ).ok(),
     ).toBe(true)
+    await memberPage.goto('/#/account/membership?product=entertainment')
+    await memberPage
+      .getByRole('navigation', { name: '平台导航' })
+      .getByRole('link', { name: '我的额度卡', exact: true })
+      .click()
+    await expect(
+      memberPage.getByRole('heading', { name: '我的额度卡' }),
+    ).toBeVisible()
+    await expect(
+      memberPage.getByText('可抵扣 500 点', { exact: true }),
+    ).toBeVisible()
     await memberPage.goto('/#/account/membership')
     await expect(
       memberPage.getByRole('heading', { name: '轻享会员', exact: true }),

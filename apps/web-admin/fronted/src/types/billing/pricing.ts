@@ -35,6 +35,7 @@ export interface PricedItem extends UsageItem {
 export interface UsageQuote {
   id: string
   source: string
+  unlimited?: boolean
   totalPoints: number
   items: (PricedItem & { rateId: string; rateRevision: number })[]
   expiresAt: string

@@ -50,11 +50,19 @@ async def test_product_roles_login_and_membership_boundaries(
 
     for role_id, account in accounts.items():
         h = headers(account)
+        wallet = (await client.get("/api/me/billing", headers=h)).json()
+        assert wallet["unlimited"] == (role_id in {"admin", "office_admin", "entertainment_admin"})
         assert (await client.get("/api/auth/me", headers=h)).json()["roles"] == [role_id]
         for product in ["office", "entertainment"]:
             allowed = role_id in ["admin", product + "_admin"]
             response = await client.get("/api/products/" + product + "/members", headers=h)
             assert response.status_code == (200 if allowed else 403), response.text
+            if role_id == "admin":
+                assert all(
+                    row["billing"]["userId"] == row["userId"] for row in response.json()["items"]
+                )
+            elif allowed:
+                assert all("billing" not in row for row in response.json()["items"])
         for path in ["/api/admin/users", "/api/admin/roles"]:
             assert (await client.get(path, headers=h)).status_code == (
                 200 if role_id == "admin" else 403

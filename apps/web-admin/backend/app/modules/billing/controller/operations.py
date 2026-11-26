@@ -13,7 +13,7 @@ from app.modules.billing.entity.vo.changes import (
     ChangeRecord,
     ScheduleInput,
 )
-from app.modules.billing.entity.vo.dto import Wallet
+from app.modules.billing.entity.vo.dto import CreditCards, Wallet
 from app.modules.billing.entity.vo.operations import (
     BillingAccounts,
     ConfirmInput,
@@ -97,6 +97,13 @@ async def history(
     user_id: str, request: Request, account: Actor, page: Page = 1, pageSize: Size = 10
 ) -> OperationHistory:
     return await service(request).history(account, user_id, page, pageSize)
+
+
+@router.get("/accounts/{user_id}/cards")
+async def account_cards(
+    user_id: str, request: Request, account: Actor, page: Page = 1, pageSize: Size = 10
+) -> CreditCards:
+    return await service(request).cards(account, user_id, page, pageSize)
 
 
 @router.get("/accounts/{user_id}/summary")

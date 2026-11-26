@@ -22,6 +22,7 @@ def editable_ids(
     platform = {i["id"] for i in catalog.defaults if i["parentId"] == "platform"} | {
         "access.users",
         "billing.subscriptions",
+        "billing.cards",
         "billing.plans",
         "billing.rates",
     }

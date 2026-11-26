@@ -38,6 +38,7 @@ export interface CreditCard {
   status: 'available' | 'held' | 'spent' | 'expired'
 }
 export interface Wallet {
+  unlimited?: boolean
   cardPoints?: number
   planChange: ChangeSummary | null
   asOf: string

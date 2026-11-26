@@ -3,8 +3,8 @@
 from typing import TYPE_CHECKING, Any, cast
 
 from app.infrastructure.errors import DomainError
-from app.modules.billing.dao.usage_credit import reserve_jobs
 from app.modules.billing.service.quote_service import lock_plan_quote
+from app.modules.billing.service.usage_credit import chargeable_points, reserve_jobs
 from app.modules.identity.entity.bo.models import Account
 from app.modules.models.entity.vo.model_vo import CapabilityBinding
 from app.modules.models.service.image_protocol import supports_reference_images
@@ -205,7 +205,10 @@ class PreparationMediaService:
                 },
             )
             quote = priced["usageQuote"]
-            plan["quotedPoints"] = quote["totalPoints"]
+            charge = chargeable_points(quote["totalPoints"], unlimited=quote["unlimited"])
+            if quote["unlimited"]:
+                plan["unlimited"] = True
+            plan["quotedPoints"] = charge
             digest = content_hash({"plan": plan, "payload": payload, "quote": quote["id"]})
             if preview:
                 return {"plan": plan, "planHash": digest}
@@ -224,11 +227,11 @@ class PreparationMediaService:
                     **payload,
                     "creditMetered": True,
                     "usageQuoteId": quote["id"],
-                    "quotedPoints": quote["totalPoints"],
+                    "quotedPoints": charge,
                 },
             )
             session.add(job)
-            await reserve_jobs(session, account.user_id, [(job.id, quote["totalPoints"])])
+            await reserve_jobs(session, account.user_id, [(job.id, charge)])
             await session.flush()
             return {"job": job_view(job)}
 

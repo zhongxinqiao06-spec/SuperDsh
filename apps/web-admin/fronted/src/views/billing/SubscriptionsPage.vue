@@ -213,7 +213,11 @@ function saved(r: BillingOperation) {
               >
             </td>
             <td :data-label="tr('可用点', 'Available credits')">
-              {{ a.availablePoints.toLocaleString() }}
+              {{
+                a.unlimited
+                  ? tr('无限额度', 'Unlimited')
+                  : a.availablePoints.toLocaleString()
+              }}
             </td>
             <td class="actions">
               <div class="toolbar">

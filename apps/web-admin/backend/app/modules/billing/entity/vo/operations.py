@@ -89,6 +89,7 @@ class ConfirmInput(BillingView):
 
 
 class BillingAccount(BillingView):
+    unlimited: bool
     revision: int
     last_booked_sku: str | None
     last_booked_name: str | None

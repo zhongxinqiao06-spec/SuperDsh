@@ -69,7 +69,11 @@ function refresh() {
         <div class="billing-metrics">
           <div>
             <span>{{ tr('可用创作点', 'Available credits') }}</span
-            ><strong>{{ data.availablePoints.toLocaleString() }}</strong>
+            ><strong>{{
+              data.unlimited
+                ? tr('无限额度', 'Unlimited')
+                : data.availablePoints.toLocaleString()
+            }}</strong>
             <small v-if="data.cardPoints"
               >{{ tr('其中额度卡', 'From cards') }}
               {{ data.cardPoints.toLocaleString() }}

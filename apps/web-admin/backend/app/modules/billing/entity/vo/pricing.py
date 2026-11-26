@@ -148,6 +148,7 @@ class QuoteView(BillingView):
 
     id: str
     source: str
+    unlimited: bool = False
     items: list[QuotedItem]
     total_points: int
     expires_at: str

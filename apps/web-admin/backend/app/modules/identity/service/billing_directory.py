@@ -1,5 +1,6 @@
 """提供账务管理台可读取的账号字段及办理所需产品资格。"""
 
+from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.sql.selectable import Subquery
 
@@ -10,6 +11,16 @@ from app.modules.identity.dao.billing_directory import directory_projection, eli
 def account_directory() -> Subquery:
     """公共只读投影限定字段，允许账务在数据库完成联表筛选和分页。"""
     return directory_projection()
+
+
+async def owner_has_unlimited_credit(session: AsyncSession, owner: str) -> bool:
+    """报价与提交均读取数据库当前账号角色，免扣资格不接受客户端输入。"""
+    users = account_directory()
+    return bool(
+        await session.scalar(
+            select(users.c.unlimited).where(users.c.id == owner, users.c.disabled.is_(False))
+        )
+    )
 
 
 async def require_billing_customer(session: AsyncSession, owner: str) -> str:

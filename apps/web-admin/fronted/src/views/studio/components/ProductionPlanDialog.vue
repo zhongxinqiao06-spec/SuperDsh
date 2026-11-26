@@ -81,7 +81,7 @@ const states: Record<string, string> = {
     :submit-disabled="!!plan.issues.length || !selected.length"
     :submit-text="
       plan.usageQuote
-        ? `确认用量并提交 · ${plan.usageQuote.totalPoints} 点`
+        ? `确认用量并提交 · ${plan.usageQuote.unlimited ? 0 : plan.usageQuote.totalPoints} 点`
         : '确认用量并提交'
     "
     @submit="emit('confirm')"
@@ -103,7 +103,11 @@ const states: Record<string, string> = {
         class="panel studio-panel form-stack"
         aria-label="本次报价"
       >
-        <strong>本次上限 {{ plan.usageQuote.totalPoints }} 点</strong
+        <strong>{{
+          plan.usageQuote.unlimited
+            ? '管理员无限额度 · 本次扣 0 点'
+            : '本次上限 ' + plan.usageQuote.totalPoints + ' 点'
+        }}</strong
         ><span v-for="(line, i) in plan.usageQuote.items" :key="i"
           >{{ selected[i]?.label }} · {{ line.spec }} · {{ line.quantity }}
           {{
@@ -112,14 +116,19 @@ const states: Record<string, string> = {
             ]
           }}
           · {{ line.payer === 'personal' ? '本人凭据' : '平台模型' }} ·
-          {{ line.points }} 点</span
+          {{ plan.usageQuote.unlimited ? '标准报价 ' : ''
+          }}{{ line.points }} 点</span
         ><small
           >报价有效至
-          {{
-            new Date(plan.usageQuote.expiresAt).toLocaleTimeString()
-          }}，确认后按此价格预留创作点。</small
+          {{ new Date(plan.usageQuote.expiresAt).toLocaleTimeString()
+          }}{{
+            plan.usageQuote.unlimited ? '。' : '，确认后按此价格预留创作点。'
+          }}</small
         >
-        <CardFundingHint :points="plan.usageQuote.totalPoints" />
+        <CardFundingHint
+          v-if="!plan.usageQuote.unlimited"
+          :points="plan.usageQuote.totalPoints"
+        />
       </section>
       <p v-else class="studio-meta">
         视频共

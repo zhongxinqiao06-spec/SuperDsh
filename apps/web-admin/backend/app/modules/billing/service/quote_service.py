@@ -11,6 +11,7 @@ from app.modules.billing.dao import pricing_dao as dao
 from app.modules.billing.entity.do.pricing_do import UsageQuote
 from app.modules.billing.entity.vo.pricing import QuoteRequest, RateTerms, Trial, UsageItem
 from app.modules.identity.entity.bo.models import Account
+from app.modules.identity.service.billing_directory import owner_has_unlimited_credit
 
 
 def price(item: UsageItem, rate: RateTerms) -> dict:
@@ -31,6 +32,7 @@ def quote_view(row: UsageQuote) -> dict:
         "id": row.id,
         "source": row.source,
         "items": row.snapshot["items"],
+        "unlimited": row.snapshot.get("unlimited", False),
         "totalPoints": row.snapshot["totalPoints"],
         "expiresAt": row.expires_at.isoformat(),
         "lockedAt": row.locked_at.isoformat() if row.locked_at else None,
@@ -70,6 +72,7 @@ async def quote_in(
         source=source,
         expires_at=now + timedelta(minutes=15),
         snapshot={
+            "unlimited": await owner_has_unlimited_credit(db, owner),
             "input": raw,
             "items": lines,
             "totalPoints": sum(line["points"] for line in lines),
@@ -85,6 +88,8 @@ async def lock_plan_quote(db: AsyncSession, owner: str, plan: str, identity: str
         raise DomainError(409, "原任务报价不存在，请重新预检")
     now = datetime.now(UTC)
     if not row.locked_at:
+        if bool(row.snapshot.get("unlimited")) != await owner_has_unlimited_credit(db, owner):
+            raise DomainError(409, "账号的额度权益已变化，请重新预检")
         if row.expires_at <= now:
             raise DomainError(409, "报价已过期，请重新预检")
         row.locked_at = now

@@ -8,7 +8,13 @@ from pathlib import Path
 
 import httpx
 import pytest
-from conftest import bootstrap_studio, complete_initial_login, grant_studio_points, upgrade_database
+from conftest import (
+    bootstrap,
+    bootstrap_studio,
+    complete_initial_login,
+    grant_studio_points,
+    upgrade_database,
+)
 from fastapi import FastAPI, Request
 from httpx import AsyncClient
 from PIL import Image
@@ -91,11 +97,93 @@ async def make_plan(client: AsyncClient, uri: str, revision: int, key: str) -> d
     return response.json()
 
 
+@pytest.mark.parametrize("role", ["admin", "office_admin", "entertainment_admin"])
+async def test_admin_with_empty_wallet_generates_without_credit(
+    platform: tuple[FastAPI, AsyncClient], role: str
+) -> None:
+    app, client = platform
+    admin = await bootstrap(client)
+    # 办公管理员仍需独立的娱乐产品资格，额度权益本身不授予跨产品访问权。
+    if role != "admin":
+        username, password = "studio-admin", "Synthetic-role-fixture!"
+        roles = [role, "entertainment_creator"] if role == "office_admin" else [role]
+        created = await client.post(
+            "/api/admin/users",
+            json={
+                "username": username,
+                "displayName": "合成管理员",
+                "roles": roles,
+                "password": password,
+            },
+        )
+        assert created.status_code == 201, created.text
+        login = await complete_initial_login(client, username, password)
+        client.headers["Authorization"] = "Bearer " + str(login["accessToken"])
+    await app.state.services.media_jobs.close()
+    balance = (await client.get("/api/me/billing")).json()
+    assert balance["unlimited"] and balance["availablePoints"] == 0
+    uri, saved = await create_quick(client)
+    plan = await make_plan(client, uri, saved["revision"], "admin-free")
+    quote = plan["usageQuote"]
+    assert quote["unlimited"] and quote["totalPoints"] == 100
+    body = {"revision": plan["revision"], "planHash": plan["planHash"], "requestKey": "admin-job"}
+    endpoint = uri + "/quick/generation-plans/" + plan["id"] + "/confirm"
+    reply = await client.post(endpoint, json=body)
+    assert reply.is_success, reply.text
+    assert reply.json()["jobs"][0]["quotedPoints"] == 0
+    assert (await client.post(endpoint, json=body)).json() == reply.json()
+    assert (await client.get("/api/me/billing/entries")).json()["items"] == []
+    if role == "office_admin":
+        # 已有免扣报价不能带到降级后的普通账号继续免费提交。
+        other, draft = await create_quick(client, "second-admin-work")
+        pending = await make_plan(client, other, draft["revision"], "before-demotion")
+        endpoint = other + "/quick/generation-plans/" + pending["id"] + "/confirm"
+        body = {
+            "revision": pending["revision"],
+            "planHash": pending["planHash"],
+            "requestKey": "after-demotion",
+        }
+        changed = await client.patch(
+            "/api/admin/users/" + str(login["userId"]),
+            headers={"Authorization": "Bearer " + str(admin["accessToken"])},
+            json={"roles": ["entertainment_creator"]},
+        )
+        assert changed.is_success, changed.text
+        fresh = await client.post(
+            "/api/auth/login", json={"identifier": username, "password": password}
+        )
+        client.headers["Authorization"] = "Bearer " + fresh.json()["accessToken"]
+        assert (await client.post(endpoint, json=body)).status_code == 409
+        assert not (await client.get("/api/me/billing")).json()["unlimited"]
+
+
+async def metered_creator(client: AsyncClient) -> tuple[str, str]:
+    """用真实创作者身份验证余额不足；只有运营建号及赠点调用使用管理员令牌。"""
+    admin = await bootstrap(client)
+    admin_token = "Bearer " + str(admin["accessToken"])
+    password = "Synthetic-credit-fixture!"
+    created = await client.post(
+        "/api/admin/users",
+        json={
+            "username": "metered-creator",
+            "displayName": "普通创作者",
+            "password": password,
+            "roles": ["entertainment_creator"],
+        },
+    )
+    assert created.status_code == 201, created.text
+    owner = created.json()["userId"]
+    await grant_studio_points(client, owner, 40)
+    actor = await complete_initial_login(client, "metered-creator", password)
+    client.headers["Authorization"] = "Bearer " + str(actor["accessToken"])
+    return owner, admin_token
+
+
 async def test_generation_wallet_blocks_before_enqueue_and_serializes_concurrent_projects(
     platform: tuple[FastAPI, AsyncClient],
 ) -> None:
     app, client = platform
-    owner = str((await bootstrap_studio(client, 40))["userId"])
+    owner, admin_token = await metered_creator(client)
     media = app.state.services.media_jobs
     await media.close()
     plans = []
@@ -127,7 +215,10 @@ async def test_generation_wallet_blocks_before_enqueue_and_serializes_concurrent
     quote_id = plans[0][1]["usageQuote"]["id"]
     assert (await client.get("/api/billing/usage-quotes/" + quote_id)).json()["lockedAt"] is None
     assert await balance() == (40, 0)
+    member_token = client.headers["Authorization"]
+    client.headers["Authorization"] = admin_token
     await grant_studio_points(client, owner, 160)
+    client.headers["Authorization"] = member_token
     results = await asyncio.gather(*(confirm(i) for i in range(3)))
     assert sorted(r.status_code for r in results) == [200, 200, 402]
     assert await balance() == (0, 200)
@@ -153,7 +244,7 @@ async def test_card_grants_and_wallet_first_generation(
     from uuid import uuid4
 
     app, client = platform
-    owner = str((await bootstrap_studio(client, 40))["userId"])
+    owner, admin_token = await metered_creator(client)
     media = app.state.services.media_jobs
     await media.close()
     values = (await client.get("/api/billing/catalog")).json()["cardDenominations"]
@@ -167,14 +258,25 @@ async def test_card_grants_and_wallet_first_generation(
             points=points,
             validDays=days,
         )
-        preview = await client.post("/api/admin/billing/operation-previews", json=request)
+        preview = await client.post(
+            "/api/admin/billing/operation-previews",
+            json=request,
+            headers={"Authorization": admin_token},
+        )
         if points == 99:
             assert preview.status_code == 422
             continue
         assert preview.is_success, preview.text
         confirm = dict(previewId=preview.json()["id"])
         replies = await asyncio.gather(
-            *(client.post("/api/admin/billing/adjustments", json=confirm) for _ in range(2))
+            *(
+                client.post(
+                    "/api/admin/billing/adjustments",
+                    json=confirm,
+                    headers={"Authorization": admin_token},
+                )
+                for _ in range(2)
+            )
         )
         assert all(r.is_success for r in replies) and replies[0].json() == replies[1].json()
 
@@ -301,7 +403,8 @@ async def test_quick_quote_expiry_and_price_lock(platform: tuple[FastAPI, AsyncC
     response = await confirm(plan)
     assert response.is_success, response.text
     result = response.json()
-    assert result["usageQuote"]["lockedAt"] and result["jobs"][0]["quotedPoints"] == 160
+    assert result["usageQuote"]["lockedAt"] and result["usageQuote"]["unlimited"]
+    assert result["usageQuote"]["totalPoints"] == 160 and result["jobs"][0]["quotedPoints"] == 0
     changed = (
         await client.post(
             "/api/admin/billing/rate-versions",
@@ -461,7 +564,10 @@ async def test_quick_freeze_candidate_collect_and_promote(
     ready = (await client.get(uri + "/quick")).json()
     assert ready["jobs"][0]["state"] == "ready", ready
     charged_wallet = (await client.get("/api/me/billing")).json()
-    assert (charged_wallet["availablePoints"], charged_wallet["heldPoints"]) == (1900, 0)
+    assert charged_wallet["unlimited"] and (
+        charged_wallet["availablePoints"],
+        charged_wallet["heldPoints"],
+    ) == (2000, 0)
     assert len(posts) == 1 and posts[0]["input"]["prompt"] == "两只小狗踏上月球"
     assert ready["draft"]["prompt"] == "下一条是海边"
     assert ready["jobs"][0]["quickDraft"]["prompt"] == "两只小狗踏上月球"

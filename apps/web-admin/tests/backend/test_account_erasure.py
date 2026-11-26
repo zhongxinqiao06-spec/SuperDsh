@@ -22,7 +22,7 @@ async def test_confirm_erase_and_register_again(platform: tuple[FastAPI, AsyncCl
     services.accounts.email.registration_sender = sender
     email = "closed@example.invalid"
 
-    async def register():
+    async def register() -> dict:
         sent = await client.post(
             "/api/auth/email-code", json={"email": email, "purpose": "register"}
         )
@@ -41,6 +41,7 @@ async def test_confirm_erase_and_register_again(platform: tuple[FastAPI, AsyncCl
         return registered.json()
 
     first = await register()
+    assert first["registrationGrant"]["points"] == 200
     uid = first["userId"]
     auth = {"Authorization": "Bearer " + first["accessToken"]}
     owner = await services.identity.get_account(uid)

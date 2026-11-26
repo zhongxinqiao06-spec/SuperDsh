@@ -11,6 +11,7 @@ from sqlalchemy import insert, select
 from sqlalchemy.ext.asyncio import create_async_engine
 
 from app.infrastructure.configuration import Settings
+from app.modules.navigation.entity.bo.navigation import Product
 from app.modules.navigation.entity.do.models import NavigationRow
 from app.modules.navigation.service.catalogs import product_catalogs
 
@@ -25,8 +26,14 @@ async def test_move_existing_product_menus(platform_configuration: Settings) -> 
     moved = ("access.users", "billing.subscriptions", "billing.plans", "billing.rates")
     try:
         async with engine.begin() as db:
-            for key, product in (("global", "office"), ("entertainment", "entertainment")):
-                items = deepcopy(menus[product].defaults)
+            product: Product
+            for product in menus:
+                key = "global" if product == "office" else "entertainment"
+                items = [
+                    deepcopy(i)
+                    for i in menus[product].defaults
+                    if i["id"] not in {"billing.cards", "account.cards"}
+                ]
                 by_id = {i["id"]: i for i in items}
                 for n, module in enumerate(moved, 6):
                     by_id[module].update(parentId="platform", order=n)
@@ -44,7 +51,7 @@ async def test_move_existing_product_menus(platform_configuration: Settings) -> 
             rows = (await db.execute(select(NavigationRow.__table__))).mappings().all()
             assert len(rows) == 2
             for row in rows:
-                assert (row["version"], row["updated_by"]) == (8, "operator")
+                assert (row["version"], row["updated_by"]) == (9, "operator")
                 by_id = {i["id"]: i for i in row["items"]}
                 moved_here = [m for m in moved if row["id"] == "global" or m != "billing.plans"]
                 children = sorted(
@@ -55,7 +62,9 @@ async def test_move_existing_product_menus(platform_configuration: Settings) -> 
                     "product.members",
                     "access.menus",
                     *moved_here,
+                    "billing.cards",
                 ]
+                assert by_id["account.cards"]["parentId"] == "account"
                 assert by_id["models"]["parentId"] == "platform"
                 assert by_id["access.users"]["title"] == "账号运营"
                 assert not by_id["access.users"]["visible"] and by_id["access.users"][

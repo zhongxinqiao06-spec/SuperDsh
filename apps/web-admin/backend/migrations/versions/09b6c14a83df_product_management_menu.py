@@ -54,6 +54,8 @@ def upgrade() -> None:
         "UPDATE navigation_settings SET items=:items, version=version+1 WHERE id=:id"
     ).bindparams(sa.bindparam("items", type_=JSONB))
     for key, items in rows:
+        if not isinstance(items, list):
+            raise ValueError("产品菜单必须是 JSON 数组")
         if move_pages(items):
             conn.execute(update, {"id": key, "items": items})
 

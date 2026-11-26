@@ -4,7 +4,7 @@ import json
 from typing import TYPE_CHECKING, Any, cast
 
 from app.infrastructure.errors import DomainError
-from app.modules.billing.dao.usage_credit import finish_job
+from app.modules.billing.service.usage_credit import finish_job
 from app.modules.identity.entity.bo.models import Account
 from app.modules.models.entity.vo.model_vo import CapabilityBinding
 from app.modules.studio.dao.production_dao import ProductionDao

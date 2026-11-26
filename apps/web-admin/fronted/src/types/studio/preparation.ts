@@ -68,6 +68,7 @@ export interface PreparationPlan {
     voice: string | null
     references: number
     revision: number
+    unlimited?: boolean
     quotedPoints: number
     estimatedCost: number | null
   }

@@ -206,6 +206,7 @@ async def test_product_menu_editor_cannot_change_platform(
         "access.users",
         "billing.plans",
         "billing.subscriptions",
+        "billing.cards",
         "billing.rates",
     }
     assert protected.isdisjoint(i["id"] for i in editable["items"])

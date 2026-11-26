@@ -1,11 +1,14 @@
 import type { Capability, ModelConfiguration } from '@/types/models/models'
 
-/** 仅带回本产品成员的公开显示字段和可撤回资格。 */
+import type { BillingAccount } from '@/types/billing/operations'
+
+/** 账务摘要仅对具有跨账号账务读取权限的管理员返回。 */
 export interface ProductMember {
   userId: string
   username: string
   displayName: string | null
   roleIds: string[]
+  billing?: BillingAccount | null
   removable: boolean
   revision: number
 }

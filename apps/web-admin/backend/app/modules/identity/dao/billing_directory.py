@@ -4,12 +4,21 @@ from sqlalchemy import or_, select
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.sql.selectable import Subquery
 
+from app.modules.identity.entity.bo.product_roles import UNLIMITED_CREDIT_ROLES
 from app.modules.identity.entity.do.models import RoleRow, UserRow
 
 
 def directory_projection() -> Subquery:
     return (
-        select(UserRow.id, UserRow.username, UserRow.display_name, UserRow.disabled)
+        select(
+            UserRow.id,
+            UserRow.username,
+            UserRow.display_name,
+            UserRow.disabled,
+            or_(*(UserRow.roles.contains([role]) for role in UNLIMITED_CREDIT_ROLES)).label(
+                "unlimited"
+            ),
+        )
         .where(UserRow.deleted_at.is_(None))
         .subquery("billing_accounts")
     )

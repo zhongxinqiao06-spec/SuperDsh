@@ -29,7 +29,13 @@ async def list_members(
 ) -> dict[str, object]:
     """服务端只返回本产品成员的必要资料和可操作状态。"""
     items, total = await service(request).list(account, product, page, pageSize, search)
-    return {"items": items, "total": total, "page": page, "pageSize": pageSize}
+    result: dict[str, object] = {"items": items, "total": total, "page": page, "pageSize": pageSize}
+    if "billing.read" in account.permissions:
+        summaries = await request.app.state.services.billing_operations.user_summaries(
+            account, [item["userId"] for item in items]
+        )
+        result["items"] = [{**item, "billing": summaries.get(item["userId"])} for item in items]
+    return result
 
 
 @router.post("")

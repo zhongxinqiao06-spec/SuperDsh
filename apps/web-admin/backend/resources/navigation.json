@@ -22,6 +22,13 @@
       "permissions": ["billing.read"]
     },
     {
+      "id": "billing.cards",
+      "route": "#/billing/cards",
+      "title": "额度卡管理",
+      "icon": "box",
+      "permissions": ["billing.read"]
+    },
+    {
       "id": "billing.subscriptions",
       "route": "#/billing/subscriptions",
       "title": "会员记录与办理",
@@ -148,6 +155,13 @@
       "route": "#/account/profile",
       "title": "账号资料",
       "icon": "user",
+      "permissions": []
+    },
+    {
+      "id": "account.cards",
+      "route": "#/account/cards",
+      "title": "我的额度卡",
+      "icon": "box",
       "permissions": []
     },
     {
@@ -346,6 +360,7 @@
         "access.menus",
         "access.users",
         "billing.subscriptions",
+        "billing.cards",
         "billing.plans",
         "billing.rates"
       ]
@@ -370,6 +385,7 @@
       "pages": [
         "account.profile",
         "account.membership",
+        "account.cards",
         "account.security",
         "account.appearance",
         "account.models"

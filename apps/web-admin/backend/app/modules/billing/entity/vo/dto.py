@@ -76,6 +76,7 @@ class CreditCards(BillingView):
 
 
 class Wallet(BillingView):
+    unlimited: bool = False
     card_points: int = 0
     plan_change: ChangeSummary | None = None
     as_of: datetime

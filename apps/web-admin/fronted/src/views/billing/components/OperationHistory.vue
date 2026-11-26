@@ -44,7 +44,12 @@ watch(page, () => {
       <dl v-if="summary.data.value" class="billing-details">
         <dt>{{ tr('可用 / 占用', 'Available / held') }}</dt>
         <dd>
-          {{ summary.data.value.availablePoints }} /
+          {{
+            summary.data.value.unlimited
+              ? tr('无限额度', 'Unlimited')
+              : summary.data.value.availablePoints
+          }}
+          /
           {{ summary.data.value.heldPoints }}
         </dd>
         <dt>{{ tr('7 天内到期', 'Expiring in 7 days') }}</dt>

@@ -16,7 +16,7 @@ from app.modules.billing.dao.membership_dao import MembershipRepository
 from app.modules.billing.entity.do.change_do import PlanChangeRow
 from app.modules.billing.entity.do.operation_do import BillingOperationRow
 from app.modules.billing.entity.do.plan_do import SubscriptionRow
-from app.modules.billing.entity.vo.dto import Wallet
+from app.modules.billing.entity.vo.dto import CreditCards, Wallet
 from app.modules.billing.entity.vo.operations import (
     BillingAccounts,
     Operation,
@@ -123,7 +123,14 @@ class BillingOperations:
         accounts = await self.accounts(actor, "", None, None, None, 1, 1, owner)
         if not accounts.total:
             raise DomainError(404, "账号不存在")
-        return await MembershipRepository(self.database).wallet(owner, datetime.now(UTC), 7, 20)
+        wallet = await MembershipRepository(self.database).wallet(owner, datetime.now(UTC), 7, 20)
+        wallet.unlimited = accounts.items[0].unlimited
+        return wallet
+
+    async def cards(self, actor: Account, owner: str, page: int, size: int) -> CreditCards:
+        """运营按账号核对已发卡和剩余额度，沿用个人页的卡状态口径。"""
+        actor.require("billing.read")
+        return await MembershipRepository(self.database).cards(owner, datetime.now(UTC), page, size)
 
     async def history(self, actor: Account, owner: str, page: int, size: int) -> OperationHistory:
         actor.require("billing.read")

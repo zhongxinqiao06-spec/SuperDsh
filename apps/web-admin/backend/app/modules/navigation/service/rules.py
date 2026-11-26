@@ -18,6 +18,7 @@ def validate_items(items: list[dict[str, object]], modules: list[dict[str, objec
         limit += 1
     if any(module["id"] == "billing.rates" for module in modules):
         limit += 1
+    limit += sum(module["id"] in {"billing.cards", "account.cards"} for module in modules)
     if len(items) > limit:
         raise DomainError(422, "too many menu items")
     ids: set[str] = set()

@@ -5,6 +5,7 @@ export type BillingAction =
   'open' | 'renew' | 'gift' | 'compensation' | 'topup' | 'card'
 export type PaymentMode = 'complimentary' | 'offline'
 export interface BillingAccount {
+  unlimited?: boolean
   revision: number
   lastBookedSku: string | null
   lastBookedName: string | null

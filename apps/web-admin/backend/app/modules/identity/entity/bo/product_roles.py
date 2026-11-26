@@ -5,6 +5,9 @@ from typing import Literal
 Product = Literal["office", "entertainment"]
 ProductArea = Literal["members", "menus", "resources", "models"]
 
+# 双产品共用钱包，免扣取决于内置角色身份。
+UNLIMITED_CREDIT_ROLES = frozenset({"admin", "office_admin", "entertainment_admin"})
+
 PRODUCTS: dict[Product, str] = {"office": "办公", "entertainment": "娱乐"}
 AREAS: dict[ProductArea, str] = {
     "members": "产品成员",

@@ -156,7 +156,9 @@ async def test_upgrade_manual_billing(platform_configuration: Settings) -> None:
             for version, items in await db.execute(
                 select(NavigationRow.version, NavigationRow.items)
             ):
-                assert version == 9 and items[2]["moduleId"] == "billing.subscriptions"
+                assert items[5]["moduleId"] == "billing.cards" and not items[5]["visible"]
+                assert items[5]["roleIds"] == ["clerical"]
+                assert version == 10 and items[2]["moduleId"] == "billing.subscriptions"
                 assert (
                     items[4]["moduleId"] == "billing.rates"
                     and items[4]["parentId"] == items[3]["parentId"]

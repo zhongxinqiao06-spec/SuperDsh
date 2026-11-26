@@ -195,8 +195,12 @@ async def test_upgrade_preserves_menu_settings(platform_configuration: Settings)
         async with engine.connect() as conn:
             rows = (await conn.execute(select(NavigationRow.version, NavigationRow.items))).all()
             assert len(rows) == 2
-            for version, (saved_group, original, added) in rows:
-                assert version == 9 and original["title"] == "我的档案"
+            for version, (saved_group, original, added, cards) in rows:
+                assert (
+                    cards["moduleId"] == "account.cards" and cards["parentId"] == added["parentId"]
+                )
+                assert not cards["visible"] and cards["roleIds"] == ["limited"]
+                assert version == 10 and original["title"] == "我的档案"
                 assert added["id"] == "account.membership" and not added["visible"]
                 assert added["roleIds"] == ["limited"] and added["order"] == 10000
                 assert added["parentId"] == original["parentId"] == saved_group["id"]

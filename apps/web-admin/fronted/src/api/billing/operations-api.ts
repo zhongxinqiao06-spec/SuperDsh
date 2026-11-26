@@ -1,5 +1,5 @@
 import { request } from '@/utils/request'
-import type { Wallet } from '@/types/billing/membership'
+import type { CreditCard, Wallet } from '@/types/billing/membership'
 import type {
   BillingAccount,
   BillingOperation,
@@ -21,6 +21,11 @@ export const operationsApi = {
     request<{ items: BillingAccount[]; total: number }>(
       '/admin/billing/subscriptions',
       { query, signal },
+    ),
+  cards: (owner: string, page: number, signal: AbortSignal) =>
+    request<{ items: CreditCard[]; hasMore: boolean }>(
+      '/admin/billing/accounts/' + encodeURIComponent(owner) + '/cards',
+      { query: { page, pageSize: 10 }, signal },
     ),
   history: (owner: string, page: number, signal: AbortSignal) =>
     request<{ items: OperationRecord[]; hasMore: boolean }>(

@@ -1,4 +1,13 @@
 <script setup lang="ts">
+import { ref } from 'vue'
+import { useAuthStore } from '@/store/modules/auth-store'
+import AccountGrantActions from '@/views/billing/components/AccountGrantActions.vue'
+import OperationDialog from '@/views/billing/components/OperationDialog.vue'
+import type {
+  BillingAccount,
+  BillingAction,
+  BillingOperation,
+} from '@/types/billing/operations'
 import PageHeader from '@/components/layout/PageHeader.vue'
 import FilterBar from '@/components/management/FilterBar.vue'
 import DataTable from '@/components/management/DataTable.vue'
@@ -10,6 +19,19 @@ import { useProductMembers } from '@/composables/products/use-product-members'
 import { usePreferences } from '@/store/modules/preferences'
 import { roleLabel } from '@/utils/access/role-labels'
 const vm = useProductMembers()
+const auth = useAuthStore()
+const selected = ref<{ account: BillingAccount; action: BillingAction } | null>(
+  null,
+)
+const notice = ref('')
+function operate(account: BillingAccount, action: BillingAction) {
+  selected.value = { account, action }
+}
+function saved(result: BillingOperation) {
+  selected.value = null
+  notice.value = tr('办理成功，单号 ', 'Confirmed. Operation ') + result.id
+  void vm.resource.reload()
+}
 const { tr } = usePreferences()
 </script>
 <template>
@@ -30,6 +52,12 @@ const { tr } = usePreferences()
       :error="vm.resource.error.value"
       @retry="vm.resource.reload"
     />
+    <el-alert
+      v-if="notice"
+      type="success"
+      :title="notice"
+      @close="notice = ''"
+    />
     <ManagementList :page="vm.page.value" :page-size="vm.pageSize.value">
       <DataTable mobile-cards label="产品成员">
         <thead>
@@ -37,6 +65,7 @@ const { tr } = usePreferences()
             <th>账号</th>
             <th>显示名称</th>
             <th>本产品角色</th>
+            <th v-if="auth.can('billing.read')">会员与额度</th>
             <th>操作</th>
           </tr>
         </thead>
@@ -50,14 +79,34 @@ const { tr } = usePreferences()
             <td data-label="本产品角色">
               {{ member.roleIds.map((id) => roleLabel(id, tr)).join('、') }}
             </td>
+            <td v-if="auth.can('billing.read')" data-label="会员与额度">
+              <template v-if="member.billing">
+                {{ member.billing.planName ?? tr('未开通', 'Not enrolled') }}
+                <small
+                  >{{ tr('可用', 'Available') }}
+                  {{
+                    member.billing.unlimited
+                      ? tr('无限额度', 'Unlimited')
+                      : member.billing.availablePoints.toLocaleString()
+                  }}</small
+                > </template
+              ><span v-else>—</span>
+            </td>
             <td data-label="操作">
-              <el-button
-                v-if="member.removable"
-                link
-                type="danger"
-                @click="vm.remove(member)"
-                >移除成员</el-button
-              ><span v-else class="muted">由角色授权</span>
+              <div class="toolbar">
+                <AccountGrantActions
+                  v-if="member.billing"
+                  :account="member.billing"
+                  @operate="operate"
+                />
+                <el-button
+                  v-if="member.removable"
+                  link
+                  type="danger"
+                  @click="vm.remove(member)"
+                  >移除成员</el-button
+                ><span v-else class="muted">由角色授权</span>
+              </div>
             </td>
           </tr>
           <tr
@@ -65,7 +114,9 @@ const { tr } = usePreferences()
               vm.resource.data.value && !vm.resource.data.value.items.length
             "
           >
-            <td class="empty-cell" colspan="4">没有匹配的产品成员</td>
+            <td class="empty-cell" :colspan="auth.can('billing.read') ? 5 : 4">
+              没有匹配的产品成员
+            </td>
           </tr>
         </tbody>
       </DataTable>
@@ -76,6 +127,14 @@ const { tr } = usePreferences()
           :total="vm.resource.data.value?.total ?? 0"
       /></template>
     </ManagementList>
+    <OperationDialog
+      v-if="selected"
+      :key="selected.account.userId"
+      :account="selected.account"
+      :initial="selected.action"
+      @close="selected = null"
+      @saved="saved"
+    />
     <ManagementDialog
       v-model="vm.adding.value"
       title="添加产品成员"

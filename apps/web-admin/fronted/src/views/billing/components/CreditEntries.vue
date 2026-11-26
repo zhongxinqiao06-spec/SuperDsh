@@ -47,8 +47,10 @@ function nextPage() {
           <el-option
             :label="tr('注册赠额', 'Registration credit')"
             value="registration_grant"
-          /><el-option
+          />
+          <el-option
             v-for="type in [
+              'registration_supplement',
               'membership_grant',
               'usage_hold',
               'usage_charge',
