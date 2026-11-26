@@ -1,4 +1,6 @@
+import { randomUUID } from 'node:crypto'
 import { expect, test } from '@playwright/test'
+import { loginIsolatedAccount } from './live-auth'
 import { installFoundationFixture } from './foundation-fixture'
 import { captureDesign } from './design-capture'
 
@@ -62,3 +64,57 @@ for (const theme of ['light', 'dark'] as const) {
     expect(calls).toBe(2)
   })
 }
+
+test('独立后端本人从资料页注销并撤销既有会话', async ({ page, request }) => {
+  test.skip(process.env.WEB_ADMIN_E2E_LIVE !== '1', '仅运行于隔离后端')
+  const admin = await loginIsolatedAccount(
+    request,
+    process.env.WEB_ADMIN_E2E_USERNAME ?? 'foundation-admin',
+    process.env.WEB_ADMIN_E2E_PASSWORD!,
+  )
+  const username = 'erase-' + randomUUID().slice(0, 12)
+  const password = randomUUID() + '!'
+  const created = await request.post('/api/admin/users', {
+    headers: { authorization: 'Bearer ' + (await admin.json()).accessToken },
+    data: { username, password, displayName: username, roles: ['member'] },
+  })
+  expect(created.status(), await created.text()).toBe(201)
+  const login = await loginIsolatedAccount(
+    page.request,
+    username,
+    password,
+    'browser',
+  )
+  expect(login.status(), await login.text()).toBe(200)
+  const token = (await login.json()).accessToken
+  await page.goto('/#/account/profile')
+  const open = page.getByRole('button', { name: '注销账号', exact: true })
+  const dialog = page.getByRole('dialog', { name: '确认注销账号？' })
+  await open.click()
+  await expect(dialog.getByText(username, { exact: true })).toBeVisible()
+  await dialog.getByRole('button', { name: '取消', exact: true }).click()
+  expect(
+    (
+      await request.get('/api/auth/me', {
+        headers: { authorization: 'Bearer ' + token },
+      })
+    ).status(),
+  ).toBe(200)
+  await open.click()
+  const result = page.waitForResponse(
+    (r) =>
+      r.url().endsWith('/api/auth/me') && r.request().method() === 'DELETE',
+  )
+  await dialog
+    .getByRole('button', { name: '确认注销账号', exact: true })
+    .click()
+  expect((await result).status()).toBe(202)
+  await expect(page).toHaveURL(/#\/login/)
+  expect(
+    (
+      await request.get('/api/auth/me', {
+        headers: { authorization: 'Bearer ' + token },
+      })
+    ).status(),
+  ).toBe(401)
+})

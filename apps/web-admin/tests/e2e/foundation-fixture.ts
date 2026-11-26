@@ -169,6 +169,7 @@ export async function installFoundationFixture(
     ]),
   }
   const state = {
+    identity,
     signedIn: false,
     get menuVersion() {
       return menus.office.version

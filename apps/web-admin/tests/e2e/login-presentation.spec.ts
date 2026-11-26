@@ -226,7 +226,7 @@ test('娱乐邮箱注册保留错误草稿并可重新验证', async ({ page }, 
 })
 
 test('注册重发、改邮箱和到账后直接返回办公台', async ({ page }) => {
-  await installFoundationFixture(page, ['products.office'])
+  const auth = await installFoundationFixture(page, ['products.office'])
   await page.route('**/api/auth/config', (r) =>
     r.fulfill({
       json: {
@@ -254,22 +254,23 @@ test('注册重发、改邮箱和到账后直接返回办公台', async ({ page 
       },
     })
   })
-  await page.route('**/api/auth/register', (r) =>
-    r.fulfill({
-      json: {
-        userId: 'example-member',
-        email: 'review@example.invalid',
-        displayName: 'Example',
-        role: 'member',
-        roles: ['member'],
-        authzVersion: 1,
-        permissions: ['products.office'],
-        accessToken: 'synthetic-registered',
-        tokenType: 'bearer',
-        registrationGrant: { points: 40, expiresAt: '2030-03-31T00:00:00Z' },
-      },
-    }),
-  )
+  await page.route('**/api/auth/register', (r) => {
+    // 成功注册同时建立服务端会话，后续导航与刷新必须能查回同一个账号。
+    auth.signedIn = true
+    Object.assign(auth.identity, {
+      userId: 'example-member',
+      email: 'review@example.invalid',
+      displayName: 'Example',
+      role: 'member',
+      roles: ['member'],
+      authzVersion: 1,
+      permissions: ['products.office'],
+      accessToken: 'synthetic-registered',
+      tokenType: 'bearer',
+      registrationGrant: { points: 40, expiresAt: '2030-03-31T00:00:00Z' },
+    })
+    return r.fulfill({ json: auth.identity })
+  })
   await page.goto('/#/register?product=office')
   await page.getByLabel('邮箱', { exact: true }).fill('review@example.invalid')
   const send = page.getByRole('button', { name: '发送验证码' })
