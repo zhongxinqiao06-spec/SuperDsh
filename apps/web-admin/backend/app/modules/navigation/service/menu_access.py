@@ -18,7 +18,13 @@ def require_menu_access(account: Account, product: Product, *, write: bool = Fal
 def editable_ids(
     items: list[dict[str, object]], catalog: MenuCatalog, account: Account
 ) -> set[str]:
-    platform = {i["id"] for i in catalog.defaults if i["parentId"] == "platform"}
+    # 账号与账务共享两个产品的业务数据；换导航父级不改变平台菜单编排权。
+    platform = {i["id"] for i in catalog.defaults if i["parentId"] == "platform"} | {
+        "access.users",
+        "billing.subscriptions",
+        "billing.plans",
+        "billing.rates",
+    }
     grants = {m["id"]: m["permissions"] for m in catalog.modules}
     locked = {"platform"}
     for item in items:
@@ -51,15 +57,30 @@ def merge_product_changes(
         draft if draft is not None else [i for i in catalog.defaults if i["id"] not in reserved]
     )
     previous_by_id = {i["id"]: i for i in previous}
+    visible_parents = {i["parentId"] for i in previous if i["id"] in editable}
+    accepted = []
     for item in candidates:
         identifier, parent = item.get("id"), item.get("parentId")
         if not isinstance(identifier, str) or (parent is not None and not isinstance(parent, str)):
             raise DomainError(422, "invalid menu identifier or parent")
         previous_parent = previous_by_id.get(identifier, {}).get("parentId")
+        # 混合分组在编辑器中作为只读父级显示，全表提交时保留数据库原件。
         if (
             identifier in reserved
-            or (draft is not None and parent in reserved and parent != previous_parent)
+            and identifier in visible_parents
+            and item == previous_by_id[identifier]
+        ):
+            continue
+        if (
+            identifier in reserved
+            or (
+                draft is not None
+                and parent in reserved
+                and parent != previous_parent
+                and parent != "product-management"
+            )
             or (item.get("kind") == "page" and identifier not in editable)
         ):
             raise DomainError(403, "cannot configure a protected menu")
-    return [*protected, *candidates]
+        accepted.append(item)
+    return [*protected, *accepted]

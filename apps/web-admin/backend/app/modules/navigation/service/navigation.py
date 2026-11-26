@@ -81,7 +81,8 @@ class NavigationService:
             items = filter_items(items, catalog.modules, viewer, all_menus="admin" in account.roles)
         if admin and not global_access:
             editable = editable_ids(items, catalog, account)
-            items = [i for i in items if i["id"] in editable]
+            parents = {i["parentId"] for i in items if i["id"] in editable}
+            items = [i for i in items if i["id"] in editable or i["id"] in parents]
         return {
             "version": value.version,
             "items": items,

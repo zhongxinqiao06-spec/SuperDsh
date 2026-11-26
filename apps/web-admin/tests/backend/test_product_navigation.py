@@ -168,7 +168,8 @@ async def test_product_menu_editor_cannot_change_platform(
     password = "Synthetic-office-password!"
     read_role = await client.post(
         "/api/admin/roles",
-        json={"name": "只读菜单观察员", "permissions": ["menus.read"]},
+        # 即使获准查看账号和账务，产品级菜单编辑权也不能重编这些跨产品入口。
+        json={"name": "只读菜单观察员", "permissions": ["menus.read", "users.read", "billing.read"]},
     )
     assert read_role.status_code == 201
     assert (
@@ -196,8 +197,18 @@ async def test_product_menu_editor_cannot_change_platform(
     )
     assert saved.status_code == 200
     editable = (await client.get(menus, headers=headers)).json()
-    assert set(editable["editableIds"]) == {i["id"] for i in editable["items"]}
-    assert {"models", "platform", "access.users"}.isdisjoint(editable["editableIds"])
+    assert {i["id"] for i in editable["items"]} - set(editable["editableIds"]) == {
+        "product-management"
+    }
+    protected = {
+        "models",
+        "platform",
+        "access.users",
+        "billing.plans",
+        "billing.subscriptions",
+        "billing.rates",
+    }
+    assert protected.isdisjoint(i["id"] for i in editable["items"])
 
     async def save(items: list[dict[str, object]]) -> int:
         return (
@@ -216,6 +227,9 @@ async def test_product_menu_editor_cannot_change_platform(
         patch = deepcopy(editable["items"])
         next(i for i in patch if i["id"] == "agents")[key] = value
         assert await save(patch) == expected
+    patch = deepcopy(editable["items"])
+    next(i for i in patch if i["id"] == "product-management")["visible"] = False
+    assert await save(patch) == 403
     next(i for i in editable["items"] if i["id"] == "skills")["title"] = "办公技能"
     assert await save(editable["items"]) == 200
     preview = await client.get(

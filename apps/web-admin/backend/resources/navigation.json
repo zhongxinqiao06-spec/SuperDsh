@@ -341,7 +341,14 @@
       "id": "product-management",
       "title": "产品管理",
       "icon": "users",
-      "pages": ["product.members", "access.menus"]
+      "pages": [
+        "product.members",
+        "access.menus",
+        "access.users",
+        "billing.subscriptions",
+        "billing.plans",
+        "billing.rates"
+      ]
     },
     {
       "id": "platform",
@@ -349,10 +356,6 @@
       "icon": "settings",
       "pages": [
         "overview",
-        "access.users",
-        "billing.subscriptions",
-        "billing.plans",
-        "billing.rates",
         "models",
         "platform.extensions",
         "devices",
