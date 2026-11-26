@@ -105,3 +105,85 @@ test('开放注册和授权入口随服务器配置展开并保留返回地址',
   )
   await expect(page.getByLabel('用户名或邮箱')).toBeVisible()
 })
+
+test('娱乐邮箱注册保留错误草稿并可重新验证', async ({ page }, testInfo) => {
+  await installFoundationFixture(page)
+  await page.route('**/api/auth/config', (route) =>
+    route.fulfill({
+      json: {
+        needsBootstrap: false,
+        registrationOpen: true,
+        registrationEmailAvailable: true,
+        registrationGrant: { points: 40, validDays: 30 },
+        emailVerificationRequired: true,
+        oauthEnabled: false,
+      },
+    }),
+  )
+  let sends = 0
+  let submissions = 0
+  await page.route('**/api/auth/email-code', (route) => {
+    expect(route.request().postDataJSON()).toMatchObject({
+      email: 'creator@example.invalid',
+      purpose: 'register',
+    })
+    sends++
+    return route.fulfill({ json: {} })
+  })
+  await page.route('**/api/auth/register', (route) => {
+    submissions++
+    const body = route.request().postDataJSON()
+    expect(body).toMatchObject({
+      product: 'entertainment',
+      email: 'creator@example.invalid',
+      code: '123456',
+    })
+    expect(body.passwordVerifier).toBeTruthy()
+    expect(body.password).toBeUndefined()
+    return route.fulfill({
+      status: 422,
+      json: { detail: 'invalid or expired verification code' },
+    })
+  })
+  await page.goto('/#/register?product=entertainment', {
+    waitUntil: 'domcontentloaded',
+  })
+  const send = page.getByRole('button', { name: '发送验证码' })
+  await expect(page.getByText(/验证邮箱后获 40 创作点/)).toBeVisible()
+  for (const colorScheme of ['light', 'dark'] as const) {
+    await page.emulateMedia({ colorScheme })
+    for (const width of [390, 768, 1280, 1440]) {
+      await page.setViewportSize({ width, height: 850 })
+      await expect(page.locator('.login-page')).toHaveJSProperty(
+        'scrollWidth',
+        width,
+      )
+      if (width === 390 || width === 1280)
+        await page.screenshot({
+          path: testInfo.outputPath(`registration-${colorScheme}-${width}.png`),
+          fullPage: true,
+        })
+    }
+  }
+  await page.emulateMedia({ colorScheme: 'light' })
+  await page.setViewportSize({ width: 390, height: 690 })
+  await page.getByLabel('邮箱', { exact: true }).fill('creator@example.invalid')
+  await send.click()
+  await expect(page.getByRole('button', { name: /秒后重发/ })).toBeDisabled()
+  await page.getByLabel('验证码', { exact: true }).fill('123456')
+  await page.getByLabel('密码', { exact: true }).fill('Synthetic-test-secret')
+  await page
+    .getByLabel('确认密码', { exact: true })
+    .fill('Synthetic-test-secret')
+  await page.getByRole('button', { name: '验证并注册' }).click()
+  await expect(
+    page.getByText('验证码不正确或已过期，请检查邮箱或重新发送。'),
+  ).toBeVisible()
+  await expect(page.getByLabel('邮箱', { exact: true })).toHaveValue(
+    'creator@example.invalid',
+  )
+  expect([sends, submissions]).toEqual([1, 1])
+  await page.getByLabel('邮箱', { exact: true }).fill('another@example.invalid')
+  await expect(page.getByLabel('验证码', { exact: true })).toHaveValue('')
+  await expect(send).toBeEnabled()
+})

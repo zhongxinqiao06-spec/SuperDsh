@@ -103,22 +103,27 @@ for (const theme of ['light', 'dark']) {
     await page.route('**' + path + '/preparation', (route) =>
       route.fulfill({ json: { revision: project.revision, stages: [] } }),
     )
-    await page.route('**/api/studio/assets', (route) =>
+    await page.route('**/api/studio/library?*', (route) =>
       route.fulfill({
-        json: [
-          {
-            id: 'historic-lulu',
-            name: '历史噜噜',
-            description: '橙帽子和圆圆的脸',
-            kind: 'character',
-            version: 3,
-            family: 'lulu',
-            parent: null,
-            project: null,
-            fileId: null,
-            voice: '',
-          },
-        ],
+        json: {
+          total: 1,
+          page: 1,
+          pageSize: 10,
+          items: [
+            {
+              id: 'historic-lulu',
+              name: '历史噜噜',
+              description: '橙帽子和圆圆的脸',
+              kind: 'character',
+              version: 3,
+              family: 'lulu',
+              parent: null,
+              project: null,
+              fileId: null,
+              voice: '',
+            },
+          ],
+        },
       }),
     )
     const picture = {
@@ -331,15 +336,15 @@ for (const theme of ['light', 'dark']) {
     await expect(visionChoice).not.toBeChecked()
     await visionLabel.click()
     await expect(visionChoice).toBeChecked()
-    await panel.getByRole('button', { name: '从个人形象库选择' }).click()
+    await panel.getByRole('button', { name: '从素材库选择' }).click()
     const library = page.getByRole('dialog', {
-      name: '选择个人形象',
+      name: '为导演选择角色、场景或道具',
       exact: true,
     })
     await library
-      .getByRole('button', { name: '选择形象 历史噜噜', exact: true })
+      .getByRole('button', { name: '选择历史噜噜', exact: true })
       .click()
-    await library.getByRole('button', { name: '完成选择' }).click()
+    await library.getByRole('button', { name: '使用所选素材' }).click()
     await panel.getByText('联网查询地点和故事背景', { exact: true }).click()
     await expect(
       panel.getByRole('checkbox', { name: '联网查询地点和故事背景' }),
@@ -359,7 +364,7 @@ for (const theme of ['light', 'dark']) {
       await page.setViewportSize({ width, height: 960 })
       await inspectDrawer(page, panel)
       await panel
-        .getByText('参考形象', { exact: true })
+        .getByText('参考资料', { exact: true })
         .scrollIntoViewIfNeeded()
       await page.screenshot({
         path: resolve(capture, `director-input-${theme}-${width}.png`),

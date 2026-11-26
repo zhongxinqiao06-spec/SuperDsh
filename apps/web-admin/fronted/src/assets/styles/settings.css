@@ -13,6 +13,7 @@
   border-radius: var(--radius-card);
   overflow: hidden;
   background: var(--card);
+  box-shadow: var(--shadow-card);
 }
 .settings-card-header {
   display: flex;
@@ -21,11 +22,11 @@
   flex-wrap: wrap;
   gap: var(--field-gap);
   padding: var(--layout-gap) var(--panel-padding);
+  background: var(--card);
 }
 .settings-card-header h2 {
   margin: 0;
-  font-size: 16px;
-  font-weight: 600;
+  font: 600 var(--sheet-section-size)/1.4 var(--sheet-font);
 }
 .settings-card-header p {
   margin: 4px 0 0;
@@ -34,6 +35,24 @@
 }
 .settings-card-content {
   border-top: 1px solid var(--border);
+}
+.settings-card-heading {
+  display: flex;
+  align-items: center;
+  gap: var(--space-4);
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+.settings-summary .settings-card-header {
+  background: var(--sheet-heading);
+  isolation: isolate;
+  position: relative;
+}
+.settings-summary .settings-card-header h2 {
+  font-size: clamp(24px, 2.2vw, 34px);
+}
+.settings-card-content > .detail-facts {
+  margin: var(--space-4) var(--panel-padding);
 }
 .settings-row {
   display: flex;
@@ -58,6 +77,7 @@
   align-items: center;
   gap: 12px;
   overflow-wrap: anywhere;
+  min-width: 0;
 }
 .settings-details {
   margin: 0;
@@ -78,22 +98,12 @@
   margin: 0;
   overflow-wrap: anywhere;
 }
-.profile-heading {
-  display: flex;
-  align-items: center;
-  gap: 16px;
-}
-.profile-heading .el-avatar {
+.profile-avatar {
+  flex: none;
   color: var(--primary-foreground);
-  background: var(--primary);
+  background: var(--primary-fill);
+  box-shadow: var(--shadow-button);
   font-size: 22px;
-}
-.profile-heading strong {
-  display: block;
-  font-size: 16px;
-}
-.profile-heading small {
-  color: var(--muted-foreground);
 }
 .appearance-options {
   display: flex;

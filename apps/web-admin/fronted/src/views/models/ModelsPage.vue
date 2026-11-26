@@ -1,4 +1,9 @@
 <script setup lang="ts">
+import { computed, ref, watch } from 'vue'
+import { useRoute, useRouter } from 'vue-router'
+import SupplierDetail from './components/SupplierDetail.vue'
+import SupplierKeyDialog from './components/SupplierKeyDialog.vue'
+import type { ModelConnection } from '@/types/models/models'
 import ManagementList from '@/components/management/ManagementList.vue'
 import RowActions from '@/components/management/RowActions.vue'
 import PageHeader from '@/components/layout/PageHeader.vue'
@@ -15,6 +20,47 @@ import ConfigurationEditor from '@/views/models/components/ConfigurationEditor.v
 import PersonalProviderCard from '@/views/models/components/PersonalProviderCard.vue'
 /** 聊天、多模态和个人模型共用协议组件，作用域权限由页面用例固定。 */
 const vm = useModels()
+const route = useRoute()
+const router = useRouter()
+const keyConnection = ref<ModelConnection>()
+const detail = computed(() =>
+  vm.allowed.value && !vm.personal.value
+    ? vm.catalog.data.value?.connections.find(
+        (c) => c.id === route.query.supplier,
+      )
+    : undefined,
+)
+// 明文确认属于当前导航上下文；查询参数里只保留可刷新、可分享的供应商标识。
+watch(
+  () => route.fullPath,
+  () => {
+    keyConnection.value = undefined
+  },
+  { flush: 'sync' },
+)
+// 详情是页面，返回时将键盘焦点还给打开它的供应商。
+watch(
+  detail,
+  (current, previous) => {
+    if (!current && previous && !route.query.supplier)
+      document.getElementById('supplier-detail-trigger-' + previous.id)?.focus()
+  },
+  { flush: 'post' },
+)
+function showDetail(id: string) {
+  void router.push({
+    path: route.path,
+    query: { ...route.query, supplier: id },
+  })
+}
+function backToDirectory() {
+  const query = { ...route.query }
+  delete query.supplier
+  const list = { path: route.path, query }
+  if (router.options.history.state.back === router.resolve(list).fullPath)
+    router.back()
+  else void router.replace(list)
+}
 function addSupplierModel(connectionId: string, modelId: string) {
   vm.editConfiguration('new')
   vm.configuration.connectionId = connectionId
@@ -27,10 +73,15 @@ function addSupplierModel(connectionId: string, modelId: string) {
 
 <template>
   <section
-    class="page paged-page management-page models-page"
-    :class="{ 'personal-models-page': vm.personal.value }"
+    class="page management-page models-page"
+    :class="{
+      'personal-models-page': vm.personal.value,
+      'paged-page': !detail,
+      'management-detail-page': detail,
+    }"
   >
     <PageHeader
+      v-if="!detail"
       :title="
         vm.personal.value
           ? '个人模型'
@@ -181,13 +232,24 @@ function addSupplierModel(connectionId: string, modelId: string) {
         >
       </el-dialog>
     </template>
+    <SupplierDetail
+      v-else-if="detail"
+      :key="detail.id"
+      :row="detail"
+      :configurations="vm.catalog.data.value?.configurations ?? []"
+      @edit="vm.editConnection(detail)"
+      @reveal="keyConnection = detail"
+      @back="backToDirectory"
+      @add-model="addSupplierModel(detail.id, $event)"
+    />
     <template v-else-if="!vm.personal.value && vm.allowed.value">
       <SupplierDirectory
         :key="String(vm.multimodal.value)"
         :connections="vm.catalog.data.value?.connections ?? []"
         :configurations="vm.catalog.data.value?.configurations ?? []"
         @edit="vm.editConnection"
-        @add-model="addSupplierModel"
+        @detail="showDetail"
+        @reveal="keyConnection = $event"
       />
       <FilterBar class="toolbar models-search">
         <el-input
@@ -294,6 +356,12 @@ function addSupplierModel(connectionId: string, modelId: string) {
         </template>
       </ManagementList>
     </template>
+    <SupplierKeyDialog
+      v-if="keyConnection && vm.allowed.value"
+      :key="keyConnection.id"
+      :connection="keyConnection"
+      @close="keyConnection = undefined"
+    />
     <ManagementDialog
       :model-value="Boolean(vm.editingProvider.value)"
       width="min(896px, calc(100vw - 32px))"

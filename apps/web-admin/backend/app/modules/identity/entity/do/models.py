@@ -2,7 +2,7 @@
 
 from datetime import datetime
 
-from sqlalchemy import Boolean, DateTime, ForeignKey, Integer, String, Text, func
+from sqlalchemy import Boolean, CheckConstraint, DateTime, ForeignKey, Integer, String, Text, func
 from sqlalchemy.dialects.postgresql import JSONB
 from sqlalchemy.orm import Mapped, mapped_column
 
@@ -13,6 +13,13 @@ class UserRow(Base):
     """账号授权代际与编辑 revision 分别解决令牌撤销和并发覆盖。"""
 
     __tablename__ = "users"
+    __table_args__ = (
+        CheckConstraint(
+            "registration_product IN ('office','entertainment')",
+            name="ck_users_registration_product",
+        ),
+    )
+    registration_product: Mapped[str | None] = mapped_column(String(20))
     id: Mapped[str] = mapped_column(String(80), primary_key=True)
     username: Mapped[str] = mapped_column(String(32), unique=True)
     password_hash: Mapped[str] = mapped_column(Text)

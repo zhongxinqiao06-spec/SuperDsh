@@ -118,7 +118,7 @@ async def registration_access(request: Request) -> None:
 
 @router.post("/auth/register", dependencies=[Depends(registration_access)])
 async def register(body: RegisterInput, request: Request, response: Response) -> dict[str, object]:
-    """只在独立新空库中创建首个管理员。"""
+    """普通注册校验邮箱；兼容空库初始化须先通过专用令牌验证。"""
     if await identity(request).needs_bootstrap():
         account = await identity(request).bootstrap(
             body.username,
@@ -235,8 +235,15 @@ async def users(
     page_number = query_integer(page, 1, 1)
     page_size = query_integer(pageSize, 50, 1, 200)
     values, total = await management(request).list_users(account, page_number, page_size, search)
+    rows = [account_payload(value) for value in values]
+    if "billing.read" in account.permissions:
+        summaries = await request.app.state.services.billing_operations.user_summaries(
+            account, [value.user_id for value in values]
+        )
+        for row in rows:
+            row["billing"] = summaries.get(row["userId"])
     return {
-        "users": [account_payload(value) for value in values],
+        "users": rows,
         "total": total,
         "page": page_number,
         "pageSize": page_size,

@@ -1,4 +1,6 @@
 <script setup lang="ts">
+import { adapterNames } from '@/utils/models/supplier-presentation'
+import FormSection from '@/components/form/FormSection.vue'
 import type {
   ConnectionDraft,
   SupplierSubscription,
@@ -16,42 +18,43 @@ function subscription(value: Partial<SupplierSubscription>): void {
 </script>
 
 <template>
-  <label class="field"
-    >连接名称<el-input
-      :model-value="draft.name"
-      maxlength="100"
-      @update:model-value="patch({ name: $event })"
-  /></label>
-  <label class="field"
-    >适配器<el-select
-      :model-value="draft.adapter"
-      @update:model-value="patch({ adapter: $event })"
-      ><el-option
-        value="openai-completions"
-        label="OpenAI Chat Completions" /><el-option
-        value="openai-responses"
-        label="OpenAI Responses" /><el-option
-        value="anthropic-messages"
-        label="Anthropic Messages" /><el-option
-        value="volcengine-ark"
-        label="火山方舟" /><el-option
-        value="volcengine-speech"
-        label="火山语音（能力尚未开放）" /></el-select
-  ></label>
-  <label class="field"
-    >API 地址<el-input
-      :model-value="draft.baseUrl"
-      placeholder="供应商提供的完整 Base URL"
-      @update:model-value="patch({ baseUrl: $event })"
-  /></label>
-  <label class="field"
-    >区域（可选）<el-input
-      :model-value="draft.region"
-      maxlength="100"
-      @update:model-value="patch({ region: $event })"
-  /></label>
-  <fieldset class="stack">
-    <legend>套餐与额度登记</legend>
+  <FormSection title="连接信息" columns>
+    <label class="field"
+      >连接名称<el-input
+        :model-value="draft.name"
+        maxlength="100"
+        @update:model-value="patch({ name: $event })"
+    /></label>
+    <label class="field"
+      >适配器<el-select
+        :model-value="draft.adapter"
+        @update:model-value="patch({ adapter: $event })"
+        ><el-option
+          v-for="(label, id) in adapterNames"
+          :key="id"
+          :value="id"
+          :label="label" /></el-select
+    ></label>
+    <label class="field form-span"
+      >API 地址<el-input
+        :model-value="draft.baseUrl"
+        placeholder="供应商提供的完整 Base URL"
+        @update:model-value="patch({ baseUrl: $event })"
+    /></label>
+    <label class="field"
+      >区域（可选）<el-input
+        :model-value="draft.region"
+        maxlength="100"
+        @update:model-value="patch({ region: $event })"
+    /></label>
+    <el-checkbox
+      class="form-column-option"
+      :model-value="draft.enabled"
+      @update:model-value="patch({ enabled: Boolean($event) })"
+      >启用连接</el-checkbox
+    >
+  </FormSection>
+  <FormSection title="套餐与额度登记" columns>
     <label class="field"
       >套餐名称<el-input
         :model-value="draft.subscription?.plan"
@@ -79,26 +82,23 @@ function subscription(value: Partial<SupplierSubscription>): void {
         :controls="false"
         @update:model-value="subscription({ remaining: $event ?? null })"
     /></label>
-  </fieldset>
-  <label class="field"
-    >API Key<el-input
-      :model-value="draft.apiKey"
-      type="password"
-      show-password
-      autocomplete="new-password"
-      :placeholder="keyConfigured ? '已配置，留空保留' : '输入供应商密钥'"
-      @update:model-value="patch({ apiKey: $event })"
-  /></label>
-  <el-checkbox
-    v-if="keyConfigured"
-    :model-value="draft.clearApiKey"
-    :disabled="Boolean(draft.apiKey)"
-    @update:model-value="patch({ clearApiKey: Boolean($event) })"
-    >明确清除已有密钥</el-checkbox
-  >
-  <el-checkbox
-    :model-value="draft.enabled"
-    @update:model-value="patch({ enabled: Boolean($event) })"
-    >启用连接</el-checkbox
-  >
+  </FormSection>
+  <FormSection title="访问凭据">
+    <label class="field"
+      >API Key<el-input
+        :model-value="draft.apiKey"
+        type="password"
+        show-password
+        autocomplete="new-password"
+        :placeholder="keyConfigured ? '已配置，留空保留' : '输入供应商密钥'"
+        @update:model-value="patch({ apiKey: $event })"
+    /></label>
+    <el-checkbox
+      v-if="keyConfigured"
+      :model-value="draft.clearApiKey"
+      :disabled="Boolean(draft.apiKey)"
+      @update:model-value="patch({ clearApiKey: Boolean($event) })"
+      >明确清除已有密钥</el-checkbox
+    >
+  </FormSection>
 </template>

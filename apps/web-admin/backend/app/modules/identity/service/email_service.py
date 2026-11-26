@@ -43,9 +43,25 @@ class EmailVerification:
     """同一邮箱的请求跨进程串行，OTP 仅保存带服务端密钥的摘要。"""
 
     def __init__(
-        self, repository: SqlAccountRepository, secret: str, sender: MailSender | None = None
+        self,
+        repository: SqlAccountRepository,
+        secret: str,
+        sender: MailSender | None = None,
+        *,
+        registration_sender: MailSender | None = None,
     ) -> None:
         self.repository, self.secret, self.sender = repository, secret, sender or ResendMailSender()
+        self.registration_sender = registration_sender
+
+    def available(self, configuration: dict[str, object], purpose: str) -> bool:
+        """已审核的注册模板仅用于注册，找回密码和绑邮箱仍使用原有配置。"""
+        if purpose == "register" and self.registration_sender is not None:
+            return True
+        return bool(
+            configuration.get("enabled")
+            and configuration.get("apiKey")
+            and configuration.get("fromAddress")
+        )
 
     def scope(self, address: str, purpose: str, user_id: str) -> str:
         return hashlib.sha256(f"{address}\0{purpose}\0{user_id}".encode()).hexdigest()
@@ -72,11 +88,7 @@ class EmailVerification:
     async def issue(
         self, configuration: dict[str, object], address: str, purpose: str, user_id: str
     ) -> None:
-        if (
-            not configuration.get("enabled")
-            or not configuration.get("apiKey")
-            or not configuration.get("fromAddress")
-        ):
+        if not self.available(configuration, purpose):
             raise DomainError(409, "email verification is disabled")
         now, scope = datetime.now(UTC), self.scope(address, purpose, user_id)
         code, nonce = f"{secrets.randbelow(1000000):06d}", secrets.token_urlsafe(24)
@@ -114,7 +126,8 @@ class EmailVerification:
                 )
             )
         try:
-            await self.sender.send(configuration, address, code)
+            sender = self.registration_sender if purpose == "register" else None
+            await (sender or self.sender).send(configuration, address, code)
         except Exception as error:
             async with self.repository.sessions.begin() as session:
                 current = await self.repository.code(session, scope)

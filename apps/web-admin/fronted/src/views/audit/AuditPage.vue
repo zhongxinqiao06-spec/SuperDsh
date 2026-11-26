@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import ManagementList from '@/components/management/ManagementList.vue'
+import ManagementDialog from '@/components/overlay/ManagementDialog.vue'
 import PageHeader from '@/components/layout/PageHeader.vue'
 import DateTime from '@/components/base/DateTime.vue'
 import FilterBar from '@/components/management/FilterBar.vue'
@@ -92,10 +93,12 @@ function filter() {
           @change="resource.reload"
         />
       </template> </ManagementList
-    ><el-dialog
+    ><ManagementDialog
       :model-value="selected !== null"
       :title="tr('审计详情', 'Audit details')"
-      @update:model-value="selected = null"
+      :close-on-click-modal="true"
+      readonly
+      @update:model-value="!$event && (selected = null)"
       ><dl v-if="selected" class="details">
         <dt>{{ tr('操作人', 'Actor') }}</dt>
         <dd>{{ selected.actorUsername || selected.actorId || '—' }}</dd>
@@ -111,7 +114,7 @@ function filter() {
             {{ typeof value === 'object' ? JSON.stringify(value) : value }}
           </dd></template
         >
-      </dl></el-dialog
+      </dl></ManagementDialog
     >
   </section>
 </template>

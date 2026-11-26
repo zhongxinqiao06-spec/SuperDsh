@@ -144,6 +144,12 @@
   box-shadow: var(--shadow-button);
   font-weight: 500;
 }
+[data-console-product='entertainment'] .nav-link.active {
+  box-shadow: inset 3px 0 var(--brand-ink);
+}
+[data-console-product='entertainment'] .console-brand {
+  font-family: var(--sheet-font);
+}
 .nav-chevron {
   margin-left: auto;
   transition: transform 150ms;

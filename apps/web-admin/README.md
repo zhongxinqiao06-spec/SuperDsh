@@ -73,6 +73,8 @@ npm run dev
 
 开发配置位于 `.superdsh-work/web-admin-dev/config`，后端读取其中的 `backend-environment.json`，不把密钥复制到源码。修改 `settings.json` 的端口等配置后重新执行 `web-admin:init` 导出配置；两端需重启。`WEB_ADMIN_CONFIG_ROOT` 可显式选择另一开发配置目录，`UV_PROJECT_ENVIRONMENT` 可指定虚拟环境，`UV_PYTHON_INSTALL_DIR` 可指定受管 Python 安装目录；使用自定义值时，准备命令与原生启动终端应保持相同设置。开发依赖只绑定回环地址。Ollama 默认为 `http://127.0.0.1:21434`，端口可在 `settings.json` 的 `ports.ollamaPort` 修改，然后重新运行 `web-admin:deps:up` 并重启宿主机后端。已有知识库保留活动模型和索引。若活动模型指向旧端口，在知识库 Embedding 设置中更新地址。停止整组依赖使用 `web-admin:deps:down`，数据卷和密钥会保留。
 
+本机可用腾讯云 SES 发送注册验证码。在开发配置目录下建立仅后端可读的 `registration-ses.json`，填写 `secretId`、`secretKey`、`region`、`fromAddress` 和整数 `templateId`。地域与已审核的注册模板一致，模板使用 `{{code}}`。原生 Python 入口在执行 `web-admin:init` 后按导出的 `WEB_ADMIN_REGISTRATION_SES_FILE` 读取该文件，也支持直接指定这个环境变量。替换密钥后重启后端。公开注册仍由管理端的注册开关控制，找回密码和绑定邮箱继续使用服务设置中的邮件配置。
+
 `uv run python main.py` 只启动 Python 后端，前提是上述依赖已运行；它不会自行启动 Docker。若出现 `WinError 1225`、连接被拒绝或 PostgreSQL 连接失败，说明迁移阶段尚未连接到数据库，先检查 Docker 和开发依赖容器状态。恢复步骤为：
 
 ```powershell
@@ -235,6 +237,8 @@ docker run --rm --read-only --network none --user nginx -i --entrypoint sh "$FRO
 ```
 
 该检查也纳入现有生产镜像生命周期验收。后端会真实打开 Alembic 配置、迁移、业务 JSON 和引擎入口；前端以 Nginx worker 身份检查所有文件，覆盖复制进来的字体与图片，避免仅检查文件存在却漏掉启动权限或静态资源 403。可选 workspace 断链单列为 `danglingLinks`；权限检查不替代 DSH 启动和工具执行验收，不代表完整引擎已可用。
+
+生产注册发信复用后端的持久配置卷。将腾讯云注册发信配置放在该卷的 `/data/config/registration-ses.json`，使用后端运行用户所有、权限 `0600`，重启后端后通过 `/api/auth/config` 的 `registrationEmailAvailable` 核对配置加载状态。开放注册由服务设置的 `registrationOpen` 单独控制。配置文件随卷保留，密钥轮换后重启后端生效。
 
 ### 星桥正式域名与 HTTPS
 

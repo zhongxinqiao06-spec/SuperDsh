@@ -141,6 +141,7 @@ export async function loadConfiguration(
     configuration.publicOrigin ??
     `http://localhost:${ports.frontedPort}`
   const developmentEmbedding: Record<string, string> = {}
+  const registrationMailFile = resolve(root, 'config/registration-ses.json')
   if (mode === 'development') {
     const port = ports.ollamaPort
     if (!Number.isInteger(port) || port < 1 || port > 65535)
@@ -162,6 +163,9 @@ export async function loadConfiguration(
   }
   const environment = {
     ...developmentEmbedding,
+    ...(mode === 'development' && existsSync(registrationMailFile)
+      ? { WEB_ADMIN_REGISTRATION_SES_FILE: registrationMailFile }
+      : {}),
     WEB_ADMIN_DATABASE_URL: `postgresql+asyncpg://web_admin:${configuration.databasePassword}@${host}:${dbPort}/web_admin`,
     WEB_ADMIN_REDIS_URL: `redis://:${configuration.redisPassword}@${mode === 'production' ? 'redis:6379' : `127.0.0.1:${ports.redisPort}`}/0`,
     WEB_ADMIN_SECRET: configuration.secret,

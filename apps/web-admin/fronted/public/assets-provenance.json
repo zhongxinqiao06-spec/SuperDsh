@@ -2,6 +2,12 @@
   "description": "仅复制自有管理端静态资产，不在运行时依赖旧包。",
   "assets": [
     {
+      "path": "images/console/ivory-film.webp",
+      "source": "OpenAI Image Gen / approved Starbridge ivory supplier detail / exec-1cb4845b-8c3b-4eb3-b1cd-75813ba47987",
+      "owner": "SuperDsh original generated concept artwork",
+      "usage": "Cropped film detail for entertainment console mastheads"
+    },
+    {
       "path": "images/website/login-mirror-lake.jpg",
       "source": "OpenAI Image Gen / Starbridge sign-in film artwork / exec-55c2204b-82b7-40aa-b8fc-89d4ba3794a6",
       "owner": "SuperDsh original generated concept artwork",

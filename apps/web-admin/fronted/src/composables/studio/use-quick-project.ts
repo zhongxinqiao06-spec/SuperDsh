@@ -251,6 +251,7 @@ export function useQuickProject(initialId: string | null) {
         controller.signal,
       )
       controller.signal.throwIfAborted()
+      attempts.delete('prepare:' + JSON.stringify(body))
       planOpen.value = true
     })
   }

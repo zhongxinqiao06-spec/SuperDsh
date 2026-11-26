@@ -1,5 +1,8 @@
-/** 用户管理DTO，revision只用于并发控制，不是发布版本。 */
+import type { BillingAccount } from '@/types/billing/operations'
+
+/** 用户管理DTO，只有具备账务查看权限时才附带会员摘要。 */
 export interface ManagedUser {
+  billing?: BillingAccount | null
   userId: string
   username?: string
   displayName: string

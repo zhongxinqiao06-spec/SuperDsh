@@ -23,6 +23,8 @@ class Settings(BaseSettings):
     allowed_origins: list[str] = Field(default_factory=lambda: ["http://localhost:5175"])
     setup_token: SecretStr = SecretStr("")
     setup_token_expires_at: str | None = None
+    # 仅显式配置时将注册邮件交给腾讯云；服务端私有文件不经前端或服务设置接口。
+    registration_ses_file: Path | None = None
     # 初始账号仅用于空库启动，账号和密码由部署配置同时注入。
     initial_admin_username: str = Field(default="", pattern=r"^(?:[a-z0-9_-]{3,32})?$")
     initial_admin_password: SecretStr = SecretStr("")

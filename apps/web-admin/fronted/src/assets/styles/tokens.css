@@ -152,12 +152,12 @@
   --entertainment-primary-foreground: #ffffff;
   --entertainment-ink: var(--orange-700);
   --entertainment-accent: var(--orange-100);
-  --entertainment-canvas: #f7f5f1;
-  --entertainment-sidebar: #fffcf7;
+  --entertainment-canvas: #fcfaf7;
+  --entertainment-sidebar: #faf6f1;
   --entertainment-foreground: #302820;
   --entertainment-muted: #f1ece5;
   --entertainment-muted-foreground: #6f645d;
-  --entertainment-border: #e7e0d7;
+  --entertainment-border: #e6ddd4;
   --entertainment-gradient: linear-gradient(
     135deg,
     var(--orange-600),
@@ -252,6 +252,20 @@
 
 /* 身份从已进入的工作台推导；明暗完全服从用户偏好，两者可以独立切换。 */
 :root[data-console-product] {
+  /* 纸面、细线与标题由公共组件消费；产品与明暗主题只覆盖语义变量。 */
+  --sheet-tint: color-mix(in srgb, var(--primary) 5%, var(--card));
+  --sheet-line: color-mix(in srgb, var(--foreground) 13%, var(--border));
+  --sheet-heading: linear-gradient(108deg, var(--card), var(--sheet-tint));
+  --sheet-art: none;
+  --sheet-font: var(--font-sans);
+  --sheet-title-size: clamp(21px, 1.55vw, 25px);
+  --sheet-section-size: clamp(17px, 1.24vw, 20px);
+  --detail-title-size: clamp(32px, 4.3vw, 64px);
+  --sheet-mask: rgb(23 26 32 / 27%);
+  --sheet-footer: color-mix(in srgb, var(--canvas) 68%, var(--card));
+  --field-line: color-mix(in srgb, var(--foreground) 22%, var(--card));
+  --field-surface: var(--card);
+  --field-focus: 0 0 0 3px color-mix(in srgb, var(--ring) 15%, transparent);
   --font-editorial: var(--font-sans);
   --background: var(--canvas);
   --popover: var(--card);
@@ -292,7 +306,12 @@
 }
 :root[data-console-product='entertainment'] {
   --canvas: var(--entertainment-canvas);
-  --card: #ffffff;
+  --card: #fffdfb;
+  --sheet-font: var(--showcase-display-font);
+  --sheet-art: url('/images/console/ivory-film.webp');
+  --sheet-heading: linear-gradient(108deg, #fcf8f3 4%, #f5ede4);
+  --sheet-mask: rgb(48 36 26 / 22%);
+  --radius-control: 7px;
   --sidebar: var(--entertainment-sidebar);
   --foreground: var(--entertainment-foreground);
   --muted: var(--entertainment-muted);
@@ -302,17 +321,13 @@
   --primary-foreground: var(--entertainment-primary-foreground);
   --brand-ink: var(--entertainment-ink);
   --accent: var(--entertainment-accent);
-  --primary-fill: var(--entertainment-gradient);
+  --primary-fill: linear-gradient(160deg, #b45a2a, #a44b20 65%, #94411b);
   --primary-fill-hover: var(--entertainment-gradient-hover);
   --selection-fill: var(--entertainment-selection);
   --selection-ink: var(--orange-800);
-  --nav-active-fill: var(--primary-fill);
-  --nav-active-ink: var(--primary-foreground);
-  --surface-glow: radial-gradient(
-    ellipse at top right,
-    rgb(255 225 173 / 20%),
-    transparent 64%
-  );
+  --nav-active-fill: color-mix(in srgb, var(--primary) 10%, var(--sidebar));
+  --nav-active-ink: var(--brand-ink);
+  --surface-glow: none;
   --shadow-button:
     inset 0 1px 0 rgb(255 255 255 / 24%), 0 2px 5px rgb(151 68 16 / 16%);
   --shadow-floating:
@@ -320,6 +335,9 @@
 }
 :root.dark[data-console-product='entertainment'] {
   --card: #26292f;
+  --sheet-heading: linear-gradient(108deg, var(--card), var(--sheet-tint));
+  --sheet-art: none;
+  --sheet-mask: rgb(12 11 10 / 46%);
   --selection-ink: var(--orange-200);
   --surface-glow: radial-gradient(
     ellipse at top right,

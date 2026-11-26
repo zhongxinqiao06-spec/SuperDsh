@@ -1,0 +1,120 @@
+/* 账本和套餐沿用当前产品主题，批次编号允许在窄屏自然换行。 */
+.billing-operation-fields {
+  border: 0;
+  margin: 0;
+  padding: 0;
+  min-width: 0;
+}
+.billing-page .settings-card-content {
+  display: grid;
+  gap: var(--space-4);
+  padding: var(--space-4) var(--panel-padding);
+}
+.billing-page .settings-card-content > p {
+  margin: 0;
+}
+.billing-metrics,
+.billing-plans {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 10rem), 1fr));
+  gap: var(--space-3);
+}
+.billing-metrics > div,
+.billing-option {
+  display: grid;
+  gap: var(--space-2);
+  align-content: start;
+  padding: var(--space-4);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-card);
+  min-width: 0;
+}
+.billing-metrics strong,
+.billing-price {
+  font-size: 1.75rem;
+  font-variant-numeric: tabular-nums;
+}
+.billing-metrics > :first-child strong {
+  color: var(--primary);
+}
+.billing-option {
+  font: inherit;
+  color: var(--foreground);
+  text-align: start;
+  background: var(--card);
+  cursor: pointer;
+}
+.billing-option[aria-pressed='true'] {
+  border-color: var(--primary);
+  box-shadow: inset 0 0 0 1px var(--primary);
+}
+.billing-option:focus-visible {
+  outline: 2px solid var(--primary);
+  outline-offset: 2px;
+}
+.billing-option small,
+.billing-note,
+.billing-rows small,
+.billing-details dt {
+  color: var(--muted-foreground);
+}
+.billing-rows {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+.billing-rows li {
+  display: flex;
+  align-items: center;
+  gap: var(--space-4);
+  padding: var(--space-3) 0;
+  border-bottom: 1px solid var(--border);
+  flex-wrap: wrap;
+}
+.billing-rows li > div {
+  display: grid;
+  gap: var(--space-1);
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+.billing-rows li > div:first-child {
+  flex: 1 1 9rem;
+}
+.billing-filters label {
+  display: grid;
+  gap: var(--space-1);
+  width: min(100%, 10rem);
+}
+.billing-details {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  gap: var(--space-3) var(--space-4);
+  margin: 0;
+}
+.billing-details dd {
+  margin: 0;
+  overflow-wrap: anywhere;
+}
+@media (max-width: 600px) {
+  .billing-directory-filter > .el-input {
+    flex: 1 1 100%;
+    max-width: none;
+  }
+  .billing-metrics {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+  .billing-metrics > :first-child {
+    grid-column: 1 / -1;
+    background: var(--muted);
+  }
+  .billing-plans {
+    grid-template-columns: 1fr;
+  }
+  .billing-option {
+    grid-template-columns: 1fr auto;
+    align-items: baseline;
+  }
+  .billing-option small {
+    align-self: end;
+  }
+}

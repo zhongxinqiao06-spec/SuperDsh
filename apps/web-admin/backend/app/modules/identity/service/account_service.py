@@ -7,8 +7,14 @@ from uuid import uuid4
 from app.infrastructure.crypto import PasswordSecurity
 from app.infrastructure.database import lock_transaction
 from app.infrastructure.errors import DomainError
+from app.modules.billing.service.registration_credit import (
+    REGISTRATION_POINTS,
+    REGISTRATION_TERM_DAYS,
+    grant_registration_credit,
+)
 from app.modules.identity.dao.account_dao import SqlAccountRepository
 from app.modules.identity.entity.bo.models import Account
+from app.modules.identity.entity.bo.product_roles import MEMBER_ROLE
 from app.modules.identity.entity.bo.validation import (
     account_username,
     collision_username,
@@ -16,10 +22,10 @@ from app.modules.identity.entity.bo.validation import (
     email_address,
 )
 from app.modules.identity.entity.do.account_models import RecoveryCodeRow
-from app.modules.identity.entity.do.models import UserRow
+from app.modules.identity.entity.do.models import AuditRow, UserRow
 from app.modules.identity.entity.vo.account_vo import EmailCodeInput, EmailInput, RecoveryInput
 from app.modules.identity.entity.vo.dto import RegisterInput, account_payload
-from app.modules.identity.service.email_service import EmailVerification
+from app.modules.identity.service.email_service import EmailVerification, MailSender
 from app.modules.identity.service.external_oauth_service import ExternalOAuth
 from app.modules.identity.service.identity import IdentityService
 from app.modules.identity.service.mobile_service import MobileLogin
@@ -40,6 +46,8 @@ class AccountFlows:
         identity: IdentityService,
         system: SystemManagement,
         security: PasswordSecurity,
+        *,
+        registration_sender: MailSender | None = None,
     ) -> None:
         self.repository, self.identity, self.system, self.security = (
             repository,
@@ -47,7 +55,9 @@ class AccountFlows:
             system,
             security,
         )
-        self.email = EmailVerification(repository, security.secret)
+        self.email = EmailVerification(
+            repository, security.secret, registration_sender=registration_sender
+        )
         self.mobile = MobileLogin(repository, identity)
         self.external = ExternalOAuth(self)
 
@@ -59,6 +69,13 @@ class AccountFlows:
         return {
             "needsBootstrap": bootstrap,
             "registrationOpen": bool(settings.get("registrationOpen")),
+            "registrationEmailAvailable": self.email.available(
+                object_value(settings.get("email")), "register"
+            ),
+            "registrationGrant": {
+                "points": REGISTRATION_POINTS,
+                "validDays": REGISTRATION_TERM_DAYS,
+            },
             "oauthRegistrationOpen": bool(settings.get("oauthRegistrationOpen")),
             "oauthEnabled": enabled,
             "oauthProviderLabel": oauth.get("label", "OAuth") if enabled else None,
@@ -93,18 +110,23 @@ class AccountFlows:
         )
         return account_payload(await self.current(account))
 
-    async def register(self, body: RegisterInput, *, oauth_registration: bool = False) -> Account:
+    async def register(self, body: RegisterInput, *, oauth_pending: str = "") -> Account:
+        """只为已验真邮箱建号，在同一事务内消费凭证、分配入口角色并发放一次体验额度。"""
         settings = await self.system.internal_settings()
-        if not settings.get("oauthRegistrationOpen" if oauth_registration else "registrationOpen"):
+        if not settings.get("oauthRegistrationOpen" if oauth_pending else "registrationOpen"):
             raise DomainError(403, "registration is closed")
-        username = account_username(body.username, body.email)
-        email_settings = object_value(settings.get("email"))
-        if email_settings.get("enabled") and not body.email:
+        if not body.email:
             raise DomainError(422, "email is required")
+        username = account_username(body.username, body.email)
+        provider = await self.external.pending(oauth_pending) if oauth_pending else {}
+        verified = bool(provider.get("verifiedEmail") == body.email)
+        if not verified and not self.email.available(
+            object_value(settings.get("email")), "register"
+        ):
+            raise DomainError(503, "registration email service unavailable")
         hashed = await self.security.hash_password(
             body.password, body.passwordVerifier, body.passwordSalt
         )
-        verified = True
         user_id = str(uuid4())
         async with self.repository.sessions.begin() as session:
             await lock_transaction(session, "web-admin:identity-management")
@@ -114,30 +136,44 @@ class AccountFlows:
                 body.email and await self.repository.user(session, body.email)
             ):
                 raise DomainError(409, "username or email is already in use")
-            if email_settings.get("enabled"):
-                verified = await self.email.consume(
-                    session, body.email or "", "register", "", body.code
-                )
+            if not verified:
+                verified = await self.email.consume(session, body.email, "register", "", body.code)
             if verified:
+                now = datetime.now(UTC)
                 session.add(
                     UserRow(
                         id=user_id,
                         username=username,
                         password_hash=hashed,
-                        roles=["member"],
+                        roles=[MEMBER_ROLE[body.product]],
+                        registration_product=body.product,
                         email=body.email,
-                        display_name=display_name(body.displayName),
+                        display_name=display_name(body.displayName or username),
                         disabled=False,
                         reset_required=False,
                         auth_version=0,
                         revision=1,
-                        created_at=datetime.now(UTC),
-                        email_verified_at=datetime.now(UTC) if body.email else None,
+                        created_at=now,
+                        email_verified_at=now,
                     )
+                )
+                await session.flush()
+                if oauth_pending:
+                    await self.external.bind_pending(session, oauth_pending, provider, user_id)
+                await grant_registration_credit(session, user_id, now)
+                await self.repository.audit(
+                    session,
+                    AuditRow(
+                        id=str(uuid4()),
+                        actor_id=user_id,
+                        target_id=user_id,
+                        action="account.registered",
+                        detail={"product": body.product, "role": MEMBER_ROLE[body.product]},
+                        created_at=now,
+                    ),
                 )
         if not verified:
             raise DomainError(422, "invalid or expired verification code")
-        await self.identity.audit(user_id, "account.registered", user_id, {})
         # 不创建额外登录会话；调用者使用标准 issue_login 发放一次登录。
         async with self.identity.repository.transaction() as tx:
             from app.modules.identity.service.identity import resolve_account

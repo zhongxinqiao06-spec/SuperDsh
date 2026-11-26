@@ -8,10 +8,12 @@ from typing import TYPE_CHECKING
 from urllib.parse import parse_qsl, urlencode, urlsplit, urlunsplit
 
 import httpx
+from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.infrastructure.crypto import encode
 from app.infrastructure.database import lock_transaction
 from app.infrastructure.errors import DomainError
+from app.modules.identity.entity.bo.validation import email_address
 from app.modules.identity.entity.do.account_models import (
     ExternalOAuthBindingRow,
     ExternalOAuthStateRow,
@@ -149,9 +151,24 @@ class ExternalOAuth:
             provider = str(config.get("provider") or "oidc")
             address = str(claims.get(str(config.get("emailClaim") or "email")) or "").lower()
             name = str(claims.get(str(config.get("nameClaim") or "name")) or "")
+            # 只接受可信 userinfo 对同一标准邮箱的布尔验真声明。
+            verified_email = (
+                email_address(address)
+                if address
+                and claims.get("email_verified") is True
+                and claims.get("email") == claims.get(str(config.get("emailClaim") or "email"))
+                else ""
+            )
             pending = await self.save_state(
                 "pending",
-                {"provider": provider, "subject": subject, "email": address, "displayName": name},
+                {
+                    "provider": provider,
+                    "subject": subject,
+                    "email": address,
+                    "displayName": name,
+                    "verifiedEmail": verified_email,
+                    "product": params.get("product", "office"),
+                },
             )
             async with self.accounts.repository.sessions() as session:
                 bound = await self.accounts.repository.oauth_binding(
@@ -168,6 +185,7 @@ class ExternalOAuth:
                 else "needs_registration",
                 oauth_pending=pending,
                 oauth_email=address,
+                oauth_email_verified="1" if verified_email else "0",
                 oauth_display_name=name,
             )
         except (httpx.HTTPError, ValueError, KeyError, TypeError, DomainError):
@@ -235,31 +253,47 @@ class ExternalOAuth:
                     passwordVerifier=body.passwordVerifier if body.setPassword else None,
                     passwordSalt=body.passwordSalt,
                     code=body.code,
+                    product="entertainment"
+                    if value.get("product") == "entertainment"
+                    else "office",
                 ),
-                oauth_registration=True,
+                oauth_pending=body.pendingToken,
             )
             owner = created.user_id
-        async with self.accounts.repository.sessions.begin() as session:
-            await lock_transaction(session, "web-admin:identity-management")
-            row = await self.accounts.repository.oauth_state(
-                session, self.accounts.security.hash_token(body.pendingToken)
-            )
-            if not row or row.consumed_at or row.expires_at <= datetime.now(UTC):
-                raise DomainError(401, "OAuth session expired")
-            binding = await self.accounts.repository.oauth_binding(session, key)
-            if binding and binding.user_id != owner:
-                raise DomainError(409, "OAuth identity is already linked")
-            if not binding:
-                session.add(
-                    ExternalOAuthBindingRow(
-                        key=key,
-                        provider=str(value["provider"]),
-                        subject=str(value["subject"]),
-                        user_id=owner,
-                    )
-                )
-            row.consumed_at = datetime.now(UTC)
+        else:
+            async with self.accounts.repository.sessions.begin() as session:
+                await lock_transaction(session, "web-admin:identity-management")
+                await self.bind_pending(session, body.pendingToken, value, owner)
         await self.accounts.identity.audit(
             owner, "account.oauth-login", owner, {"provider": value["provider"]}
         )
         return await self.accounts.identity.issue_login(owner, "OAuth Browser")
+
+    async def bind_pending(
+        self, session: AsyncSession, token: str, value: dict[str, object], owner: str
+    ) -> None:
+        """消费服务端回调凭证，首次绑定与新用户、额度共同提交。"""
+        row = await self.accounts.repository.oauth_state(
+            session, self.accounts.security.hash_token(token)
+        )
+        if (
+            not row
+            or row.kind != "pending"
+            or row.consumed_at
+            or row.expires_at <= datetime.now(UTC)
+        ):
+            raise DomainError(401, "OAuth session expired")
+        key = self.binding_key(str(value["provider"]), str(value["subject"]))
+        binding = await self.accounts.repository.oauth_binding(session, key)
+        if binding and binding.user_id != owner:
+            raise DomainError(409, "OAuth identity is already linked")
+        if not binding:
+            session.add(
+                ExternalOAuthBindingRow(
+                    key=key,
+                    provider=str(value["provider"]),
+                    subject=str(value["subject"]),
+                    user_id=owner,
+                )
+            )
+        row.consumed_at = datetime.now(UTC)

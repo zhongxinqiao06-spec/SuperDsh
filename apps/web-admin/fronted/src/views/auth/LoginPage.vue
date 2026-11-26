@@ -9,6 +9,8 @@ import AppIcon from '@/components/base/AppIcon.vue'
 import LoginArtwork from './components/LoginArtwork.vue'
 import RecoveryDialog from './components/RecoveryDialog.vue'
 import OAuthFinalize from './components/OAuthFinalize.vue'
+import RegistrationCode from './components/RegistrationCode.vue'
+import { registrationError } from '@/utils/auth/registration-error'
 
 /** 账号入口共用表单及身份用例；开放注册和授权回调按服务端能力展开。 */
 const vm = useLoginForm()
@@ -50,7 +52,10 @@ const title = computed(() =>
         class="login-content"
         :class="{ 'login-content--extended': isExtended }"
       >
-        <header class="login-intro">
+        <header
+          class="login-intro"
+          :class="{ 'login-intro--registration': vm.register.value }"
+        >
           <h1
             id="login-title"
             :aria-label="
@@ -61,6 +66,28 @@ const title = computed(() =>
           >
             {{ title }}
           </h1>
+          <p v-if="vm.register.value">
+            {{
+              vm.product.value === 'entertainment'
+                ? tr(
+                    '星桥娱乐 · 创作者账号',
+                    'Starbridge Studio · Creator account',
+                  )
+                : tr(
+                    '星桥办公 · 办公账号',
+                    'Starbridge Office · Member account',
+                  )
+            }}
+            <template v-if="vm.resource.data.value?.registrationGrant">
+              ·
+              {{
+                tr(
+                  `验证邮箱后获 ${vm.resource.data.value.registrationGrant.points} 创作点，${vm.resource.data.value.registrationGrant.validDays} 天有效。`,
+                  `Verify your email to receive ${vm.resource.data.value.registrationGrant.points} credits for ${vm.resource.data.value.registrationGrant.validDays} days.`,
+                )
+              }}
+            </template>
+          </p>
         </header>
         <ResourceStatus
           :loading="vm.resource.loading.value"
@@ -79,9 +106,8 @@ const title = computed(() =>
           :status="callbackValue('oauth_status')"
           :email="callbackValue('oauth_email')"
           :name="callbackValue('oauth_display_name')"
-          :email-required="
-            vm.resource.data.value?.emailVerificationRequired ?? false
-          "
+          :provider-verified="callbackValue('oauth_email_verified') === '1'"
+          :mail-available="vm.mailAvailable.value"
         />
         <form
           v-else-if="vm.resource.data.value"
@@ -103,36 +129,17 @@ const title = computed(() =>
             />
             <template v-if="vm.register.value">
               <label class="field"
-                >{{ tr('用户名', 'Username')
-                }}<el-input
-                  v-model="vm.form.username"
-                  autocomplete="username"
-                  maxlength="32"
-              /></label>
-              <label class="field"
-                >{{ tr('显示名称', 'Display name')
-                }}<el-input v-model="vm.form.displayName" maxlength="100"
-              /></label>
-              <label class="field"
                 >{{ tr('邮箱', 'Email')
                 }}<el-input
                   v-model="vm.form.email"
                   type="email"
                   autocomplete="email"
               /></label>
-              <template v-if="vm.resource.data.value.emailVerificationRequired">
-                <label class="field"
-                  >{{ tr('验证码', 'Verification code')
-                  }}<el-input
-                    v-model="vm.form.code"
-                    autocomplete="one-time-code"
-                /></label>
-                <el-button
-                  :loading="vm.mutation.busy.value"
-                  @click="vm.sendCode"
-                  >{{ tr('发送验证码', 'Send code') }}</el-button
-                >
-              </template>
+              <RegistrationCode
+                v-model="vm.form.code"
+                :email="vm.form.email"
+                :available="vm.mailAvailable.value"
+              />
             </template>
             <label v-else class="field"
               >{{ tr('用户名或邮箱', 'Username or email') }}
@@ -201,7 +208,11 @@ const title = computed(() =>
           <div class="login-actions">
             <el-alert
               v-if="vm.mutation.error.value"
-              :title="vm.mutation.error.value"
+              :title="
+                vm.register.value
+                  ? registrationError(vm.mutation.error.value, tr)
+                  : vm.mutation.error.value
+              "
               type="error"
               :closable="false"
               show-icon
@@ -210,12 +221,14 @@ const title = computed(() =>
               type="submit"
               class="login-submit"
               :disabled="
-                vm.initializationPending.value || vm.mutation.busy.value
+                vm.initializationPending.value ||
+                vm.mutation.busy.value ||
+                (vm.register.value && !vm.mailAvailable.value)
               "
               :aria-busy="vm.mutation.busy.value"
               :aria-label="
                 vm.register.value
-                  ? tr('注册', 'Register')
+                  ? tr('验证并注册', 'Verify and register')
                   : tr('登录 ↵', 'Sign in ↵')
               "
               aria-keyshortcuts="Enter"
@@ -223,7 +236,7 @@ const title = computed(() =>
               <span class="login-submit-label">
                 {{
                   vm.register.value
-                    ? tr('注册', 'Register')
+                    ? tr('验证并注册', 'Verify and register')
                     : tr('登录', 'Sign in')
                 }}
                 <AppIcon
@@ -250,9 +263,12 @@ const title = computed(() =>
               class="login-register"
               :to="{
                 path: vm.register.value ? '/login' : '/register',
-                query: route.query.returnTo
-                  ? { returnTo: route.query.returnTo }
-                  : {},
+                query: {
+                  ...(route.query.returnTo
+                    ? { returnTo: route.query.returnTo }
+                    : {}),
+                  ...(route.query.product ? { product: vm.product.value } : {}),
+                },
               }"
             >
               {{

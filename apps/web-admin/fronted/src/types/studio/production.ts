@@ -1,10 +1,12 @@
 import type { Job, StudioAsset } from './studio'
+import type { UsageQuote } from '@/types/billing/pricing'
 
 /** 预检结果与已确认任务分开，页面不推断是否需要重新付费。 */
 export interface GenerationPlan {
   id: string
   revision: number
   planHash: string
+  usageQuote?: UsageQuote | null
   state: string
   items: {
     target: string

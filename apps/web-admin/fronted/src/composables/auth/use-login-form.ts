@@ -6,8 +6,9 @@ import { authApi } from '@/api/auth/auth-api'
 import { sessionController } from '@/store/session-controller'
 import { useAuthStore } from '@/store/modules/auth-store'
 import type { AuthResponse } from '@/types/auth/auth'
-import { accountApi } from '@/api/account/account-api'
 import { signedInDestination } from '@/utils/auth/native-oauth'
+import { productOf } from '@/utils/studio/products'
+import { usePreferences } from '@/store/modules/preferences'
 
 /** 登录与开放注册表单；管理员由服务端配置初始化，失败保留输入。 */
 export function useLoginForm() {
@@ -20,12 +21,25 @@ export function useLoginForm() {
     identifier: '',
     password: '',
     confirm: '',
-    username: '',
-    displayName: '',
     email: '',
     code: '',
   })
   const abort = new AbortController()
+  const { tr } = usePreferences()
+  const product = computed(
+    () =>
+      productOf(route.query.product) ??
+      (typeof route.query.returnTo === 'string' &&
+      /^\/entertainment(?:\/|\?|$)/u.test(route.query.returnTo)
+        ? 'entertainment'
+        : 'office'),
+  )
+  const mailAvailable = computed(
+    () =>
+      resource.data.value?.registrationEmailAvailable ??
+      resource.data.value?.emailVerificationRequired ??
+      false,
+  )
   onScopeDispose(() => abort.abort())
   const initializationPending = computed(
     () => resource.data.value?.needsBootstrap === true,
@@ -41,14 +55,16 @@ export function useLoginForm() {
     if (!resource.data.value || initializationPending.value) return
     if (register.value) {
       if (
-        !resource.data.value.registrationOpen ||
-        !/^[a-z0-9_-]{3,32}$/.test(form.username) ||
-        !form.displayName.trim() ||
+        !mailAvailable.value ||
+        !form.email.trim() ||
+        !/^\d{6}$/u.test(form.code) ||
         form.password.length < 8 ||
         form.password !== form.confirm
       ) {
-        mutation.error.value =
-          '请检查用户名（3–32位小写字母、数字、下划线）、显示名称与两次密码（至少8位）'
+        mutation.error.value = tr(
+          '请输入邮箱、六位验证码和两次一致的密码（至少 8 位）。',
+          'Enter your email, six-digit code and matching passwords (at least 8 characters).',
+        )
         return
       }
     } else if (!form.identifier.trim() || !form.password) {
@@ -60,10 +76,9 @@ export function useLoginForm() {
       if (register.value) {
         response = await authApi.register(
           {
-            username: form.username,
-            displayName: form.displayName.trim(),
             password: form.password,
-            ...(form.email ? { email: form.email } : {}),
+            email: form.email.trim(),
+            product: product.value,
             code: form.code,
           },
           abort.signal,
@@ -85,12 +100,10 @@ export function useLoginForm() {
       )
     }
   }
-  async function sendCode() {
-    await mutation.run(() => accountApi.emailCode(form.email, 'register'))
-  }
   async function oauth() {
     await mutation.run(async () => {
       const callback = new URL('/login', location.origin)
+      callback.searchParams.set('product', product.value)
       if (typeof route.query.returnTo === 'string')
         callback.searchParams.set('returnTo', route.query.returnTo)
       const value = await authApi.oauthStart(callback.href)
@@ -104,7 +117,8 @@ export function useLoginForm() {
     initializationPending,
     register,
     submit,
-    sendCode,
+    product,
+    mailAvailable,
     oauth,
   }
 }

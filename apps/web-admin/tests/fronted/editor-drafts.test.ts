@@ -129,11 +129,9 @@ describe('编辑器草稿单向更新', () => {
     const draft = freeze(connectionDraft())
     wrapper = shallowMount(ModelConnectionEditor, {
       props: { draft, keyConfigured: false },
-      global,
+      global: { ...global, stubs: { FormSection: false } },
     })
-    wrapper
-      .findAllComponents(ElInput)[0]!
-      .vm.$emit('update:modelValue', '新连接')
+    wrapper.getComponent(ElInput).vm.$emit('update:modelValue', '新连接')
     expect(draft.name).toBe('')
     expect(wrapper.emitted('update:draft')).toEqual([
       [{ ...draft, name: '新连接' }],

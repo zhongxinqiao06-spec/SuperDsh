@@ -81,7 +81,7 @@ test('个人库独立制作、批量预检与取消完整闭环', async ({ page 
   ).json()
   await page.goto('/#/entertainment/characters')
   await page
-    .getByRole('button', { name: '制作素材', exact: true })
+    .getByRole('button', { name: 'AI 制作', exact: true })
     .first()
     .click()
   const dialog = page.getByRole('dialog', { name: '个人素材制作', exact: true })
@@ -118,7 +118,7 @@ test('个人库独立制作、批量预检与取消完整闭环', async ({ page 
     .getByRole('button', { name: '采用并保存新版本' })
     .click()
   await expect.poll(async () => (await read()).asset.voice).toBe('b')
-  await dialog.getByRole('button', { name: '关闭', exact: true }).click()
+  await dialog.getByRole('button', { name: '取消', exact: true }).click()
   const projectResponse = await page.request.post('/api/studio/projects', {
     headers,
     data: { title: '批量闭环', requestKey: crypto.randomUUID() },
@@ -145,6 +145,11 @@ test('个人库独立制作、批量预检与取消完整闭环', async ({ page 
   await page.goto('/#/entertainment/' + project.id + '?section=production')
   await page.getByRole('button', { name: '检查本次制作' }).click()
   await expect(plan.getByText('本次提交', { exact: true })).toHaveCount(2)
+  const shotPoints = document.shots.reduce(
+    (sum, shot) => sum + Math.ceil(shot.duration / 1000) * 20,
+    0,
+  )
+  await expect(plan.getByText(`本次上限 ${shotPoints} 点`)).toBeVisible()
   expect((await current()).jobs).toHaveLength(0)
   await plan.getByRole('button', { name: '确认用量并提交' }).click()
   await expect
@@ -174,6 +179,10 @@ test('个人库独立制作、批量预检与取消完整闭环', async ({ page 
     )
     .toBe('cancelled')
   await page.getByRole('button', { name: '检查本次制作' }).click()
+  await plan
+    .locator('summary')
+    .filter({ hasText: '已跳过，不重复生成' })
+    .click()
   await expect(plan.getByText('已有候选，跳过')).toBeVisible()
   await expect(plan.getByText('本次提交', { exact: true })).toHaveCount(1)
   await plan.getByRole('button', { name: '取消', exact: true }).click()

@@ -3,6 +3,7 @@
 from typing import TYPE_CHECKING
 
 from app.infrastructure.errors import DomainError
+from app.modules.billing.service.quote_service import lock_plan_quote
 from app.modules.identity.entity.bo.models import Account
 from app.modules.studio.dao.production_dao import ProductionDao
 from app.modules.studio.dao.studio_dao import StudioDao
@@ -12,6 +13,7 @@ from app.modules.studio.entity.do.models import MediaJob
 from app.modules.studio.entity.do.production_do import GenerationPlan
 from app.modules.studio.entity.vo.production_vo import ConfirmPlan
 from app.modules.studio.entity.vo.studio_vo import identifier
+from app.modules.studio.service.plan_pricing import quote_manifest
 from app.modules.studio.service.series_access_service import assert_episode_editable
 from app.modules.studio.service.studio_service import job_view
 
@@ -32,6 +34,7 @@ def plan_view(plan: GenerationPlan) -> dict:
         "issues": plan.manifest["issues"],
         "result": plan.result,
         "estimatedCost": None,
+        "usageQuote": (plan.result or {}).get("usageQuote") or plan.manifest.get("usageQuote"),
     }
 
 
@@ -79,8 +82,10 @@ class GenerationPlans:
                 return plan_view(previous)
             if revision != intent["revision"]:
                 raise DomainError(409, "内容已更新，请重新预检")
+            identity = identifier()
+            manifest = await quote_manifest(session, account.user_id, identity, manifest)
             plan = GenerationPlan(
-                id=identifier(),
+                id=identity,
                 owner=account.user_id,
                 project=project,
                 entity=entity,
@@ -129,10 +134,16 @@ class GenerationPlans:
                 return plan.result or {}
             if plan.project:
                 await assert_episode_editable(session, account, project)
+            quote = plan.manifest.get("usageQuote")
+            if quote:
+                rebuilt = {**rebuilt, "usageQuote": quote}
             if revision != plan.revision or content_hash(rebuilt) != plan.plan_hash:
                 raise DomainError(409, "作品、模型或任务状态已变化，请重新预检")
             if rebuilt["issues"] or not any(i["selected"] for i in rebuilt["items"]):
                 raise DomainError(422, "请先处理阻塞项并选择需要制作的内容")
+            if not quote:
+                raise DomainError(409, "旧计划缺少报价，请重新预检")
+            locked = await lock_plan_quote(session, account.user_id, plan.id, quote["id"])
             rows: list[MediaJob] = []
             for item in rebuilt["items"]:
                 if not item["selected"]:
@@ -166,6 +177,8 @@ class GenerationPlans:
                     **item["payload"],
                     "owner": account.user_id,
                     "planId": plan.id,
+                    "usageQuoteId": locked["id"],
+                    "quotedPoints": locked["items"][len(rows)]["points"],
                     "inputHash": input_hash(item["kind"], item["payload"]),
                     "fingerprint": plan.request_hash,
                 }
@@ -201,5 +214,5 @@ class GenerationPlans:
                 rows.append(row)
             await session.flush()
             plan.state = "confirmed"
-            plan.result = {"jobs": [job_view(row) for row in rows]}
+            plan.result = {"jobs": [job_view(row) for row in rows], "usageQuote": locked}
             return plan.result

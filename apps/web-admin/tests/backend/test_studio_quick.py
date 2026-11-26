@@ -91,6 +91,105 @@ async def make_plan(client: AsyncClient, uri: str, revision: int, key: str) -> d
     return response.json()
 
 
+async def test_quick_quote_expiry_and_price_lock(platform: tuple[FastAPI, AsyncClient]) -> None:
+    from datetime import UTC, datetime, timedelta
+    from uuid import uuid4
+
+    from app.modules.billing.entity.do.pricing_do import UsageQuote
+
+    app, client = platform
+    await bootstrap(client)
+    media = app.state.services.media_jobs
+    await media.close()
+    uri, saved = await create_quick(client)
+    initial = await make_plan(client, uri, saved["revision"], "first-quote")
+    assert initial["usageQuote"]["totalPoints"] == 100
+    saved = (
+        await client.put(
+            uri + "/quick",
+            json={
+                "revision": saved["revision"],
+                "title": "合成八秒",
+                "requestKey": "eight",
+                "draft": {**saved["draft"], "durationSeconds": 8},
+            },
+        )
+    ).json()
+    expired = await make_plan(client, uri, saved["revision"], "expired")
+    async with media.database.sessions.begin() as db:
+        row = await db.get(UsageQuote, expired["usageQuote"]["id"])
+        assert row is not None
+        row.expires_at = datetime.now(UTC) - timedelta(seconds=1)
+
+    async def confirm(plan: dict) -> httpx.Response:
+        return await client.post(
+            uri + "/quick/generation-plans/" + plan["id"] + "/confirm",
+            json={
+                "revision": plan["revision"],
+                "planHash": plan["planHash"],
+                "requestKey": "confirmed",
+            },
+        )
+
+    assert (await confirm(expired)).status_code == 409
+    plan = await make_plan(client, uri, saved["revision"], "renewed")
+    assert plan["usageQuote"]["totalPoints"] == 160
+    terms = dict(
+        product="entertainment",
+        capability="video.generate",
+        spec="720P",
+        model="text",
+        modelRevision=0,
+        unit="second",
+        unitSize=1,
+        unitPoints=30,
+        payer="platform",
+    )
+    draft = (
+        await client.post(
+            "/api/admin/billing/rate-versions",
+            json=dict(terms=terms, expectedRevision=0, reason="合成调价", businessKey=str(uuid4())),
+        )
+    ).json()
+    assert (
+        await client.post(
+            "/api/admin/billing/rate-versions/" + draft["id"] + "/publish", json={"revision": 1}
+        )
+    ).is_success
+    newer = await make_plan(client, uri, saved["revision"], "new-price")
+    assert newer["usageQuote"]["totalPoints"] == 240
+    response = await confirm(plan)
+    assert response.is_success, response.text
+    result = response.json()
+    assert result["usageQuote"]["lockedAt"] and result["jobs"][0]["quotedPoints"] == 160
+    changed = (
+        await client.post(
+            "/api/admin/billing/rate-versions",
+            json=dict(
+                terms=dict(terms, unitPoints=35),
+                expectedRevision=1,
+                reason="确认后再次调价",
+                businessKey=str(uuid4()),
+            ),
+        )
+    ).json()
+    assert (
+        await client.post(
+            "/api/admin/billing/rate-versions/" + changed["id"] + "/publish", json={"revision": 2}
+        )
+    ).is_success
+    item = {k: v for k, v in terms.items() if k not in {"unit", "unitSize", "unitPoints"}}
+    fresh = await client.post(
+        "/api/billing/usage-quotes",
+        json=dict(businessKey=str(uuid4()), source="after-confirm", items=[dict(item, quantity=8)]),
+    )
+    assert fresh.json()["totalPoints"] == 280
+    assert (await confirm(plan)).json() == result
+    assert (
+        await client.get("/api/billing/usage-quotes/" + plan["usageQuote"]["id"])
+    ).json() == result["usageQuote"]
+
+
 async def test_quick_candidate_numbers_survive_status_updates(
     platform: tuple[FastAPI, AsyncClient],
 ) -> None:

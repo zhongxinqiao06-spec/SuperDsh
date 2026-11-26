@@ -48,6 +48,8 @@ def job_view(row: MediaJob) -> dict:
         "state": row.state,
         "error": row.error,
         "binding": row.payload.get("binding"),
+        "usageQuoteId": row.payload.get("usageQuoteId"),
+        "quotedPoints": row.payload.get("quotedPoints"),
         "recoveryState": row.payload.get("recoveryState"),
         "hasReceipt": bool(row.provider_id),
         "cancelRequested": row.cancel_requested,

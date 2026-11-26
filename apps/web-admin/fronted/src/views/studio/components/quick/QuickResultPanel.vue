@@ -53,6 +53,9 @@ const ready = computed(() => props.selected?.state === 'ready')
     >
     <div class="form-stack">
       <template v-if="selected">
+        <small v-if="selected.quotedPoints != null" class="studio-meta"
+          >任务锁定报价 · {{ selected.quotedPoints }} 点</small
+        >
         <div v-if="ready" class="quick-player">
           <StudioMedia
             :key="selected.id"

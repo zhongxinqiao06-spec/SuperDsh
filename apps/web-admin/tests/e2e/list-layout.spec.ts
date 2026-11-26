@@ -1,5 +1,6 @@
 import { expect, test, type Page } from '@playwright/test'
 import { installParityFixture } from '../parity/ui-fixture'
+import { captureDesign } from './design-capture'
 import { installResourceFixture } from '../parity/resource-fixture'
 import type { ModelCatalog } from '../../fronted/src/types/models/models'
 
@@ -27,10 +28,11 @@ async function installCatalog(
     connections: [
       {
         id: 'local',
-        name: '测试连接',
+        name: bothProducts ? '阿里云百炼' : '测试连接',
+        subscription: bothProducts ? { plan: 'Pro 套餐' } : undefined,
         adapter: 'openai-completions',
         enabled: true,
-        region: '',
+        region: bothProducts ? '北京' : '',
         baseUrl,
         revision: 1,
         scope: 'platform',
@@ -117,11 +119,27 @@ test('四条模型的工具栏、直接操作和内容区底部分页', async ({
   }
   await page.setViewportSize({ width: 1280, height: 800 })
   await main.getByRole('button', { name: '套餐、额度与模型' }).click()
-  const dialog = page.getByRole('dialog', { name: '测试连接 · 供应商详情' })
   await expect(
-    dialog.getByRole('heading', { name: '已配置模型' }),
+    main.getByRole('heading', { name: '测试连接', exact: true }),
   ).toBeVisible()
-  await dialog.getByRole('button', { name: '关闭此对话框' }).click()
+  await expect(main.getByRole('heading', { name: '已配置模型' })).toBeVisible()
+  await expect(page).toHaveURL(/supplier=local/)
+  await page.reload()
+  await expect(
+    main.getByRole('heading', { name: '测试连接', exact: true }),
+  ).toBeVisible()
+  await main.getByRole('button', { name: '编辑连接', exact: true }).click()
+  const editor = page.getByRole('dialog', { name: '供应商连接' })
+  await expect(editor.getByLabel('连接名称')).toHaveValue('测试连接')
+  await editor.getByRole('button', { name: '取消' }).click()
+  await main.getByRole('button', { name: '查看 Key' }).click()
+  const confirm = page.getByRole('dialog', { name: /查看 API Key/ })
+  await expect(
+    confirm.getByRole('button', { name: '确认并查看' }),
+  ).toBeDisabled()
+  await confirm.getByRole('button', { name: '取消' }).click()
+  await main.getByRole('button', { name: '返回供应商列表' }).click()
+  await expect(page).not.toHaveURL(/supplier=local/)
   await row.getByRole('button', { name: '清除默认' }).click()
   await expect(row.getByRole('button', { name: '设为默认' })).toBeEnabled()
   await row.getByRole('button', { name: '设为默认' }).click()
@@ -158,6 +176,42 @@ test('四条模型的工具栏、直接操作和内容区底部分页', async ({
   await bar.getByRole('textbox').fill('无匹配项')
   await expect(pager).toBeHidden()
   await expect(main.getByText(/搜索条件/u)).toBeVisible()
+})
+
+test('详情的密钥确认只提交验证凭据，关闭后再次查看需重新确认', async ({
+  page,
+}) => {
+  await installCatalog(page, 1)
+  let reads = 0
+  await page.route(
+    '**/api/admin/models/connections/local/reveal-key',
+    async (route) => {
+      const payload = route.request().postDataJSON()
+      expect(Object.keys(payload)).toEqual(['passwordVerifier'])
+      expect(payload.passwordVerifier).toBeTruthy()
+      expect(payload.passwordVerifier).not.toBe('synthetic-review-password')
+      reads++
+      await route.fulfill({ json: { apiKey: 'example-only-test-value' } })
+    },
+  )
+  await page.goto('/#/models?supplier=local')
+  const trigger = page.getByRole('button', { name: '查看 Key' })
+  await trigger.click()
+  const dialog = page.getByRole('dialog', { name: /查看 API Key/ })
+  await expect(dialog.getByLabel('当前 API Key')).toHaveCount(0)
+  expect(reads).toBe(0)
+  await dialog
+    .getByLabel('当前管理员账号密码')
+    .fill('synthetic-review-password')
+  await dialog.getByRole('button', { name: '确认并查看' }).click()
+  await expect(dialog.getByLabel('当前 API Key')).toHaveValue(
+    'example-only-test-value',
+  )
+  await dialog.getByRole('button', { name: '关闭', exact: true }).click()
+  await trigger.click()
+  await expect(dialog.getByLabel('当前管理员账号密码')).toHaveValue('')
+  await expect(dialog.getByLabel('当前 API Key')).toHaveCount(0)
+  expect(reads).toBe(1)
 })
 
 test('阿里云个人版用量显示真实零值、北京时间和订阅入口', async ({
@@ -201,15 +255,18 @@ test('阿里云个人版用量显示真实零值、北京时间和订阅入口',
     'https://bailian.console.aliyun.com/cn-beijing/subscription/token-plan/personal',
   )
   await usage.getByRole('button', { name: '查询上游' }).click()
-  await expect(usage.getByText('0%', { exact: true })).toBeVisible()
+  await expect(usage.locator('.usage-value')).toHaveText('0%')
   await expect(usage.getByText('身份已核验')).toBeVisible()
   await expect(usage.getByText('ram-fixture')).toBeVisible()
   await expect(usage.getByText(/2026\/12\/02\s+00:00/)).toBeVisible()
-  usedRatio = 0.56
+  usedRatio = 0.7538
   await usage.getByRole('button', { name: '查询上游' }).click()
-  await expect(usage.getByText('56%', { exact: true })).toBeVisible()
+  await expect(usage.getByText('75.38%', { exact: true })).toBeVisible()
+  await page.setViewportSize({ width: 1487, height: 1058 })
+  await captureDesign(page, 'supplier-detail-reference.png')
   for (const width of [1440, 1280, 768, 390]) {
     await page.setViewportSize({ width, height: width === 390 ? 844 : 940 })
+    if (width === 390) await captureDesign(page, 'supplier-detail-mobile.png')
     expect(
       await usage.evaluate((el) => el.scrollWidth <= el.clientWidth + 1),
     ).toBe(true)

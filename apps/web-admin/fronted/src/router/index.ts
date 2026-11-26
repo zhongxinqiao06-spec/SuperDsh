@@ -29,6 +29,12 @@ const pages: Record<string, RouteRecordRaw['component']> = {
   'access.roles': () => import('@/views/access/RolesPage.vue'),
   'access.menus': () => import('@/views/console/MenusPage.vue'),
   'account.profile': () => import('@/views/account/AccountPage.vue'),
+  'account.membership': () => import('@/views/billing/MembershipPage.vue'),
+  'billing.plans': () => import('@/views/billing/CatalogAdminPage.vue'),
+  'billing.rates': () => import('@/views/billing/RateAdminPage.vue'),
+  'billing.subscriptions': () =>
+    import('@/views/billing/SubscriptionsPage.vue'),
+  'account.plans': () => import('@/views/billing/PlansPage.vue'),
   'account.security': () => import('@/views/account/SecurityPage.vue'),
   'account.appearance': () => import('@/views/account/AppearancePage.vue'),
   workbench: () => import('@/views/workbench/WorkbenchPage.vue'),

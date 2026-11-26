@@ -57,6 +57,7 @@ async def platform_configuration(
             public_origin="http://localhost:5175",
             use_langgraph=True,
             model_defaults_file=None,
+            registration_ses_file=None,
         )
         settings = Settings.model_validate({**settings.model_dump(), **platform_settings})
         yield settings

@@ -14,6 +14,10 @@ def load_compose_environment() -> None:
     if not path:
         return
     credentials = json.loads(Path(path).read_text())
+    # 注册模板和密钥独立保存在后端持久配置卷，升级镜像或重新生成 Compose 环境时继续使用。
+    registration_mail = Path(path).with_name("registration-ses.json")
+    if registration_mail.is_file():
+        os.environ.setdefault("WEB_ADMIN_REGISTRATION_SES_FILE", str(registration_mail))
     postgres = quote(credentials["WEB_ADMIN_POSTGRES_PASSWORD"], safe="")
     redis = quote(credentials["WEB_ADMIN_REDIS_PASSWORD"], safe="")
     origin = os.environ.get("WEB_ADMIN_PUBLIC_ORIGIN")

@@ -219,12 +219,40 @@ form.stack {
 }
 .details {
   display: grid;
-  grid-template-columns: 120px 1fr;
-  row-gap: 20px;
+  grid-template-columns: minmax(5rem, 26%) minmax(0, 1fr);
   margin: 0;
+  border-top: 1px solid var(--border);
+}
+.details > :is(dt, dd) {
+  padding: var(--space-3) var(--space-2);
+  border-bottom: 1px solid var(--border);
 }
 .details dt {
+  font-size: var(--font-size-meta);
+  overflow-wrap: anywhere;
   color: var(--muted-foreground);
+}
+/* 摘要字段按实际容器宽度分栏，余数独占剩余宽度，手机自然换行。 */
+.detail-facts {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 10rem), 1fr));
+  gap: var(--space-3) var(--field-gap);
+  margin: 0;
+}
+.detail-facts > div {
+  min-width: 0;
+  padding: var(--space-3) 0;
+  border-block-start: 1px solid var(--sheet-line);
+  overflow-wrap: anywhere;
+}
+.detail-facts dt {
+  color: var(--muted-foreground);
+  font-size: var(--font-size-meta);
+}
+.detail-facts dd {
+  margin: var(--space-1) 0 0;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
 }
 .details dd {
   margin: 0;

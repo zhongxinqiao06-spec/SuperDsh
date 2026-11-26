@@ -254,6 +254,7 @@ for (const theme of ['light', 'dark']) {
     page.on('pageerror', (error) => errors.push(error.message))
     await page.routeWebSocket('**/api/**', () => {})
     const headings: Record<string, string> = {
+      'studio.create': '创作中心',
       overview: '看板',
       'access.users': '用户管理',
       'access.menus': '菜单管理',

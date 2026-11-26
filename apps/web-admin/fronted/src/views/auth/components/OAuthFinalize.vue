@@ -1,8 +1,9 @@
 <script setup lang="ts">
-import { onMounted, reactive } from 'vue'
+import { computed, onMounted, reactive } from 'vue'
+import RegistrationCode from './RegistrationCode.vue'
+import { registrationError } from '@/utils/auth/registration-error'
 import { useRoute, useRouter } from 'vue-router'
 import { authApi } from '@/api/auth/auth-api'
-import { accountApi } from '@/api/account/account-api'
 import { useMutation } from '@/composables/use-mutation'
 import { usePreferences } from '@/store/modules/preferences'
 import { sessionController } from '@/store/session-controller'
@@ -18,7 +19,8 @@ const props = defineProps<{
   status: string
   email: string
   name: string
-  emailRequired: boolean
+  providerVerified: boolean
+  mailAvailable: boolean
 }>()
 const { tr } = usePreferences(),
   mutation = useMutation(),
@@ -32,6 +34,12 @@ const form = reactive({
   confirm: '',
   code: '',
 })
+const requiresCode = computed(
+  () =>
+    props.status === 'needs_registration' &&
+    (!props.providerVerified ||
+      form.email.trim().toLowerCase() !== props.email.trim().toLowerCase()),
+)
 async function submit() {
   let response: AuthResponse | null = null
   const succeeded = await mutation.run(async () => {
@@ -54,7 +62,15 @@ async function submit() {
             'Passwords must match and have at least 8 characters',
           ),
         )
-      credentials = await createPasswordVerifier(form.password)
+      if (
+        requiresCode.value &&
+        (!props.mailAvailable || !/^\d{6}$/u.test(form.code))
+      )
+        throw new Error(tr('请先验证邮箱', 'Verify your email first'))
+      credentials = {
+        ...(await createPasswordVerifier(form.password)),
+        setPassword: true,
+      }
     }
     await sessionController.beforeLogin()
     response = await authApi.oauthFinalize({
@@ -72,16 +88,12 @@ async function submit() {
     form.confirm = ''
     await router.replace(
       signedInDestination(
-        route.query.returnTo,
+        route.query.returnTo ??
+          new URLSearchParams(location.search).get('returnTo'),
         sessionController.current?.permissions,
       ),
     )
   }
-}
-async function sendCode() {
-  await mutation.run(() =>
-    accountApi.emailCode(form.email, 'register', props.pending),
-  )
 }
 onMounted(() => {
   if (props.status === 'authenticated') void submit()
@@ -92,7 +104,7 @@ onMounted(() => {
     <h2>{{ tr('完成第三方登录', 'Complete provider sign-in') }}</h2>
     <el-alert
       v-if="mutation.error.value"
-      :title="mutation.error.value"
+      :title="registrationError(mutation.error.value, tr)"
       type="error"
       :closable="false"
     />
@@ -126,18 +138,16 @@ onMounted(() => {
         ><label class="field"
           >{{ tr('确认密码', 'Confirm password')
           }}<el-input v-model="form.confirm" type="password" /></label
-        ><template v-if="emailRequired"
-          ><label class="field"
-            >{{ tr('验证码', 'Verification code')
-            }}<el-input v-model="form.code" /></label
-          ><el-button :loading="mutation.busy.value" @click="sendCode">{{
-            tr('发送验证码', 'Send code')
-          }}</el-button></template
-        ></template
-      ></template
+        ><RegistrationCode
+          v-if="requiresCode"
+          v-model="form.code"
+          :email="form.email"
+          :pending="pending"
+          :available="mailAvailable" /></template></template
     ><el-button
       type="primary"
       native-type="submit"
+      :disabled="requiresCode && !mailAvailable"
       :loading="mutation.busy.value"
       >{{ tr('继续', 'Continue') }}</el-button
     >

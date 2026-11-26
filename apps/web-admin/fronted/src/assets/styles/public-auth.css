@@ -369,3 +369,25 @@
     transition: none;
   }
 }
+.registration-code-row {
+  display: flex;
+  align-items: center;
+  gap: var(--control-gap);
+}
+.login-intro.login-intro--registration {
+  display: grid;
+  gap: var(--control-gap);
+  align-content: start;
+}
+.login-intro--registration::after {
+  display: none;
+}
+.login-intro--registration p {
+  margin: 0;
+  font-size: var(--font-size-meta);
+  color: var(--auth-muted);
+}
+.registration-code-row .el-input {
+  flex: 1;
+  min-width: 0;
+}

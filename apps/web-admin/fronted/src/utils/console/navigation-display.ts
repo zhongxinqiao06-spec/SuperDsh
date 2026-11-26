@@ -56,6 +56,10 @@ export const consoleTabGroups: ReadonlyArray<
     ['system.service', '服务设置', 'Service settings'],
   ],
   [
+    ['account.membership', '我的会员与额度', 'My membership and credits'],
+    ['account.plans', '套餐与加购', 'Plans and top-ups'],
+  ],
+  [
     ['account.security', '账号安全', 'Account security'],
     ['account.mobile', '手机登录记录', 'Mobile sign-ins'],
   ],

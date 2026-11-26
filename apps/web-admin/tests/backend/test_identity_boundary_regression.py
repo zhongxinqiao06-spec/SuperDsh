@@ -144,7 +144,12 @@ async def test_oauth_new_account_uses_email_name_without_implicit_password_requi
             return httpx.Response(200, json={"access_token": "synthetic-provider-access"})
         return httpx.Response(
             200,
-            json={"sub": "new-subject", "email": "new-oauth@example.invalid", "name": "合成新用户"},
+            json={
+                "sub": "new-subject",
+                "email": "new-oauth@example.invalid",
+                "email_verified": True,
+                "name": "合成新用户",
+            },
         )
 
     app.state.services.accounts.external.transport = httpx.MockTransport(provider)
@@ -157,6 +162,15 @@ async def test_oauth_new_account_uses_email_name_without_implicit_password_requi
     assert callback.status_code == 302, callback.text
     parameters = parse_qs(urlsplit(callback.headers["location"]).query)
     assert parameters["oauth_status"] == ["needs_registration"]
+    # 即使提供方已验真原邮箱，修改为别人的邮箱仍需站内验证码。
+    changed = await client.post(
+        "/api/auth/oauth/finalize",
+        json={
+            "pendingToken": parameters["oauth_pending"][0],
+            "email": "other@example.invalid",
+        },
+    )
+    assert changed.status_code == 503
     result = await client.post(
         "/api/auth/oauth/finalize",
         json={

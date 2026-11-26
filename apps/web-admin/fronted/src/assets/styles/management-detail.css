@@ -1,0 +1,281 @@
+/* 详情沿用页面外壳。标题、键值表和分栏按可用空间收叠，数值来自各领域。 */
+.page.management-detail-page {
+  --detail-gutter: var(--page-gutter);
+  gap: var(--space-8);
+}
+[data-console-product] .page.management-detail-page {
+  padding: 0 var(--detail-gutter) var(--space-8);
+}
+.detail-masthead {
+  position: relative;
+  isolation: isolate;
+  margin-inline: calc(-1 * var(--detail-gutter));
+  padding: var(--space-5) var(--detail-gutter) clamp(24px, 3.8vw, 55px);
+  background: var(--sheet-heading);
+  border-bottom: 1px solid var(--border);
+}
+.detail-masthead::before,
+.settings-summary .settings-card-header::before {
+  content: '';
+  position: absolute;
+  z-index: -1;
+  pointer-events: none;
+  inset: 0 0 auto auto;
+  width: min(43%, 490px);
+  height: 100%;
+  background: var(--sheet-art) right top / cover no-repeat;
+  mask-image:
+    linear-gradient(to right, transparent, black 22%),
+    linear-gradient(to top, transparent, black 20%);
+  mask-composite: intersect;
+}
+.settings-summary .settings-card-header::before {
+  width: min(28%, 220px);
+  opacity: 0.42;
+}
+.detail-masthead .detail-back {
+  min-height: var(--control-height-small);
+  color: var(--muted-foreground);
+}
+.detail-masthead-row,
+.detail-identity,
+.detail-section-heading,
+.detail-action-value {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: var(--control-gap);
+  min-width: 0;
+}
+.detail-masthead-row,
+.detail-section-heading,
+.detail-action-value {
+  justify-content: space-between;
+}
+.detail-masthead-row {
+  margin-top: clamp(22px, 3vw, 44px);
+  gap: var(--field-gap);
+}
+.detail-masthead-row > .el-button {
+  flex: none;
+}
+.detail-masthead .el-button > span {
+  gap: var(--space-2);
+}
+.detail-identity {
+  gap: var(--space-4);
+  flex: 1 1 17rem;
+}
+.detail-identity h1 {
+  margin: 0;
+  font: 600 var(--detail-title-size)/1.15 var(--sheet-font);
+  letter-spacing: -0.035em;
+  overflow-wrap: anywhere;
+}
+.detail-identity .status-badge {
+  padding-inline: 0;
+  background: transparent;
+}
+.detail-spread {
+  display: grid;
+  grid-template-columns: minmax(0, 1.15fr) minmax(0, 1fr);
+  align-items: start;
+  gap: var(--space-8);
+}
+.detail-section {
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+.detail-spread > .detail-section + .detail-section {
+  border-inline-start: 1px solid var(--sheet-line);
+  padding-inline-start: var(--space-8);
+}
+.detail-section > h2,
+.detail-section-heading {
+  padding-bottom: var(--space-4);
+  border-bottom: 1px solid var(--sheet-line);
+  margin: 0 0 var(--space-4);
+}
+.detail-section h2 {
+  font: 600 clamp(22px, 1.85vw, 29px)/1.3 var(--sheet-font);
+}
+.detail-section-heading h2 {
+  margin: 0;
+}
+.detail-section .details {
+  border-top: 0;
+  grid-template-columns: minmax(6rem, 29%) minmax(0, 1fr);
+}
+.detail-section .details > :is(dt, dd) {
+  padding: var(--space-4) var(--space-1);
+}
+.detail-models {
+  border-block-start: 1px solid var(--sheet-line);
+  padding-block-start: var(--space-6);
+}
+.detail-plan,
+.usage-value {
+  font-family: var(--sheet-font);
+  color: var(--brand-ink);
+}
+.credential-mask {
+  margin-inline-end: var(--space-2);
+  letter-spacing: 0.1em;
+}
+.detail-plan {
+  font-size: var(--sheet-title-size);
+  line-height: 1.35;
+}
+.detail-docs,
+.detail-section a,
+.detail-disclosure summary {
+  color: var(--brand-ink);
+}
+.detail-section a,
+.detail-disclosure summary {
+  text-underline-offset: 0.22em;
+}
+.detail-docs {
+  display: inline-block;
+  margin-block-start: var(--space-3);
+  font-size: var(--font-size-meta);
+}
+.detail-disclosure {
+  margin-top: var(--field-gap);
+}
+.detail-disclosure summary {
+  cursor: pointer;
+  font-size: var(--font-size-meta);
+}
+.detail-disclosure[open] summary {
+  margin-block-end: var(--space-2);
+}
+.personal-usage {
+  display: grid;
+  gap: var(--field-gap);
+  min-width: 0;
+}
+.usage-metrics {
+  display: grid;
+  gap: var(--space-3);
+  margin: 0;
+}
+.usage-metrics > div {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  align-items: baseline;
+  gap: var(--control-gap);
+  border-bottom: 1px solid var(--border);
+  padding-block: var(--space-2) var(--space-3);
+}
+.usage-metrics dd {
+  margin: 0;
+  text-align: end;
+  font-variant-numeric: tabular-nums;
+}
+.usage-metrics .usage-value {
+  font-weight: 600;
+  font-size: clamp(25px, 2.2vw, 34px);
+  line-height: 1.2;
+}
+.usage-metrics progress {
+  appearance: none;
+  grid-column: 1 / -1;
+  width: 100%;
+  height: 10px;
+  overflow: hidden;
+  border: 0;
+  border-radius: 6px;
+  background: var(--muted);
+  color: var(--primary);
+  accent-color: var(--primary);
+}
+.usage-metrics progress::-webkit-progress-bar {
+  background: var(--muted);
+}
+.usage-metrics progress::-webkit-progress-value {
+  background: var(--primary-fill);
+  border-radius: var(--radius-control);
+}
+.usage-metrics progress::-moz-progress-bar {
+  background: var(--primary-fill);
+  border-radius: var(--radius-control);
+}
+.meter-scale {
+  grid-column: 1 / -1;
+  display: flex;
+  justify-content: space-between;
+  font-variant-numeric: tabular-nums;
+}
+.meter-scale,
+.usage-note,
+.usage-meta,
+.usage-account,
+.detail-records small {
+  color: var(--muted-foreground);
+  font-size: var(--font-size-meta);
+}
+.usage-account {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--control-gap);
+  align-items: center;
+}
+.usage-note {
+  border-inline-start: 2px solid var(--sheet-line);
+  padding-inline-start: var(--space-3);
+  margin: 0;
+}
+.detail-records {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+}
+.detail-records li {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: var(--control-gap);
+  padding: var(--space-3) 0;
+  border-block-end: 1px solid var(--border);
+}
+@media (min-width: 1001px) {
+  .detail-section .details > :is(dt, dd) {
+    padding-block: var(--space-6);
+  }
+  .detail-section .details dt,
+  .detail-section .usage-metrics dt {
+    font-size: 15px;
+  }
+  .detail-section .details dd,
+  .detail-section .usage-metrics dd:not(.usage-value) {
+    font-size: 17px;
+  }
+  .detail-identity .status-badge {
+    font-size: 15px;
+  }
+}
+@media (max-width: 1000px) {
+  .detail-spread {
+    grid-template-columns: minmax(0, 1fr);
+    gap: var(--space-6);
+  }
+  .detail-spread > .detail-section + .detail-section {
+    border-inline-start: 0;
+    padding-inline-start: 0;
+  }
+}
+@media (max-width: 800px) {
+  .page.management-detail-page {
+    --detail-gutter: var(--space-4);
+    gap: var(--space-6);
+  }
+  .detail-masthead::before {
+    width: 45%;
+    height: 60%;
+  }
+  .detail-identity {
+    flex-basis: auto;
+  }
+}

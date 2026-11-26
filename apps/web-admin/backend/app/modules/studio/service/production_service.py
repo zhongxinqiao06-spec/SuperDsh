@@ -210,11 +210,25 @@ class ProductionService:
             }
             for item in manifest["items"]
         ]
+        planned = previous or await self.plans.store(
+            account, project, None, body.model_dump(), manifest
+        )
+        quote = planned.get("usageQuote")
+        if quote:
+            charges = {
+                (line.get("target"), line["capability"]): line["points"] for line in quote["items"]
+            }
+            for row, item in zip(rows, manifest["items"], strict=True):
+                key = (item["target"], row["model"]["capability"])
+                if item["selected"] and key not in charges:
+                    raise DomainError(409, "制作范围已变化，请重新预检")
+                row["quotedPoints"] = charges[key] if item["selected"] else 0
+                row["usageQuoteId"] = quote["id"]
+                row["quoteExpiresAt"] = quote["expiresAt"]
         if preview:
             return rows
         if approved_hash and approved_hash != self.media.plan_hash(rows):
             raise DomainError(409, "制作范围已变化，请重新确认")
-        planned = await self.plans.store(account, project, None, body.model_dump(), manifest)
         result = await self.confirm(
             account,
             project,

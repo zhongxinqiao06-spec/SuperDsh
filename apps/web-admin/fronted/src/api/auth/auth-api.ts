@@ -1,5 +1,6 @@
 import { request } from '@/utils/request'
 import type { AuthConfig, AuthResponse, Identity } from '@/types/auth/auth'
+import type { Product } from '@/types/console/navigation'
 import {
   createPasswordVerifier,
   derivePasswordVerifier,
@@ -50,11 +51,10 @@ export const authApi = {
   },
   async register(
     input: {
-      username: string
-      displayName: string
       password: string
-      email?: string
-      code?: string
+      email: string
+      code: string
+      product: Product
     },
     signal?: AbortSignal,
   ): Promise<AuthResponse> {

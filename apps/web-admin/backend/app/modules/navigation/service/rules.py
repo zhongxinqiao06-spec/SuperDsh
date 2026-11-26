@@ -6,12 +6,18 @@ from app.infrastructure.errors import DomainError
 from app.modules.identity.entity.bo.models import Account
 
 
-def validate_items(
-    items: list[dict[str, object]], modules: list[dict[str, object]]
-) -> None:
+def validate_items(items: list[dict[str, object]], modules: list[dict[str, object]]) -> None:
     """拒绝循环、重复页面、非法模块及不可识别字段。"""
     # 娱乐端拆分了既有作品入口，已配满的历史菜单仍能保存原先的全部自定义项。
     limit = 129 if any(module["id"] == "studio.create" for module in modules) else 128
+    if any(module["id"] == "account.membership" for module in modules):
+        limit += 1
+    if any(module["id"] == "billing.subscriptions" for module in modules):
+        limit += 1
+    if any(module["id"] == "billing.plans" for module in modules):
+        limit += 1
+    if any(module["id"] == "billing.rates" for module in modules):
+        limit += 1
     if len(items) > limit:
         raise DomainError(422, "too many menu items")
     ids: set[str] = set()

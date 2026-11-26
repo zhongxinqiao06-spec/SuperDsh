@@ -94,6 +94,8 @@ export interface Project extends Partial<ProjectBrief> {
 }
 export interface Job {
   id: string
+  usageQuoteId?: string | null
+  quotedPoints?: number | null
   subject: string
   kind: 'export' | 'video' | 'speech' | 'image'
   revision: number

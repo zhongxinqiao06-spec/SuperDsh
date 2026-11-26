@@ -117,6 +117,8 @@ test('作品分类与快速视频：预检、候选、恢复、收藏和进入�
   const path = '/api/studio/projects/' + id
   const read = async (): Promise<QuickProject> =>
     (await page.request.get(path + '/quick', { headers })).json()
+  const expectedPoints = (await read()).draft.durationSeconds * 20
+  await expect(plan.getByText(`本次上限 ${expectedPoints} 点`)).toBeVisible()
   expect((await read()).jobs).toHaveLength(0)
   await expect(plan.getByText('受控文本视频', { exact: false })).toBeVisible()
   await plan.getByRole('button', { name: '确认用量并提交' }).click()
@@ -129,6 +131,10 @@ test('作品分类与快速视频：预检、候选、恢复、收藏和进入�
   expect((await read()).jobs).toHaveLength(1)
   const firstCandidate = (await read()).jobs[0]!
   expect(firstCandidate.candidateNumber).toBe(1)
+  expect(firstCandidate.quotedPoints).toBe(expectedPoints)
+  await expect(
+    page.getByText(`任务锁定报价 · ${expectedPoints} 点`),
+  ).toBeVisible()
   const download = page.waitForEvent('download')
   await page.getByRole('button', { name: '下载视频', exact: true }).click()
   expect((await download).suggestedFilename()).toContain('.mp4')
@@ -425,7 +431,8 @@ async function screenshotMatrix(page: Page, prefix: string) {
           '-' +
           width +
           '.png',
-        fullPage: true,
+        animations: 'disabled',
+        timeout: 45000,
       })
       if (prefix.startsWith('quick') && width < 900) {
         await page.locator('.quick-results').scrollIntoViewIfNeeded()
@@ -439,7 +446,8 @@ async function screenshotMatrix(page: Page, prefix: string) {
             '-' +
             width +
             '-results.png',
-          fullPage: true,
+          animations: 'disabled',
+          timeout: 45000,
         })
         await page
           .getByRole('heading', { name: '快速创作', exact: true })

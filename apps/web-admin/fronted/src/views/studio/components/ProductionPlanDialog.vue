@@ -78,7 +78,11 @@ const states: Record<string, string> = {
     :busy="busy"
     :error="error"
     :submit-disabled="!!plan.issues.length || !selected.length"
-    submit-text="确认用量并提交"
+    :submit-text="
+      plan.usageQuote
+        ? `确认用量并提交 · ${plan.usageQuote.totalPoints} 点`
+        : '确认用量并提交'
+    "
     @submit="emit('confirm')"
   >
     <div class="stack">
@@ -93,7 +97,29 @@ const states: Record<string, string> = {
           >、{{ imageCount }} 张新增参考画面</template
         >。
       </p>
-      <p class="studio-meta">
+      <section
+        v-if="plan.usageQuote"
+        class="panel studio-panel form-stack"
+        aria-label="本次报价"
+      >
+        <strong>本次上限 {{ plan.usageQuote.totalPoints }} 点</strong
+        ><span v-for="(line, i) in plan.usageQuote.items" :key="i"
+          >{{ selected[i]?.label }} · {{ line.spec }} · {{ line.quantity }}
+          {{
+            { second: '秒', character: '字', image: '张', call: '次' }[
+              line.unit
+            ]
+          }}
+          · {{ line.payer === 'personal' ? '本人凭据' : '平台模型' }} ·
+          {{ line.points }} 点</span
+        ><small
+          >报价有效至
+          {{
+            new Date(plan.usageQuote.expiresAt).toLocaleTimeString()
+          }}，确认后沿用此价格。</small
+        >
+      </section>
+      <p v-else class="studio-meta">
         视频共
         {{ selected.reduce((n, i) => n + (i.seconds ?? 0), 0) }} 秒，配音共
         {{ selected.reduce((n, i) => n + (i.characters ?? 0), 0) }}

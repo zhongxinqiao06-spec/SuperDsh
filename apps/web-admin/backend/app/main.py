@@ -32,6 +32,17 @@ from app.modules.agents.controller.agent_controller import router as agent_route
 from app.modules.agents.entity.vo.agent_vo import AssetInput
 from app.modules.agents.service.agent_service import AgentService
 from app.modules.agents.service.package_service import ExamplePackageService
+from app.modules.billing.controller.catalog import router as billing_catalog_router
+from app.modules.billing.controller.operations import router as billing_operations_router
+from app.modules.billing.controller.pricing import router as billing_pricing_router
+from app.modules.billing.controller.routes import router as billing_router
+from app.modules.billing.dao.membership_dao import MembershipRepository
+from app.modules.billing.service.catalog_service import CatalogManagement
+from app.modules.billing.service.change_service import PlanChanges
+from app.modules.billing.service.membership_service import MembershipService
+from app.modules.billing.service.operations_service import BillingOperations
+from app.modules.billing.service.pricing_service import PricingManagement
+from app.modules.billing.service.quote_service import QuoteService
 from app.modules.conversations.controller.attachment_controller import router as attachment_router
 from app.modules.conversations.controller.conversation_controller import (
     router as conversation_router,
@@ -58,6 +69,7 @@ from app.modules.identity.service.account_service import AccountFlows
 from app.modules.identity.service.identity import IdentityService
 from app.modules.identity.service.management import AccountManagement
 from app.modules.identity.service.oauth import OAuthService
+from app.modules.identity.service.registration_ses import TencentRegistrationMail
 from app.modules.knowledge.controller.knowledge_controller import router as knowledge_router
 from app.modules.knowledge.service.knowledge_service import KnowledgeOptions, KnowledgeService
 from app.modules.management.controller.system_controller import router as system_router
@@ -124,6 +136,12 @@ class Services:
     skills: SkillRunService
     evidence: EvidenceService
     accounts: AccountFlows
+    billing: MembershipService
+    billing_operations: BillingOperations
+    plan_changes: PlanChanges
+    catalog_management: CatalogManagement
+    pricing: PricingManagement
+    quotes: QuoteService
     system: SystemManagement
     models: ModelService
     model_configurations: ConfigurationService
@@ -233,7 +251,13 @@ def create_app(settings: Settings | None = None) -> FastAPI:
         build,
     )
     system.allowed_origins = tuple(settings.allowed_origins)
-    accounts = AccountFlows(SqlAccountRepository(database), identity, system, security)
+    accounts = AccountFlows(
+        SqlAccountRepository(database),
+        identity,
+        system,
+        security,
+        registration_sender=TencentRegistrationMail.from_file(settings.registration_ses_file),
+    )
     models = ModelService(
         database,
         cipher,
@@ -350,6 +374,12 @@ def create_app(settings: Settings | None = None) -> FastAPI:
         skills,
         evidence,
         accounts,
+        MembershipService(MembershipRepository(database)),
+        BillingOperations(database),
+        PlanChanges(database),
+        CatalogManagement(database),
+        PricingManagement(database),
+        QuoteService(database),
         system,
         models,
         model_configurations,
@@ -615,6 +645,10 @@ def create_app(settings: Settings | None = None) -> FastAPI:
         resources_router,
         runtime_router,
         account_router,
+        billing_router,
+        billing_operations_router,
+        billing_catalog_router,
+        billing_pricing_router,
         system_router,
         model_router,
         agent_router,

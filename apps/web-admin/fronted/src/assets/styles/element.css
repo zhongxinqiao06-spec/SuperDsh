@@ -475,6 +475,72 @@
   padding: var(--field-gap) var(--panel-padding);
   border-top: 1px solid var(--border);
 }
+/* 管理端浮层通过根产品主题着色，公开认证和官网可继续使用独立纸面。 */
+[data-console-product]
+  :is(
+    .el-dialog__header,
+    .app-drawer .el-drawer__header,
+    .el-message-box__header
+  ) {
+  background: var(--sheet-heading);
+  border-bottom: 1px solid var(--sheet-line);
+}
+[data-console-product] .el-overlay {
+  background: var(--sheet-mask);
+}
+[data-console-product]
+  :is(
+    .el-dialog__title,
+    .el-message-box__title,
+    .el-drawer__title,
+    .app-drawer-heading h2
+  ) {
+  font-family: var(--sheet-font);
+  font-size: var(--sheet-title-size);
+  line-height: 1.35;
+}
+[data-console-product] :is(.el-dialog__footer, .app-drawer .el-drawer__footer) {
+  background: var(--sheet-footer);
+}
+[data-console-product] .el-message-box {
+  padding: 0;
+  overflow: hidden;
+}
+[data-console-product] .el-message-box__header {
+  padding: var(--space-4) 52px var(--space-4) var(--panel-padding);
+}
+[data-console-product] .el-message-box__content {
+  padding: var(--space-5) var(--panel-padding);
+}
+[data-console-product] .el-message-box__btns {
+  padding: var(--space-3) var(--panel-padding);
+  border-top: 1px solid var(--border);
+  background: var(--sheet-footer);
+}
+.sheet-title {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+.sheet-symbol {
+  display: grid;
+  place-items: center;
+  flex: none;
+  color: var(--brand-ink);
+}
+[data-console-product] .el-dialog__headerbtn {
+  top: var(--space-4);
+  inset-inline-end: var(--space-4);
+  background: var(--card);
+  border: 1px solid var(--border);
+}
+[data-console-product] .el-dialog__headerbtn:hover {
+  color: var(--brand-ink);
+  border-color: var(--sheet-line);
+  background: var(--sheet-tint);
+}
 @media (max-width: 767px) {
   .el-select-dropdown__item,
   .el-dropdown-menu__item {

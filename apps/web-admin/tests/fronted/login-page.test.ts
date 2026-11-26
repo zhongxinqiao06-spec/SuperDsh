@@ -66,6 +66,7 @@ async function renderLogin() {
 
 beforeEach(() => {
   mocks.route.path = '/login'
+  mocks.route.query = {}
   mocks.config.mockResolvedValue({ ...config })
   mocks.login.mockResolvedValue(identity)
   mocks.register.mockResolvedValue(identity)
@@ -138,28 +139,55 @@ describe('管理员配置初始化后的认证入口', () => {
     expect(page.text()).not.toContain('确认密码')
   })
 
-  it('服务端开放普通注册时保留注册能力但不发送初始化令牌', async () => {
+  it.each([
+    ['/office', 'office'],
+    ['/entertainment/works', 'entertainment'],
+  ])('从 %s 提交邮箱验证并选择默认角色的产品', async (returnTo, product) => {
     mocks.route.path = '/register'
-    mocks.config.mockResolvedValue({ ...config, registrationOpen: true })
+    mocks.route.query = { returnTo }
+    mocks.config.mockResolvedValue({
+      ...config,
+      registrationOpen: true,
+      registrationEmailAvailable: true,
+    })
     const page = await renderLogin()
     const inputs = page.findAll('input')
-    expect(inputs).toHaveLength(5)
-    await page.get('input[autocomplete="username"]').setValue('fixture-user')
-    await page.get('input[maxlength="100"]').setValue('合成普通用户')
+    expect(inputs).toHaveLength(4)
+    await page
+      .get('input[autocomplete="email"]')
+      .setValue('fixture@example.invalid')
     for (const input of page.findAll('input[autocomplete="new-password"]')) {
       await input.setValue('Synthetic-register-password!')
     }
     await page.get('form').trigger('submit')
+    expect(mocks.register).not.toHaveBeenCalled()
+    await page.get('input[autocomplete="one-time-code"]').setValue('123456')
+    await page.get('form').trigger('submit')
     await flushPromises()
     expect(mocks.register).toHaveBeenCalledWith(
       {
-        username: 'fixture-user',
-        displayName: '合成普通用户',
+        email: 'fixture@example.invalid',
+        product,
         password: 'Synthetic-register-password!',
-        code: '',
+        code: '123456',
       },
       expect.any(AbortSignal),
     )
     expect(mocks.login).not.toHaveBeenCalled()
+  })
+  it('邮件不可用时保留注册表单并阻止提交', async () => {
+    mocks.route.path = '/register'
+    mocks.config.mockResolvedValue({
+      ...config,
+      registrationOpen: true,
+      registrationEmailAvailable: false,
+    })
+    const page = await renderLogin()
+    expect(page.text()).toContain('暂时无法发送验证邮件')
+    expect(
+      page.get('button[type="submit"]').attributes('disabled'),
+    ).toBeDefined()
+    await page.get('form').trigger('submit')
+    expect(mocks.register).not.toHaveBeenCalled()
   })
 })

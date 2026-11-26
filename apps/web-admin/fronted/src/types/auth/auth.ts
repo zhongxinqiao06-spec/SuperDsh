@@ -24,6 +24,8 @@ export interface AuthResponse extends Identity {
 export interface AuthConfig {
   needsBootstrap: boolean
   registrationOpen: boolean
+  registrationEmailAvailable?: boolean
+  registrationGrant?: { points: number; validDays: number }
   oauthEnabled: boolean
   emailVerificationRequired: boolean
   oauthRegistrationOpen?: boolean

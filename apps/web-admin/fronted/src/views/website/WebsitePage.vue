@@ -152,9 +152,11 @@ onBeforeUnmount(() => document.removeEventListener('pointerdown', outside))
         </nav>
         <div class="public-actions">
           <template v-if="product === 'entertainment'">
-            <router-link class="premiere-login" to="/login">{{
-              tr('登录', 'Sign in')
-            }}</router-link>
+            <router-link
+              class="premiere-login"
+              :to="{ path: '/login', query: { product: 'entertainment' } }"
+              >{{ tr('登录', 'Sign in') }}</router-link
+            >
             <router-link
               class="studio-button premiere-start"
               to="/entertainment"

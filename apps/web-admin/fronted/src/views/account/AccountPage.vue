@@ -12,24 +12,29 @@ const { tr } = usePreferences()
   <section class="page settings-page">
     <PageHeader :title="tr('个人资料', 'My profile')" />
     <el-alert v-if="vm.notice.value" :title="vm.notice.value" type="success" />
-    <SettingsCard :title="tr('账号', 'Account')">
-      <div class="settings-row">
-        <div class="profile-heading">
-          <el-avatar :size="64" :src="vm.auth.session?.avatar || undefined">{{
-            vm.auth.session?.displayName?.slice(0, 2)
-          }}</el-avatar>
-          <div>
-            <strong>{{ vm.auth.session?.displayName }}</strong
-            ><small>{{
-              vm.auth.session?.role === 'admin' ? 'Admin' : 'Member'
-            }}</small>
-          </div>
-        </div>
+    <SettingsCard
+      class="settings-summary"
+      :title="vm.auth.session?.displayName || tr('账号', 'Account')"
+      :description="
+        vm.auth.session?.role === 'admin'
+          ? tr('管理员账号', 'Administrator account')
+          : tr('成员账号', 'Member account')
+      "
+    >
+      <template #leading>
+        <el-avatar
+          class="profile-avatar"
+          :size="56"
+          :src="vm.auth.session?.avatar || undefined"
+          >{{ vm.auth.session?.displayName?.slice(0, 2) }}</el-avatar
+        >
+      </template>
+      <template #action>
         <el-button @click="vm.edit('avatar')">{{
           tr('更换头像', 'Change avatar')
         }}</el-button>
-      </div>
-      <dl class="settings-details">
+      </template>
+      <dl class="detail-facts">
         <div>
           <dt>{{ tr('登录邮箱', 'Sign-in email') }}</dt>
           <dd>{{ vm.auth.session?.email || '—' }}</dd>

@@ -8,6 +8,27 @@
       "permissions": ["settings.manage"]
     },
     {
+      "id": "billing.rates",
+      "route": "#/billing/rates",
+      "title": "模型扣点价目",
+      "icon": "box",
+      "permissions": ["billing.read"]
+    },
+    {
+      "id": "billing.plans",
+      "route": "#/billing/plans",
+      "title": "套餐版本管理",
+      "icon": "box",
+      "permissions": ["billing.read"]
+    },
+    {
+      "id": "billing.subscriptions",
+      "route": "#/billing/subscriptions",
+      "title": "会员记录与办理",
+      "icon": "gauge",
+      "permissions": ["billing.read"]
+    },
+    {
       "id": "access.users",
       "route": "#/access/users",
       "title": "账号与角色",
@@ -128,6 +149,21 @@
       "title": "账号资料",
       "icon": "user",
       "permissions": []
+    },
+    {
+      "id": "account.membership",
+      "route": "#/account/membership",
+      "title": "我的会员与额度",
+      "icon": "gauge",
+      "permissions": []
+    },
+    {
+      "id": "account.plans",
+      "route": "#/account/plans",
+      "title": "套餐与加购",
+      "icon": "box",
+      "permissions": [],
+      "contextual": true
     },
     {
       "id": "account.security",
@@ -314,6 +350,9 @@
       "pages": [
         "overview",
         "access.users",
+        "billing.subscriptions",
+        "billing.plans",
+        "billing.rates",
         "models",
         "platform.extensions",
         "devices",
@@ -327,6 +366,7 @@
       "icon": "user",
       "pages": [
         "account.profile",
+        "account.membership",
         "account.security",
         "account.appearance",
         "account.models"

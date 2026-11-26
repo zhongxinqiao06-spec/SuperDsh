@@ -6,9 +6,12 @@ defineProps<{ title: string; description?: string }>()
 <template>
   <section class="settings-card">
     <header class="settings-card-header">
-      <div>
-        <h2>{{ title }}</h2>
-        <p v-if="description">{{ description }}</p>
+      <div class="settings-card-heading">
+        <slot name="leading" />
+        <div>
+          <h2>{{ title }}</h2>
+          <p v-if="description">{{ description }}</p>
+        </div>
       </div>
       <div v-if="$slots.action" class="toolbar"><slot name="action" /></div>
     </header>

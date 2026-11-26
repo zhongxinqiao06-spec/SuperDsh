@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { ref, useId, watch } from 'vue'
+import AppIcon from '@/components/base/AppIcon.vue'
 import { ElMessageBox } from 'element-plus'
 import { usePreferences } from '@/store/modules/preferences'
 import { useProductEditorGuard } from '@/composables/console/use-product-editor-guard'
@@ -78,9 +79,14 @@ function submit(): void {
     :before-close="requestClose"
     @update:model-value="$emit('update:modelValue', $event)"
   >
-    <template v-if="$slots.toolbar" #header="{ titleId, titleClass }">
+    <template #header="{ titleId, titleClass }">
       <div class="management-dialog-heading">
-        <h2 :id="titleId" :class="titleClass">{{ title }}</h2>
+        <div class="sheet-title">
+          <span class="sheet-symbol" aria-hidden="true"
+            ><AppIcon :name="readonly ? 'file-text' : 'settings'"
+          /></span>
+          <h2 :id="titleId" :class="titleClass">{{ title }}</h2>
+        </div>
         <slot name="toolbar" />
       </div>
     </template>
@@ -144,6 +150,5 @@ function submit(): void {
 }
 .management-dialog-heading h2 {
   margin: 0;
-  font-size: var(--font-size-section);
 }
 </style>

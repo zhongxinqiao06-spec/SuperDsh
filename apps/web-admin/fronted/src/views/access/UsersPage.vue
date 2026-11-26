@@ -9,8 +9,30 @@ import { useUsers } from '@/composables/access/use-users'
 import { usePreferences } from '@/store/modules/preferences'
 import ResourceStatus from '@/components/feedback/ResourceStatus.vue'
 import ManagementDialog from '@/components/overlay/ManagementDialog.vue'
+import { ref } from 'vue'
+import { useRoute } from 'vue-router'
+import OperationDialog from '@/views/billing/components/OperationDialog.vue'
+import type {
+  BillingAccount,
+  BillingAction,
+  BillingOperation,
+} from '@/types/billing/operations'
+import { dateTimeLabel } from '@/utils/date-time'
+import '@/assets/styles/billing.css'
 /** 用户页只组装列表、表单和确认；请求与业务状态由composable提供。 */
 const vm = useUsers()
+const target = ref<BillingAccount | null>(null)
+const action = ref<BillingAction>('gift')
+function operate(account: BillingAccount, kind: BillingAction) {
+  action.value = kind
+  target.value = account
+}
+const route = useRoute()
+function saved(result: BillingOperation) {
+  target.value = null
+  vm.notice.value = tr('办理成功，单号 ', 'Confirmed. Operation ') + result.id
+  void vm.resource.reload()
+}
 const { tr } = usePreferences()
 </script>
 
@@ -49,6 +71,9 @@ const { tr } = usePreferences()
           <tr>
             <th>{{ tr('用户', 'User') }}</th>
             <th>{{ tr('角色', 'Roles') }}</th>
+            <th v-if="vm.auth.can('billing.read')">
+              {{ tr('会员与额度', 'Membership and credits') }}
+            </th>
             <th>{{ tr('状态', 'Status') }}</th>
             <th>{{ tr('操作', 'Actions') }}</th>
           </tr>
@@ -78,6 +103,59 @@ const { tr } = usePreferences()
                   )
                   .join(', ')
               }}
+            </td>
+            <td
+              v-if="vm.auth.can('billing.read')"
+              :data-label="tr('会员与额度', 'Membership and credits')"
+            >
+              <template v-if="user.billing">
+                <router-link
+                  :to="{
+                    path: '/billing/subscriptions',
+                    query: {
+                      product: route.query.product,
+                      userId: user.userId,
+                    },
+                  }"
+                  >{{
+                    user.billing.planName ?? tr('未开通', 'Not enrolled')
+                  }}</router-link
+                >
+                <small v-if="user.billing.endsAt"
+                  >{{ tr('到期', 'Expires') }} ·
+                  {{ dateTimeLabel(user.billing.endsAt) }}</small
+                >
+                <small
+                  >{{ tr('可用', 'Available') }}
+                  {{ user.billing.availablePoints }}</small
+                >
+                <el-button
+                  v-if="
+                    !user.disabled && vm.auth.can('billing.adjustments.create')
+                  "
+                  link
+                  @click="operate(user.billing, 'gift')"
+                  >{{ tr('加额度', 'Add credits') }}</el-button
+                ><el-button
+                  v-if="
+                    !user.disabled &&
+                    vm.auth.can('billing.subscriptions.manage')
+                  "
+                  link
+                  @click="
+                    operate(
+                      user.billing,
+                      user.billing.state === 'active' ? 'renew' : 'open',
+                    )
+                  "
+                >
+                  {{
+                    user.billing.state === 'active'
+                      ? tr('续期', 'Renew')
+                      : tr('开通', 'Activate')
+                  }}</el-button
+                > </template
+              ><span v-else>—</span>
             </td>
             <td :data-label="tr('状态', 'Status')">
               <span>
@@ -153,7 +231,10 @@ const { tr } = usePreferences()
               vm.resource.data.value?.users.length === 0
             "
           >
-            <td colspan="4" class="empty-cell">
+            <td
+              :colspan="vm.auth.can('billing.read') ? 5 : 4"
+              class="empty-cell"
+            >
               {{ tr('没有符合条件的用户', 'No matching users') }}
             </td>
           </tr>
@@ -168,6 +249,13 @@ const { tr } = usePreferences()
         />
       </template>
     </ManagementList>
+    <OperationDialog
+      v-if="target"
+      :account="target"
+      :initial="action"
+      @saved="saved"
+      @close="target = null"
+    />
 
     <ManagementDialog
       :model-value="vm.editing.value !== null"

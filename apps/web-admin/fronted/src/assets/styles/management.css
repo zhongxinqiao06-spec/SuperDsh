@@ -1,4 +1,18 @@
-/* 管理页公共布局；页面不再覆盖按钮、表单和弹窗的基础皮肤。 */
+/* 系统宋体往往只有常规字重，标题允许合成粗体，输入值仍按系统正文字体渲染。 */
+[data-console-product='entertainment']
+  :is(
+    .management-page,
+    .settings-page,
+    .el-dialog,
+    .el-message-box,
+    .app-drawer
+  )
+  :is(h1, h2, h3, .el-message-box__title, .el-drawer__title),
+[data-console-product='entertainment']
+  :is(.detail-plan, .usage-value, .console-brand) {
+  font-synthesis: weight;
+}
+
 .management-page {
   gap: var(--layout-gap);
 }
@@ -13,10 +27,20 @@
 }
 [data-console-product] .management-page > .page-heading h1,
 [data-console-product] .settings-page > .page-heading h1 {
-  font-size: var(--page-title-size);
+  font-family: var(--sheet-font);
+  font-size: clamp(var(--page-title-size), 1.95vw, 30px);
   line-height: 1.4;
   letter-spacing: -0.025em;
   font-weight: 600;
+}
+[data-console-product]
+  :is(.management-page, .settings-page)
+  > .page-heading::after {
+  content: '';
+  align-self: center;
+  flex: 1 1 32px;
+  height: 1px;
+  background: linear-gradient(to right, var(--sheet-line), transparent);
 }
 [data-console-product]
   .management-page
@@ -299,9 +323,74 @@
   flex-basis: 100%;
   text-align: left;
 }
-.management-dialog .field {
-  font-size: 14px;
-  font-weight: 500;
+[data-console-product]
+  :is(.management-dialog, .app-drawer, .management-page, .settings-page)
+  .field {
+  font-size: var(--font-size-meta);
+  font-weight: 600;
+}
+[data-console-product]
+  .field
+  :is(
+    .el-input__wrapper,
+    .el-select__wrapper,
+    .el-textarea__inner,
+    .native-control
+  ) {
+  background-color: var(--field-surface);
+  border-color: var(--field-line);
+  font-weight: 400;
+}
+[data-console-product]
+  .field
+  :is(
+    .el-input__wrapper.is-focus,
+    .el-select__wrapper.is-focused,
+    .el-textarea__inner:focus,
+    .native-control:focus-visible
+  ) {
+  background-color: var(--card);
+  border-color: var(--ring);
+  box-shadow: var(--field-focus);
+}
+[data-console-product]
+  .field
+  :is(
+    .el-input.is-disabled .el-input__wrapper,
+    .el-select__wrapper.is-disabled,
+    .native-control:disabled,
+    .el-textarea.is-disabled .el-textarea__inner
+  ) {
+  background-color: var(--muted);
+  border-color: var(--border);
+}
+[data-console-product]
+  .field
+  :is(
+    .el-form-item.is-error .el-input__wrapper,
+    .native-control[aria-invalid='true'],
+    .el-textarea__inner[aria-invalid='true']
+  ) {
+  border-color: var(--destructive);
+}
+.form-columns {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 14rem), 1fr));
+  gap: var(--field-gap);
+}
+.form-columns > .form-span {
+  grid-column: 1 / -1;
+}
+.form-columns .field > .el-input-number {
+  width: 100%;
+}
+.form-column-option {
+  align-self: end;
+  min-height: var(--control-height);
+  align-items: center;
+}
+.form-column-option.el-checkbox .el-checkbox__input {
+  margin-block-start: 0;
 }
 .management-dialog .field small {
   font-weight: 400;
@@ -312,13 +401,17 @@
 .form-section > header {
   margin-bottom: var(--field-gap);
 }
-.form-section h3 {
-  margin: 0 0 6px;
-  font-size: 16px;
-  font-weight: 600;
+.form-section > header h3 {
+  margin: 0;
+  padding-block-end: var(--space-2);
+  border-bottom: 1px solid var(--sheet-line);
+  font: 600 var(--sheet-section-size)/1.45 var(--sheet-font);
+}
+.form-section + .form-section {
+  margin-block-start: var(--space-2);
 }
 .form-section header p {
-  margin: 0;
+  margin: var(--space-2) 0 0;
   color: var(--muted-foreground);
   font-size: 13px;
 }

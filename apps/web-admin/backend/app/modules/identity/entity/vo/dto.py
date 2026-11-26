@@ -6,6 +6,7 @@ from typing import Self
 from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
 
 from app.modules.identity.entity.bo.models import Account, Role
+from app.modules.identity.entity.bo.product_roles import Product
 from app.modules.identity.entity.bo.validation import email_address
 
 
@@ -85,8 +86,9 @@ class UserCreateInput(InputModel):
 
 
 class RegisterInput(UserCreateInput):
-    """首个管理员初始化 DTO，角色由用例固定而非客户端控制。"""
+    """开放注册只接受内置产品入口；兼容空库初始化沿用已有凭证。"""
 
+    product: Product = "office"
     setupToken: str = Field(default="", max_length=200)
     code: str = Field(default="", max_length=20)
     clientType: str = "browser"
