@@ -88,6 +88,19 @@ class FileTransferService:
             raise DomainError(403, "设备连接已被阻断")
         return account
 
+    def retire_owner(self, owner: str) -> bool:
+        """撤销该账号预览和传输票据，待进行中的流结束后清除分片。"""
+        for key, access in list(self.accesses.items()):
+            if access.owner == owner:
+                self.accesses.pop(key, None)
+        for transfer in self.transfers.values():
+            if transfer.owner == owner:
+                transfer.expires = 0
+                transfer.error = "账号已注销"
+                transfer.ready.set()
+        self.prune()
+        return not any(t.owner == owner for t in self.transfers.values())
+
     def prune(self) -> None:
         """过期对象不留在内存或磁盘；活跃传输有独立超时，不由清理中途删除。"""
         now = time.monotonic()

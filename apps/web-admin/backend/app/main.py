@@ -66,6 +66,7 @@ from app.modules.identity.dao.oauth import SqlOAuthRepository
 from app.modules.identity.dao.repository import SqlIdentityRepository
 from app.modules.identity.entity.bo.models import Account
 from app.modules.identity.service.account_service import AccountFlows
+from app.modules.identity.service.erasure_cleanup import ErasureCleanup
 from app.modules.identity.service.identity import IdentityService
 from app.modules.identity.service.management import AccountManagement
 from app.modules.identity.service.oauth import OAuthService
@@ -448,6 +449,14 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     extensions.register_builtin(text_manifest, studio_agent.execute)
     catalog = CompatibilityCatalog(settings.compatibility_path)
     closing = False
+    erasure_cleanup = ErasureCleanup(
+        database,
+        files,
+        devices,
+        knowledge.qdrant,
+        settings.data_dir,
+        settings.runtime_state_root or settings.data_dir / "runtime",
+    )
 
     async def prepare_workspace(owner: str) -> None:
         """显式准备时持久化设备及唯一受管项目；只读页面不触发创建或启动。"""
@@ -457,6 +466,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     @asynccontextmanager
     async def lifespan(application: FastAPI) -> AsyncIterator[None]:
         nonlocal closing
+        cleanup_task = None
         try:
             await database.ready()
             await require_current_schema(database)
@@ -480,9 +490,13 @@ def create_app(settings: Settings | None = None) -> FastAPI:
             await knowledge.initialize(settings.embedding_default)
             await skills.recover()
             media_jobs.start()
+            cleanup_task = asyncio.create_task(erasure_cleanup.run(services.runtime))
             yield
         finally:
             closing = True
+            if cleanup_task:
+                cleanup_task.cancel()
+                await asyncio.gather(cleanup_task, return_exceptions=True)
             try:
                 await media_jobs.close()
                 await devices.close()
@@ -495,6 +509,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
                 await database.close()
 
     app = FastAPI(title="SuperDsh Web Admin", version=str(build["version"]), lifespan=lifespan)
+    app.state.erasure_cleanup = erasure_cleanup
     instance_id = str(uuid4())
     app.state.settings, app.state.services, app.state.database, app.state.compatibility = (
         settings,

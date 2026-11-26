@@ -1,5 +1,8 @@
 """异步 PostgreSQL 连接与短事务；生命周期由应用装配统一持有。"""
 
+from collections.abc import AsyncIterator
+from contextlib import asynccontextmanager
+
 from sqlalchemy import text
 from sqlalchemy.ext.asyncio import (
     AsyncEngine,
@@ -8,6 +11,7 @@ from sqlalchemy.ext.asyncio import (
     create_async_engine,
 )
 from sqlalchemy.orm import DeclarativeBase
+from sqlalchemy.pool import NullPool
 
 
 class Base(DeclarativeBase):
@@ -30,7 +34,25 @@ class Database:
                 "server_settings": {"statement_timeout": "30000", "lock_timeout": "10000"},
             },
         )
+        # 外部写入可跨越慢速网络调用，单独连接避免耗尽业务事务池。
+        self._io_leases = create_async_engine(url, poolclass=NullPool)
         self.sessions = async_sessionmaker(self.engine, expire_on_commit=False)
+
+    @asynccontextmanager
+    async def owner_io(self, owner: str) -> AsyncIterator[bool]:
+        """外部文件及向量写入完成前持有共享锁，注销回收方等待最后一个写入者。"""
+        async with self._io_leases.begin() as conn:
+            await conn.execute(
+                text(
+                    "SELECT pg_advisory_xact_lock_shared(hashtextextended('account-io:' || :uid,0))"
+                ),
+                {"uid": owner},
+            )
+            yield not bool(
+                await conn.scalar(
+                    text("SELECT 1 FROM account_erasure_jobs WHERE owner=:uid"), {"uid": owner}
+                )
+            )
 
     async def ready(self) -> bool:
         """真实检查数据库连通性，异常由健康端点转为依赖失败。"""
@@ -40,6 +62,7 @@ class Database:
 
     async def close(self) -> None:
         """应用退出时释放池，先由运行服务回收长期租约。"""
+        await self._io_leases.dispose()
         await self.engine.dispose()
 
     async def schema_version(self) -> str | None:

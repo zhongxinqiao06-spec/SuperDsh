@@ -89,7 +89,9 @@ class KnowledgeIndexService:
                 operation_ids.append(attempt)
             try:
                 # 每个文档有整体截止时间，防止分批超时累加形成无界任务。
-                async with asyncio.timeout(240):
+                async with asyncio.timeout(240), self.database.owner_io(owner) as active:
+                    if not active:
+                        raise DomainError(401, "账号已注销")
                     count = await self.qdrant.index(owner, asset, embedding)
                 await self._finish(owner, identifier, generation, attempt, "ready", count, None)
                 total += count

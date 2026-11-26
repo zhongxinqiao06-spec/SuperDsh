@@ -355,6 +355,17 @@ class TerminalService:
             },
         )
 
+    async def retire_owner(self, owner: str) -> None:
+        """清除本人终端进程和内存滚屏，保留其他账号正在运行的终端。"""
+        async with self._creation:
+            terminals = [row for row in self.terminals.values() if row.owner == owner]
+            tasks = [row.task for row in terminals if row.task]
+            for task in tasks:
+                task.cancel()
+            await asyncio.gather(*tasks, return_exceptions=True)
+            for row in terminals:
+                self.terminals.pop(row.id, None)
+
     async def close(self) -> None:
         """服务退出等待所有进程清理，不遗留本代理启动的 Shell。"""
         tasks = [row.task for row in self.terminals.values() if row.task]

@@ -50,6 +50,10 @@ class RuntimeService:
     async def stop(self, owner: str) -> None:
         """取消启动任务并停止当前用户实例，等待所有清理完成。"""
         await self.authorize(owner)
+        await self.stop_retired_owner(owner)
+
+    async def stop_retired_owner(self, owner: str) -> None:
+        """已由注销事务撤销登录的内部回收入口，仍需等待原子进程退出。"""
         task = self._preparing.get(owner)
         if task:
             task.cancel()

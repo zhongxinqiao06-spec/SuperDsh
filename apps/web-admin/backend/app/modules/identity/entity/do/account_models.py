@@ -20,6 +20,7 @@ class RecoveryCodeRow(Base):
 class VerificationCodeRow(Base):
     __tablename__ = "account_verification_codes"
     scope: Mapped[str] = mapped_column(String(64), primary_key=True)
+    owner_id: Mapped[str | None] = mapped_column(String(80))
     code_hash: Mapped[str] = mapped_column(String(64))
     nonce: Mapped[str] = mapped_column(String(100))
     sent_at: Mapped[datetime] = mapped_column(DateTime(timezone=True))

@@ -13,6 +13,7 @@ const props = defineProps<{
   readonly?: boolean
   width?: string
   submitText?: string
+  submitType?: 'primary' | 'danger'
   submitDisabled?: boolean
   dirty?: boolean
   /** 领域已提供完整导航保护时关闭本组件的产品级保护，避免重复询问。 */
@@ -129,7 +130,7 @@ function submit(): void {
         </el-button>
         <el-button
           v-if="!readonly"
-          type="primary"
+          :type="submitType ?? 'primary'"
           native-type="submit"
           :loading="busy"
           :form="formId"

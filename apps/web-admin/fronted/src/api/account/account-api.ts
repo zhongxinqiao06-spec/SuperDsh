@@ -11,6 +11,11 @@ export interface LoginSession {
   lastSeenAt?: string | null
 }
 export const accountApi = {
+  close: (accountId: string) =>
+    request<{ status: 'closed' }>('/auth/me', {
+      method: 'DELETE',
+      body: { accountId, confirm: true },
+    }),
   profile: (displayName: string) =>
     request<Identity>('/auth/me/profile', {
       method: 'PUT',

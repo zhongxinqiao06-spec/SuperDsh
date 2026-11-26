@@ -7,10 +7,11 @@ from fastapi import APIRouter, Depends, Query, Request, Response
 
 from app.api.dependencies import current_account
 from app.infrastructure.query_parameters import query_integer
-from app.modules.identity.controller.routes import login_payload
+from app.modules.identity.controller.routes import check_origin, login_payload, refresh_cookie
 from app.modules.identity.entity.bo.models import Account
 from app.modules.identity.entity.vo.account_vo import (
     AvatarInput,
+    CloseAccountInput,
     EmailCodeInput,
     EmailInput,
     MobileInput,
@@ -27,6 +28,18 @@ AccountDep = Annotated[Account, Depends(current_account)]
 
 def accounts(request: Request) -> AccountFlows:
     return request.app.state.services.accounts
+
+
+@router.delete("/auth/me", status_code=202)
+async def close_account(
+    body: CloseAccountInput, request: Request, response: Response, account: AccountDep
+) -> dict[str, str]:
+    """仅注销当前登录者；提交后撤销会话并清除浏览器刷新 Cookie。"""
+    check_origin(request)
+    await accounts(request).close_account(account, body.accountId)
+    refresh_cookie(request, response)
+    response.headers["Cache-Control"] = "no-store"
+    return {"status": "closed"}
 
 
 @router.put("/auth/me/profile")

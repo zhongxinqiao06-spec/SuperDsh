@@ -89,7 +89,14 @@ class EmailVerification:
         return await self.consume_error(session, address, purpose, user_id, code) is None
 
     async def consume_error(
-        self, session: AsyncSession, address: str, purpose: str, user_id: str, code: str
+        self,
+        session: AsyncSession,
+        address: str,
+        purpose: str,
+        user_id: str,
+        code: str,
+        *,
+        registered_owner: str | None = None,
     ) -> DomainError | None:
         """事务内返回失败原因，让调用方先提交错误计数，再向客户端返回。"""
         row = await self.repository.code(session, self.scope(address, purpose, user_id))
@@ -111,6 +118,8 @@ class EmailVerification:
                 )
             return DomainError(422, detail, "verification_code_incorrect")
         row.consumed_at = now
+        if registered_owner:
+            row.owner_id = registered_owner
         return None
 
     async def issue(
@@ -162,6 +171,7 @@ class EmailVerification:
             await session.merge(
                 VerificationCodeRow(
                     scope=scope,
+                    owner_id=user_id or None,
                     nonce=nonce,
                     code_hash=self.digest(nonce, code),
                     sent_at=now,

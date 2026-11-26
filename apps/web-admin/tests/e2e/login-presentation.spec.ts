@@ -168,6 +168,16 @@ test('娱乐邮箱注册保留错误草稿并可重新验证', async ({ page }, 
         'scrollWidth',
         width,
       )
+      const emailBox = await page
+        .getByLabel('邮箱', { exact: true })
+        .boundingBox()
+      const button = await send.boundingBox()
+      expect(Math.abs(button!.x - emailBox!.x)).toBeLessThan(2)
+      expect(Math.abs(button!.width - emailBox!.width)).toBeLessThan(2)
+      if (width >= 1280) {
+        expect(button!.y).toBeGreaterThan(850 * 0.52)
+        expect(button!.y + button!.height).toBeLessThan(850 * 0.86)
+      }
       if (width === 390 || width === 1280)
         await page.screenshot({
           path: testInfo.outputPath(`registration-${colorScheme}-${width}.png`),
@@ -182,8 +192,14 @@ test('娱乐邮箱注册保留错误草稿并可重新验证', async ({ page }, 
   await expect(page.getByRole('button', { name: /秒后重发/ })).toBeDisabled()
   const otp = page.getByLabel('验证码', { exact: true })
   const password = page.getByLabel('设置密码', { exact: true })
+  // 用缩短的可视高度模拟键盘占屏；验证码、密码和提交按钮应可顺序滚动到达。
+  await page.setViewportSize({ width: 390, height: 440 })
   await otp.fill('123456')
   await password.fill('Synthetic-test-secret')
+  const verify = page.getByRole('button', { name: '验证并创建账号' })
+  await verify.scrollIntoViewIfNeeded()
+  await expect(verify).toBeInViewport({ ratio: 1 })
+  await page.setViewportSize({ width: 390, height: 690 })
   await page.reload()
   await expect(otp).toHaveValue('')
   await expect(password).toHaveValue('')

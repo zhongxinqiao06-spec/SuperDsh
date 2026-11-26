@@ -272,6 +272,12 @@ class MediaJobs:
         )
 
     async def process(self, job: MediaJob) -> None:
+        """注销与正在写回的本地媒体文件按账号协调，其他用户继续执行。"""
+        async with self.database.owner_io(job.payload["owner"]) as active:
+            if active:
+                await self._process(job)
+
+    async def _process(self, job: MediaJob) -> None:
         # 只有已保存的远端任务号或下载回执允许恢复；中途失联不能重新发起付费请求。
         state = job.state
         try:

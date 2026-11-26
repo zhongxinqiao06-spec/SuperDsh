@@ -142,6 +142,12 @@ class MaintenanceService:
     async def migrate(self, account: Account, identifier: str, target: str) -> dict[str, object]:
         """先复制并校验目标摘要，再原子切换指针；不持锁等待网络。"""
         account.require("storage.manage")
+        async with self.files.repository.database.owner_io(account.user_id) as active:
+            if not active:
+                raise DomainError(401, "账号已注销")
+            return await self._migrate(account, identifier, target)
+
+    async def _migrate(self, account: Account, identifier: str, target: str) -> dict[str, object]:
         source = await self.files._row(account, identifier)
         if source.storage_id == target:
             return {"file": self.files.view(source), "state": "completed"}

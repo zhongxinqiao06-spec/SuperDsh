@@ -30,7 +30,11 @@ class SqlIdentityTransaction:
         await lock_transaction(self.db, "web-admin:identity-management")
 
     async def users(self) -> list[User]:
-        rows = await self.db.scalars(select(UserRow).order_by(UserRow.created_at, UserRow.id))
+        rows = await self.db.scalars(
+            select(UserRow)
+            .where(UserRow.erased.is_(False))
+            .order_by(UserRow.created_at, UserRow.id)
+        )
         return [user_entity(row) for row in rows]
 
     async def product_members(
@@ -54,13 +58,13 @@ class SqlIdentityTransaction:
 
     async def user(self, user_id: str) -> User | None:
         row = await self.db.get(UserRow, user_id)
-        return user_entity(row) if row else None
+        return user_entity(row) if row and not row.erased else None
 
     async def find_user(self, identifier: str) -> User | None:
         row = await self.db.scalar(
             select(UserRow).where(or_(UserRow.username == identifier, UserRow.email == identifier))
         )
-        return user_entity(row) if row else None
+        return user_entity(row) if row and not row.erased else None
 
     async def save_user(self, user: User) -> None:
         user.updated_at = datetime.now(UTC)

@@ -13,6 +13,7 @@ from app.modules.billing.service.registration_credit import (
     grant_registration_credit,
 )
 from app.modules.identity.dao.account_dao import SqlAccountRepository
+from app.modules.identity.dao.erasure_dao import erase_personal_data
 from app.modules.identity.entity.bo.models import Account
 from app.modules.identity.entity.bo.product_roles import MEMBER_ROLE
 from app.modules.identity.entity.bo.validation import (
@@ -93,6 +94,13 @@ class AccountFlows:
             self.security.issue(account.user_id, account.session_id, account.auth_version)
         )
 
+    async def close_account(self, account: Account, confirmed_id: str) -> None:
+        """注销在同一提交中撤销身份、私有数据、额度和共享入口。"""
+        if confirmed_id != account.user_id:
+            raise DomainError(409, "当前账号已变化，请重新打开注销确认框。")
+        async with self.repository.sessions.begin() as session:
+            await erase_personal_data(session, account)
+
     async def profile(self, account: Account, changes: dict[str, object]) -> dict[str, object]:
         """本人资料更新不隐式变更角色或密钥，唯一性冲突由数据库统一映射 409。"""
         async with self.repository.sessions.begin() as session:
@@ -151,7 +159,7 @@ class AccountFlows:
                         422, "请刷新注册页，先发送并填写邮箱验证码。", "verification_code_required"
                     )
                 verification_error = await self.email.consume_error(
-                    session, body.email, "register", "", body.code
+                    session, body.email, "register", "", body.code, registered_owner=user_id
                 )
                 verified = verification_error is None
             if verified:

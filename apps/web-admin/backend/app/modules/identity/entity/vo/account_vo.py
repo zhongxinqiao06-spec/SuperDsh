@@ -10,6 +10,13 @@ from app.modules.identity.entity.bo.validation import display_name, email_addres
 from app.modules.identity.entity.vo.dto import InputModel, PasswordInput
 
 
+class CloseAccountInput(InputModel):
+    """确认绑定到弹框所示身份，即使浏览器在两个账号之间切换也不会注销错人。"""
+
+    confirm: Literal[True]
+    accountId: str = Field(min_length=1, max_length=80)
+
+
 class ProfileInput(InputModel):
     displayName: str = Field(default="", validate_default=True)
 

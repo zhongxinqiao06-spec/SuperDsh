@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import CloseAccountCard from './CloseAccountCard.vue'
 import PageHeader from '@/components/layout/PageHeader.vue'
 import { useProfile } from '@/composables/account/use-profile'
 import { usePreferences } from '@/store/modules/preferences'
@@ -81,6 +82,7 @@ const { tr } = usePreferences()
         </div>
       </div>
     </SettingsCard>
+    <CloseAccountCard />
     <ManagementDialog
       :model-value="vm.editing.value === 'name'"
       :title="tr('修改昵称', 'Edit name')"

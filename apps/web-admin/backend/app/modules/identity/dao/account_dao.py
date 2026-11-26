@@ -32,7 +32,7 @@ class SqlAccountRepository:
             if by_id
             else or_(UserRow.username == identifier, UserRow.email == identifier)
         )
-        return await session.scalar(select(UserRow).where(condition))
+        return await session.scalar(select(UserRow).where(condition, UserRow.erased.is_(False)))
 
     async def recovery(self, session: AsyncSession, code_hash: str) -> RecoveryCodeRow | None:
         return await session.scalar(
@@ -95,7 +95,7 @@ class SqlAccountRepository:
     async def facts(
         self, session: AsyncSession, before: datetime
     ) -> tuple[list[UserRow], list[SessionRow]]:
-        users = list(await session.scalars(select(UserRow)))
+        users = list(await session.scalars(select(UserRow).where(UserRow.erased.is_(False))))
         logins = list(
             await session.scalars(select(SessionRow).where(SessionRow.created_at < before))
         )

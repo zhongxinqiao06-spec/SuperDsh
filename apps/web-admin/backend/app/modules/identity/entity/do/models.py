@@ -19,6 +19,7 @@ class UserRow(Base):
             name="ck_users_registration_product",
         ),
     )
+    erased: Mapped[bool] = mapped_column(Boolean, server_default="false")
     registration_product: Mapped[str | None] = mapped_column(String(20))
     id: Mapped[str] = mapped_column(String(80), primary_key=True)
     username: Mapped[str] = mapped_column(String(32), unique=True)
