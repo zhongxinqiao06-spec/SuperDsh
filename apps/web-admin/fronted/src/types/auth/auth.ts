@@ -17,6 +17,7 @@ export interface Identity {
 export interface AuthResponse extends Identity {
   accessToken: string
   tokenType: string
+  registrationGrant?: { points: number; expiresAt: string }
   expiresIn?: number
 }
 

@@ -9,8 +9,7 @@ import AppIcon from '@/components/base/AppIcon.vue'
 import LoginArtwork from './components/LoginArtwork.vue'
 import RecoveryDialog from './components/RecoveryDialog.vue'
 import OAuthFinalize from './components/OAuthFinalize.vue'
-import RegistrationCode from './components/RegistrationCode.vue'
-import { registrationError } from '@/utils/auth/registration-error'
+import EmailRegistration from './components/EmailRegistration.vue'
 
 /** 账号入口共用表单及身份用例；开放注册和授权回调按服务端能力展开。 */
 const vm = useLoginForm()
@@ -109,6 +108,20 @@ const title = computed(() =>
           :provider-verified="callbackValue('oauth_email_verified') === '1'"
           :mail-available="vm.mailAvailable.value"
         />
+        <EmailRegistration
+          v-else-if="vm.register.value"
+          :key="vm.product.value"
+          :product="vm.product.value"
+          :available="vm.mailAvailable.value"
+          :oauth-label="
+            vm.resource.data.value?.oauthEnabled
+              ? vm.resource.data.value.oauthProviderLabel
+              : null
+          "
+          @registered="vm.registered"
+          @retry="vm.resource.reload"
+          @oauth="vm.oauth"
+        />
         <form
           v-else-if="vm.resource.data.value"
           class="login-form"
@@ -127,21 +140,20 @@ const title = computed(() =>
               :closable="false"
               show-icon
             />
-            <template v-if="vm.register.value">
-              <label class="field"
-                >{{ tr('邮箱', 'Email')
-                }}<el-input
-                  v-model="vm.form.email"
-                  type="email"
-                  autocomplete="email"
-              /></label>
-              <RegistrationCode
-                v-model="vm.form.code"
-                :email="vm.form.email"
-                :available="vm.mailAvailable.value"
-              />
-            </template>
-            <label v-else class="field"
+            <p
+              v-if="
+                route.path === '/register' && !vm.initializationPending.value
+              "
+              role="status"
+            >
+              {{
+                tr(
+                  '注册暂未开放，已有账号可在此登录。',
+                  'Registration is closed. Sign in with an existing account.',
+                )
+              }}
+            </p>
+            <label class="field"
               >{{ tr('用户名或邮箱', 'Username or email') }}
               <el-input
                 v-model="vm.form.identifier"
@@ -158,7 +170,6 @@ const title = computed(() =>
               <div class="login-field-heading">
                 <label for="login-password">{{ tr('密码', 'Password') }}</label>
                 <button
-                  v-if="!vm.register.value"
                   type="button"
                   class="login-text-action"
                   @click="recovering = true"
@@ -170,9 +181,7 @@ const title = computed(() =>
                 id="login-password"
                 v-model="vm.form.password"
                 :type="showPassword ? 'text' : 'password'"
-                :autocomplete="
-                  vm.register.value ? 'new-password' : 'current-password'
-                "
+                autocomplete="current-password"
                 :placeholder="tr('请输入密码', 'Enter your password')"
               >
                 <template #suffix>
@@ -195,24 +204,11 @@ const title = computed(() =>
                 </template>
               </el-input>
             </div>
-            <label v-if="vm.register.value" class="field"
-              >{{ tr('确认密码', 'Confirm password') }}
-              <el-input
-                v-model="vm.form.confirm"
-                type="password"
-                show-password
-                autocomplete="new-password"
-              />
-            </label>
           </div>
           <div class="login-actions">
             <el-alert
               v-if="vm.mutation.error.value"
-              :title="
-                vm.register.value
-                  ? registrationError(vm.mutation.error.value, tr)
-                  : vm.mutation.error.value
-              "
+              :title="vm.mutation.error.value"
               type="error"
               :closable="false"
               show-icon
@@ -221,24 +217,14 @@ const title = computed(() =>
               type="submit"
               class="login-submit"
               :disabled="
-                vm.initializationPending.value ||
-                vm.mutation.busy.value ||
-                (vm.register.value && !vm.mailAvailable.value)
+                vm.initializationPending.value || vm.mutation.busy.value
               "
               :aria-busy="vm.mutation.busy.value"
-              :aria-label="
-                vm.register.value
-                  ? tr('验证并注册', 'Verify and register')
-                  : tr('登录 ↵', 'Sign in ↵')
-              "
+              :aria-label="tr('登录 ↵', 'Sign in ↵')"
               aria-keyshortcuts="Enter"
             >
               <span class="login-submit-label">
-                {{
-                  vm.register.value
-                    ? tr('验证并注册', 'Verify and register')
-                    : tr('登录', 'Sign in')
-                }}
+                {{ tr('登录', 'Sign in') }}
                 <AppIcon
                   v-if="!vm.mutation.busy.value"
                   name="arrow-right"
@@ -262,7 +248,7 @@ const title = computed(() =>
               "
               class="login-register"
               :to="{
-                path: vm.register.value ? '/login' : '/register',
+                path: '/register',
                 query: {
                   ...(route.query.returnTo
                     ? { returnTo: route.query.returnTo }
@@ -271,11 +257,7 @@ const title = computed(() =>
                 },
               }"
             >
-              {{
-                vm.register.value
-                  ? tr('已有账号，登录', 'Already have an account? Sign in')
-                  : tr('创建账号', 'Create account')
-              }}
+              {{ tr('创建账号', 'Create account') }}
             </router-link>
             <p class="login-legal">
               {{

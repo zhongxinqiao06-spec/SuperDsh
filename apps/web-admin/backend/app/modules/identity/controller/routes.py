@@ -119,6 +119,7 @@ async def registration_access(request: Request) -> None:
 @router.post("/auth/register", dependencies=[Depends(registration_access)])
 async def register(body: RegisterInput, request: Request, response: Response) -> dict[str, object]:
     """普通注册校验邮箱；兼容空库初始化须先通过专用令牌验证。"""
+    grant = None
     if await identity(request).needs_bootstrap():
         account = await identity(request).bootstrap(
             body.username,
@@ -130,10 +131,13 @@ async def register(body: RegisterInput, request: Request, response: Response) ->
             body.email,
         )
     else:
-        account = await request.app.state.services.accounts.register(body)
+        account, grant = await request.app.state.services.accounts.register(body)
     result = await identity(request).issue_login(account.user_id, body.clientName)
     await request.app.state.services.resources.initialize(result.account)
-    return login_payload(request, response, result, body.clientType == "native")
+    payload = login_payload(request, response, result, body.clientType == "native")
+    if grant is not None:
+        payload["registrationGrant"] = grant
+    return payload
 
 
 @router.post("/auth/refresh")

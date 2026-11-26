@@ -96,7 +96,7 @@ test('开放注册和授权入口随服务器配置展开并保留返回地址',
   await page.goto('/#/login?returnTo=/entertainment')
   await expect(page.getByRole('button', { name: /Studio SSO/ })).toBeVisible()
   await page.getByRole('link', { name: '创建账号' }).click()
-  await expect(page.getByLabel('确认密码')).toBeVisible()
+  await expect(page.getByLabel('设置密码')).toHaveCount(0)
   await expect(page.getByRole('button', { name: '发送验证码' })).toBeVisible()
   const back = page.getByRole('link', { name: '已有账号，登录' })
   await back.click()
@@ -115,7 +115,7 @@ test('娱乐邮箱注册保留错误草稿并可重新验证', async ({ page }, 
         registrationOpen: true,
         registrationEmailAvailable: true,
         registrationGrant: { points: 40, validDays: 30 },
-        emailVerificationRequired: true,
+        emailVerificationRequired: false,
         oauthEnabled: false,
       },
     }),
@@ -128,7 +128,14 @@ test('娱乐邮箱注册保留错误草稿并可重新验证', async ({ page }, 
       purpose: 'register',
     })
     sends++
-    return route.fulfill({ json: {} })
+    const now = Date.now()
+    return route.fulfill({
+      json: {
+        serverTime: new Date(now).toISOString(),
+        expiresAt: new Date(now + 600000).toISOString(),
+        resendAt: new Date(now + 60000).toISOString(),
+      },
+    })
   })
   await page.route('**/api/auth/register', (route) => {
     submissions++
@@ -142,7 +149,10 @@ test('娱乐邮箱注册保留错误草稿并可重新验证', async ({ page }, 
     expect(body.password).toBeUndefined()
     return route.fulfill({
       status: 422,
-      json: { detail: 'invalid or expired verification code' },
+      json: {
+        detail: 'invalid or expired verification code',
+        code: 'verification_code_incorrect',
+      },
     })
   })
   await page.goto('/#/register?product=entertainment', {
@@ -170,20 +180,147 @@ test('娱乐邮箱注册保留错误草稿并可重新验证', async ({ page }, 
   await page.getByLabel('邮箱', { exact: true }).fill('creator@example.invalid')
   await send.click()
   await expect(page.getByRole('button', { name: /秒后重发/ })).toBeDisabled()
-  await page.getByLabel('验证码', { exact: true }).fill('123456')
-  await page.getByLabel('密码', { exact: true }).fill('Synthetic-test-secret')
-  await page
-    .getByLabel('确认密码', { exact: true })
-    .fill('Synthetic-test-secret')
-  await page.getByRole('button', { name: '验证并注册' }).click()
-  await expect(
-    page.getByText('验证码不正确或已过期，请检查邮箱或重新发送。'),
-  ).toBeVisible()
-  await expect(page.getByLabel('邮箱', { exact: true })).toHaveValue(
-    'creator@example.invalid',
-  )
+  const otp = page.getByLabel('验证码', { exact: true })
+  const password = page.getByLabel('设置密码', { exact: true })
+  await otp.fill('123456')
+  await password.fill('Synthetic-test-secret')
+  await page.reload()
+  await expect(otp).toHaveValue('')
+  await expect(password).toHaveValue('')
+  await expect(page.getByRole('button', { name: /秒后重发/ })).toBeDisabled()
+  await otp.fill('123456')
+  await password.fill('Synthetic-test-secret')
+  await page.getByRole('button', { name: '验证并创建账号' }).click()
+  await expect(page.getByText('验证码不正确，请核对最新邮件。')).toBeVisible()
+  await expect(password).toHaveValue('Synthetic-test-secret')
+  await expect(otp).toBeFocused()
   expect([sends, submissions]).toEqual([1, 1])
+  await page.screenshot({
+    path: testInfo.outputPath('registration-verify-mobile.png'),
+    fullPage: true,
+  })
+  await page.getByRole('button', { name: '修改邮箱' }).click()
   await page.getByLabel('邮箱', { exact: true }).fill('another@example.invalid')
-  await expect(page.getByLabel('验证码', { exact: true })).toHaveValue('')
+  await expect(otp).toHaveCount(0)
   await expect(send).toBeEnabled()
+  await page.getByRole('link', { name: '已有账号，登录' }).click()
+  await expect(page.getByLabel('用户名或邮箱')).toHaveValue(
+    'another@example.invalid',
+  )
+})
+
+test('注册重发、改邮箱和到账后直接返回办公台', async ({ page }) => {
+  await installFoundationFixture(page, ['products.office'])
+  await page.route('**/api/auth/config', (r) =>
+    r.fulfill({
+      json: {
+        needsBootstrap: false,
+        registrationOpen: true,
+        registrationEmailAvailable: true,
+        emailVerificationRequired: false,
+        oauthEnabled: false,
+      },
+    }),
+  )
+  let sends = 0
+  await page.route('**/api/auth/email-code', (r) => {
+    ++sends
+    if (sends === 1)
+      return r.fulfill({
+        status: 502,
+        json: { detail: 'verification email could not be sent' },
+      })
+    return r.fulfill({
+      json: {
+        serverTime: '2030-03-01T00:00:00Z',
+        expiresAt: '2030-03-01T00:10:00Z',
+        resendAt: '2030-03-01T00:00:00Z',
+      },
+    })
+  })
+  await page.route('**/api/auth/register', (r) =>
+    r.fulfill({
+      json: {
+        userId: 'example-member',
+        email: 'review@example.invalid',
+        displayName: 'Example',
+        role: 'member',
+        roles: ['member'],
+        authzVersion: 1,
+        permissions: ['products.office'],
+        accessToken: 'synthetic-registered',
+        tokenType: 'bearer',
+        registrationGrant: { points: 40, expiresAt: '2030-03-31T00:00:00Z' },
+      },
+    }),
+  )
+  await page.goto('/#/register?product=office')
+  await page.getByLabel('邮箱', { exact: true }).fill('review@example.invalid')
+  const send = page.getByRole('button', { name: '发送验证码' })
+  await send.click()
+  await expect(page.getByText(/邮件发送失败/)).toBeVisible()
+  await send.click()
+  const code = page.getByLabel('验证码', { exact: true }),
+    pass = page.getByLabel('设置密码')
+  await code.fill('001235')
+  await pass.fill('Example-test-123')
+  await page.getByRole('button', { name: '重新发送' }).click()
+  await expect(code).toHaveValue('')
+  await expect(pass).toHaveValue('Example-test-123')
+  await code.fill('001236')
+  await page.getByRole('button', { name: '验证并创建账号' }).click()
+  await expect(page).toHaveURL(/#\/office(?:[/?]|$)/)
+  await expect(page.getByText(/体验额度已到账 40 点/)).toBeVisible()
+  await expect(
+    page.getByRole('link', { name: '查看我的额度明细' }),
+  ).toHaveAttribute('href', /#\/account\/membership$/)
+  expect(sends).toBe(3)
+})
+
+test('服务端限流刷新仍保留倒计时，换邮箱可独立发码或登录', async ({ page }) => {
+  await installFoundationFixture(page)
+  await page.route('**/api/auth/config', (r) =>
+    r.fulfill({
+      json: {
+        needsBootstrap: false,
+        registrationOpen: true,
+        registrationEmailAvailable: true,
+        oauthEnabled: false,
+        emailVerificationRequired: false,
+      },
+    }),
+  )
+  await page.route('**/api/auth/email-code', (r) =>
+    r.request().postDataJSON().email === 'limited@example.invalid'
+      ? r.fulfill({
+          status: 429,
+          headers: { 'Retry-After': '120' },
+          json: {
+            detail: 'too many verification emails; try again later',
+            code: 'verification_hourly_limit',
+          },
+        })
+      : r.fulfill({
+          status: 409,
+          json: {
+            detail: 'email is already in use',
+            code: 'registration_conflict',
+          },
+        }),
+  )
+  await page.goto('/#/register', { waitUntil: 'domcontentloaded' })
+  const email = page.getByLabel('邮箱', { exact: true })
+  await email.fill('limited@example.invalid')
+  await page.getByRole('button', { name: '发送验证码' }).click()
+  await expect(
+    page.getByText('本小时发送次数已达上限，请稍后重试。'),
+  ).toBeVisible()
+  await page.reload({ waitUntil: 'domcontentloaded' })
+  await expect(page.getByRole('button', { name: /秒后可重发/ })).toBeDisabled()
+  await email.fill('existing@example.invalid')
+  await page.getByRole('button', { name: '发送验证码' }).click()
+  await page.getByRole('link', { name: '用此邮箱登录' }).click()
+  await expect(page.getByLabel('用户名或邮箱')).toHaveValue(
+    'existing@example.invalid',
+  )
 })

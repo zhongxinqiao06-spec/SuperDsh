@@ -1,4 +1,4 @@
-import { computed, onScopeDispose, reactive } from 'vue'
+import { computed, h, onScopeDispose, reactive, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { useResource } from '@/composables/use-resource'
 import { useMutation } from '@/composables/use-mutation'
@@ -9,6 +9,7 @@ import type { AuthResponse } from '@/types/auth/auth'
 import { signedInDestination } from '@/utils/auth/native-oauth'
 import { productOf } from '@/utils/studio/products'
 import { usePreferences } from '@/store/modules/preferences'
+import { ElNotification } from 'element-plus'
 
 /** 登录与开放注册表单；管理员由服务端配置初始化，失败保留输入。 */
 export function useLoginForm() {
@@ -20,10 +21,18 @@ export function useLoginForm() {
   const form = reactive({
     identifier: '',
     password: '',
-    confirm: '',
-    email: '',
-    code: '',
   })
+  watch(
+    () => route.path,
+    (path) => {
+      if (
+        path === '/login' &&
+        typeof history.state?.registrationEmail === 'string'
+      )
+        form.identifier = history.state.registrationEmail
+    },
+    { immediate: true },
+  )
   const abort = new AbortController()
   const { tr } = usePreferences()
   const product = computed(
@@ -53,52 +62,56 @@ export function useLoginForm() {
   async function submit(): Promise<void> {
     // 首个管理员只能由服务端初始化；禁止从遗留入口降为匿名注册请求。
     if (!resource.data.value || initializationPending.value) return
-    if (register.value) {
-      if (
-        !mailAvailable.value ||
-        !form.email.trim() ||
-        !/^\d{6}$/u.test(form.code) ||
-        form.password.length < 8 ||
-        form.password !== form.confirm
-      ) {
-        mutation.error.value = tr(
-          '请输入邮箱、六位验证码和两次一致的密码（至少 8 位）。',
-          'Enter your email, six-digit code and matching passwords (at least 8 characters).',
-        )
-        return
-      }
-    } else if (!form.identifier.trim() || !form.password) {
+    if (register.value) return
+    if (!form.identifier.trim() || !form.password) {
       mutation.error.value = '请输入账号和密码'
       return
     }
     let response: AuthResponse | null = null
     const success = await mutation.run(async () => {
-      if (register.value) {
-        response = await authApi.register(
-          {
-            password: form.password,
-            email: form.email.trim(),
-            product: product.value,
-            code: form.code,
-          },
-          abort.signal,
-        )
-      } else
-        response = await authApi.login(
-          form.identifier,
-          form.password,
-          abort.signal,
-        )
+      response = await authApi.login(
+        form.identifier,
+        form.password,
+        abort.signal,
+      )
     })
     if (success && response && !abort.signal.aborted) {
       // 只有仍挂载的认证页面才能发布新身份；发布后再跳转，避免把正常换代际误判为迟到结果。
       sessionController.accept(response)
       form.password = ''
-      form.confirm = ''
       await router.replace(
         signedInDestination(route.query.returnTo, auth.session?.permissions),
       )
     }
+  }
+  async function registered(result: AuthResponse) {
+    sessionController.accept(result)
+    const destination = signedInDestination(
+      route.query.returnTo,
+      auth.session?.permissions,
+    )
+    const generation = sessionController.generation
+    await router.replace(destination)
+    if (generation !== sessionController.generation) return
+    const grant = result.registrationGrant
+    if (!grant) return
+    const expiry = new Date(grant.expiresAt).toLocaleDateString()
+    const link = router.resolve('/account/membership').href
+    ElNotification({
+      title: tr('注册成功', 'Account created'),
+      message: h('div', [
+        h(
+          'p',
+          tr(
+            `体验额度已到账 ${grant.points} 点，有效期至 ${expiry}。`,
+            `${grant.points} credits received. Valid until ${expiry}.`,
+          ),
+        ),
+        h('a', { href: link }, tr('查看我的额度明细', 'View credit details')),
+      ]),
+      type: 'success',
+      duration: 10000,
+    })
   }
   async function oauth() {
     await mutation.run(async () => {
@@ -117,6 +130,7 @@ export function useLoginForm() {
     initializationPending,
     register,
     submit,
+    registered,
     product,
     mailAvailable,
     oauth,

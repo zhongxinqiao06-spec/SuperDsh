@@ -4,6 +4,7 @@ export class ApiError extends Error {
     message: string,
     readonly status: number,
     readonly code?: string,
+    readonly retryAfter?: number,
   ) {
     super(message)
     this.name = 'ApiError'
@@ -19,7 +20,11 @@ export function errorMessage(error: unknown): string {
 }
 
 /** 接受旧 detail 与规范 message 错误形状；校验错误保持可读。 */
-export function responseError(payload: unknown, status: number): ApiError {
+export function responseError(
+  payload: unknown,
+  status: number,
+  retryAfter?: string | null,
+): ApiError {
   const body = payload && typeof payload === 'object' ? payload : {}
   const detail =
     'detail' in body ? body.detail : 'message' in body ? body.message : null
@@ -33,5 +38,6 @@ export function responseError(payload: unknown, status: number): ApiError {
         : `请求失败（${status}）`,
     status,
     code,
+    retryAfter && /^\d+$/u.test(retryAfter) ? Number(retryAfter) : undefined,
   )
 }

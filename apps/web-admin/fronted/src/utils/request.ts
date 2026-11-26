@@ -91,6 +91,11 @@ export async function request<T>(
   } catch {
     throw new ApiError('服务返回了无法识别的数据', response.status)
   }
-  if (!response.ok) throw responseError(payload, response.status)
+  if (!response.ok)
+    throw responseError(
+      payload,
+      response.status,
+      response.headers.get('Retry-After'),
+    )
   return payload as T
 }

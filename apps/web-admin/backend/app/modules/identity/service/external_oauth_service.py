@@ -244,7 +244,7 @@ class ExternalOAuth:
             owner = existing.id
         if not owner:
             # 旧OAuth注册表单仅提供邮箱和显示名称，用户名沿统一注册规则推导。
-            created = await self.accounts.register(
+            created, _ = await self.accounts.register(
                 RegisterInput(
                     username=body.username,
                     displayName=body.displayName or str(value.get("displayName") or ""),

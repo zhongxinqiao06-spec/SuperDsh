@@ -21,7 +21,36 @@ const messages: Record<string, string> = {
 export function registrationError(
   message: string,
   tr: (zh: string, en: string) => string,
+  code?: string,
 ): string {
+  const actionable: Record<string, [string, string]> = {
+    verification_code_required: [
+      '请先发送验证码，并使用最新一封邮件。',
+      'Request a code and use the latest email.',
+    ],
+    verification_code_incorrect: [
+      '验证码不正确，请核对最新邮件。',
+      'Incorrect code. Check your latest email.',
+    ],
+    verification_code_expired: [
+      '验证码已过期，请重新发送。',
+      'This code expired. Request a new one.',
+    ],
+    verification_attempts_exhausted: [
+      '验证码尝试次数已用完，请在倒计时结束后重新发送。',
+      'Too many incorrect attempts. Request another code after the countdown.',
+    ],
+    verification_cooldown: [
+      '验证码发送较频繁，请在倒计时结束后重试。',
+      'Wait for the countdown before requesting another code.',
+    ],
+    registration_conflict: [
+      '此邮箱已有星桥账号，可直接登录。',
+      'This email already has a Starbridge account. Sign in to continue.',
+    ],
+  }
+  const entry = code ? actionable[code] : undefined
+  if (entry) return tr(...entry)
   const translated = messages[message]
   return typeof translated === 'string' ? tr(translated, message) : message
 }

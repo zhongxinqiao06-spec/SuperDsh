@@ -1,7 +1,7 @@
 """用户注册切片的实库证据，复用合成邮件传输和独立 PostgreSQL。"""
 
 import asyncio
-from datetime import timedelta
+from datetime import datetime, timedelta
 from unittest.mock import AsyncMock
 
 import pytest
@@ -20,7 +20,9 @@ async def test_registration_grant_is_atomic_and_shared(
 ) -> None:
     app, client = platform
     await bootstrap(client)
-    response = await client.patch("/api/admin/settings", json={"registrationOpen": True})
+    response = await client.patch(
+        "/api/admin/settings", json={"registrationOpen": True}
+    )
     assert response.status_code == 200
     body = {
         "email": "studio@example.invalid",
@@ -28,7 +30,9 @@ async def test_registration_grant_is_atomic_and_shared(
         "password": "Synthetic-password-456!",
         "roles": ["admin"],
     }
-    assert (await client.get("/api/auth/config")).json()["registrationEmailAvailable"] is False
+    assert (await client.get("/api/auth/config")).json()[
+        "registrationEmailAvailable"
+    ] is False
     assert (await client.post("/api/auth/register", json=body)).status_code == 503
     sent = AsyncMock()
     app.state.services.accounts.email.sender = sent
@@ -44,11 +48,16 @@ async def test_registration_grant_is_atomic_and_shared(
             },
         )
     ).status_code == 200
+    email_request = {"email": body["email"], "purpose": "register"}
+    issued = await client.post("/api/auth/email-code", json=email_request)
+    assert issued.status_code == 200
+    clock = {k: datetime.fromisoformat(v) for k, v in issued.json().items()}
+    assert clock["expiresAt"] - clock["resendAt"] == timedelta(minutes=9)
+    limited = await client.post("/api/auth/email-code", json=email_request)
     assert (
-        await client.post(
-            "/api/auth/email-code", json={"email": body["email"], "purpose": "register"}
-        )
-    ).status_code == 200
+        limited.status_code == 429 and limited.json()["code"] == "verification_cooldown"
+    )
+    assert 0 < int(limited.headers["retry-after"]) <= 60
     body["code"] = sent.send.await_args.args[2]
     assert (
         await client.post("/api/auth/register", json={**body, "product": "admin"})
@@ -63,7 +72,10 @@ async def test_registration_grant_is_atomic_and_shared(
             await client.post("/api/auth/register", json=body)
     # 失败后原验证码可重试，同一邮箱同时命中新旧两个入口只能产生一次发放。
     results = await asyncio.gather(
-        *(client.post(prefix + "/auth/register", json=body) for prefix in ["/api", "/api/v2"])
+        *(
+            client.post(prefix + "/auth/register", json=body)
+            for prefix in ["/api", "/api/v2"]
+        )
     )
     assert sorted(r.status_code for r in results) == [200, 409]
     user = next(r.json() for r in results if r.status_code == 200)
@@ -89,12 +101,59 @@ async def test_registration_grant_is_atomic_and_shared(
             row.available_delta,
             row.held_delta,
         ) == ("entertainment", 40, 40, 0, 40, 0)
+        assert user["registrationGrant"] == {
+            "points": row.granted,
+            "expiresAt": row.expires_at.isoformat(),
+        }
         assert row.expires_at - row.email_verified_at == timedelta(days=30)
-        assert (await connection.scalar(text("SELECT count(*) FROM billing_wallets"))) == 1
+        assert (
+            await connection.scalar(text("SELECT count(*) FROM billing_wallets"))
+        ) == 1
+
+
+async def test_challenge_expiry_replacement_and_lockout(
+    platform: tuple[FastAPI, AsyncClient],
+) -> None:
+    """用真实数据库时钟推进过期窗口，验证重发覆盖和尝试次数跨请求持久化。"""
+    app, client = platform
+    await bootstrap(client)
+    await client.patch("/api/admin/settings", json={"registrationOpen": True})
+    sender = AsyncMock()
+    app.state.services.accounts.email.registration_sender = sender
+    email = "retry@example.invalid"
+    request = {"email": email, "purpose": "register"}
+    body = {"email": email, "password": "Synthetic-password-456!"}
+    await client.post("/api/auth/email-code", json=request)
+    original = sender.send.await_args.args[2]
+    async with app.state.database.engine.begin() as db:
+        await db.execute(
+            text(
+                "UPDATE account_verification_codes SET sent_at=now()-interval '11 minutes', expires_at=now()-interval '1 minute'"
+            )
+        )
+    expired = await client.post("/api/auth/register", json={**body, "code": original})
+    assert expired.json()["code"] == "verification_code_expired"
+    assert (await client.post("/api/auth/email-code", json=request)).status_code == 200
+    latest = sender.send.await_args.args[2]
+    wrong = original if original != latest else f"{(int(latest) + 1) % 1000000:06d}"
+    for _ in range(4):
+        result = await client.post("/api/auth/register", json={**body, "code": wrong})
+        assert result.json()["code"] == "verification_code_incorrect"
+    exhausted = await client.post("/api/auth/register", json={**body, "code": wrong})
+    assert exhausted.json()["code"] == "verification_attempts_exhausted"
+    assert 0 < int(exhausted.headers["retry-after"]) <= 3600
+    assert (
+        await client.post("/api/auth/register", json={**body, "code": latest})
+    ).status_code == 429
+    assert (await client.post("/api/auth/email-code", json=request)).json()[
+        "code"
+    ] == "verification_attempts_exhausted"
 
 
 @pytest.mark.parametrize("platform_configuration", ["01bd73a6cae2"], indirect=True)
-async def test_upgrade_preserves_existing_user(platform_configuration: Settings) -> None:
+async def test_upgrade_preserves_existing_user(
+    platform_configuration: Settings,
+) -> None:
     """从上一实际 revision 安装数据，再升级并核对用户及未发放状态。"""
     url = platform_configuration.database_url
     engine = create_async_engine(url)
@@ -115,6 +174,9 @@ async def test_upgrade_preserves_existing_user(platform_configuration: Settings)
                 )
             ).one()
             assert tuple(row) == ("original", None, None)
-            assert await connection.scalar(text("SELECT count(*) FROM billing_wallets")) == 0
+            assert (
+                await connection.scalar(text("SELECT count(*) FROM billing_wallets"))
+                == 0
+            )
     finally:
         await engine.dispose()

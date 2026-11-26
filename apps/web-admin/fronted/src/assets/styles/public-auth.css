@@ -391,3 +391,50 @@
   flex: 1;
   min-width: 0;
 }
+
+.registration-form .login-actions {
+  margin-top: 0;
+}
+.registration-step,
+.registration-help,
+.registration-form .login-fields small {
+  color: var(--auth-muted);
+  font-size: var(--font-size-meta);
+}
+.registration-step,
+.registration-help p {
+  margin: 0;
+}
+.registration-address {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: var(--control-gap);
+}
+.registration-address span,
+.registration-address small {
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+.registration-address button {
+  flex: none;
+}
+.registration-help summary {
+  cursor: pointer;
+}
+.login-form .registration-error {
+  color: var(--el-color-danger);
+  margin: 0;
+}
+.login-form .login-text-action:disabled {
+  color: var(--auth-muted);
+  cursor: default;
+}
+@media (max-width: 760px) {
+  .registration-address button,
+  .registration-help summary {
+    min-height: 44px;
+    align-content: center;
+  }
+}

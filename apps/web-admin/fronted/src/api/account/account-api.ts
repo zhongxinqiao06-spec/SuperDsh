@@ -34,12 +34,17 @@ export const accountApi = {
     email: string,
     purpose: 'bind' | 'register' | 'reset',
     pendingToken = '',
+    signal?: AbortSignal,
   ) =>
-    request('/auth/email-code', {
-      method: 'POST',
-      auth: purpose === 'bind',
-      body: { email, purpose, pendingToken },
-    }),
+    request<{ serverTime: string; expiresAt?: string; resendAt?: string }>(
+      '/auth/email-code',
+      {
+        signal,
+        method: 'POST',
+        auth: purpose === 'bind',
+        body: { email, purpose, pendingToken },
+      },
+    ),
   recoveryCodes: () =>
     request<{ codes: string[] }>('/auth/recovery-codes', { method: 'POST' }),
   logoutAll: () => request<void>('/auth/logout-all', { method: 'POST' }),

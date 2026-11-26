@@ -8,6 +8,7 @@ import httpx
 import pytest
 from conftest import bootstrap
 from fastapi import FastAPI
+from sqlalchemy import text
 
 from app.modules.identity.service.registration_ses import TencentRegistrationMail
 
@@ -49,7 +50,9 @@ async def test_registration_uses_only_approved_template(
         base_url="http://localhost:5175",
         headers={"Origin": "http://localhost:5175"},
     ) as guest:
-        assert (await guest.get("/api/auth/config")).json()["registrationEmailAvailable"]
+        assert (await guest.get("/api/auth/config")).json()[
+            "registrationEmailAvailable"
+        ]
         assert (await guest.post("/api/auth/email-code", json=body)).status_code == 403
         assert (
             await client.patch("/api/admin/settings", json={"registrationOpen": True})
@@ -65,7 +68,9 @@ async def test_registration_uses_only_approved_template(
         settings.sender = legacy
         with monkeypatch.context() as patch:
             patch.setattr(httpx.AsyncHTTPTransport, "handle_async_request", wire)
-            assert (await guest.post("/api/auth/email-code", json=body)).status_code == 200
+            assert (
+                await guest.post("/api/auth/email-code", json=body)
+            ).status_code == 200
             assert wire.await_args is not None
             request = wire.await_args.args[0]
             payload = json.loads(request.content)
@@ -76,8 +81,25 @@ async def test_registration_uses_only_approved_template(
             assert request.headers["Authorization"].startswith(
                 "TC3-HMAC-SHA256 Credential=synthetic-id/"
             )
-            assert payload["Template"]["TemplateID"] == 123 and payload["Destination"] == [email]
+            assert payload["Template"]["TemplateID"] == 123 and payload[
+                "Destination"
+            ] == [email]
             assert payload["TriggerType"] == 1 and len(code) == 6
+            # 上一封仍有效时，供应商拒绝重发不能让已收到的验证码作废。
+            async with app.state.database.engine.begin() as db:
+                await db.execute(
+                    text(
+                        "UPDATE account_verification_codes SET sent_at=now()-interval '2 minutes'"
+                    )
+                )
+            wire.return_value = httpx.Response(
+                200, json={"Response": {"Error": {"Code": "FailedOperation"}}}
+            )
+            failed_resend = await guest.post("/api/auth/email-code", json=body)
+            assert (
+                failed_resend.status_code == 502
+                and int(failed_resend.headers["retry-after"]) > 0
+            )
             user = await guest.post(
                 "/api/auth/register",
                 json={
@@ -95,5 +117,5 @@ async def test_registration_uses_only_approved_template(
             rejected = await guest.post(
                 "/api/auth/email-code", json={**body, "email": "other@example.invalid"}
             )
-            assert rejected.status_code == 502 and wire.await_count == 2
+            assert rejected.status_code == 502 and wire.await_count == 3
             legacy.send.assert_not_awaited()

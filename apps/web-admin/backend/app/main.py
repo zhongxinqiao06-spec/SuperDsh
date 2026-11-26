@@ -546,6 +546,9 @@ def create_app(settings: Settings | None = None) -> FastAPI:
         response = JSONResponse(
             {"detail": error.detail, **({"code": error.code} if error.code else {})},
             status_code=error.status,
+            headers={"Retry-After": str(error.retry_after)}
+            if error.retry_after is not None
+            else None,
         )
         if request.scope["path"] == "/api/auth/refresh" and error.status == 401:
             refresh_cookie(request, response)

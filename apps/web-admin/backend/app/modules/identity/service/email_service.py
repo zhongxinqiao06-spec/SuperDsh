@@ -2,6 +2,7 @@
 
 import hashlib
 import hmac
+import math
 import secrets
 from datetime import UTC, datetime, timedelta
 from typing import Protocol
@@ -13,6 +14,16 @@ from app.infrastructure.database import lock_transaction
 from app.infrastructure.errors import DomainError
 from app.modules.identity.dao.account_dao import SqlAccountRepository
 from app.modules.identity.entity.do.account_models import VerificationCodeRow, VerificationLimitRow
+
+
+def wait_error(detail: str, code: str, until: datetime) -> DomainError:
+    """服务端给出实际剩余时间，以便刷新和多标签页共享同一限流窗口。"""
+    return DomainError(
+        429,
+        detail,
+        code,
+        retry_after=max(1, math.ceil((until - datetime.now(UTC)).total_seconds())),
+    )
 
 
 class MailSender(Protocol):
@@ -75,21 +86,38 @@ class EmailVerification:
         self, session: AsyncSession, address: str, purpose: str, user_id: str, code: str
     ) -> bool:
         """错误尝试也必须提交计数；调用方在事务退出之后再抛出校验失败。"""
+        return await self.consume_error(session, address, purpose, user_id, code) is None
+
+    async def consume_error(
+        self, session: AsyncSession, address: str, purpose: str, user_id: str, code: str
+    ) -> DomainError | None:
+        """事务内返回失败原因，让调用方先提交错误计数，再向客户端返回。"""
         row = await self.repository.code(session, self.scope(address, purpose, user_id))
+        detail = "invalid or expired verification code"
         now = datetime.now(UTC)
-        if not row or row.consumed_at or row.expires_at <= now or row.attempts >= 5:
-            return False
+        if not row or row.consumed_at:
+            return DomainError(422, detail, "verification_code_required")
+        if row.attempts >= 5:
+            return wait_error(
+                detail, "verification_attempts_exhausted", row.sent_at + timedelta(hours=1)
+            )
+        if row.expires_at <= now:
+            return DomainError(422, detail, "verification_code_expired")
         if not hmac.compare_digest(row.code_hash, self.digest(row.nonce, code)):
             row.attempts += 1
-            return False
+            if row.attempts >= 5:
+                return wait_error(
+                    detail, "verification_attempts_exhausted", row.sent_at + timedelta(hours=1)
+                )
+            return DomainError(422, detail, "verification_code_incorrect")
         row.consumed_at = now
-        return True
+        return None
 
     async def issue(
         self, configuration: dict[str, object], address: str, purpose: str, user_id: str
-    ) -> None:
+    ) -> dict[str, str]:
         if not self.available(configuration, purpose):
-            raise DomainError(409, "email verification is disabled")
+            raise DomainError(409, "email verification is disabled", "verification_unavailable")
         now, scope = datetime.now(UTC), self.scope(address, purpose, user_id)
         code, nonce = f"{secrets.randbelow(1000000):06d}", secrets.token_urlsafe(24)
         async with self.repository.sessions.begin() as session:
@@ -100,12 +128,24 @@ class EmailVerification:
                 session, hashlib.sha256(address.encode()).hexdigest()
             )
             if limit and limit.started_at > now - timedelta(hours=1) and limit.count >= 10:
-                raise DomainError(429, "too many verification emails; try again later")
+                raise wait_error(
+                    "too many verification emails; try again later",
+                    "verification_hourly_limit",
+                    limit.started_at + timedelta(hours=1),
+                )
             row = await self.repository.code(session, scope)
-            if row and row.sent_at > now - timedelta(seconds=60):
-                raise DomainError(429, "wait 60 seconds before requesting another code")
             if row and row.attempts >= 5 and row.sent_at > now - timedelta(hours=1):
-                raise DomainError(429, "too many incorrect codes; try again later")
+                raise wait_error(
+                    "too many incorrect codes; try again later",
+                    "verification_attempts_exhausted",
+                    row.sent_at + timedelta(hours=1),
+                )
+            if row and row.sent_at > now - timedelta(seconds=60):
+                raise wait_error(
+                    "wait 60 seconds before requesting another code",
+                    "verification_cooldown",
+                    row.sent_at + timedelta(seconds=60),
+                )
             if not limit:
                 limit = VerificationLimitRow(
                     key=hashlib.sha256(address.encode()).hexdigest(), started_at=now, count=0
@@ -114,6 +154,11 @@ class EmailVerification:
             if limit.started_at <= now - timedelta(hours=1):
                 limit.started_at, limit.count = now, 0
             limit.count += 1
+            previous = (
+                (row.nonce, row.code_hash, row.expires_at)
+                if row and not row.consumed_at and row.expires_at > now
+                else None
+            )
             await session.merge(
                 VerificationCodeRow(
                     scope=scope,
@@ -131,6 +176,22 @@ class EmailVerification:
         except Exception as error:
             async with self.repository.sessions.begin() as session:
                 current = await self.repository.code(session, scope)
-                if current and current.code_hash == self.digest(nonce, code):
-                    current.consumed_at = datetime.now(UTC)
-            raise DomainError(502, "verification email could not be sent") from error
+                if current and current.nonce == nonce and not current.consumed_at:
+                    # 重发失败只撤销本次写入；保留原码有效期、累计错误次数和本次发送的冷却。
+                    if previous:
+                        current.nonce, current.code_hash, current.expires_at = previous
+                    else:
+                        current.consumed_at = datetime.now(UTC)
+            raise DomainError(
+                502,
+                "verification email could not be sent",
+                "verification_send_failed",
+                retry_after=max(
+                    1, math.ceil((now + timedelta(seconds=60) - datetime.now(UTC)).total_seconds())
+                ),
+            ) from error
+        return {
+            "serverTime": datetime.now(UTC).isoformat(),
+            "expiresAt": (now + timedelta(minutes=10)).isoformat(),
+            "resendAt": (now + timedelta(seconds=60)).isoformat(),
+        }

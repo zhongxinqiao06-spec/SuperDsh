@@ -110,7 +110,9 @@ class AccountFlows:
         )
         return account_payload(await self.current(account))
 
-    async def register(self, body: RegisterInput, *, oauth_pending: str = "") -> Account:
+    async def register(
+        self, body: RegisterInput, *, oauth_pending: str = ""
+    ) -> tuple[Account, dict[str, object]]:
         """只为已验真邮箱建号，在同一事务内消费凭证、分配入口角色并发放一次体验额度。"""
         settings = await self.system.internal_settings()
         if not settings.get("oauthRegistrationOpen" if oauth_pending else "registrationOpen"):
@@ -123,11 +125,15 @@ class AccountFlows:
         if not verified and not self.email.available(
             object_value(settings.get("email")), "register"
         ):
-            raise DomainError(503, "registration email service unavailable")
+            raise DomainError(
+                503, "registration email service unavailable", "verification_unavailable"
+            )
         hashed = await self.security.hash_password(
             body.password, body.passwordVerifier, body.passwordSalt
         )
         user_id = str(uuid4())
+        verification_error = None
+        grant: dict[str, object] = {}
         async with self.repository.sessions.begin() as session:
             await lock_transaction(session, "web-admin:identity-management")
             if not body.username and body.email and await self.repository.user(session, username):
@@ -135,9 +141,19 @@ class AccountFlows:
             if await self.repository.user(session, username) or (
                 body.email and await self.repository.user(session, body.email)
             ):
-                raise DomainError(409, "username or email is already in use")
+                raise DomainError(
+                    409, "username or email is already in use", "registration_conflict"
+                )
             if not verified:
-                verified = await self.email.consume(session, body.email, "register", "", body.code)
+                # 旧页面可能缺少发码控件，明确给出恢复入口，空提交也不消耗猜码次数。
+                if not body.code:
+                    raise DomainError(
+                        422, "请刷新注册页，先发送并填写邮箱验证码。", "verification_code_required"
+                    )
+                verification_error = await self.email.consume_error(
+                    session, body.email, "register", "", body.code
+                )
+                verified = verification_error is None
             if verified:
                 now = datetime.now(UTC)
                 session.add(
@@ -160,7 +176,7 @@ class AccountFlows:
                 await session.flush()
                 if oauth_pending:
                     await self.external.bind_pending(session, oauth_pending, provider, user_id)
-                await grant_registration_credit(session, user_id, now)
+                grant = await grant_registration_credit(session, user_id, now)
                 await self.repository.audit(
                     session,
                     AuditRow(
@@ -172,8 +188,8 @@ class AccountFlows:
                         created_at=now,
                     ),
                 )
-        if not verified:
-            raise DomainError(422, "invalid or expired verification code")
+        if verification_error is not None:
+            raise verification_error
         # 不创建额外登录会话；调用者使用标准 issue_login 发放一次登录。
         async with self.identity.repository.transaction() as tx:
             from app.modules.identity.service.identity import resolve_account
@@ -181,7 +197,7 @@ class AccountFlows:
             user = await tx.user(user_id)
             if user is None:
                 raise DomainError(500, "account creation failed")
-            return await resolve_account(tx, user)
+            return await resolve_account(tx, user), grant
 
     async def recovery_codes(self, account: Account) -> dict[str, object]:
         """恢复码只在本次响应中出现，替换后旧码立即失效。"""
@@ -273,7 +289,11 @@ class AccountFlows:
             ):
                 return {"serverTime": datetime.now(UTC).isoformat()}
             if body.purpose != "reset" and user and (not account or user.id != account.user_id):
-                raise DomainError(409, "email is already in use")
+                raise DomainError(
+                    409,
+                    "email is already in use",
+                    "registration_conflict" if body.purpose == "register" else None,
+                )
             owner = (
                 user.id
                 if body.purpose == "reset" and user
@@ -281,8 +301,12 @@ class AccountFlows:
                 if body.purpose == "bind" and account
                 else ""
             )
-        await self.email.issue(object_value(settings.get("email")), body.email, body.purpose, owner)
-        return {"serverTime": datetime.now(UTC).isoformat()}
+        receipt = await self.email.issue(
+            object_value(settings.get("email")), body.email, body.purpose, owner
+        )
+        return (
+            dict(receipt) if body.purpose == "register" else {"serverTime": receipt["serverTime"]}
+        )
 
     async def bind_email(self, account: Account, body: EmailInput) -> dict[str, object]:
         settings = await self.system.internal_settings()

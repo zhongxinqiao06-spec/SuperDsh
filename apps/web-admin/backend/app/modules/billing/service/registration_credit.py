@@ -10,8 +10,10 @@ REGISTRATION_POINTS = 40
 REGISTRATION_TERM_DAYS = 30
 
 
-async def grant_registration_credit(session: AsyncSession, user_id: str, now: datetime) -> None:
+async def grant_registration_credit(
+    session: AsyncSession, user_id: str, now: datetime
+) -> dict[str, object]:
     """仅用于刚插入并验证的公开注册账号，失败随建号事务整体回滚。"""
-    await insert_registration_credit(
-        session, user_id, REGISTRATION_POINTS, now, now + timedelta(days=REGISTRATION_TERM_DAYS)
-    )
+    expires_at = now + timedelta(days=REGISTRATION_TERM_DAYS)
+    await insert_registration_credit(session, user_id, REGISTRATION_POINTS, now, expires_at)
+    return {"points": REGISTRATION_POINTS, "expiresAt": expires_at.isoformat()}
