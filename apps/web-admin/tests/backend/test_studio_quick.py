@@ -8,7 +8,7 @@ from pathlib import Path
 
 import httpx
 import pytest
-from conftest import bootstrap, complete_initial_login, upgrade_database
+from conftest import bootstrap_studio, complete_initial_login, grant_studio_points, upgrade_database
 from fastapi import FastAPI, Request
 from httpx import AsyncClient
 from PIL import Image
@@ -60,10 +60,10 @@ def platform_settings(tmp_path: Path) -> dict[str, object]:
     return {"model_defaults_file": config}
 
 
-async def create_quick(client: AsyncClient) -> tuple[str, dict]:
+async def create_quick(client: AsyncClient, key: str = "new-quick") -> tuple[str, dict]:
     created = await client.post(
         "/api/studio/projects",
-        json={"title": "快速登月", "creationMode": "quick", "requestKey": "new-quick"},
+        json={"title": "快速登月", "creationMode": "quick", "requestKey": key},
     )
     assert created.status_code == 200, created.text
     uri = "/api/studio/projects/" + created.json()["id"]
@@ -91,6 +91,61 @@ async def make_plan(client: AsyncClient, uri: str, revision: int, key: str) -> d
     return response.json()
 
 
+async def test_generation_wallet_blocks_before_enqueue_and_serializes_concurrent_projects(
+    platform: tuple[FastAPI, AsyncClient],
+) -> None:
+    app, client = platform
+    owner = str((await bootstrap_studio(client, 40))["userId"])
+    media = app.state.services.media_jobs
+    await media.close()
+    plans = []
+    for index in range(3):
+        uri, saved = await create_quick(client, f"budget-{index}")
+        plan = await make_plan(client, uri, saved["revision"], f"price-{index}")
+        assert plan["usageQuote"]["totalPoints"] == 100
+        plans.append((uri, plan))
+
+    async def confirm(index: int) -> httpx.Response:
+        uri, plan = plans[index]
+        return await client.post(
+            uri + "/quick/generation-plans/" + plan["id"] + "/confirm",
+            json={
+                "revision": plan["revision"],
+                "planHash": plan["planHash"],
+                "requestKey": f"charge-{index}",
+            },
+        )
+
+    async def balance() -> tuple[int, int]:
+        data = (await client.get("/api/me/billing")).json()
+        return data["availablePoints"], data["heldPoints"]
+
+    declined = await confirm(0)
+    assert declined.status_code == 402
+    assert declined.json()["context"] == {"availablePoints": 40, "requiredPoints": 100}
+    assert (await client.get(plans[0][0] + "/quick")).json()["jobs"] == []
+    quote_id = plans[0][1]["usageQuote"]["id"]
+    assert (await client.get("/api/billing/usage-quotes/" + quote_id)).json()["lockedAt"] is None
+    assert await balance() == (40, 0)
+    await grant_studio_points(client, owner, 160)
+    results = await asyncio.gather(*(confirm(i) for i in range(3)))
+    assert sorted(r.status_code for r in results) == [200, 200, 402]
+    assert await balance() == (0, 200)
+    first, second = [i for i, r in enumerate(results) if r.is_success]
+    assert (await confirm(first)).json() == results[first].json()
+    for i, state in [(first, "ready"), (second, "cancelled")]:
+        job_id = results[i].json()["jobs"][0]["id"]
+        async with media.database.sessions() as db:
+            job = await db.get(MediaJob, job_id)
+            assert job is not None
+        await media.mark(job, state)
+        await media.mark(job, state)
+    assert await balance() == (100, 0)
+    entries = (await client.get("/api/me/billing/entries")).json()["items"]
+    assert sum(e["heldDelta"] for e in entries if e["kind"] == "usage_charge") == -100
+    assert sum(e["availableDelta"] for e in entries if e["kind"] == "usage_release") == 100
+
+
 async def test_quick_quote_expiry_and_price_lock(platform: tuple[FastAPI, AsyncClient]) -> None:
     from datetime import UTC, datetime, timedelta
     from uuid import uuid4
@@ -98,7 +153,7 @@ async def test_quick_quote_expiry_and_price_lock(platform: tuple[FastAPI, AsyncC
     from app.modules.billing.entity.do.pricing_do import UsageQuote
 
     app, client = platform
-    await bootstrap(client)
+    await bootstrap_studio(client)
     media = app.state.services.media_jobs
     await media.close()
     uri, saved = await create_quick(client)
@@ -195,7 +250,7 @@ async def test_quick_candidate_numbers_survive_status_updates(
 ) -> None:
     """迟到结果或核对更新不能把旧候选变成新的候选编号。"""
     app, client = platform
-    await bootstrap(client)
+    await bootstrap_studio(client)
     media = app.state.services.media_jobs
     await media.close()
     uri, saved = await create_quick(client)
@@ -230,7 +285,7 @@ async def test_quick_freeze_candidate_collect_and_promote(
     platform: tuple[FastAPI, AsyncClient],
 ) -> None:
     app, client = platform
-    await bootstrap(client)
+    await bootstrap_studio(client)
     media = app.state.services.media_jobs
     await media.close()
     capability = (await client.get("/api/studio/quick-capabilities")).json()
@@ -320,6 +375,8 @@ async def test_quick_freeze_candidate_collect_and_promote(
         await media.process(row)
     ready = (await client.get(uri + "/quick")).json()
     assert ready["jobs"][0]["state"] == "ready", ready
+    charged_wallet = (await client.get("/api/me/billing")).json()
+    assert (charged_wallet["availablePoints"], charged_wallet["heldPoints"]) == (1900, 0)
     assert len(posts) == 1 and posts[0]["input"]["prompt"] == "两只小狗踏上月球"
     assert ready["draft"]["prompt"] == "下一条是海边"
     assert ready["jobs"][0]["quickDraft"]["prompt"] == "两只小狗踏上月球"
@@ -356,7 +413,7 @@ async def test_quick_conflicts_preflight_and_account_isolation(
     platform: tuple[FastAPI, AsyncClient],
 ) -> None:
     app, client = platform
-    login = await bootstrap(client)
+    login = await bootstrap_studio(client)
     await app.state.services.media_jobs.close()
     uri, saved = await create_quick(client)
     body = {
@@ -454,7 +511,7 @@ async def test_quick_cancel_reconcile_regenerate_and_readonly(
     platform: tuple[FastAPI, AsyncClient], monkeypatch: pytest.MonkeyPatch
 ) -> None:
     app, client = platform
-    login = await bootstrap(client)
+    login = await bootstrap_studio(client)
     media = app.state.services.media_jobs
     await media.close()
     uri, saved = await create_quick(client)
@@ -477,6 +534,8 @@ async def test_quick_cancel_reconcile_regenerate_and_readonly(
     cancelled = await client.post(actions, json=body)
     assert cancelled.status_code == 200 and cancelled.json()["state"] == "cancelled"
     assert (await client.post(actions, json=body)).json() == cancelled.json()
+    refunded_wallet = (await client.get("/api/me/billing")).json()
+    assert (refunded_wallet["availablePoints"], refunded_wallet["heldPoints"]) == (2000, 0)
     second = await confirm(await make_plan(client, uri, saved["revision"], "unknown-video"))
     async with media.database.sessions.begin() as session:
         row = await session.get(MediaJob, second["id"])

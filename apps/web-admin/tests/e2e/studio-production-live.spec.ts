@@ -1,4 +1,5 @@
 import { expect, test } from '@playwright/test'
+import { grantCreationBudget } from './live-auth'
 import { newShot } from '../../fronted/src/utils/studio/storyboard'
 import type { PersonalProduction } from '../../fronted/src/types/studio/production'
 import type { StudioProject } from '../../fronted/src/types/studio/studio'
@@ -21,9 +22,11 @@ test('个人库独立制作、批量预检与取消完整闭环', async ({ page 
       r.url().endsWith('/api/auth/login') && r.request().method() === 'POST',
   )
   await page.getByRole('button', { name: '登录 ↵', exact: true }).click()
+  const actor = await (await signed).json()
   const headers = {
-    authorization: 'Bearer ' + (await (await signed).json()).accessToken,
+    authorization: 'Bearer ' + actor.accessToken,
   }
+  await grantCreationBudget(page.request, headers, actor.userId, 2000)
   const connection = await page.request.post('/api/admin/models/connections', {
     headers,
     data: {

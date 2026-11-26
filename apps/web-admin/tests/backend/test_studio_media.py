@@ -7,7 +7,7 @@ from pathlib import Path
 
 import httpx
 import pytest
-from conftest import bootstrap
+from conftest import bootstrap_studio
 from fastapi import FastAPI
 from httpx import AsyncClient
 from PIL import Image
@@ -62,7 +62,7 @@ def platform_settings(tmp_path: Path) -> dict[str, object]:
 
 async def test_batch_resume_adopt_export(platform: tuple[FastAPI, AsyncClient]) -> None:
     app, client = platform
-    login = await bootstrap(client)
+    login = await bootstrap_studio(client)
     services = app.state.services
     jobs = services.media_jobs
     await jobs.close()

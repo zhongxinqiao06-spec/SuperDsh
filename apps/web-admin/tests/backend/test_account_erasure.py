@@ -150,13 +150,13 @@ async def test_confirm_erase_and_register_again(platform: tuple[FastAPI, AsyncCl
             await cleanup.drain_one(services.runtime)
             await asyncio.sleep(0.05)
     second = await register()
-    assert second["userId"] != uid and second["registrationGrant"]["points"] == 40
+    assert second["userId"] != uid and second["registrationGrant"]["points"] == 200
     assert (await client.get(url)).status_code == 200
     async with database.engine.connect() as db:
         assert (
             await db.scalar(
                 text(
-                    "SELECT count(*) FROM billing_credit_lots WHERE user_id=:uid AND remaining=40"
+                    "SELECT count(*) FROM billing_credit_lots WHERE user_id=:uid AND remaining=200"
                 ),
                 {"uid": second["userId"]},
             )

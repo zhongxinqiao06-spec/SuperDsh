@@ -7,6 +7,12 @@ export function billingLabel(
     case 'registration':
     case 'registration_grant':
       return tr('注册赠额', 'Registration credit')
+    case 'usage_hold':
+      return tr('生成预留', 'Generation hold')
+    case 'usage_charge':
+      return tr('生成扣点', 'Generation charge')
+    case 'usage_release':
+      return tr('解除预留', 'Hold released')
     case 'membership_grant':
       return tr('会员周期发放', 'Membership credit')
     case 'gift':

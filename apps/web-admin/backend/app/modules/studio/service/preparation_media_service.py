@@ -3,6 +3,8 @@
 from typing import TYPE_CHECKING, Any, cast
 
 from app.infrastructure.errors import DomainError
+from app.modules.billing.dao.usage_credit import reserve_jobs
+from app.modules.billing.service.quote_service import lock_plan_quote
 from app.modules.identity.entity.bo.models import Account
 from app.modules.models.entity.vo.model_vo import CapabilityBinding
 from app.modules.models.service.image_protocol import supports_reference_images
@@ -14,6 +16,7 @@ from app.modules.studio.entity.do.foundation_do import StudioCommand
 from app.modules.studio.entity.do.models import MediaJob
 from app.modules.studio.entity.vo.preparation_vo import AdoptPreparation, PreparationJob
 from app.modules.studio.entity.vo.studio_vo import AssetInput, identifier
+from app.modules.studio.service.plan_pricing import quote_manifest
 from app.modules.studio.service.series_access_service import assert_episode_editable
 
 if TYPE_CHECKING:
@@ -186,22 +189,46 @@ class PreparationMediaService:
                 "revision": project.revision,
                 "estimatedCost": None,
             }
-            digest = content_hash({"plan": plan, "payload": payload})
+            kind = "speech" if body.kind == "voice" else "image"
+            identity = content_hash(
+                {"project": project_id, "request": body.requestKey, "fingerprint": fingerprint}
+            )
+            priced = await quote_manifest(
+                session,
+                account.user_id,
+                identity,
+                {
+                    "issues": [],
+                    "items": [
+                        {"selected": True, "kind": kind, "target": body.target, "payload": payload}
+                    ],
+                },
+            )
+            quote = priced["usageQuote"]
+            plan["quotedPoints"] = quote["totalPoints"]
+            digest = content_hash({"plan": plan, "payload": payload, "quote": quote["id"]})
             if preview:
                 return {"plan": plan, "planHash": digest}
             if digest != body.planHash:
                 raise DomainError(409, "作品或模型已变化，请重新预检并确认")
+            await lock_plan_quote(session, account.user_id, identity, quote["id"])
             job = MediaJob(
                 id=identifier(),
                 project=project_id,
                 revision=project.revision,
                 request_key=body.requestKey,
                 subject=body.target,
-                kind="speech" if body.kind == "voice" else "image",
+                kind=kind,
                 state="queued",
-                payload=payload,
+                payload={
+                    **payload,
+                    "creditMetered": True,
+                    "usageQuoteId": quote["id"],
+                    "quotedPoints": quote["totalPoints"],
+                },
             )
             session.add(job)
+            await reserve_jobs(session, account.user_id, [(job.id, quote["totalPoints"])])
             await session.flush()
             return {"job": job_view(job)}
 

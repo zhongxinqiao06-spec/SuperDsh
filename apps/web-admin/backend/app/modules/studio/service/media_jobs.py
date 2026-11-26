@@ -13,6 +13,7 @@ from sqlalchemy import select, text, update
 
 from app.infrastructure.crypto import CredentialCipher
 from app.infrastructure.errors import DomainError
+from app.modules.billing.dao.usage_credit import finish_job
 from app.modules.identity.entity.bo.models import Account
 from app.modules.identity.service.identity import IdentityService
 from app.modules.models.entity.vo.model_vo import CapabilityBinding
@@ -231,10 +232,15 @@ class MediaJobs:
             origin=job,
         )
 
-    async def mark(self, job: MediaJob, state: str, **values: Any) -> None:
+    async def mark(
+        self, job: MediaJob, state: str, *, delivery_failure: bool = False, **values: Any
+    ) -> None:
         """迟到的供应商回执仍持久化，但不能覆盖用户已请求的停止状态。"""
         async with self.database.sessions.begin() as session:
             row = await ProductionDao(session).job(job.id, lock=True)
+            if row.payload.get("creditReleased") and state == "ready":
+                return
+            reported = state
             if row.cancel_requested:
                 state = row.state if row.state == "cancelled" else "paused"
                 values.pop("error", None)
@@ -243,6 +249,18 @@ class MediaJobs:
                 if key == "payload":
                     value = {**row.payload, **value}
                 setattr(row, key, value)
+            if row.payload.get("creditMetered"):
+                terminal = reported in {"ready", "cancelled"} or (
+                    reported == "failed" and not row.payload.get("recoveryState")
+                )
+                stopped_after_use = row.cancel_requested and bool(row.payload.get("usageStarted"))
+                if terminal or stopped_after_use:
+                    used = not delivery_failure and (
+                        reported == "ready" or bool(row.payload.get("usageStarted"))
+                    )
+                    charged = await finish_job(session, row.payload["owner"], row.id, used=used)
+                    if not charged:
+                        row.payload = {**row.payload, "creditReleased": True}
 
     async def claim(self, job: MediaJob) -> bool:
         """发送前原子领取；在此之前取消的任务绝不触发付费请求。"""
@@ -280,6 +298,7 @@ class MediaJobs:
     async def _process(self, job: MediaJob) -> None:
         # 只有已保存的远端任务号或下载回执允许恢复；中途失联不能重新发起付费请求。
         state = job.state
+        delivering = state == "downloading"
         try:
             account = await self.identity.get_account(job.payload["owner"])
             account.require("products.entertainment")
@@ -344,7 +363,12 @@ class MediaJobs:
                         await image_provider.generate(
                             job.payload["prompt"], image_references, receipt
                         )
-                        await self.mark(job, "downloading", provider_id="receipt")
+                        await self.mark(
+                            job,
+                            "downloading",
+                            provider_id="receipt",
+                            payload={"usageStarted": True},
+                        )
                         return
                     await image_provider.result(receipt, self.path(job))
                     await self.models.resolve(
@@ -405,13 +429,20 @@ class MediaJobs:
                         url = await provider.speech(job.payload["text"], job.payload["voice"])
                         self.save_submission(job, url=url)
                         await self.mark(
-                            job, "downloading", provider_id=self.cipher.seal(url, job.id)
+                            job,
+                            "downloading",
+                            provider_id=self.cipher.seal(url, job.id),
+                            payload={"usageStarted": True},
                         )
                     return
                 if state == "polling":
                     status, url = await provider.status(job.provider_id or "")
                     if status in {"PENDING", "RUNNING"}:
-                        await self.mark(job, "polling")
+                        await self.mark(
+                            job,
+                            "polling",
+                            payload={"usageStarted": True} if status == "RUNNING" else {},
+                        )
                         return
                     if status != "SUCCEEDED":
                         await self.mark(
@@ -426,6 +457,7 @@ class MediaJobs:
                         return
                 else:
                     url = self.cipher.open(job.provider_id or "", job.id)
+                delivering = True
                 await provider.download(url, self.path(job))
                 if job.kind == "speech":
                     with wave.open(str(self.path(job)), "rb") as audio:
@@ -456,11 +488,18 @@ class MediaJobs:
                 await self.mark(
                     job,
                     "unknown" if transient and state == "submitting" else "failed",
+                    delivery_failure=delivering,
                     error=detail,
                     payload={
                         **job.payload,
                         "recoveryState": state
-                        if transient and state in {"polling", "downloading"}
+                        if transient
+                        and state in {"polling", "downloading"}
+                        and not (
+                            delivering
+                            and isinstance(exc, OSError)
+                            and not isinstance(exc, TimeoutError)
+                        )
                         else None,
                     },
                 )

@@ -559,7 +559,11 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     @app.exception_handler(DomainError)
     async def domain_error(request: Request, error: DomainError) -> JSONResponse:
         response = JSONResponse(
-            {"detail": error.detail, **({"code": error.code} if error.code else {})},
+            {
+                "detail": error.detail,
+                **({"code": error.code} if error.code else {}),
+                **({"context": error.context} if error.context else {}),
+            },
             status_code=error.status,
             headers={"Retry-After": str(error.retry_after)}
             if error.retry_after is not None

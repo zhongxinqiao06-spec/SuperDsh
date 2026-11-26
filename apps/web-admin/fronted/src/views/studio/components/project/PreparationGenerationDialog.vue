@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { ApiError } from '@/utils/errors'
 import { createUuid } from '@/utils/uuid'
 import { computed, ref, watch } from 'vue'
 import ManagementDialog from '@/components/overlay/ManagementDialog.vue'
@@ -119,6 +120,10 @@ async function submit() {
       open.value = false
     }
   } catch (cause) {
+    if (cause instanceof ApiError && cause.status === 409) {
+      attempt = undefined
+      preview.value = undefined
+    }
     error.value = cause instanceof Error ? cause.message : String(cause)
   } finally {
     busy.value = false
@@ -131,7 +136,11 @@ async function submit() {
     :title="title"
     :busy="busy"
     :error="error"
-    :submit-text="preview?.plan ? '确认提交本次生成' : '检查本次方案'"
+    :submit-text="
+      preview?.plan
+        ? `确认并预留 ${preview.plan.quotedPoints} 点`
+        : '检查本次方案'
+    "
     :submit-disabled="
       !configuration || (kind === 'voice' && (!voice || !text.trim()))
     "
@@ -200,7 +209,11 @@ async function submit() {
         <p v-else>生成 1 张画面 · {{ preview.plan.references }} 张参考图</p>
         <ExpandableText :text="preview.plan.text" label="制作内容" />
         <p class="studio-meta">
-          本次费用由供应商结算，目前无法预估。确认后提交；结果先进入候选区，不自动替换作品。
+          本次生成需要
+          {{
+            preview.plan.quotedPoints
+          }}
+          创作点。确认后预留，完成后结果进入候选区。
         </p>
         <el-button text :disabled="busy" @click="preview = undefined"
           >返回修改方案</el-button

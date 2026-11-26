@@ -50,6 +50,9 @@ function nextPage() {
           /><el-option
             v-for="type in [
               'membership_grant',
+              'usage_hold',
+              'usage_charge',
+              'usage_release',
               'gift',
               'compensation',
               'topup',

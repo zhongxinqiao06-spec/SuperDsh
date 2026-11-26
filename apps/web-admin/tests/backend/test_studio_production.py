@@ -8,7 +8,7 @@ from pathlib import Path
 
 import httpx
 import pytest
-from conftest import bootstrap, complete_initial_login
+from conftest import bootstrap_studio, complete_initial_login
 from fastapi import FastAPI
 from httpx import AsyncClient
 from PIL import Image
@@ -65,7 +65,7 @@ async def test_personal_generation_version_and_isolation(
     platform: tuple[FastAPI, AsyncClient],
 ) -> None:
     app, client = platform
-    await bootstrap(client)
+    await bootstrap_studio(client)
     media = app.state.services.media_jobs
     await media.close()
     asset = (
@@ -134,7 +134,7 @@ async def test_personal_generation_version_and_isolation(
 
 async def test_preflight_ranges_cancel_and_receipt(platform: tuple[FastAPI, AsyncClient]) -> None:
     app, client = platform
-    await bootstrap(client)
+    await bootstrap_studio(client)
     media = app.state.services.media_jobs
     await media.close()
     uri, project = await create(client)
@@ -221,7 +221,7 @@ async def test_durable_receipt_recovers_without_resubmitting(
     platform: tuple[FastAPI, AsyncClient],
 ) -> None:
     app, client = platform
-    await bootstrap(client)
+    await bootstrap_studio(client)
     media = app.state.services.media_jobs
     await media.close()
     uri, project = await create(client)
@@ -282,7 +282,7 @@ async def test_concurrent_confirm_late_receipt_and_stale_revision(
     platform: tuple[FastAPI, AsyncClient],
 ) -> None:
     app, client = platform
-    await bootstrap(client)
+    await bootstrap_studio(client)
     media = app.state.services.media_jobs
     await media.close()
     uri, project = await create(client)

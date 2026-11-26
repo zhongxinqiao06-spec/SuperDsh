@@ -1,5 +1,7 @@
 <script setup lang="ts">
-import { computed, ref } from 'vue'
+import { computed, ref, watch } from 'vue'
+import { useRoute } from 'vue-router'
+import MembershipPlanCard from './components/MembershipPlanCard.vue'
 import { membershipApi } from '@/api/billing/membership-api'
 import ResourceStatus from '@/components/feedback/ResourceStatus.vue'
 import PageHeader from '@/components/layout/PageHeader.vue'
@@ -10,6 +12,14 @@ import '@/assets/styles/billing.css'
 const { tr } = usePreferences()
 const { data, loading, error, reload } = useResource(membershipApi.catalog)
 const chosen = ref('')
+const route = useRoute()
+watch(
+  () => route.query.plan,
+  (id) => {
+    chosen.value = typeof id === 'string' ? id : ''
+  },
+  { immediate: true },
+)
 const memberships = computed(
   () => data.value?.items.filter((p) => p.kind === 'membership') ?? [],
 )
@@ -53,45 +63,18 @@ const money = (fen: number) =>
         "
       >
         <div
-          class="billing-plans"
+          class="membership-card-grid"
           role="group"
           :aria-label="tr('会员套餐', 'Membership plans')"
         >
-          <button
+          <MembershipPlanCard
             v-for="plan in memberships"
             :key="plan.id"
-            type="button"
-            class="billing-option"
-            :aria-pressed="plan.id === selected.id"
+            :plan="plan"
+            :selected="plan.id === selected.id"
+            :clip-points="data.sampleClipPoints"
             @click="chosen = plan.id"
-          >
-            <strong>{{ plan.name }}</strong
-            ><span class="billing-price"
-              >{{ money(plan.priceFen) }}
-              <small
-                >/
-                {{
-                  plan.termUnit === 'month'
-                    ? tr('月', 'month')
-                    : tr('年', 'year')
-                }}</small
-              ></span
-            >
-            <span
-              >{{ plan.points.toLocaleString() }}
-              {{ tr('创作点', 'credits') }}</span
-            >
-            <small v-if="data.sampleClipPoints">{{
-              tr(
-                '约 ' +
-                  Math.floor(plan.points / data.sampleClipPoints) +
-                  ' 个示例镜头',
-                'About ' +
-                  Math.floor(plan.points / data.sampleClipPoints) +
-                  ' sample shots',
-              )
-            }}</small>
-          </button>
+          />
         </div>
       </SettingsCard>
       <SettingsCard

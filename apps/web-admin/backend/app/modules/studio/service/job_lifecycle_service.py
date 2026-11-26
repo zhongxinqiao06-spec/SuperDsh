@@ -4,6 +4,7 @@ import json
 from typing import TYPE_CHECKING, Any, cast
 
 from app.infrastructure.errors import DomainError
+from app.modules.billing.dao.usage_credit import finish_job
 from app.modules.identity.entity.bo.models import Account
 from app.modules.models.entity.vo.model_vo import CapabilityBinding
 from app.modules.studio.dao.production_dao import ProductionDao
@@ -128,6 +129,8 @@ class JobLifecycleService:
                     else job.payload.get("recoveryState"),
                 }
             elif body.action in {"resume", "receipt"}:
+                if job.payload.get("creditReleased"):
+                    raise DomainError(409, "此任务的预留已释放，请重新预检生成")
                 if job.state not in UNCERTAIN | {"failed"}:
                     raise DomainError(409, "任务状态已变化，请刷新")
                 if remote_status in {"CANCELED", "CANCELLED"}:
@@ -162,6 +165,16 @@ class JobLifecycleService:
                     if body.action == "unaccepted"
                     else job.error
                 )
+            if remote_status in {"RUNNING", "SUCCEEDED"}:
+                job.payload = {**job.payload, "usageStarted": True}
+            stopped_after_use = job.state == "paused" and job.payload.get("usageStarted")
+            if job.payload.get("creditMetered") and (
+                job.state in {"cancelled", "failed"} or stopped_after_use
+            ):
+                used = bool(job.payload.get("usageStarted"))
+                charged = await finish_job(session, account.user_id, job.id, used=used)
+                if not charged:
+                    job.payload = {**job.payload, "creditReleased": True}
             await session.flush()
             await session.refresh(job)
             result = job_view(job)
@@ -201,6 +214,21 @@ class JobLifecycleService:
                         and remote_status in {"CANCELED", "CANCELLED"}
                     ):
                         current.state, current.error = "cancelled", "供应商已确认取消"
+                        if current.payload.get("creditMetered"):
+                            await finish_job(
+                                session,
+                                account.user_id,
+                                current.id,
+                                used=bool(current.payload.get("usageStarted")),
+                            )
+                    elif (
+                        current.cancel_requested
+                        and current.state == "paused"
+                        and remote_status in {"RUNNING", "SUCCEEDED"}
+                    ):
+                        current.payload = {**current.payload, "usageStarted": True}
+                        if current.payload.get("creditMetered"):
+                            await finish_job(session, account.user_id, current.id, used=True)
                     record = await dao.action(account.user_id, body.requestKey)
                     await session.flush()
                     await session.refresh(current)

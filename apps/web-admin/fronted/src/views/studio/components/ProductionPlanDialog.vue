@@ -116,7 +116,7 @@ const states: Record<string, string> = {
           >报价有效至
           {{
             new Date(plan.usageQuote.expiresAt).toLocaleTimeString()
-          }}，确认后沿用此价格。</small
+          }}，确认后按此价格预留创作点。</small
         >
       </section>
       <p v-else class="studio-meta">

@@ -1,7 +1,7 @@
 import { expect, test, type Page } from '@playwright/test'
 import { randomUUID } from 'node:crypto'
 import type { QuickProject } from '../../fronted/src/types/studio/quick'
-import { loginIsolatedAccount } from './live-auth'
+import { grantCreationBudget, loginIsolatedAccount } from './live-auth'
 
 /** 浏览器、API、事务和媒体队列真实运行；仅供应商传输由隔离替身接管。 */
 test('作品分类与快速视频：预检、候选、恢复、收藏和进入分镜', async ({
@@ -65,6 +65,7 @@ test('作品分类与快速视频：预检、候选、恢复、收藏和进入�
   })
   expect(userResponse.ok(), await userResponse.text()).toBeTruthy()
   const user = await userResponse.json()
+  await grantCreationBudget(page.request, adminHeaders, user.userId, 40)
   const firstLogin = await loginIsolatedAccount(
     page.request,
     username,
@@ -121,6 +122,54 @@ test('作品分类与快速视频：预检、候选、恢复、收藏和进入�
   await expect(plan.getByText(`本次上限 ${expectedPoints} 点`)).toBeVisible()
   expect((await read()).jobs).toHaveLength(0)
   await expect(plan.getByText('受控文本视频', { exact: false })).toBeVisible()
+  await plan.getByRole('button', { name: '确认用量并提交' }).click()
+  const offer = page.getByRole('dialog', { name: '创作点不足' })
+  await expect(
+    offer.getByText('本次生成需要 100 点，当前可用 40 点，还差 60 点。'),
+  ).toBeVisible()
+  expect((await read()).jobs).toHaveLength(0)
+  await expect(offer.locator('.membership-plan-card')).toHaveCount(3)
+  await expect
+    .poll(() =>
+      offer
+        .locator('img')
+        .evaluateAll((images) =>
+          images.every(
+            (img) =>
+              img instanceof HTMLImageElement &&
+              img.complete &&
+              img.naturalWidth > 0,
+          ),
+        ),
+    )
+    .toBe(true)
+  for (const width of [390, 1280]) {
+    await page.setViewportSize({ width, height: 850 })
+    await expect(
+      offer.getByRole('button', { name: '查看会员办理' }),
+    ).toBeInViewport()
+    await page.screenshot({
+      path:
+        process.env.WEB_ADMIN_VALIDATION_DIR +
+        '/membership-offer-' +
+        width +
+        '.png',
+      animations: 'disabled',
+    })
+  }
+  await offer.getByRole('button', { name: /创作会员/ }).click()
+  await offer.getByRole('button', { name: '查看会员办理' }).click()
+  await expect(page).toHaveURL(/account\/plans\?.*plan=/)
+  await expect(page.getByRole('button', { name: /创作会员/ })).toHaveAttribute(
+    'aria-pressed',
+    'true',
+  )
+  await grantCreationBudget(page.request, adminHeaders, user.userId, 360)
+  await page.goto('/#/entertainment/quick/' + id)
+  await expect(page.getByLabel('视频提示词')).toHaveValue(
+    '雨后清晨，列车缓缓驶入安静的车站',
+  )
+  await page.getByRole('button', { name: '生成一条视频' }).click()
   await plan.getByRole('button', { name: '确认用量并提交' }).click()
   await expect
     .poll(async () => (await read()).jobs[0]?.state, { timeout: 30_000 })

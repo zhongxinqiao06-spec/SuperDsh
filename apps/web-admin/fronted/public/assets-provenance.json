@@ -207,6 +207,24 @@
       "source": "OpenAI Image Gen / Starbridge Studio chapters / exec-58609345-49e8-46a4-b689-636facfdd38a",
       "owner": "SuperDsh original generated concept artwork",
       "usage": "Public studio website illustration"
+    },
+    {
+      "path": "images/membership/light.webp",
+      "source": "OpenAI ImageGen / Starbridge membership collection",
+      "owner": "SuperDsh original generated artwork",
+      "usage": "Membership plan and credit shortfall cards"
+    },
+    {
+      "path": "images/membership/creator.webp",
+      "source": "OpenAI ImageGen / Starbridge membership collection",
+      "owner": "SuperDsh original generated artwork",
+      "usage": "Membership plan and credit shortfall cards"
+    },
+    {
+      "path": "images/membership/pro.webp",
+      "source": "OpenAI ImageGen / Starbridge membership collection",
+      "owner": "SuperDsh original generated artwork",
+      "usage": "Membership plan and credit shortfall cards"
     }
   ]
 }

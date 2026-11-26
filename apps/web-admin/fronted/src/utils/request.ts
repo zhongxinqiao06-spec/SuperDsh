@@ -2,6 +2,7 @@ import { apiUrl } from '@/utils/api-config'
 import { requestSignal } from '@/utils/request-timeout'
 import { ApiError, responseError } from '@/utils/errors'
 import { sessionController } from '@/store/session-controller'
+import { showCreditShortfall } from '@/store/modules/credit-shortfall'
 
 /** 领域API调用选项；取消信号向下传播，默认请求有时间上限。 */
 export interface RequestOptions {
@@ -91,11 +92,21 @@ export async function request<T>(
   } catch {
     throw new ApiError('服务返回了无法识别的数据', response.status)
   }
-  if (!response.ok)
+  if (!response.ok) {
+    if (
+      response.status === 402 &&
+      payload &&
+      typeof payload === 'object' &&
+      'code' in payload &&
+      payload.code === 'insufficient_credits' &&
+      'context' in payload
+    )
+      showCreditShortfall(payload.context)
     throw responseError(
       payload,
       response.status,
       response.headers.get('Retry-After'),
     )
+  }
   return payload as T
 }

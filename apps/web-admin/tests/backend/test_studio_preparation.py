@@ -9,7 +9,7 @@ from pathlib import Path
 
 import httpx
 import pytest
-from conftest import bootstrap
+from conftest import bootstrap, bootstrap_studio
 from fastapi import FastAPI
 from httpx import AsyncClient
 from PIL import Image
@@ -199,7 +199,7 @@ async def test_confirm_and_three_way_review(platform: tuple[FastAPI, AsyncClient
 @pytest.mark.parametrize("platform_settings", ["volcano", "bailian"], indirect=True)
 async def test_reference_voice_candidate_adoption(platform: tuple[FastAPI, AsyncClient]) -> None:
     app, client = platform
-    await bootstrap(client)
+    await bootstrap_studio(client)
     media = app.state.services.media_jobs
     await media.close()
     media.root.mkdir(parents=True, exist_ok=True)
@@ -400,7 +400,7 @@ async def test_reference_voice_candidate_adoption(platform: tuple[FastAPI, Async
 async def test_preflight_and_unknown_submission(platform: tuple[FastAPI, AsyncClient]) -> None:
     """无效音色与过期计划先拒绝；提交超时保留未知，不因同号重试重复收费。"""
     app, client = platform
-    await bootstrap(client)
+    await bootstrap_studio(client)
     media = app.state.services.media_jobs
     await media.close()
     uri, project = await create(client)

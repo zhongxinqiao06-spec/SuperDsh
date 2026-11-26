@@ -123,6 +123,32 @@ async def bootstrap(client: AsyncClient, prefix: str = "/api") -> dict[str, obje
     return data
 
 
+async def grant_studio_points(client: AsyncClient, owner: str, points: int) -> None:
+    """隔离制作测试通过真实运营入口为合成账号准备额度。"""
+    preview = await client.post(
+        "/api/admin/billing/operation-previews",
+        json={
+            "userId": owner,
+            "action": "gift",
+            "points": points,
+            "validDays": 30,
+            "reason": "隔离测试制作预算",
+            "businessKey": str(uuid4()),
+        },
+    )
+    assert preview.is_success, preview.text
+    reply = await client.post(
+        "/api/admin/billing/adjustments", json={"previewId": preview.json()["id"]}
+    )
+    assert reply.is_success, reply.text
+
+
+async def bootstrap_studio(client: AsyncClient, points: int = 2000) -> dict[str, object]:
+    actor = await bootstrap(client)
+    await grant_studio_points(client, str(actor["userId"]), points)
+    return actor
+
+
 async def complete_initial_login(
     client: AsyncClient, identifier: str, password: str
 ) -> dict[str, object]:

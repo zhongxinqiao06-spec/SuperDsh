@@ -3,6 +3,7 @@
 from typing import TYPE_CHECKING
 
 from app.infrastructure.errors import DomainError
+from app.modules.billing.dao.usage_credit import reserve_jobs
 from app.modules.billing.service.quote_service import lock_plan_quote
 from app.modules.identity.entity.bo.models import Account
 from app.modules.studio.dao.production_dao import ProductionDao
@@ -179,6 +180,7 @@ class GenerationPlans:
                     "planId": plan.id,
                     "usageQuoteId": locked["id"],
                     "quotedPoints": locked["items"][len(rows)]["points"],
+                    "creditMetered": True,
                     "inputHash": input_hash(item["kind"], item["payload"]),
                     "fingerprint": plan.request_hash,
                 }
@@ -212,6 +214,9 @@ class GenerationPlans:
                 )
                 dao.add(row)
                 rows.append(row)
+            await reserve_jobs(
+                session, account.user_id, [(row.id, row.payload["quotedPoints"]) for row in rows]
+            )
             await session.flush()
             plan.state = "confirmed"
             plan.result = {"jobs": [job_view(row) for row in rows], "usageQuote": locked}

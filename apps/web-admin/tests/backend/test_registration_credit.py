@@ -100,7 +100,7 @@ async def test_registration_grant_is_atomic_and_shared(
             row.held,
             row.available_delta,
             row.held_delta,
-        ) == ("entertainment", 40, 40, 0, 40, 0)
+        ) == ("entertainment", 200, 200, 0, 200, 0)
         assert user["registrationGrant"] == {
             "points": row.granted,
             "expiresAt": row.expires_at.isoformat(),

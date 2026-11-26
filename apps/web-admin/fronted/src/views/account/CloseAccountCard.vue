@@ -110,8 +110,8 @@ async function confirm() {
       <li>
         {{
           tr(
-            '同一邮箱可以重新注册，按新用户领取 40 点体验额度。',
-            'You can register again with this email and receive 40 trial credits as a new user.',
+            '同一邮箱可以重新注册，并按注册时的标准领取体验额度。',
+            'You can register again with this email and receive the trial credits offered at that time.',
           )
         }}
       </li>

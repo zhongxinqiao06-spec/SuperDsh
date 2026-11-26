@@ -49,7 +49,7 @@ for (const theme of ['light', 'dark'] as const) {
       await open.click()
       await expect(modal).toBeVisible()
       await expect(modal.getByText('admin', { exact: true })).toBeVisible()
-      await expect(modal.getByText(/40 点体验额度/)).toBeVisible()
+      await expect(modal.getByText(/领取体验额度/)).toBeVisible()
       const bounds = await modal.boundingBox()
       expect(bounds!.x).toBeGreaterThanOrEqual(0)
       expect(bounds!.x + bounds!.width).toBeLessThanOrEqual(width + 1)
@@ -206,12 +206,12 @@ for (const product of ['entertainment', 'office'] as const) {
       expect(response.request().postDataJSON().product).toBe(product)
       const account = await response.json()
       expect(account.roles).toEqual([role])
-      expect(account.registrationGrant.points).toBe(40)
+      expect(account.registrationGrant.points).toBe(200)
       await expect(page).toHaveURL(new RegExp('#/' + product + '$'))
       const wallet = await request.get('/api/me/billing', {
         headers: { authorization: 'Bearer ' + account.accessToken },
       })
-      expect((await wallet.json()).availablePoints).toBe(40)
+      expect((await wallet.json()).availablePoints).toBe(200)
       return account.userId as string
     }
     try {

@@ -6,7 +6,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.modules.billing.dao.credit_dao import insert_registration_credit
 
-REGISTRATION_POINTS = 40
+REGISTRATION_POINTS = 200
 REGISTRATION_TERM_DAYS = 30
 
 
