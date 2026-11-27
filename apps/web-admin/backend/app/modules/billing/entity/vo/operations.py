@@ -10,8 +10,6 @@ from pydantic.alias_generators import to_camel
 from app.modules.billing.entity.vo.changes import ChangeSummary
 from app.modules.billing.entity.vo.dto import BillingView
 
-# 运营发卡面额由服务端校验，办理表单通过目录读取同一组数值。
-CARD_DENOMINATIONS = (100, 200, 500, 1000, 2000)
 Action = Literal["open", "renew", "gift", "compensation", "topup", "card"]
 Payment = Literal["complimentary", "offline"]
 
@@ -26,6 +24,8 @@ class OperationInput(BillingView):
     business_key: UUID
     action: Action
     reason: str = Field(min_length=1, max_length=300)
+    card_type_id: str | None = Field(None, min_length=1, max_length=80)
+    card_revision: int | None = Field(None, ge=1)
     plan_version_id: str | None = Field(None, min_length=1, max_length=80)
     points: Annotated[int, Field(strict=True, ge=1, le=1000000)] | None = None
     valid_days: Annotated[int, Field(strict=True, ge=1, le=3650)] | None = None
@@ -35,8 +35,10 @@ class OperationInput(BillingView):
 
     @model_validator(mode="after")
     def consistent(self) -> "OperationInput":
-        if self.action == "card" and self.points not in CARD_DENOMINATIONS:
-            raise ValueError("请选择有效的额度卡面额")
+        if (self.card_type_id is None) != (self.card_revision is None) or (
+            self.card_type_id and self.action != "card"
+        ):
+            raise ValueError("请选择有效的卡种及修订")
         manual = self.action in {"gift", "compensation", "card"}
         if manual and (
             self.points is None
@@ -61,6 +63,10 @@ class OperationInput(BillingView):
 
 
 class Quote(BillingView):
+    card_type_id: str | None = None
+    card_revision: int | None = None
+    card_image: str | None = None
+    weekly_limit: int | None = None
     plan_change_id: str | None = None
     username: str
     action: Action

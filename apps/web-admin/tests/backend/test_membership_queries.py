@@ -20,13 +20,26 @@ from app.modules.navigation.entity.do.models import NavigationRow
 async def test_personal_credit_queries(platform: tuple[FastAPI, AsyncClient]) -> None:
     app, client = platform
     path = "/api/me/billing"
-    for url in [path, path + "/entries", path + "/entries/nonexistent", path + "/cards", "/api/billing/catalog"]:
+    for url in [
+        path,
+        path + "/entries",
+        path + "/entries/nonexistent",
+        path + "/cards",
+        "/api/billing/catalog",
+    ]:
         assert (await client.get(url)).status_code == 401
     account = await bootstrap(client)
     owner = str(account["userId"])
     empty = (await client.get(path)).json()
-    assert (empty["availablePoints"], empty["subscription"], empty["lots"]) == (0, None, [])
-    assert (await client.get(path + "/entries")).json() == {"items": [], "nextCursor": None}
+    assert (empty["availablePoints"], empty["subscription"], empty["lots"]) == (
+        0,
+        None,
+        [],
+    )
+    assert (await client.get(path + "/entries")).json() == {
+        "items": [],
+        "nextCursor": None,
+    }
     now = datetime.now(UTC)
     async with app.state.database.sessions.begin() as db:
         assert await db.scalar(text("SELECT count(*) FROM billing_wallets")) == 0
@@ -78,7 +91,11 @@ async def test_personal_credit_queries(platform: tuple[FastAPI, AsyncClient]) ->
             )
         )
     wallet = (await client.get(path + "?userId=other")).json()
-    assert (wallet["availablePoints"], wallet["heldPoints"], wallet["expiringPoints"]) == (207, 5, 7)
+    assert (
+        wallet["availablePoints"],
+        wallet["heldPoints"],
+        wallet["expiringPoints"],
+    ) == (207, 5, 7)
     assert wallet["lots"][0]["availablePoints"] == 0 and wallet["lots"][0]["held"] == 2
     assert wallet["subscription"]["plan"]["priceFen"] == 2900
     assert (await client.get(path + "/entries/" + foreign)).status_code == 404
@@ -90,7 +107,7 @@ async def test_personal_credit_queries(platform: tuple[FastAPI, AsyncClient]) ->
     ).json()
     assert [i["id"] for i in last["items"]] == ["tie-a"] and last["nextCursor"] is None
     detail = (await client.get(path + "/entries/tie-b")).json()
-    assert detail["lotId"] == lot_id and detail["sourceKey"] == "registration"
+    assert detail["lotId"] == lot_id and detail["sourceKey"] == "card:registration"
     assert (await client.get(path + "/entries?since=2026-01-01")).status_code == 422
     future = now + timedelta(days=1)
     assert (await client.get(path + "/entries", params={"since": future.isoformat()})).json()[
@@ -124,7 +141,11 @@ async def test_wallet_at_exact_expiry(platform: tuple[FastAPI, AsyncClient]) -> 
                 )
             )
     wallet = await MembershipRepository(app.state.database).wallet(owner, now, 7, 1)
-    assert (wallet.available_points, wallet.held_points, wallet.expiring_points) == (16, 4, 8)
+    assert (wallet.available_points, wallet.held_points, wallet.expiring_points) == (
+        16,
+        4,
+        8,
+    )
     assert wallet.has_more_lots and [lot.id for lot in wallet.lots] == ["boundary-0"]
 
 
@@ -134,11 +155,11 @@ async def test_effective_catalog(platform: tuple[FastAPI, AsyncClient]) -> None:
     path = "/api/billing/catalog"
     catalog = (await client.get(path)).json()
     assert catalog["saleOpen"] is False
-    assert [(p["priceFen"], p["points"]) for p in catalog["items"]] == [
-        (1900, 180),
-        (2900, 300),
-        (6900, 800),
-        (19900, 2600),
+    assert [(p["priceFen"], p["points"], p["weeklyPoints"]) for p in catalog["items"]] == [
+        (1900, 180, None),
+        (2900, 500, 200),
+        (6900, 1500, 500),
+        (19900, 3000, 1000),
     ]
     now = datetime.now(UTC)
     async with app.state.database.sessions.begin() as db:
@@ -161,7 +182,9 @@ async def test_effective_catalog(platform: tuple[FastAPI, AsyncClient]) -> None:
 
 
 @pytest.mark.parametrize("platform_configuration", ["02ce84b7dbf3"], indirect=True)
-async def test_upgrade_preserves_menu_settings(platform_configuration: Settings) -> None:
+async def test_upgrade_preserves_menu_settings(
+    platform_configuration: Settings,
+) -> None:
     engine = create_async_engine(platform_configuration.database_url)
     group: dict[str, object] = dict(
         id="account.membership",

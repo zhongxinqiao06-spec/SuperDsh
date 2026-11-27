@@ -10,7 +10,14 @@ from sqlalchemy.ext.asyncio import create_async_engine
 
 from app.infrastructure.database import Base
 from app.modules.agents.entity.do import agent_do
-from app.modules.billing.entity.do import change_do, credit_do, operation_do, plan_do, pricing_do
+from app.modules.billing.entity.do import (
+    card_do,
+    change_do,
+    credit_do,
+    operation_do,
+    plan_do,
+    pricing_do,
+)
 from app.modules.conversations.entity.do import models as conversation_models
 from app.modules.devices.entity.do import models as device_models
 from app.modules.devices.entity.do import operation_do as device_operation_models
@@ -38,6 +45,7 @@ from app.modules.studio.entity.do import models as studio_models
 
 # 导入只注册自有 DO 元数据，历史 revision 文件不依赖这份可变模型。
 MODEL_MODULES = (
+    card_do,
     credit_do,
     change_do,
     plan_do,

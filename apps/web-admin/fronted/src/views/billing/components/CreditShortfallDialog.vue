@@ -24,7 +24,7 @@ const gap = computed(() =>
     : 0,
 )
 const recommended = computed(() =>
-  plans.value.find((p) => p.points >= gap.value),
+  plans.value.find((p) => Math.min(p.weeklyPoints ?? 0, p.points) >= gap.value),
 )
 const choice = ref('')
 const selected = computed(
@@ -100,7 +100,6 @@ async function seePlans() {
           :plan="p"
           :selected="p.id === selected?.id"
           :recommended="p.id === recommended?.id"
-          :clip-points="data?.sampleClipPoints ?? null"
           @click="choice = p.id"
         />
       </div>

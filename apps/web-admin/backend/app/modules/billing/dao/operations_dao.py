@@ -141,6 +141,8 @@ async def record_grant(
     member = body.action in {"open", "renew"}
     kind = "membership_grant" if member else body.action
     source = f"{kind}:{op.id}"
+    plan = await db.get(PlanVersionRow, body.plan_version_id) if member else None
+    granted = quote.points * (12 if plan and plan.term_unit == "year" else 1)
     await db.execute(
         pg_insert(WalletRow)
         .values(user_id=owner, created_at=confirmed)
@@ -152,8 +154,12 @@ async def record_grant(
             id=lot_id,
             user_id=owner,
             source_key=source,
-            granted=quote.points,
-            remaining=quote.points,
+            card_name=quote.plan_name if body.action == "card" else None,
+            card_image=quote.card_image,
+            weekly_limit=quote.weekly_limit,
+            monthly_limit=quote.points if member else None,
+            granted=granted,
+            remaining=granted,
             held=0,
             created_at=quote.starts_at,
             expires_at=quote.ends_at,
@@ -166,7 +172,7 @@ async def record_grant(
             lot_id=lot_id,
             kind=kind,
             event_key=source,
-            available_delta=quote.points,
+            available_delta=granted,
             held_delta=0,
             created_at=quote.starts_at,
         )

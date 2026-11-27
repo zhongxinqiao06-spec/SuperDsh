@@ -25,17 +25,34 @@ class PublishPlan(CatalogCommand):
     term_unit: Literal["month", "year"]
     price_fen: Annotated[int, Field(strict=True, ge=0, le=2147483647)]
     points: Annotated[int, Field(strict=True, ge=1, le=2147483647)]
+    weekly_points: Annotated[int, Field(strict=True, ge=1, le=2147483647)] | None = None
     listed: StrictBool
     effective_at: AwareDatetime | None = None
+
+    def with_weekly_limit(self, previous: int | None) -> "PublishPlan":
+        """旧客户端缺少周额度时沿用原档周限，新建档位默认周限等于月限。"""
+        if self.kind != "membership" or self.weekly_points is not None:
+            return self
+        return self.model_copy(update={"weekly_points": min(previous or self.points, self.points)})
 
     def terms(self) -> dict[str, object]:
         """参与版本比较并冻结到办理单的商品条款。"""
         return self.model_dump(
-            include={"name", "kind", "term_unit", "points", "price_fen", "listed"}
+            include={"name", "kind", "term_unit", "points", "weekly_points", "price_fen", "listed"}
         )
 
     @model_validator(mode="after")
-    def addon_price(self) -> "PublishPlan":
+    def validate_entitlements(self) -> "PublishPlan":
+        if self.kind == "addon" and self.weekly_points is not None:
+            raise ValueError("加购包仅支持固定额度")
+        if self.weekly_points is not None and self.weekly_points > self.points:
+            raise ValueError("会员周额度不能高于月额度")
+        if (
+            self.kind == "membership"
+            and self.term_unit == "year"
+            and self.points > 2147483647 // 12
+        ):
+            raise ValueError("全年会员总额度超出范围")
         if self.kind == "addon" and self.price_fen == 0:
             raise ValueError("加购包价格须大于零")
         return self

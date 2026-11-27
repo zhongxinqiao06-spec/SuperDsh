@@ -7,6 +7,7 @@ from sqlalchemy import case, func, or_, select, tuple_
 from app.infrastructure.database import Database
 from app.infrastructure.errors import DomainError
 from app.modules.billing.dao.change_dao import visible_changes
+from app.modules.billing.dao.member_quota import current_quota, spendable
 from app.modules.billing.dao.period_dao import effective_plan, next_grant
 from app.modules.billing.entity.do.credit_do import CreditLotRow, LedgerEntryRow
 from app.modules.billing.entity.do.operation_do import BillingPeriodRow
@@ -53,14 +54,18 @@ class MembershipRepository:
 
     async def wallet(self, owner: str, now: datetime, days: int, lot_limit: int) -> Wallet:
         lot = CreditLotRow
-        available = case((lot.expires_at > now, lot.remaining - lot.held), else_=0)
+        available = spendable(now)
         async with self.database.sessions() as session:
             await session.connection(execution_options={"isolation_level": "REPEATABLE READ"})
-            total, card_points, held, expiring = (
+            total, card_points, ordinary, held, expiring = (
                 await session.execute(
                     select(
                         func.coalesce(func.sum(available), 0),
                         func.coalesce(func.sum(available).filter(lot.is_card()), 0),
+                        func.coalesce(
+                            func.sum(available).filter(lot.weekly_limit.is_(None), ~lot.is_card()),
+                            0,
+                        ),
                         func.coalesce(func.sum(lot.held), 0),
                         func.coalesce(
                             func.sum(
@@ -75,8 +80,8 @@ class MembershipRepository:
                 )
             ).one()
             rows = (
-                await session.scalars(
-                    select(lot)
+                await session.execute(
+                    select(lot, available)
                     .where(
                         lot.user_id == owner,
                         lot.created_at <= now,
@@ -130,6 +135,8 @@ class MembershipRepository:
             return Wallet(
                 plan_change=(await visible_changes(session, [owner], now)).get(owner),
                 as_of=now,
+                quota=await current_quota(session, owner, now),
+                ordinary_points=ordinary,
                 available_points=total,
                 card_points=card_points,
                 held_points=held,
@@ -143,10 +150,10 @@ class MembershipRepository:
                         source_key=r.source_key,
                         granted=r.granted,
                         held=r.held,
-                        available_points=r.remaining - r.held if r.expires_at > now else 0,
+                        available_points=can_use,
                         expires_at=r.expires_at,
                     )
-                    for r in rows[:lot_limit]
+                    for r, can_use in rows[:lot_limit]
                 ],
             )
 
@@ -175,6 +182,8 @@ class MembershipRepository:
                     CreditCard(
                         id=row.id,
                         granted=row.granted,
+                        name=row.card_name,
+                        image=row.card_image,
                         available_points=available,
                         used_points=row.granted - row.remaining,
                         held=row.held,

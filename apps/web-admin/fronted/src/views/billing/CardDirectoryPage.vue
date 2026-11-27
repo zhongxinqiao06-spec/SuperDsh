@@ -1,161 +1,98 @@
 <script setup lang="ts">
-import { ref, watch } from 'vue'
-import { operationsApi } from '@/api/billing/operations-api'
-import DataTable from '@/components/management/DataTable.vue'
-import FilterBar from '@/components/management/FilterBar.vue'
-import ManagementList from '@/components/management/ManagementList.vue'
-import ManagementPagination from '@/components/management/ManagementPagination.vue'
-import ManagementDialog from '@/components/overlay/ManagementDialog.vue'
+import { ref } from 'vue'
+import { cardTypesApi } from '@/api/billing/card-types-api'
 import ResourceStatus from '@/components/feedback/ResourceStatus.vue'
 import PageHeader from '@/components/layout/PageHeader.vue'
+import { useCurrentProduct } from '@/composables/console/use-current-product'
 import { useResource } from '@/composables/use-resource'
 import { useAuthStore } from '@/store/modules/auth-store'
 import { usePreferences } from '@/store/modules/preferences'
-import type {
-  BillingAccount,
-  BillingOperation,
-} from '@/types/billing/operations'
-import CreditCards from './components/CreditCards.vue'
-import OperationDialog from './components/OperationDialog.vue'
+import type { CardType } from '@/types/billing/membership'
+import CardTypeEditor from './components/CardTypeEditor.vue'
+import CreditTicket from './components/CreditTicket.vue'
 import '@/assets/styles/billing.css'
-const { tr } = usePreferences()
 const auth = useAuthStore()
-const query = ref(''),
-  search = ref(''),
-  page = ref(1),
-  size = ref(10)
-const issuing = ref<BillingAccount | null>(null),
-  viewing = ref<BillingAccount | null>(null)
+const product = useCurrentProduct()
+const { tr } = usePreferences()
+const { data, loading, error, reload } = useResource(cardTypesApi.list)
+const editor = ref<{ card: CardType | null } | null>(null)
 const notice = ref('')
-const { data, loading, error, reload } = useResource((signal) =>
-  operationsApi.accounts(
-    { search: search.value, page: page.value, pageSize: size.value },
-    signal,
-  ),
-)
-watch(
-  size,
-  () => {
-    page.value = 1
-  },
-  { flush: 'sync' },
-)
-watch([search, page, size], () => {
-  data.value = null
-  void reload()
-})
-function filter() {
-  const value = query.value.trim()
-  if (search.value === value && page.value === 1) void reload()
-  search.value = value
-  page.value = 1
-}
-function saved(r: BillingOperation) {
-  issuing.value = null
-  notice.value = tr('额度卡已发放，单号 ', 'Card issued. Operation ') + r.id
-  void reload()
+async function saved() {
+  editor.value = null
+  notice.value = tr('卡种已保存', 'Card type saved')
+  await reload()
 }
 </script>
 <template>
-  <section class="page paged-page management-page">
+  <section class="page settings-page ticket-page">
     <PageHeader :title="tr('额度卡管理', 'Credit card management')" />
-    <FilterBar @submit="filter"
-      ><el-input
-        v-model="query"
-        maxlength="100"
-        clearable
-        :aria-label="tr('搜索账号', 'Search accounts')"
-        :placeholder="tr('搜索用户名或显示名称', 'Username or display name')"
-      />
-      <el-button native-type="submit">{{
-        tr('搜索', 'Search')
-      }}</el-button></FilterBar
-    >
-    <ResourceStatus :loading="loading" :error="error" @retry="reload" />
+    <div class="ticket-directory-intro">
+      <p>
+        {{
+          tr(
+            '维护卡面与固定面额，修改仅用于之后发放的卡。',
+            'Manage artwork and fixed face values. Changes apply to future issues.',
+          )
+        }}
+      </p>
+      <el-button
+        v-if="auth.can('billing.plans.manage')"
+        type="primary"
+        @click="editor = { card: null }"
+        >{{ tr('新建卡种', 'New card type') }}</el-button
+      >
+    </div>
+    <ResourceStatus
+      :loading="loading"
+      :has-data="!!data"
+      :error="error"
+      :empty="data?.items.length === 0"
+      :empty-title="tr('暂无额度卡种', 'No card types yet')"
+      @retry="reload"
+    />
     <el-alert
       v-if="notice"
       type="success"
       :title="notice"
       @close="notice = ''"
     />
-    <ManagementList :page="page" :page-size="size">
-      <DataTable
-        mobile-cards
-        :label="tr('额度卡管理', 'Credit card management')"
-      >
-        <thead>
-          <tr>
-            <th>{{ tr('账号', 'Account') }}</th>
-            <th>{{ tr('可用创作点', 'Available credits') }}</th>
-            <th>{{ tr('操作', 'Actions') }}</th>
-          </tr>
-        </thead>
-        <tbody>
-          <tr v-for="account in data?.items" :key="account.userId">
-            <td>
-              <strong>{{ account.displayName || account.username }}</strong
-              ><small
-                >{{ account.username
-                }}<template v-if="account.disabled">
-                  · {{ tr('已禁用', 'Disabled') }}</template
-                ></small
-              >
-            </td>
-            <td :data-label="tr('可用创作点', 'Available credits')">
-              {{
-                account.unlimited
-                  ? tr('无限额度', 'Unlimited')
-                  : account.availablePoints.toLocaleString()
-              }}
-            </td>
-            <td :data-label="tr('操作', 'Actions')">
-              <div class="toolbar">
-                <el-button
-                  v-if="
-                    auth.can('billing.adjustments.create') && !account.disabled
-                  "
-                  link
-                  @click="issuing = account"
-                  >{{ tr('发额度卡', 'Issue card') }}</el-button
-                >
-                <el-button link @click="viewing = account">{{
-                  tr('查看额度卡', 'View cards')
-                }}</el-button>
-              </div>
-            </td>
-          </tr>
-          <tr v-if="!loading && !error && data?.total === 0">
-            <td colspan="3" class="empty-cell">
-              {{ tr('没有符合条件的账号', 'No matching accounts') }}
-            </td>
-          </tr>
-        </tbody>
-      </DataTable>
-      <template #pagination
-        ><ManagementPagination
-          v-model:current-page="page"
-          v-model:page-size="size"
-          :loading="loading"
-          :total="data?.total ?? 0"
-      /></template>
-    </ManagementList>
-    <OperationDialog
-      v-if="issuing"
-      :key="issuing.userId"
-      :account="issuing"
-      initial="card"
-      card-only
-      @close="issuing = null"
+    <ul v-if="data?.items.length" class="ticket-catalog">
+      <li v-for="card in data.items" :key="card.id">
+        <CreditTicket
+          :image="card.image"
+          :name="card.name"
+          :points="card.points"
+        />
+        <div class="ticket-caption">
+          <h2>{{ card.name }}</h2>
+          <span>{{
+            card.enabled ? tr('启用中', 'Active') : tr('已停用', 'Inactive')
+          }}</span>
+          <el-button
+            v-if="auth.can('billing.plans.manage')"
+            @click="editor = { card }"
+            >{{ tr('编辑', 'Edit') }}</el-button
+          >
+        </div>
+      </li>
+    </ul>
+    <footer
+      v-if="
+        auth.can('products.' + product + '.members.manage') &&
+        auth.can('billing.adjustments.create')
+      "
+      class="ticket-footnote"
+    >
+      {{ tr('发放额度卡请前往', 'To issue a card, visit') }}
+      <router-link :to="{ path: '/product/members', query: { product } }">{{
+        tr('产品成员', 'Product members')
+      }}</router-link>
+    </footer>
+    <CardTypeEditor
+      v-if="editor"
+      :card="editor.card"
+      @close="editor = null"
       @saved="saved"
     />
-    <ManagementDialog
-      v-if="viewing"
-      :model-value="true"
-      readonly
-      :title="tr('查看额度卡', 'View cards') + ' · ' + viewing.username"
-      @update:model-value="!$event && (viewing = null)"
-    >
-      <CreditCards :key="viewing.userId" :owner="viewing.userId" />
-    </ManagementDialog>
   </section>
 </template>

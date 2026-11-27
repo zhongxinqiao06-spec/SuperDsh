@@ -322,6 +322,7 @@ export async function installFoundationFixture(
         return json({ revision: 1, stages: [] })
       if (/^\/studio\/projects\/[^/]+\/episode-context$/u.test(path))
         return json(null)
+      if (path === '/me/billing/registration-card-notice') return json(null)
       if (path === '/announcement') return json({ announcement: null })
       if (path === '/admin/users' && request.method() === 'GET')
         return json({ users, total: users.length, page: 1, pageSize: 25 })

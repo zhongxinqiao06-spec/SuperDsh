@@ -7,7 +7,9 @@ from pydantic import AwareDatetime
 
 from app.api.dependencies import current_account
 from app.modules.billing.entity.vo.dto import Catalog, CreditCards, Entries, EntryDetail, Wallet
+from app.modules.billing.entity.vo.registration_card import RegistrationCardNotice
 from app.modules.billing.service.membership_service import MembershipService
+from app.modules.billing.service.registration_credit import RegistrationNotices
 from app.modules.identity.entity.bo.models import Account
 
 router = APIRouter()
@@ -63,3 +65,19 @@ async def entry_detail(
 ) -> EntryDetail:
     """查看本人当笔变动与原始发放批次。"""
     return await service(request).detail(account, entry_id)
+
+
+@router.get("/me/billing/registration-card-notice")
+async def registration_notice(
+    request: Request, account: AccountDep
+) -> RegistrationCardNotice | None:
+    """登录后查本人尚未确认的注册赠卡。"""
+    return await RegistrationNotices(request.app.state.database).unread(account)
+
+
+@router.put("/me/billing/registration-card-notice/{lot_id}/seen", status_code=204)
+async def read_registration_notice(
+    lot_id: Annotated[str, Path(min_length=1, max_length=80)], request: Request, account: AccountDep
+) -> None:
+    """将本次提示标记为已读；同一张卡重复确认也只记录一次。"""
+    await RegistrationNotices(request.app.state.database).acknowledge(account, lot_id)

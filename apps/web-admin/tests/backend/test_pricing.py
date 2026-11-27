@@ -54,7 +54,9 @@ async def test_drafts_trials_and_quotes(platform: tuple[FastAPI, AsyncClient]) -
         await client.post(
             QUOTE,
             json=dict(
-                data, businessKey=str(uuid4()), items=[dict(item, quantity=5, spec="unknown")]
+                data,
+                businessKey=str(uuid4()),
+                items=[dict(item, quantity=5, spec="unknown")],
             ),
         )
     ).status_code == 422
@@ -100,11 +102,14 @@ async def test_drafts_trials_and_quotes(platform: tuple[FastAPI, AsyncClient]) -
     ).status_code == 409
 
 
-async def test_plan_draft_restore_and_publish(platform: tuple[FastAPI, AsyncClient]) -> None:
+async def test_plan_draft_restore_and_publish(
+    platform: tuple[FastAPI, AsyncClient],
+) -> None:
     _, client = platform
     await bootstrap(client)
     terms = dict(
         name="独立草稿",
+        weeklyPoints=120,
         businessKey=str(uuid4()),
         reason="试行",
         expectedRevision=0,
@@ -117,6 +122,7 @@ async def test_plan_draft_restore_and_publish(platform: tuple[FastAPI, AsyncClie
     body = dict(sku="draft-only", terms=terms, expectedDraftRevision=0)
     path = ROOT + "plan-versions"
     draft = (await client.post(path, json=body)).json()
+    assert draft["payload"]["terms"]["weeklyPoints"] == 120
     assert draft["id"] == (await client.post(path, json=body)).json()["id"]
     assert not any(
         row["sku"] == "draft-only"
@@ -128,7 +134,7 @@ async def test_plan_draft_restore_and_publish(platform: tuple[FastAPI, AsyncClie
             json=dict(
                 body,
                 expectedDraftRevision=1,
-                terms=dict(terms, points=350, businessKey=str(uuid4())),
+                terms=dict(terms, points=350, weeklyPoints=150, businessKey=str(uuid4())),
             ),
         )
     ).json()
@@ -142,17 +148,14 @@ async def test_plan_draft_restore_and_publish(platform: tuple[FastAPI, AsyncClie
     )
     assert first.status_code == second.status_code == 200 and first.json() == second.json()
     assert (await client.get(path, params={"search": "draft-only"})).json()["total"] == 0
-    assert (
-        next(
-            row
-            for row in (await client.get("/api/billing/catalog")).json()["items"]
-            if row["sku"] == "draft-only"
-        )["points"]
-        == 350
-    )
+    listed = (await client.get("/api/billing/catalog")).json()["items"]
+    plan = next(row for row in listed if row["sku"] == "draft-only")
+    assert (plan["weeklyPoints"], plan["points"]) == (150, 350)
 
 
-async def test_quote_ownership_and_publishing_rights(platform: tuple[FastAPI, AsyncClient]) -> None:
+async def test_quote_ownership_and_publishing_rights(
+    platform: tuple[FastAPI, AsyncClient],
+) -> None:
     _, client = platform
     await bootstrap(client)
     data = dict(businessKey=str(uuid4()), source="role-test", items=[dict(video(), quantity=5)])
@@ -178,7 +181,12 @@ async def test_quote_ownership_and_publishing_rights(platform: tuple[FastAPI, As
     assert (
         await client.post(
             ROOT + "rate-versions",
-            json=dict(terms=terms, businessKey=str(uuid4()), expectedRevision=0, reason="普通用户"),
+            json=dict(
+                terms=terms,
+                businessKey=str(uuid4()),
+                expectedRevision=0,
+                reason="普通用户",
+            ),
             headers=headers,
         )
     ).status_code == 403

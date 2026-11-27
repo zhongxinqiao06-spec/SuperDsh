@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, ref, watch } from 'vue'
+import { computed, ref } from 'vue'
 import { useRoute } from 'vue-router'
 import type { Plan } from '@/types/billing/membership'
 import ManagementDialog from '@/components/overlay/ManagementDialog.vue'
@@ -13,35 +13,21 @@ import { usePreferences } from '@/store/modules/preferences'
 import '@/assets/styles/billing.css'
 const { tr } = usePreferences()
 const { data, loading, error, reload } = useResource(membershipApi.catalog)
-const chosen = ref('')
 const contactPlan = ref<Plan | null>(null)
 const contactQr = '/images/membership/admin-wechat.jpg'
 const route = useRoute()
-watch(
-  () => route.query.plan,
-  (id) => {
-    chosen.value = typeof id === 'string' ? id : ''
-  },
-  { immediate: true },
-)
 const memberships = computed(
   () => data.value?.items.filter((p) => p.kind === 'membership') ?? [],
 )
 const extras = computed(
   () => data.value?.items.filter((p) => p.kind === 'addon') ?? [],
 )
-const selected = computed(
-  () =>
-    data.value?.items.find((p) => p.id === chosen.value) ??
-    memberships.value[0] ??
-    extras.value[0],
-)
 const money = (fen: number) =>
   '¥' + (fen / 100).toLocaleString(undefined, { maximumFractionDigits: 2 })
 </script>
 <template>
   <section class="page settings-page billing-page">
-    <PageHeader :title="tr('套餐与加购', 'Plans and top-ups')" />
+    <PageHeader :title="tr('选购会员', 'Choose a membership')" />
     <ResourceStatus
       :loading="loading"
       :error="error"
@@ -49,25 +35,18 @@ const money = (fen: number) =>
       :empty-title="tr('暂无展示中的套餐', 'No plans listed')"
       @retry="reload"
     />
-    <template v-if="data && selected">
-      <SettingsCard
-        v-if="memberships.length"
-        :title="tr('会员套餐', 'Membership plans')"
-        :description="
-          data.sampleClipPoints === null
-            ? tr('720P 示例费率待配置', '720p sample rate unavailable')
-            : tr(
-                '按通用 720P 费率估算，5 秒镜头 ' +
-                  data.sampleClipPoints +
-                  ' 点。',
-                'At the standard 720p rate, a five-second shot costs ' +
-                  data.sampleClipPoints +
-                  ' credits.',
-              )
-        "
-      >
+    <template v-if="data">
+      <template v-if="memberships.length">
+        <p class="billing-note">
+          {{
+            tr(
+              '使用会员额度时，同一笔消费同时计入周上限和月上限。达到任一上限后，优先使用普通余额，再用额度卡补差。',
+              'Membership usage counts towards both limits. When either is reached, regular credits and then credit cards cover the shortfall.',
+            )
+          }}
+        </p>
         <div
-          class="membership-card-grid"
+          class="membership-shop-gallery"
           role="group"
           :aria-label="tr('会员套餐', 'Membership plans')"
         >
@@ -75,26 +54,28 @@ const money = (fen: number) =>
             v-for="plan in memberships"
             :key="plan.id"
             :plan="plan"
-            :selected="plan.id === selected.id"
-            :clip-points="data.sampleClipPoints"
-            @click="chosen = plan.id"
+            purchase
+            :selected="plan.id === route.query.plan"
+            @click="contactPlan = plan"
           />
         </div>
-      </SettingsCard>
+        <p class="billing-note">
+          {{
+            tr(
+              '每个会员月从生效日计算，周额度每 7 天重置。',
+              'Each membership month starts on the activation anniversary. The weekly limit resets every seven days within that month.',
+            )
+          }}
+        </p>
+      </template>
       <SettingsCard
         v-if="extras.length"
         :title="tr('额度加购', 'Credit top-ups')"
-        ><div class="billing-plans">
-          <button
-            v-for="plan in extras"
-            :key="plan.id"
-            type="button"
-            class="billing-option"
-            :aria-pressed="plan.id === selected.id"
-            @click="chosen = plan.id"
-          >
-            <strong>{{ plan.name }}</strong
-            ><span
+      >
+        <div class="billing-plans">
+          <div v-for="plan in extras" :key="plan.id" class="billing-option">
+            <strong>{{ plan.name }}</strong>
+            <span
               >{{ money(plan.priceFen) }} · {{ plan.points.toLocaleString() }}
               {{ tr('创作点', 'credits') }}</span
             >
@@ -103,27 +84,11 @@ const money = (fen: number) =>
                 ? tr('有效期一年', 'Valid for one year')
                 : tr('有效期一个月', 'Valid for one month')
             }}</small>
-          </button>
-        </div></SettingsCard
-      >
-      <SettingsCard
-        :title="tr('所选方案', 'Selected plan')"
-        :description="
-          selected.name +
-          ' · ' +
-          money(selected.priceFen) +
-          ' · ' +
-          selected.points.toLocaleString() +
-          tr(' 创作点', ' credits')
-        "
-      >
-        <template #action>
-          <el-button type="primary" @click="contactPlan = selected">{{
-            selected.kind === 'membership'
-              ? tr('购买会员', 'Buy membership')
-              : tr('购买加购包', 'Buy top-up')
-          }}</el-button>
-        </template>
+            <el-button @click="contactPlan = plan">{{
+              tr('购买加购包', 'Buy top-up')
+            }}</el-button>
+          </div>
+        </div>
       </SettingsCard>
     </template>
     <ManagementDialog
@@ -149,9 +114,17 @@ const money = (fen: number) =>
           }}
         </p>
         <strong
-          >{{ contactPlan.name }} · {{ money(contactPlan.priceFen) }} ·
-          {{ contactPlan.points.toLocaleString() }}
-          {{ tr('创作点', 'credits') }}</strong
+          >{{ contactPlan.name }} · {{ money(contactPlan.priceFen)
+          }}<template v-if="contactPlan.kind === 'addon'">
+            · {{ contactPlan.points.toLocaleString() }}
+            {{ tr('创作点', 'credits') }}</template
+          ></strong
+        >
+        <span v-if="contactPlan.kind === 'membership'"
+          >{{ tr('每周额度', 'Weekly limit') }}
+          {{ contactPlan.weeklyPoints?.toLocaleString() ?? '—' }} ·
+          {{ tr('每月额度', 'Monthly limit') }}
+          {{ contactPlan.points.toLocaleString() }}</span
         >
         <div class="membership-contact-qr">
           <img

@@ -20,7 +20,9 @@ from app.modules.billing.service.operations_service import cycle_end
 BASE = "/api/admin/billing"
 
 
-async def test_operation_cycle_and_replay(platform: tuple[FastAPI, AsyncClient]) -> None:
+async def test_operation_cycle_and_replay(
+    platform: tuple[FastAPI, AsyncClient],
+) -> None:
     app, client = platform
     actor = await bootstrap(client)
     owner = actor["userId"]
@@ -33,7 +35,7 @@ async def test_operation_cycle_and_replay(platform: tuple[FastAPI, AsyncClient])
     )
     path = BASE + "/operation-previews"
     preview = (await client.post(path, json=params)).json()
-    assert preview["quote"]["immediatePoints"] == 300
+    assert preview["quote"]["immediatePoints"] == 200
     assert (await client.post(path, json=params)).json() == preview
     assert (await client.post(path, json={**params, "reason": "另一动作"})).status_code == 409
     assert (await client.get("/api/me/billing")).json()["availablePoints"] == 0
@@ -43,7 +45,7 @@ async def test_operation_cycle_and_replay(platform: tuple[FastAPI, AsyncClient])
         *(client.post(BASE + "/subscriptions", json=body) for _ in range(2))
     )
     assert all(r.status_code == 200 for r in replies) and replies[0].json() == replies[1].json()
-    assert (await client.get("/api/me/billing")).json()["availablePoints"] == 300
+    assert (await client.get("/api/me/billing")).json()["availablePoints"] == 200
     assert (
         await client.post(path, json={**params, "businessKey": str(uuid4())})
     ).status_code == 409
@@ -57,23 +59,25 @@ async def test_operation_cycle_and_replay(platform: tuple[FastAPI, AsyncClient])
         await client.post(BASE + "/subscriptions", json={"previewId": renew["id"]})
     ).status_code == 200
     wallet = (await client.get("/api/me/billing")).json()
-    assert wallet["availablePoints"] == 300 and len(wallet["lots"]) == 1
+    assert wallet["availablePoints"] == 200 and len(wallet["lots"]) == 1
     assert wallet["subscription"]["nextGrantAt"] == renew["quote"]["startsAt"]
     assert len((await client.get("/api/me/billing/entries")).json()["items"]) == 1
     after = datetime.fromisoformat(renew["quote"]["startsAt"])
     future = await MembershipRepository(app.state.database).wallet(str(owner), after, 7, 20)
     assert (
-        future.available_points == 300
+        future.available_points == 200
         and future.subscription
         and future.subscription.next_grant_at is None
     )
     accounts = (await client.get(BASE + "/subscriptions?state=active&sku=light")).json()
-    assert accounts["total"] == 1 and accounts["items"][0]["availablePoints"] == 300
+    assert accounts["total"] == 1 and accounts["items"][0]["availablePoints"] == 200
     history = (await client.get(f"{BASE}/subscriptions/{owner}/operations")).json()
     assert len(history["items"]) == 2 and not history["hasMore"]
 
 
-async def test_adjustment_conflicts_and_receipts(platform: tuple[FastAPI, AsyncClient]) -> None:
+async def test_adjustment_conflicts_and_receipts(
+    platform: tuple[FastAPI, AsyncClient],
+) -> None:
     app, client = platform
     assert (await client.get(BASE + "/subscriptions")).status_code == 401
     owner = (await bootstrap(client))["userId"]
@@ -183,4 +187,4 @@ async def test_failed_booking_rolls_back(
     assert (await client.get("/api/me/billing")).json()["subscription"] is None
     assert (await client.get("/api/me/billing/entries")).json()["items"] == []
     assert (await client.post(BASE + "/subscriptions", json=body)).status_code == 200
-    assert (await client.get("/api/me/billing")).json()["availablePoints"] == 300
+    assert (await client.get("/api/me/billing")).json()["availablePoints"] == 200

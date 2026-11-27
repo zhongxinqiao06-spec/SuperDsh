@@ -20,8 +20,8 @@ const emit = defineEmits<{ close: []; saved: [result: BillingOperation] }>()
 const { tr } = usePreferences()
 const {
   catalog,
-  cardPoints,
-  denominations,
+  cardId,
+  cardTypes,
   mutation,
   action,
   reason,
@@ -110,9 +110,10 @@ const {
             />
             <label class="field"
               >{{ tr('卡面额', 'Card value') }}
-              <select v-model="cardPoints" class="native-control">
-                <option v-for="n in denominations" :key="n" :value="n">
-                  {{ n.toLocaleString() }} {{ tr('创作点', 'credits') }}
+              <select v-model="cardId" class="native-control">
+                <option v-for="c in cardTypes" :key="c.id" :value="c.id">
+                  {{ c.name }} · {{ c.points.toLocaleString() }}
+                  {{ tr('创作点', 'credits') }}
                 </option>
               </select>
             </label>
@@ -268,7 +269,7 @@ const {
             {{ preview.quote.availableBefore }} →
             {{ preview.quote.availableAfter }}
           </dd>
-          <template v-if="preview.quote.planName"
+          <template v-if="preview.quote.planName && action !== 'card'"
             ><dt>{{ tr('商品价格', 'List price') }}</dt>
             <dd>¥{{ preview.quote.priceFen / 100 }}</dd></template
           >

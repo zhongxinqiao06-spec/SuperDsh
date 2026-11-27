@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { planQuotaLabel } from '@/utils/billing/plan-quota-label'
 import { ref, watch } from 'vue'
 import { catalogAdminApi } from '@/api/billing/catalog-api'
 import ResourceStatus from '@/components/feedback/ResourceStatus.vue'
@@ -125,13 +126,7 @@ function refresh() {
                 }}
                 <small
                   >¥{{ s.current.priceFen / 100 }} ·
-                  {{ s.current.points.toLocaleString() }}
-                  {{ tr('点', 'credits') }} /
-                  {{
-                    s.current.termUnit === 'year'
-                      ? tr('年', 'year')
-                      : tr('月', 'month')
-                  }}</small
+                  {{ planQuotaLabel(s.current, tr) }}</small
                 > </template
               ><span v-else>{{
                 tr('尚无生效版本', 'No effective version')
@@ -145,13 +140,7 @@ function refresh() {
                 }}
                 <small
                   >¥{{ s.upcoming.priceFen / 100 }} ·
-                  {{ s.upcoming.points.toLocaleString() }}
-                  {{ tr('点', 'credits') }} /
-                  {{
-                    s.upcoming.termUnit === 'year'
-                      ? tr('年', 'year')
-                      : tr('月', 'month')
-                  }}</small
+                  {{ planQuotaLabel(s.upcoming, tr) }}</small
                 ><small>{{
                   billingTime(s.upcoming.effectiveAt)
                 }}</small> </template

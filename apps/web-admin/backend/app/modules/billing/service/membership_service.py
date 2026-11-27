@@ -3,10 +3,10 @@
 from datetime import UTC, datetime
 
 from app.infrastructure.errors import DomainError
+from app.modules.billing.dao.card_dao import types as card_types
 from app.modules.billing.dao.membership_dao import MembershipRepository
 from app.modules.billing.dao.pricing_dao import active
 from app.modules.billing.entity.vo.dto import Catalog, CreditCards, Entries, EntryDetail, Wallet
-from app.modules.billing.entity.vo.operations import CARD_DENOMINATIONS
 from app.modules.billing.entity.vo.pricing import RateTerms, UsageItem
 from app.modules.billing.service.quote_service import price
 from app.modules.identity.entity.bo.models import Account
@@ -35,10 +35,12 @@ class MembershipService:
             quantity=5,
         )
         async with self.repository.database.sessions() as db:
+            cards = await card_types(db, True)
             row = await active(db, example, now)
         rate = RateTerms.model_validate(row.payload["terms"]) if row else None
         return Catalog(
-            card_denominations=list(CARD_DENOMINATIONS),
+            card_types=cards,
+            card_denominations=sorted({c.points for c in cards}),
             items=await self.repository.plans(now),
             sale_open=False,
             sample_points_per_second=price(example.model_copy(update={"quantity": 1}), rate)[

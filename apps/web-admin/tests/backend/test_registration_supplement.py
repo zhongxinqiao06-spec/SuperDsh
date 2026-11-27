@@ -4,17 +4,18 @@ from datetime import UTC, datetime, timedelta
 
 import pytest
 from conftest import upgrade_database
-from sqlalchemy import insert, select, update
+from sqlalchemy import insert, select, text, update
 from sqlalchemy.ext.asyncio import async_sessionmaker, create_async_engine
 
 from app.infrastructure.configuration import Settings
-from app.modules.billing.dao.credit_dao import insert_registration_credit
 from app.modules.billing.entity.do.credit_do import CreditLotRow, LedgerEntryRow
 from app.modules.identity.entity.do.models import UserRow
 
 
 @pytest.mark.parametrize("platform_configuration", ["0ac3d98e62a4"], indirect=True)
-async def test_registration_supplement_preserves_spending(platform_configuration: Settings) -> None:
+async def test_registration_supplement_preserves_spending(
+    platform_configuration: Settings,
+) -> None:
     url = platform_configuration.database_url
     engine = create_async_engine(url)
     sessions = async_sessionmaker(engine)
@@ -31,8 +32,28 @@ async def test_registration_supplement_preserves_spending(platform_configuration
                         deleted_at=now if uid == "deleted" else None,
                     )
                 )
-                await insert_registration_credit(
-                    db, uid, points, now - timedelta(days=40), now - timedelta(days=10)
+                # 历史修订还没有卡种表和快照列，按当时的三项账本结构布置数据。
+                args = {
+                    "uid": uid,
+                    "points": points,
+                    "issued": now - timedelta(days=40),
+                    "expiry": now - timedelta(days=10),
+                }
+                await db.execute(
+                    text("INSERT INTO billing_wallets(user_id,created_at) VALUES (:uid,:issued)"),
+                    args,
+                )
+                await db.execute(
+                    text("""INSERT INTO billing_credit_lots
+                    (id,user_id,source_key,granted,remaining,held,created_at,expires_at)
+                    VALUES (:uid,:uid,'registration',:points,:points,0,:issued,:expiry)"""),
+                    args,
+                )
+                await db.execute(
+                    text("""INSERT INTO billing_ledger_entries
+                    (id,user_id,lot_id,kind,event_key,available_delta,held_delta,created_at)
+                    VALUES (:uid,:uid,:uid,'registration_grant','registration',:points,0,:issued)"""),
+                    args,
                 )
             await db.execute(
                 update(CreditLotRow)
@@ -57,7 +78,8 @@ async def test_registration_supplement_preserves_spending(platform_configuration
             old = (
                 await db.scalars(
                     select(CreditLotRow).where(
-                        CreditLotRow.source_key == "registration", CreditLotRow.user_id == "old"
+                        CreditLotRow.source_key == "registration",
+                        CreditLotRow.user_id == "old",
                     )
                 )
             ).one()

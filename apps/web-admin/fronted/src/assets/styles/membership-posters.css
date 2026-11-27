@@ -1,0 +1,96 @@
+/* 同一张会员海报在选购页用整卡开通，在余额不足弹窗中用于选档。 */
+.membership-poster.membership-plan-card {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+}
+.membership-poster--selected {
+  outline: 1px solid var(--primary);
+}
+.membership-poster-art,
+.membership-poster-art img {
+  width: 100%;
+  display: block;
+}
+.membership-poster-art {
+  position: relative;
+}
+.membership-poster-art img {
+  aspect-ratio: 4 / 3;
+  height: auto;
+  object-fit: cover;
+}
+.membership-poster-copy {
+  display: flex;
+  flex-direction: column;
+  flex: 1;
+  width: 100%;
+  box-sizing: border-box;
+  padding: var(--space-4);
+}
+.membership-poster-heading,
+.membership-poster-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+}
+.membership-poster-heading {
+  font-family: var(--sheet-font);
+  padding-block-end: var(--space-3);
+}
+.membership-poster-heading strong,
+.membership-poster-price {
+  font-weight: 600;
+  font-size: clamp(1.25rem, 2.15vw, 2rem);
+  line-height: 1.2;
+}
+.membership-poster-price {
+  color: var(--primary);
+  white-space: nowrap;
+}
+.membership-poster-price small,
+.membership-poster-row small {
+  font: 400 var(--font-size-meta) var(--font-sans);
+}
+.membership-poster-row {
+  border-block-start: 1px solid var(--border);
+  padding-block: var(--space-2);
+}
+.membership-poster-row b {
+  font-variant-numeric: tabular-nums;
+}
+.membership-poster-action {
+  margin-block-start: auto;
+  padding: var(--space-3);
+  border-radius: var(--radius-control);
+  background: var(--primary);
+  color: var(--primary-foreground);
+  font-weight: 600;
+  text-align: center;
+}
+.membership-shop-gallery {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 230px), 1fr));
+  gap: var(--space-4);
+}
+.membership-shop-gallery + p {
+  text-align: center;
+}
+@media (max-width: 600px) {
+  .membership-offer .membership-poster {
+    flex-direction: row;
+  }
+  .membership-offer .membership-poster-art {
+    width: 30%;
+    flex: none;
+  }
+  .membership-offer .membership-poster-art img {
+    height: 100%;
+  }
+  .membership-offer .membership-poster-heading,
+  .membership-offer .membership-poster-copy {
+    padding: var(--space-2);
+  }
+}

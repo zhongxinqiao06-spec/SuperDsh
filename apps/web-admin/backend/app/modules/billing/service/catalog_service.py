@@ -52,8 +52,8 @@ class CatalogManagement:
         key = str(body.business_key)
         await self.lock(db, actor, sku, key)
         row = await dao.by_key(db, actor.user_id, key)
-        terms = body.terms()
         if row:
+            terms = body.with_weekly_limit(row.weekly_points).terms()
             if (
                 row.sku != sku
                 or row.revision != body.expected_revision + 1
@@ -64,6 +64,8 @@ class CatalogManagement:
                 raise DomainError(409, "业务号已用于其他发布请求")
             return PlanRelease.model_validate(row)
         latest = await dao.latest_version(db, sku)
+        body = body.with_weekly_limit(latest.weekly_points if latest else None)
+        terms = body.terms()
         if body.expected_revision != (latest.revision if latest else 0):
             raise DomainError(409, "商品版本已变化，请刷新目录后核对")
         if latest and latest.kind != body.kind:

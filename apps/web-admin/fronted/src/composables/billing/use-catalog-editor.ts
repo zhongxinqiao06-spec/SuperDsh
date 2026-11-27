@@ -22,6 +22,16 @@ export function useCatalogEditor(
     termUnit: base?.termUnit ?? ('month' as Plan['termUnit']),
     price: base ? String(base.priceFen / 100) : '',
     points: base ? String(base.points) : '',
+    weeklyPoints:
+      base?.kind === 'membership'
+        ? String(
+            base.weeklyPoints ??
+              Math.min(
+                base.points,
+                series?.current?.weeklyPoints ?? base.points,
+              ),
+          )
+        : '',
     listed: base?.listed ?? true,
     timing: stored?.payload.terms.effectiveAt ? 'scheduled' : 'now',
     date: stored?.payload.terms.effectiveAt
@@ -45,6 +55,8 @@ export function useCatalogEditor(
       actual.termUnit !== draft.termUnit ||
       actual.priceFen !== priceFen.value ||
       actual.points !== Number(draft.points) ||
+      (draft.kind === 'membership' &&
+        actual.weeklyPoints !== Number(draft.weeklyPoints)) ||
       actual.listed !== draft.listed
     )
   })
@@ -61,6 +73,12 @@ export function useCatalogEditor(
           /^\d+$/u.test(draft.points.trim()) &&
           Number(draft.points) > 0 &&
           Number(draft.points) <= 2147483647 &&
+          (draft.kind === 'addon' ||
+            (/^\d+$/u.test(draft.weeklyPoints.trim()) &&
+              Number(draft.weeklyPoints) > 0 &&
+              Number(draft.weeklyPoints) <= Number(draft.points) &&
+              (draft.termUnit !== 'year' ||
+                Number(draft.points) * 12 <= 2147483647))) &&
           (series || draft.listed) &&
           (draft.timing === 'now' ||
             (Number.isFinite(epoch.value) && epoch.value > Date.now())))),
@@ -84,6 +102,9 @@ export function useCatalogEditor(
       kind: draft.kind,
       termUnit: draft.termUnit,
       points: Number(draft.points),
+      ...(draft.kind === 'membership'
+        ? { weeklyPoints: Number(draft.weeklyPoints) }
+        : {}),
       priceFen: priceFen.value,
       listed: draft.listed,
       effectiveAt:

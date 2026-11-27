@@ -4,6 +4,7 @@ import { consoleMenuKey } from '@/layout/console-navigation'
 import { useConsole } from '@/composables/console/use-console'
 import AppIcon from '@/components/base/AppIcon.vue'
 import AnnouncementGate from '@/components/AnnouncementGate.vue'
+import RegistrationCardGate from '@/views/billing/components/RegistrationCardGate.vue'
 import ConsoleSidebar from '@/layout/components/ConsoleSidebar.vue'
 import AppearanceMenu from '@/layout/components/AppearanceMenu.vue'
 import '@/assets/styles/console.css'
@@ -227,7 +228,14 @@ function toggleGroup(id: string): void {
         </div>
       </main>
     </div>
-    <AnnouncementGate :key="vm.auth.session?.userId" />
+    <RegistrationCardGate
+      v-if="vm.auth.session && !vm.auth.session.resetRequired"
+      :key="vm.auth.session.userId"
+      :cards-path="vm.contextPath('/account/cards')"
+    >
+      <AnnouncementGate />
+    </RegistrationCardGate>
+    <AnnouncementGate v-else :key="vm.auth.session?.userId" />
     <el-dialog
       v-model="vm.signOutOpen.value"
       :title="vm.preferences.tr('退出登录', 'Sign out')"

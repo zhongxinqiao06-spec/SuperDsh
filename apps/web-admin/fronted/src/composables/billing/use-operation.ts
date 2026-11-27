@@ -27,19 +27,24 @@ export function useOperation(
     reason = ref(''),
     points = ref<number>(),
     days = ref(initial === 'card' ? 365 : 30)
-  const cardPoints = ref<number>()
-  const denominations = computed(
-    () => catalog.data.value?.cardDenominations ?? [],
+  const cardId = ref('')
+  const cardTypes = computed(() => catalog.data.value?.cardTypes ?? [])
+  const card = computed(() =>
+    cardTypes.value.find((c) => c.id === cardId.value),
   )
   watch(
-    denominations,
-    (values) => {
-      if (!values.includes(cardPoints.value ?? 0)) cardPoints.value = values[0]
+    cardTypes,
+    (items) => {
+      if (!items.some((c) => c.id === cardId.value))
+        cardId.value = items[0]?.id ?? ''
     },
     { immediate: true },
   )
+  watch(card, (value) => {
+    if (action.value === 'card' && value) days.value = value.validDays
+  })
   watch(action, (next, old) => {
-    if (next === 'card') days.value = 365
+    if (next === 'card') days.value = card.value?.validDays ?? 365
     else if (old === 'card') days.value = 30
   })
   const payment = ref<PaymentMode>('complimentary'),
@@ -97,7 +102,7 @@ export function useOperation(
       !!reason.value.trim() &&
       (manual.value
         ? (action.value === 'card'
-            ? denominations.value.includes(cardPoints.value ?? 0)
+            ? !!card.value
             : Number.isInteger(points.value) && (points.value ?? 0) > 0) &&
           Number.isInteger(days.value) &&
           days.value > 0
@@ -134,7 +139,10 @@ export function useOperation(
       payment: selectedPayment.value,
       ...(manual.value
         ? {
-            points: action.value === 'card' ? cardPoints.value : points.value,
+            points: action.value === 'card' ? card.value?.points : points.value,
+            ...(action.value === 'card' && card.value
+              ? { cardTypeId: card.value.id, cardRevision: card.value.revision }
+              : {}),
             validDays: days.value,
           }
         : { planVersionId: planId.value }),
@@ -159,8 +167,8 @@ export function useOperation(
   }
   return {
     catalog,
-    cardPoints,
-    denominations,
+    cardId,
+    cardTypes,
     mutation,
     action,
     reason,

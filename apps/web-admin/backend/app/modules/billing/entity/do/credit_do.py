@@ -46,6 +46,12 @@ class CreditLotRow(Base):
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True))
     expires_at: Mapped[datetime] = mapped_column(DateTime(timezone=True))
 
+    card_name: Mapped[str | None] = mapped_column(String(80))
+    card_image: Mapped[str | None] = mapped_column(String(180))
+    weekly_limit: Mapped[int | None]
+    monthly_limit: Mapped[int | None]
+    notice_seen_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+
     @classmethod
     def is_card(cls) -> ColumnElement[bool]:
         """原单生成唯一 card: 来源，与历史钱包批次共用分摊和结算约束。"""

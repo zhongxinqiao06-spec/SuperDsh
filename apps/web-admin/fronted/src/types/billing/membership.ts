@@ -9,8 +9,22 @@ export interface Plan {
   termUnit: 'month' | 'year'
   priceFen: number
   points: number
+  weeklyPoints?: number | null
+}
+/** 管理员维护的卡种，与用户已经领取的独立卡片分开。 */
+export interface CardTypeInput {
+  name: string
+  points: number
+  validDays: number
+  image: string
+  enabled: boolean
+  revision: number
+}
+export interface CardType extends CardTypeInput {
+  id: string
 }
 export interface Catalog {
+  cardTypes?: CardType[]
   cardDenominations?: number[]
   items: Plan[]
   saleOpen: boolean
@@ -25,10 +39,11 @@ export interface CreditLot {
   held: number
   expiresAt: string
 }
-/** 同一账号在两个产品下共用的本人账本快照。 */
-/** 额度卡由运营逐张发放，占用与用尽的卡都可以查回。 */
+/** 每张卡保留发放时的卡面和面额，占用或用尽后仍然可以查询。 */
 export interface CreditCard {
   id: string
+  name?: string | null
+  image?: string | null
   granted: number
   availablePoints: number
   usedPoints: number
@@ -38,6 +53,15 @@ export interface CreditCard {
   status: 'available' | 'held' | 'spent' | 'expired'
 }
 export interface Wallet {
+  ordinaryPoints?: number
+  quota?: {
+    weeklyLimit: number
+    weeklyRemaining: number
+    monthlyLimit: number
+    monthlyRemaining: number
+    weekEndsAt: string
+    monthEndsAt: string
+  } | null
   unlimited?: boolean
   cardPoints?: number
   planChange: ChangeSummary | null

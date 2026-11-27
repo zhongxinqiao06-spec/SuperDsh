@@ -45,6 +45,10 @@ function nextPage() {
         }}<el-select v-model="kind" :aria-label="tr('变动类型', 'Entry type')">
           <el-option :label="tr('全部类型', 'All types')" value="all" />
           <el-option
+            :label="tr('注册赠卡', 'Welcome card')"
+            value="registration_card"
+          />
+          <el-option
             :label="tr('注册赠额', 'Registration credit')"
             value="registration_grant"
           />
@@ -52,6 +56,7 @@ function nextPage() {
             v-for="type in [
               'registration_supplement',
               'membership_grant',
+              'member_quota_upgrade',
               'usage_hold',
               'usage_charge',
               'usage_release',

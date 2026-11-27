@@ -161,7 +161,7 @@ test('作品分类与快速视频：预检、候选、恢复、收藏和进入�
   await offer.getByRole('button', { name: '查看会员办理' }).click()
   await expect(page).toHaveURL(/account\/plans\?.*plan=/)
   await expect(page.getByRole('button', { name: /创作会员/ })).toHaveAttribute(
-    'aria-pressed',
+    'aria-current',
     'true',
   )
   const cardPreview = await page.request.post(

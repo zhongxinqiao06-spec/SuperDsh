@@ -28,6 +28,7 @@ export interface PublishPlan extends CatalogCommand {
   termUnit: Plan['termUnit']
   priceFen: number
   points: number
+  weeklyPoints?: number | null
   listed: boolean
   effectiveAt: string | null
 }

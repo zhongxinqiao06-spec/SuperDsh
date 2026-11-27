@@ -6,6 +6,7 @@ from typing import Literal
 from pydantic import BaseModel, ConfigDict
 from pydantic.alias_generators import to_camel
 
+from app.modules.billing.entity.vo.cards import CardType
 from app.modules.billing.entity.vo.changes import ChangeSummary
 
 
@@ -23,9 +24,11 @@ class Plan(BillingView):
     term_unit: Literal["month", "year"]
     price_fen: int
     points: int
+    weekly_points: int | None = None
 
 
 class Catalog(BillingView):
+    card_types: list[CardType]
     card_denominations: list[int]
     items: list[Plan]
     sale_open: bool
@@ -63,6 +66,8 @@ class CreditCard(BillingView):
     id: str
     granted: int
     available_points: int
+    name: str | None = None
+    image: str | None = None
     used_points: int
     held: int
     issued_at: datetime
@@ -75,7 +80,18 @@ class CreditCards(BillingView):
     has_more: bool
 
 
+class MemberQuota(BillingView):
+    weekly_limit: int
+    weekly_remaining: int
+    monthly_limit: int
+    monthly_remaining: int
+    week_ends_at: datetime
+    month_ends_at: datetime
+
+
 class Wallet(BillingView):
+    ordinary_points: int = 0
+    quota: MemberQuota | None = None
     unlimited: bool = False
     card_points: int = 0
     plan_change: ChangeSummary | None = None

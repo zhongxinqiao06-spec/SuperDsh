@@ -5,6 +5,7 @@ from datetime import datetime
 from sqlalchemy import Select, func, select
 from sqlalchemy.sql.elements import ColumnElement
 
+from app.modules.billing.dao.member_quota import spendable
 from app.modules.billing.entity.do.credit_do import CreditLotRow
 from app.modules.billing.entity.do.operation_do import BillingPeriodRow
 from app.modules.billing.entity.do.plan_do import SubscriptionRow
@@ -38,7 +39,7 @@ def next_grant(owner: str, now: datetime) -> Select[datetime]:
 def available_totals(now: datetime) -> Select[str, int]:
     lot = CreditLotRow
     return (
-        select(lot.user_id, func.sum(lot.remaining - lot.held).label("available"))
+        select(lot.user_id, func.sum(spendable(now)).label("available"))
         .where(lot.created_at <= now, lot.expires_at > now)
         .group_by(lot.user_id)
     )

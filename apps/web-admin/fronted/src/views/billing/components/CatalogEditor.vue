@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { planQuotaLabel } from '@/utils/billing/plan-quota-label'
 import ManagementDialog from '@/components/overlay/ManagementDialog.vue'
 import { useCatalogEditor } from '@/composables/billing/use-catalog-editor'
 import { usePreferences } from '@/store/modules/preferences'
@@ -112,11 +113,24 @@ const { draft, dirty, review, mutation, valid, submit } = useCatalogEditor(
             >{{ tr('价格（元）', 'Price (CNY)')
             }}<el-input v-model="draft.price" inputmode="decimal"
           /></label>
+          <label v-if="draft.kind === 'membership'" class="field"
+            >{{ tr('每周额度', 'Weekly limit')
+            }}<el-input v-model="draft.weeklyPoints" inputmode="numeric"
+          /></label>
           <label class="field"
-            >{{ tr('发放创作点', 'Credits per purchase')
+            >{{
+              draft.kind === 'membership'
+                ? tr('每月额度', 'Monthly limit')
+                : tr('发放创作点', 'Credits per purchase')
             }}<el-input v-model="draft.points" inputmode="numeric"
           /></label>
         </div>
+        <small v-if="draft.kind === 'membership'" class="billing-note">{{
+          tr(
+            '每周额度须在 1 至每月额度之间。年度会员按会员月重置。',
+            'Weekly credits must be between 1 and the monthly limit. Annual plans reset each membership month.',
+          )
+        }}</small>
         <label class="field"
           >{{ tr('销售状态', 'Listing status')
           }}<select v-model="draft.listed" class="native-control">
@@ -152,13 +166,7 @@ const { draft, dirty, review, mutation, valid, submit } = useCatalogEditor(
             ><dt>{{ tr('当前版本', 'Current version') }}</dt>
             <dd>
               {{ series.current.name }} · ¥{{ series.current.priceFen / 100 }} ·
-              {{ series.current.points.toLocaleString() }}
-              {{ tr('点', 'credits') }} /
-              {{
-                series.current.termUnit === 'year'
-                  ? tr('年', 'year')
-                  : tr('月', 'month')
-              }}
+              {{ planQuotaLabel(series.current, tr) }}
               ·
               {{
                 series.current.listed
@@ -171,10 +179,15 @@ const { draft, dirty, review, mutation, valid, submit } = useCatalogEditor(
           <dd>
             {{ draft.listed ? tr('上架', 'Listed') : tr('下架', 'Delisted') }} ·
             ¥{{ Number(draft.price) }} ·
-            {{ Number(draft.points).toLocaleString() }}
-            {{ tr('点', 'credits') }} /
             {{
-              draft.termUnit === 'year' ? tr('年', 'year') : tr('月', 'month')
+              planQuotaLabel(
+                {
+                  kind: draft.kind,
+                  points: Number(draft.points),
+                  weeklyPoints: Number(draft.weeklyPoints),
+                },
+                tr,
+              )
             }}
           </dd>
           <dt>{{ tr('生效时间', 'Effective time') }}</dt>

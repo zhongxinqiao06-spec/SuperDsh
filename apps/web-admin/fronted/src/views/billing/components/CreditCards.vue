@@ -6,7 +6,8 @@ import { useResource } from '@/composables/use-resource'
 import { usePreferences } from '@/store/modules/preferences'
 import { billingTime } from '@/utils/billing/change-labels'
 import ResourceStatus from '@/components/feedback/ResourceStatus.vue'
-/** 卡片独立分页，包括过期和用尽的卡；刷新余额时重新读取本人数据。 */
+import CreditTicket from './CreditTicket.vue'
+/** 历史快照与卡的账本余额独立显示，卡种调整后仍按领卡时的面额呈现。 */
 const props = defineProps<{ owner?: string }>()
 const { tr } = usePreferences()
 const page = ref(1)
@@ -22,62 +23,84 @@ watch(page, () => {
 </script>
 <template>
   <section class="stack">
-    <p class="billing-note">
-      {{
-        tr(
-          '普通创作点优先使用。余额不足时自动用卡补足差额，多张卡优先用最早到期的。',
-          'Regular credits are used first. Cards cover the shortfall, earliest expiry first.',
-        )
-      }}
-    </p>
     <ResourceStatus
       :loading="loading"
       :error="error"
+      :has-data="!!data"
       :empty="data?.items.length === 0"
       :empty-title="tr('暂无额度卡', 'No credit cards yet')"
       @retry="reload"
     />
-    <ul v-if="data?.items.length" class="billing-rows">
+    <ul v-if="data?.items.length" class="issued-tickets">
       <li v-for="card in data.items" :key="card.id">
-        <div>
-          <strong
-            >{{ card.granted.toLocaleString() }}
-            {{ tr('点额度卡', 'credit card') }}</strong
-          >
+        <CreditTicket
+          :name="card.name"
+          :image="card.image"
+          :points="card.granted"
+        />
+        <div class="issued-ticket-info">
+          <div class="issued-ticket-heading">
+            <h3>
+              {{
+                card.name ??
+                card.granted.toLocaleString() + tr(' 点额度卡', ' credit card')
+              }}
+            </h3>
+            <span
+              >{{ tr('可用', 'Available') }}
+              <b>{{ card.availablePoints.toLocaleString() }}</b>
+              {{ tr('点', 'credits') }}</span
+            >
+            <span
+              >{{ tr('已用', 'Used') }} {{ card.usedPoints.toLocaleString() }}
+              {{ tr('点', 'credits') }}</span
+            >
+          </div>
+          <div class="ticket-progress-line">
+            <span>{{ tr('剩余', 'Remaining') }}</span
+            ><progress
+              :aria-label="tr('卡内剩余', 'Card balance')"
+              :value="card.availablePoints"
+              :max="card.granted"
+            />
+            <span
+              >{{
+                Math.round((card.availablePoints / card.granted) * 100)
+              }}%</span
+            >
+          </div>
           <small
-            >{{ tr('到期', 'Expires') }} ·
-            {{ billingTime(card.expiresAt) }}</small
-          >
+            >{{ tr('到期', 'Expires') }} · {{ billingTime(card.expiresAt) }}
+            <template v-if="card.held">
+              · {{ tr('任务占用', 'Held') }} {{ card.held.toLocaleString() }}
+              {{ tr('点', 'credits') }}</template
+            >
+            <template v-if="card.status === 'expired'">
+              · {{ tr('已过期', 'Expired') }}</template
+            >
+            <template v-if="card.status === 'spent'">
+              · {{ tr('已用尽', 'Used up') }}</template
+            >
+          </small>
         </div>
-        <div>
-          <strong
-            >{{ tr('可抵扣', 'Available') }}
-            {{ card.availablePoints.toLocaleString() }}
-            {{ tr('点', 'credits') }}</strong
-          >
-          <small
-            >{{ tr('已用', 'Used') }} {{ card.usedPoints }} ·
-            {{ tr('占用', 'Held') }} {{ card.held }}</small
-          >
-        </div>
-        <span>{{
-          {
-            available: tr('可使用', 'Available'),
-            held: tr('任务占用中', 'On hold'),
-            spent: tr('已用尽', 'Used up'),
-            expired: tr('已过期', 'Expired'),
-          }[card.status]
-        }}</span>
       </li>
     </ul>
     <div v-if="page > 1 || data?.hasMore" class="toolbar">
       <el-button :disabled="page === 1 || loading" @click="page--">{{
         tr('上一页', 'Previous')
       }}</el-button>
-      <span>{{ page }}</span
-      ><el-button :disabled="!data?.hasMore || loading" @click="page++">{{
+      <span>{{ page }}</span>
+      <el-button :disabled="!data?.hasMore || loading" @click="page++">{{
         tr('下一页', 'Next')
       }}</el-button>
     </div>
+    <p class="ticket-footnote">
+      {{
+        tr(
+          '先用会员额度，再用普通额度，最后自动用额度卡补差。多张卡优先使用最早到期的。',
+          'Membership credits are used first, followed by regular credits. Cards cover the shortfall, earliest expiry first.',
+        )
+      }}
+    </p>
   </section>
 </template>

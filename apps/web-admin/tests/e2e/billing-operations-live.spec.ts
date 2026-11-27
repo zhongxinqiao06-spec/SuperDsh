@@ -10,7 +10,7 @@ test('运营开通、续期和加额在本人账本生效', async ({
   browser,
 }) => {
   test.skip(process.env.WEB_ADMIN_E2E_LIVE !== '1', '仅运行于隔离后端')
-  test.setTimeout(120000)
+  test.setTimeout(210000)
   const admin = process.env.WEB_ADMIN_E2E_USERNAME ?? 'foundation-admin',
     password = process.env.WEB_ADMIN_E2E_PASSWORD!
   const adminLogin = await loginIsolatedAccount(request, admin, password)
@@ -57,20 +57,27 @@ test('运营开通、续期和加额在本人账本生效', async ({
   await row.getByRole('button', { name: '发放会员', exact: true }).click()
   let dialog = page.getByRole('dialog', { name: '会员办理' })
   await expect(dialog.getByLabel('办理方式')).toHaveValue('complimentary')
-  await dialog.getByLabel('办理商品').selectOption('light-1')
+  await dialog.getByLabel('办理商品').selectOption({
+    label: await dialog
+      .getByLabel('办理商品')
+      .locator('option')
+      .filter({ hasText: '轻享会员' })
+      .first()
+      .innerText(),
+  })
   await dialog.getByLabel('办理原因').fill('内测开通')
   await dialog.getByRole('button', { name: '预览办理' }).click()
   await expect(dialog.getByText('赠送会员', { exact: true })).toBeVisible()
   await expect(dialog.getByText('¥0', { exact: true })).toBeVisible()
-  await expect(dialog.getByText('0 → 300')).toBeVisible()
+  await expect(dialog.getByText('0 → 200')).toBeVisible()
   await page.setViewportSize({ width: 390, height: 844 })
   await captureDesign(page, 'manual-preview-390.png')
   await dialog.getByRole('button', { name: '确认办理' }).click()
-  await expect(row.getByText('可用 300', { exact: true })).toBeVisible()
+  await expect(row.getByText('可用 200', { exact: true })).toBeVisible()
   await row.getByRole('button', { name: '续期', exact: true }).click()
   await dialog.getByLabel('办理原因').fill('提前续期')
   await dialog.getByRole('button', { name: '预览办理' }).click()
-  await expect(dialog.getByText('300 → 300')).toBeVisible()
+  await expect(dialog.getByText('200 → 200')).toBeVisible()
   await dialog.getByRole('button', { name: '确认办理' }).click()
   await expect(dialog).toBeHidden()
   await page.goto('/#/billing/subscriptions?userId=' + userId)
@@ -99,9 +106,9 @@ test('运营开通、续期和加额在本人账本生效', async ({
   await dialog.getByRole('spinbutton').first().fill('100')
   await dialog.getByLabel('办理原因').fill('样例补额')
   await dialog.getByRole('button', { name: '预览办理' }).click()
-  await expect(dialog.getByText('300 → 400')).toBeVisible()
+  await expect(dialog.getByText('200 → 300')).toBeVisible()
   await dialog.getByRole('button', { name: '确认办理' }).click()
-  await expect(row.getByText('可用 400')).toBeVisible()
+  await expect(row.getByText('可用 300')).toBeVisible()
   await page.goto(
     '/#/billing/subscriptions?userId=' + userId + '&product=entertainment',
   )
@@ -120,9 +127,9 @@ test('运营开通、续期和加额在本人账本生效', async ({
   await expect(dialog.getByRole('button', { name: '预览办理' })).toBeDisabled()
   await dialog.getByLabel('实收金额（元）').fill('19')
   await dialog.getByRole('button', { name: '预览办理' }).click()
-  await expect(dialog.getByText('400 → 580')).toBeVisible()
+  await expect(dialog.getByText('300 → 480')).toBeVisible()
   await dialog.getByRole('button', { name: '确认办理' }).click()
-  await expect(row.getByText('580', { exact: true })).toBeVisible()
+  await expect(row.getByText('480', { exact: true })).toBeVisible()
   await page
     .getByRole('navigation', { name: '平台导航' })
     .getByRole('link', { name: '额度卡管理', exact: true })
@@ -130,17 +137,8 @@ test('运营开通、续期和加额在本人账本生效', async ({
   await expect(
     page.getByRole('heading', { name: '额度卡管理', exact: true }),
   ).toBeVisible()
-  await page.getByRole('textbox', { name: '搜索账号' }).fill(username)
-  await page.getByRole('button', { name: '搜索', exact: true }).click()
-  await row.getByRole('button', { name: '发额度卡' }).click()
-  dialog = page.getByRole('dialog', { name: '发放额度卡' })
-  await dialog.getByLabel('卡面额').selectOption('500')
-  await expect(dialog.getByLabel('卡面额').locator('option')).toHaveCount(5)
-  await dialog.getByLabel('办理原因').fill('测试用额度卡')
-  await dialog.getByRole('button', { name: '预览办理' }).click()
-  await expect(dialog.getByText('580 → 1080')).toBeVisible()
-  await dialog.getByRole('button', { name: '确认办理' }).click()
-  await expect(dialog).toBeHidden()
+  const gallery = page.locator('.ticket-catalog')
+  await expect(gallery.getByRole('listitem')).toHaveCount(5)
   for (const [width, theme] of [
     [390, 'light'],
     [768, 'dark'],
@@ -149,7 +147,7 @@ test('运营开通、续期和加额在本人账本生效', async ({
   ] as const) {
     await page.setViewportSize({ width, height: width === 1280 ? 560 : 844 })
     await page.emulateMedia({ colorScheme: theme })
-    await expect(row.getByRole('button', { name: '查看额度卡' })).toBeVisible()
+    await expect(gallery.getByRole('img').first()).toBeVisible()
     expect(
       await page.evaluate(
         () => document.documentElement.scrollWidth <= innerWidth,
@@ -157,10 +155,66 @@ test('运营开通、续期和加额在本人账本生效', async ({
     ).toBe(true)
     await captureDesign(page, 'card-directory-' + width + '.png')
   }
-  await row.getByRole('button', { name: '查看额度卡' }).click()
-  const cards = page.getByRole('dialog', { name: '查看额度卡 · ' + username })
-  await expect(cards.getByText('可抵扣 500 点', { exact: true })).toBeVisible()
-  await cards.getByRole('button', { name: '关闭', exact: true }).last().click()
+  await page.getByRole('button', { name: '新建卡种', exact: true }).click()
+  let editor = page.getByRole('dialog', { name: '新建卡种', exact: true })
+  await editor.getByLabel('卡种名称').fill('联调纪念卡')
+  await editor.getByLabel('固定面额（点）').fill('450')
+  await editor.getByLabel('默认有效天数').fill('21')
+  await editor
+    .getByLabel('卡面图片')
+    .setInputFiles(
+      'apps/web-admin/fronted/public/images/credit-cards/projector.webp',
+    )
+  await editor.getByRole('button', { name: '保存', exact: true }).click()
+  await expect(editor).toBeHidden()
+  const managedCard = gallery
+    .getByRole('listitem')
+    .filter({ hasText: '联调纪念卡' })
+  const issuedImage = await managedCard.locator('img').getAttribute('src')
+  expect(issuedImage).toMatch(/^\/api\/billing\/card-images\/[0-9a-f]{64}$/)
+  await page.goto('/#/product/members?product=entertainment')
+  await row.getByRole('button', { name: '发额度卡', exact: true }).click()
+  dialog = page.getByRole('dialog', { name: '发放额度卡' })
+  await dialog
+    .getByLabel('卡面额')
+    .selectOption({ label: '联调纪念卡 · 450 创作点' })
+  await dialog.getByLabel('办理原因').fill('测试用额度卡')
+  await dialog.getByRole('button', { name: '预览办理' }).click()
+  await expect(dialog.getByText('480 → 930')).toBeVisible()
+  await dialog.getByRole('button', { name: '确认办理' }).click()
+  await expect(dialog).toBeHidden()
+  await page.goto('/#/billing/cards?product=entertainment')
+  await managedCard.getByRole('button', { name: '编辑' }).click()
+  editor = page.getByRole('dialog', { name: '编辑卡种' })
+  await editor.getByLabel('卡种名称').fill('联调新卡面')
+  await editor.getByLabel('固定面额（点）').fill('600')
+  await editor
+    .getByLabel('卡面图片')
+    .setInputFiles(
+      'apps/web-admin/fronted/public/images/credit-cards/film.webp',
+    )
+  await editor.getByLabel('允许发放此卡种').uncheck()
+  await editor.getByRole('button', { name: '保存', exact: true }).click()
+  await expect(editor).toBeHidden()
+  const disabledCard = gallery
+    .getByRole('listitem')
+    .filter({ hasText: '联调新卡面' })
+  await expect(disabledCard.getByText('已停用')).toBeVisible()
+  await expect(disabledCard.getByRole('img', { name: /600/ })).toBeVisible()
+  expect(await disabledCard.locator('img').getAttribute('src')).not.toBe(
+    issuedImage,
+  )
+  await page.goto('/#/product/members?product=entertainment')
+  await row.getByRole('button', { name: '发额度卡', exact: true }).click()
+  dialog = page.getByRole('dialog', { name: '发放额度卡' })
+  await expect(dialog.getByLabel('卡面额').locator('option')).toHaveCount(5)
+  await expect(
+    dialog
+      .getByLabel('卡面额')
+      .locator('option')
+      .filter({ hasText: '联调新卡面' }),
+  ).toHaveCount(0)
+  await dialog.getByRole('button', { name: '取消' }).click()
   const first = await loginIsolatedAccount(request, username, pass)
   const changed = await request.post('/api/auth/change-password', {
     headers: { authorization: 'Bearer ' + (await first.json()).accessToken },
@@ -172,7 +226,7 @@ test('运营开通、续期和加额在本人账本生效', async ({
   expect(
     (await (await request.get('/api/me/billing', { headers: own })).json())
       .availablePoints,
-  ).toBe(1080)
+  ).toBe(930)
   expect(
     (
       await request.get('/api/admin/billing/subscriptions', { headers: own })
@@ -240,19 +294,16 @@ test('运营开通、续期和加额在本人账本生效', async ({
       memberPage.getByRole('heading', { name: '我的额度卡' }),
     ).toBeVisible()
     await expect(
-      memberPage.getByText('可抵扣 500 点', { exact: true }),
+      memberPage
+        .locator('.issued-ticket-heading')
+        .getByText('可用 450 点', { exact: true }),
     ).toBeVisible()
-    await memberPage.goto('/#/account/membership')
-    await expect(
-      memberPage.getByRole('heading', { name: '轻享会员', exact: true }),
-    ).toBeVisible()
-    await memberPage.getByRole('tab', { name: '我的额度卡' }).click()
-    await expect(
-      memberPage.getByText('500 点额度卡', { exact: true }),
-    ).toBeVisible()
-    await expect(
-      memberPage.getByText('可抵扣 500 点', { exact: true }),
-    ).toBeVisible()
+    await expect(memberPage.locator('.issued-tickets img')).toHaveAttribute(
+      'src',
+      issuedImage!,
+    )
+    await expect(memberPage.getByText('本周剩余 200 / 200 点')).toBeVisible()
+    await expect(memberPage.getByText('本月剩余 500 / 500 点')).toBeVisible()
     for (const width of [390, 768, 1280, 1440]) {
       await memberPage.setViewportSize({ width, height: 844 })
       await captureDesign(memberPage, 'credit-cards-' + width + '.png')
@@ -262,9 +313,22 @@ test('运营开通、续期和加额在本人账本生效', async ({
         ),
       ).toBe(true)
     }
+    await memberPage.goto('/#/account/membership')
+    await expect(
+      memberPage.getByRole('heading', { name: '轻享会员', exact: true }),
+    ).toBeVisible()
+    await memberPage.getByRole('tab', { name: '我的额度卡' }).click()
+    await expect(
+      memberPage.getByRole('heading', { name: '联调纪念卡' }),
+    ).toBeVisible()
+    await expect(
+      memberPage
+        .locator('.issued-ticket-heading')
+        .getByText('可用 450 点', { exact: true }),
+    ).toBeVisible()
     await memberPage.getByRole('button', { name: '选购会员' }).click()
     await expect(
-      memberPage.getByRole('heading', { name: '套餐与加购' }),
+      memberPage.getByRole('heading', { name: '选购会员' }),
     ).toBeVisible()
     const billingWrites: string[] = []
     memberPage.on('request', (req) => {
@@ -274,15 +338,28 @@ test('运营开通、续期和加额在本人账本生效', async ({
       )
         billingWrites.push(req.url())
     })
-    await memberPage.getByRole('button', { name: /创作会员/ }).click()
-    await memberPage
-      .getByRole('button', { name: '购买会员', exact: true })
-      .click()
+    const creator = memberPage.getByRole('button', {
+      name: '联系管理员开通创作会员',
+    })
+    await expect(creator).toContainText('500')
+    await expect(creator).toContainText('1,500')
+    await expect
+      .poll(() =>
+        creator
+          .locator('img')
+          .evaluate((img) => (img as HTMLImageElement).naturalWidth),
+      )
+      .toBe(960)
+    for (const width of [390, 768, 1280, 1440]) {
+      await memberPage.setViewportSize({ width, height: 1000 })
+      await captureDesign(memberPage, 'membership-shop-' + width + '.png')
+    }
+    await creator.click()
     const contact = memberPage.getByRole('dialog', { name: '联系管理员' })
     await expect(
       contact.getByText('支付功能暂未开通，请联系管理员获取会员。'),
     ).toBeVisible()
-    await expect(contact.getByText('创作会员 · ¥69 · 800 创作点')).toBeVisible()
+    await expect(contact.getByText('创作会员 · ¥69')).toBeVisible()
     const code = contact.getByRole('img', { name: '管理员微信二维码' })
     await expect
       .poll(() => code.evaluate((el) => (el as HTMLImageElement).naturalWidth))
@@ -310,10 +387,6 @@ test('运营开通、续期和加额在本人账本生效', async ({
     await memberPage.keyboard.press('Escape')
     await expect(contact).toBeHidden()
     await memberPage
-      .getByRole('button', { name: /加购包/ })
-      .first()
-      .click()
-    await memberPage
       .getByRole('button', { name: '购买加购包', exact: true })
       .click()
     await expect(
@@ -328,7 +401,10 @@ test('运营开通、续期和加额在本人账本生效', async ({
     expect(billingWrites).toEqual([])
     const wallet = await request.get('/api/me/billing', { headers: own })
     expect(await wallet.json()).toMatchObject({
-      availablePoints: 1080,
+      availablePoints: 930,
+      ordinaryPoints: 280,
+      cardPoints: 450,
+      quota: { weeklyRemaining: 200, monthlyRemaining: 500 },
       subscription: { plan: { sku: 'light' } },
     })
   } finally {

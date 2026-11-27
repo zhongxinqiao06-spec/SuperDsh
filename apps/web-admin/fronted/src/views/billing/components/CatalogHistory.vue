@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { planQuotaLabel } from '@/utils/billing/plan-quota-label'
 import { ref, watch } from 'vue'
 import { catalogAdminApi } from '@/api/billing/catalog-api'
 import ManagementDialog from '@/components/overlay/ManagementDialog.vue'
@@ -46,8 +47,7 @@ watch(page, () => {
           {{ v.listed ? tr('上架', 'Listed') : tr('下架', 'Delisted') }} · ¥{{
             v.priceFen / 100
           }}
-          · {{ v.points.toLocaleString() }} {{ tr('点', 'credits') }} /
-          {{ v.termUnit === 'year' ? tr('年', 'year') : tr('月', 'month') }}
+          · {{ planQuotaLabel(v, tr) }}
         </dd>
         <dt>
           {{

@@ -9,7 +9,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.infrastructure.database import Database, lock_transaction
 from app.infrastructure.errors import DomainError
-from app.modules.billing.dao import change_dao
+from app.modules.billing.dao import card_dao, change_dao
 from app.modules.billing.dao import operations_dao as dao
 from app.modules.billing.dao.catalog_dao import lock_version_sku
 from app.modules.billing.dao.membership_dao import MembershipRepository
@@ -173,11 +173,24 @@ class BillingOperations:
         price = 0
         name = None
         change = None
+        card = None
+        weekly_limit = None
+        if body.action == "card":
+            options = await card_dao.issue_options(db, body.card_type_id, body.points)
+            if len(options) != 1:
+                raise DomainError(422, "请选择启用的额度卡种")
+            card = options[0]
+            if (
+                body.card_revision and card.revision != body.card_revision
+            ) or card.points != body.points:
+                raise DomainError(409, "卡种已变更，请重新选择")
+            name = card.name
         if body.plan_version_id:
             plan = await dao.listed_version(db, body.plan_version_id, now)
             if not plan or plan.kind != ("addon" if body.action == "topup" else "membership"):
                 raise DomainError(409, "商品版本已变更，请重新选择")
             points, price, name = plan.points, plan.price_fen, plan.name
+            weekly_limit = plan.weekly_points if plan.kind == "membership" else None
             anchor = start.day
             if body.action == "open" and active:
                 raise DomainError(409, "该账号已有有效会员，请选择续期")
@@ -198,8 +211,12 @@ class BillingOperations:
             end = start + timedelta(days=body.valid_days or 0)
         if body.payment == "offline" and body.received_fen != price:
             raise DomainError(422, "实收金额须与当前商品价格一致")
-        immediate = 0 if body.action == "renew" else points
+        immediate = 0 if body.action == "renew" else (weekly_limit or points)
         return Quote(
+            card_type_id=card.id if card else None,
+            card_revision=card.revision if card else None,
+            card_image=card.image if card else None,
+            weekly_limit=weekly_limit,
             plan_change_id=change.id if change else None,
             username=username,
             action=body.action,
@@ -227,7 +244,7 @@ class BillingOperations:
                 )
             )
             if row:
-                if row.request != request:
+                if OperationInput.model_validate(row.request) != body:
                     raise DomainError(409, "同一业务号的办理内容不能修改")
                 return view(row)
             now = datetime.now(UTC)

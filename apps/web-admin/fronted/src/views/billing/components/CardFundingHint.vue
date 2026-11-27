@@ -7,25 +7,61 @@ import { usePreferences } from '@/store/modules/preferences'
 const props = defineProps<{ points: number }>()
 const { tr } = usePreferences()
 const { data } = useResource(membershipApi.wallet)
-const regular = computed(() =>
+const member = computed(() =>
   Math.min(
     props.points,
-    (data.value?.availablePoints ?? 0) - (data.value?.cardPoints ?? 0),
+    data.value?.quota?.weeklyRemaining ?? 0,
+    data.value?.quota?.monthlyRemaining ?? 0,
+  ),
+)
+const regular = computed(() =>
+  Math.min(
+    props.points - member.value,
+    data.value?.ordinaryPoints ??
+      (data.value?.availablePoints ?? 0) - (data.value?.cardPoints ?? 0),
   ),
 )
 const card = computed(() =>
-  Math.min(props.points - regular.value, data.value?.cardPoints ?? 0),
+  Math.min(
+    props.points - member.value - regular.value,
+    data.value?.cardPoints ?? 0,
+  ),
 )
 </script>
 <template>
-  <small v-if="card > 0" class="billing-note">{{
-    tr(
-      '预计使用普通创作点 ' + regular + ' 点，额度卡抵扣 ' + card + ' 点。',
-      'Estimated split: ' +
-        regular +
-        ' regular credits and ' +
-        card +
-        ' card credits.',
-    )
-  }}</small>
+  <small
+    v-if="data && !data.unlimited && (card > 0 || member > 0)"
+    class="billing-note"
+    >{{
+      member
+        ? tr(
+            '预计使用会员 ' +
+              member +
+              ' 点、普通创作点 ' +
+              regular +
+              ' 点、额度卡 ' +
+              card +
+              ' 点。',
+            'Estimated use: ' +
+              member +
+              ' membership, ' +
+              regular +
+              ' regular and ' +
+              card +
+              ' card credits.',
+          )
+        : tr(
+            '预计使用普通创作点 ' +
+              regular +
+              ' 点，额度卡抵扣 ' +
+              card +
+              ' 点。',
+            'Estimated split: ' +
+              regular +
+              ' regular credits and ' +
+              card +
+              ' card credits.',
+          )
+    }}</small
+  >
 </template>

@@ -159,7 +159,7 @@ test('娱乐邮箱注册保留错误草稿并可重新验证', async ({ page }, 
     waitUntil: 'domcontentloaded',
   })
   const send = page.getByRole('button', { name: '发送验证码' })
-  await expect(page.getByText(/验证邮箱后获 200 创作点/)).toBeVisible()
+  await expect(page.getByText(/验证邮箱后获一张 200 点额度卡/)).toBeVisible()
   for (const colorScheme of ['light', 'dark'] as const) {
     await page.emulateMedia({ colorScheme })
     for (const width of [390, 768, 1280, 1440]) {
@@ -238,6 +238,28 @@ test('注册重发、改邮箱和到账后直接返回办公台', async ({ page 
       },
     }),
   )
+  let seen = false
+  await page.route('**/api/me/billing/registration-card-notice', (r) =>
+    r.fulfill({
+      json: seen
+        ? null
+        : {
+            id: 'example-card',
+            name: '场记卡',
+            points: 200,
+            image: '/images/credit-cards/slate.webp',
+            expiresAt: '2030-03-31T00:00:00Z',
+          },
+    }),
+  )
+  await page.route(
+    '**/api/me/billing/registration-card-notice/example-card/seen',
+    (r) => {
+      expect(r.request().method()).toBe('PUT')
+      seen = true
+      return r.fulfill({ status: 204 })
+    },
+  )
   let sends = 0
   await page.route('**/api/auth/email-code', (r) => {
     ++sends
@@ -287,10 +309,12 @@ test('注册重发、改邮箱和到账后直接返回办公台', async ({ page 
   await code.fill('001236')
   await page.getByRole('button', { name: '验证并创建账号' }).click()
   await expect(page).toHaveURL(/#\/office(?:[/?]|$)/)
-  await expect(page.getByText(/体验额度已到账 200 点/)).toBeVisible()
-  await expect(
-    page.getByRole('link', { name: '查看我的额度明细' }),
-  ).toHaveAttribute('href', /#\/account\/membership$/)
+  const gift = page.getByRole('dialog', { name: '注册赠卡已到账' })
+  await expect(gift.getByText('场记卡 · 200 创作点')).toBeVisible()
+  await gift.getByRole('button', { name: '查看我的额度卡' }).click()
+  await expect(page).toHaveURL(/#\/account\/cards$/)
+  expect(seen).toBe(true)
+  await expect(gift).toBeHidden()
   expect(sends).toBe(3)
 })
 

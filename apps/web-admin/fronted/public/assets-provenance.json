@@ -231,6 +231,36 @@
       "source": "OpenAI ImageGen / Starbridge membership collection",
       "owner": "SuperDsh original generated artwork",
       "usage": "Membership plan and credit shortfall cards"
+    },
+    {
+      "path": "images/credit-cards/film.webp",
+      "source": "OpenAI ImageGen / Starbridge cinema ticket collection",
+      "owner": "SuperDsh original generated artwork",
+      "usage": "Editable credit card covers and issued card snapshots"
+    },
+    {
+      "path": "images/credit-cards/slate.webp",
+      "source": "OpenAI ImageGen / Starbridge cinema ticket collection",
+      "owner": "SuperDsh original generated artwork",
+      "usage": "Editable credit card covers and issued card snapshots"
+    },
+    {
+      "path": "images/credit-cards/lens.webp",
+      "source": "OpenAI ImageGen / Starbridge cinema ticket collection",
+      "owner": "SuperDsh original generated artwork",
+      "usage": "Editable credit card covers and issued card snapshots"
+    },
+    {
+      "path": "images/credit-cards/spotlight.webp",
+      "source": "OpenAI ImageGen / Starbridge cinema ticket collection",
+      "owner": "SuperDsh original generated artwork",
+      "usage": "Editable credit card covers and issued card snapshots"
+    },
+    {
+      "path": "images/credit-cards/projector.webp",
+      "source": "OpenAI ImageGen / Starbridge cinema ticket collection",
+      "owner": "SuperDsh original generated artwork",
+      "usage": "Editable credit card covers and issued card snapshots"
     }
   ]
 }

@@ -27,6 +27,8 @@ export interface OperationInput {
   businessKey: string
   reason: string
   payment: PaymentMode
+  cardTypeId?: string
+  cardRevision?: number
   planVersionId?: string
   points?: number
   validDays?: number

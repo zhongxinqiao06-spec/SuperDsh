@@ -20,9 +20,7 @@ async def test_registration_grant_is_atomic_and_shared(
 ) -> None:
     app, client = platform
     await bootstrap(client)
-    response = await client.patch(
-        "/api/admin/settings", json={"registrationOpen": True}
-    )
+    response = await client.patch("/api/admin/settings", json={"registrationOpen": True})
     assert response.status_code == 200
     body = {
         "email": "studio@example.invalid",
@@ -30,10 +28,10 @@ async def test_registration_grant_is_atomic_and_shared(
         "password": "Synthetic-password-456!",
         "roles": ["admin"],
     }
-    assert (await client.get("/api/auth/config")).json()[
-        "registrationEmailAvailable"
-    ] is False
+    assert (await client.get("/api/auth/config")).json()["registrationEmailAvailable"] is False
     assert (await client.post("/api/auth/register", json=body)).status_code == 503
+    async with app.state.database.engine.begin() as db:
+        await db.execute(text("UPDATE billing_card_types SET name='定制场记卡' WHERE id='slate'"))
     sent = AsyncMock()
     app.state.services.accounts.email.sender = sent
     assert (
@@ -54,9 +52,7 @@ async def test_registration_grant_is_atomic_and_shared(
     clock = {k: datetime.fromisoformat(v) for k, v in issued.json().items()}
     assert clock["expiresAt"] - clock["resendAt"] == timedelta(minutes=9)
     limited = await client.post("/api/auth/email-code", json=email_request)
-    assert (
-        limited.status_code == 429 and limited.json()["code"] == "verification_cooldown"
-    )
+    assert limited.status_code == 429 and limited.json()["code"] == "verification_cooldown"
     assert 0 < int(limited.headers["retry-after"]) <= 60
     body["code"] = sent.send.await_args.args[2]
     assert (
@@ -72,10 +68,7 @@ async def test_registration_grant_is_atomic_and_shared(
             await client.post("/api/auth/register", json=body)
     # 失败后原验证码可重试，同一邮箱同时命中新旧两个入口只能产生一次发放。
     results = await asyncio.gather(
-        *(
-            client.post(prefix + "/auth/register", json=body)
-            for prefix in ["/api", "/api/v2"]
-        )
+        *(client.post(prefix + "/auth/register", json=body) for prefix in ["/api", "/api/v2"])
     )
     assert sorted(r.status_code for r in results) == [200, 409]
     user = next(r.json() for r in results if r.status_code == 200)
@@ -106,9 +99,71 @@ async def test_registration_grant_is_atomic_and_shared(
             "expiresAt": row.expires_at.isoformat(),
         }
         assert row.expires_at - row.email_verified_at == timedelta(days=30)
-        assert (
-            await connection.scalar(text("SELECT count(*) FROM billing_wallets"))
-        ) == 1
+        assert (await connection.scalar(text("SELECT count(*) FROM billing_wallets"))) == 1
+
+    notice_path = "/api/me/billing/registration-card-notice"
+    owner_headers = {"Authorization": "Bearer " + user["accessToken"]}
+    async with app.state.database.engine.begin() as db:
+        # 停用和改图不影响已到账卡片；另一个标签页或账号不能代为确认。
+        await db.execute(
+            text("UPDATE billing_card_types SET enabled=false,name='新版本' WHERE id='slate'")
+        )
+    notice = (await client.get(notice_path, headers=owner_headers)).json()
+    assert notice["name"] == "定制场记卡" and notice["image"] == "/images/credit-cards/slate.webp"
+    assert notice["points"] == 200 and datetime.fromisoformat(notice["expiresAt"]) == row.expires_at
+    notice_id = notice["id"]
+    assert (await client.get(notice_path)).json() is None
+    assert (await client.put(f"{notice_path}/{notice_id}/seen")).status_code == 204
+    assert (await client.get(notice_path, headers=owner_headers)).json() == notice
+    wallet = (await client.get("/api/me/billing", headers=owner_headers)).json()
+    assert wallet["availablePoints"] == wallet["cardPoints"] == 200
+    assert wallet["lots"][0]["sourceKey"] == "card:registration"
+    cards = (await client.get("/api/me/billing/cards", headers=owner_headers)).json()
+    assert len(cards["items"]) == 1 and cards["items"][0]["id"] == notice_id
+    marks = await asyncio.gather(
+        *[client.put(f"{notice_path}/{notice_id}/seen", headers=owner_headers) for _ in range(2)]
+    )
+    assert all(result.status_code == 204 for result in marks)
+    other_device = await client.post(
+        "/api/auth/login",
+        json={"identifier": body["email"], "password": body["password"]},
+    )
+    assert other_device.is_success
+    assert (
+        await client.get(
+            notice_path,
+            headers={
+                "Authorization": "Bearer " + other_device.json()["accessToken"],
+            },
+        )
+    ).json() is None
+
+    # 默认 200 面额停用后，新注册继续发放固定权益；重新登录不会再发卡。
+    fallback = {**body, "email": "fallback@example.invalid"}
+    assert (
+        await client.post(
+            "/api/auth/email-code",
+            json={"email": fallback["email"], "purpose": "register"},
+        )
+    ).is_success
+    fallback["code"] = sent.send.await_args.args[2]
+    created = await client.post("/api/auth/register", json=fallback)
+    assert created.is_success, created.text
+    fallback_notice = (
+        await client.get(
+            notice_path,
+            headers={"Authorization": "Bearer " + created.json()["accessToken"]},
+        )
+    ).json()
+    assert (
+        fallback_notice["points"],
+        fallback_notice["name"],
+        fallback_notice["image"],
+    ) == (
+        200,
+        "场记卡",
+        "/images/credit-cards/slate.webp",
+    )
 
 
 async def test_challenge_expiry_replacement_and_lockout(
@@ -174,9 +229,6 @@ async def test_upgrade_preserves_existing_user(
                 )
             ).one()
             assert tuple(row) == ("original", None, None)
-            assert (
-                await connection.scalar(text("SELECT count(*) FROM billing_wallets"))
-                == 0
-            )
+            assert await connection.scalar(text("SELECT count(*) FROM billing_wallets")) == 0
     finally:
         await engine.dispose()

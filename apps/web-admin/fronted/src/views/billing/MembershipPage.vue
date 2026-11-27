@@ -80,6 +80,34 @@ function refresh() {
               {{ tr('点', 'credits') }}</small
             >
           </div>
+          <template v-if="data.quota && !data.unlimited">
+            <div>
+              <span>{{
+                tr('本周会员剩余', 'Weekly membership remaining')
+              }}</span>
+              <strong
+                >{{ data.quota.weeklyRemaining.toLocaleString() }} /
+                {{ data.quota.weeklyLimit.toLocaleString() }}</strong
+              >
+              <small
+                >{{ tr('本周截止 ', 'Week ends ')
+                }}{{ billingTime(data.quota.weekEndsAt) }}</small
+              >
+            </div>
+            <div>
+              <span>{{
+                tr('本月会员剩余', 'Monthly membership remaining')
+              }}</span>
+              <strong
+                >{{ data.quota.monthlyRemaining.toLocaleString() }} /
+                {{ data.quota.monthlyLimit.toLocaleString() }}</strong
+              >
+              <small
+                >{{ tr('本期截止 ', 'Period ends ')
+                }}{{ billingTime(data.quota.monthEndsAt) }}</small
+              >
+            </div>
+          </template>
           <div>
             <span>{{ tr('任务占用', 'Held by tasks') }}</span
             ><strong>{{ data.heldPoints.toLocaleString() }}</strong>

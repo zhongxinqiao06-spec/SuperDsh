@@ -45,6 +45,7 @@ class PlanVersionRow(Base):
     term_unit: Mapped[str] = mapped_column(String(16))
     price_fen: Mapped[int]
     points: Mapped[int]
+    weekly_points: Mapped[int | None]
     listed: Mapped[bool]
     effective_at: Mapped[datetime] = mapped_column(DateTime(timezone=True))
     published_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))

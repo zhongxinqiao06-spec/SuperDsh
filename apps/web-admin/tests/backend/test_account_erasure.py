@@ -13,7 +13,9 @@ from sqlalchemy import text
 from app.modules.conversations.entity.do.models import SessionRow as Conversation
 
 
-async def test_confirm_erase_and_register_again(platform: tuple[FastAPI, AsyncClient]) -> None:
+async def test_confirm_erase_and_register_again(
+    platform: tuple[FastAPI, AsyncClient],
+) -> None:
     app, client = platform
     admin = await bootstrap(client)
     await client.patch("/api/admin/settings", json={"registrationOpen": True})
@@ -118,7 +120,8 @@ async def test_confirm_erase_and_register_again(platform: tuple[FastAPI, AsyncCl
         assert not active
     async with database.engine.begin() as db:
         await db.execute(
-            text("UPDATE account_erasure_jobs SET retry_at=now() WHERE owner=:uid"), {"uid": uid}
+            text("UPDATE account_erasure_jobs SET retry_at=now() WHERE owner=:uid"),
+            {"uid": uid},
         )
     assert (await client.get(url, headers=auth)).status_code == 401
     assert (await client.request("DELETE", url, headers=auth, json=body)).status_code == 401
@@ -157,12 +160,13 @@ async def test_confirm_erase_and_register_again(platform: tuple[FastAPI, AsyncCl
         assert (
             await db.scalar(
                 text(
-                    "SELECT count(*) FROM billing_credit_lots WHERE user_id=:uid AND remaining=200"
+                    "SELECT count(*) FROM billing_credit_lots WHERE user_id=:uid AND remaining=200 AND source_key='card:registration'"
                 ),
                 {"uid": second["userId"]},
             )
             == 1
         )
         assert not await db.scalar(
-            text("SELECT manifest FROM account_erasure_jobs WHERE owner=:uid"), {"uid": uid}
+            text("SELECT manifest FROM account_erasure_jobs WHERE owner=:uid"),
+            {"uid": uid},
         )

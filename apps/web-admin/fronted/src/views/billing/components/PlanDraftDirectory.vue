@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { planQuotaLabel } from '@/utils/billing/plan-quota-label'
 import { ref, watch } from 'vue'
 import { pricingApi } from '@/api/billing/pricing-api'
 import { catalogAdminApi } from '@/api/billing/catalog-api'
@@ -70,7 +71,7 @@ async function resume(draft: PlanDraft) {
         >{{ tr('草稿修订', 'Draft revision') }} {{ row.revision }} · ¥{{
           row.payload.terms.priceFen / 100
         }}
-        · {{ row.payload.terms.points }} {{ tr('点', 'credits') }}</span
+        · {{ planQuotaLabel(row.payload.terms, tr) }}</span
       ><small>{{ billingTime(row.createdAt) }}</small
       ><el-button :disabled="action.busy.value" @click="resume(row)">{{
         tr('继续编辑', 'Resume editing')

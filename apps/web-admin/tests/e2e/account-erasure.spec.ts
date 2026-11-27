@@ -211,7 +211,20 @@ for (const product of ['entertainment', 'office'] as const) {
       const wallet = await request.get('/api/me/billing', {
         headers: { authorization: 'Bearer ' + account.accessToken },
       })
-      expect((await wallet.json()).availablePoints).toBe(200)
+      const balance = await wallet.json()
+      expect(balance.availablePoints).toBe(200)
+      expect(balance.cardPoints).toBe(200)
+      const gift = page.getByRole('dialog', { name: '注册赠卡已到账' })
+      await expect(gift.getByText('场记卡 · 200 创作点')).toBeVisible()
+      await gift.getByRole('button', { name: '我知道了' }).click()
+      await expect(gift).toBeHidden()
+      const unread = await request.get(
+        '/api/me/billing/registration-card-notice',
+        {
+          headers: { authorization: 'Bearer ' + account.accessToken },
+        },
+      )
+      expect(await unread.json()).toBeNull()
       return account.userId as string
     }
     try {

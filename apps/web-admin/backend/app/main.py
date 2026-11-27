@@ -32,6 +32,7 @@ from app.modules.agents.controller.agent_controller import router as agent_route
 from app.modules.agents.entity.vo.agent_vo import AssetInput
 from app.modules.agents.service.agent_service import AgentService
 from app.modules.agents.service.package_service import ExamplePackageService
+from app.modules.billing.controller.cards import router as billing_cards_router
 from app.modules.billing.controller.catalog import router as billing_catalog_router
 from app.modules.billing.controller.operations import router as billing_operations_router
 from app.modules.billing.controller.pricing import router as billing_pricing_router
@@ -668,6 +669,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
         runtime_router,
         account_router,
         billing_router,
+        billing_cards_router,
         billing_operations_router,
         billing_catalog_router,
         billing_pricing_router,

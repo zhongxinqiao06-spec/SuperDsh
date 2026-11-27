@@ -8,6 +8,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.infrastructure.database import lock_transaction
 from app.infrastructure.errors import DomainError
+from app.modules.billing.dao.member_quota import spendable
 from app.modules.billing.entity.do.credit_do import CreditLotRow, LedgerEntryRow
 
 
@@ -36,20 +37,26 @@ async def reserve_jobs(db: AsyncSession, owner: str, charges: list[tuple[str, in
     await lock_transaction(db, "billing:account:" + owner)
     now = datetime.now(UTC)
     lots = (
-        await db.scalars(
-            select(CreditLotRow)
+        await db.execute(
+            select(CreditLotRow, spendable(now))
             .where(
                 CreditLotRow.user_id == owner,
                 CreditLotRow.created_at <= now,
                 CreditLotRow.expires_at > now,
-                CreditLotRow.remaining > CreditLotRow.held,
+                spendable(now) > 0,
             )
-            # 普通额度优先，两组内均先用最早到期的批次，跨卡与钱包一次预留。
-            .order_by(CreditLotRow.is_card(), CreditLotRow.expires_at, CreditLotRow.id)
+            # 同一批次锁内先用会员，再普通余额，最后卡；每类先到期先使用。
+            .order_by(
+                CreditLotRow.weekly_limit.is_(None),
+                CreditLotRow.is_card(),
+                CreditLotRow.expires_at,
+                CreditLotRow.id,
+            )
             .with_for_update()
         )
     ).all()
-    available = sum(lot.remaining - lot.held for lot in lots)
+    capacity = [int(amount) for _, amount in lots]
+    available = sum(capacity)
     if available < required:
         raise DomainError(
             402,
@@ -60,12 +67,13 @@ async def reserve_jobs(db: AsyncSession, owner: str, charges: list[tuple[str, in
     index = 0
     for job, points in charges:
         while points:
-            lot = lots[index]
-            take = min(points, lot.remaining - lot.held)
+            lot = lots[index][0]
+            take = min(points, capacity[index])
+            capacity[index] -= take
             lot.held += take
             db.add(entry(lot, "reserve:" + job, "usage_hold", -take, take, now))
             points -= take
-            if lot.held == lot.remaining:
+            if capacity[index] == 0:
                 index += 1
 
 

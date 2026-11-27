@@ -54,6 +54,9 @@ class PricingManagement:
             )
         actor.require(f"billing.{domain}s.manage")
         payload = body.model_dump(mode="json", by_alias=True)
+        if isinstance(body, PlanDraft) and body.terms.weekly_points is None:
+            # 兼容升级前保存的原始请求，旧业务号重试仍返回同一份草稿。
+            payload["terms"].pop("weeklyPoints", None)
         async with self.db.sessions.begin() as db:
             await lock_transaction(db, f"billing:pricing-key:{actor.user_id}:{key}")
             await lock_transaction(db, f"billing:pricing:{domain}:{scope}")

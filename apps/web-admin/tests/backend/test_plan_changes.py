@@ -19,7 +19,12 @@ BASE = "/api/admin/billing"
 
 
 def cmd(rev: int, **extras: object) -> dict[str, object]:
-    return {"expectedRevision": rev, "businessKey": str(uuid4()), "reason": "合成换档", **extras}
+    return {
+        "expectedRevision": rev,
+        "businessKey": str(uuid4()),
+        "reason": "合成换档",
+        **extras,
+    }
 
 
 async def operation(
@@ -49,7 +54,9 @@ async def account(client: AsyncClient, owner: str) -> dict:
     return (await client.get(BASE + "/subscriptions", params={"userId": owner})).json()["items"][0]
 
 
-async def test_paid_boundary_and_reversal(platform: tuple[FastAPI, AsyncClient]) -> None:
+async def test_paid_boundary_and_reversal(
+    platform: tuple[FastAPI, AsyncClient],
+) -> None:
     app, client = platform
     owner = str((await bootstrap(client))["userId"])
     path = f"{BASE}/subscriptions/{owner}/changes"
@@ -63,7 +70,7 @@ async def test_paid_boundary_and_reversal(platform: tuple[FastAPI, AsyncClient])
     assert change["effectiveAt"] == paid["quote"]["endsAt"]
     assert (await client.post(path, json=request)).json()["id"] == change["id"]
     snapshot = (await client.get("/api/me/billing")).json()
-    assert snapshot["availablePoints"] == 300 and snapshot["planChange"]["state"] == "scheduled"
+    assert snapshot["availablePoints"] == 200 and snapshot["planChange"]["state"] == "scheduled"
     assert "actorId" not in snapshot["planChange"] and "reason" not in snapshot["planChange"]
     new = await operation(client, owner, "renew", "creator-1")
     assert (
@@ -91,14 +98,16 @@ async def test_paid_boundary_and_reversal(platform: tuple[FastAPI, AsyncClient])
     }
     repository = MembershipRepository(app.state.database)
     for at, points, sku in [
-        (paid["quote"]["startsAt"], 300, "light"),
-        (new["quote"]["startsAt"], 800, "creator"),
+        (paid["quote"]["startsAt"], 200, "light"),
+        (new["quote"]["startsAt"], 500, "creator"),
     ]:
         w = await repository.wallet(owner, datetime.fromisoformat(at), 7, 20)
         assert w.available_points == points and w.subscription and w.subscription.plan.sku == sku
 
 
-async def test_cancel_conflicts_and_stale_preview(platform: tuple[FastAPI, AsyncClient]) -> None:
+async def test_cancel_conflicts_and_stale_preview(
+    platform: tuple[FastAPI, AsyncClient],
+) -> None:
     _, client = platform
     owner = str((await bootstrap(client))["userId"])
     path = f"{BASE}/subscriptions/{owner}/changes"
@@ -109,7 +118,8 @@ async def test_cancel_conflicts_and_stale_preview(platform: tuple[FastAPI, Async
     old_quote = await operation(client, owner, "renew", "light-1", confirm=False)
     payload = cmd(rev, planVersionId="creator-1")
     results = await asyncio.gather(
-        client.post(path, json=payload), client.post(path, json=cmd(rev, planVersionId="pro-1"))
+        client.post(path, json=payload),
+        client.post(path, json=cmd(rev, planVersionId="pro-1")),
     )
     assert sorted(r.status_code for r in results) == [200, 409]
     current = await account(client, owner)
@@ -127,7 +137,7 @@ async def test_cancel_conflicts_and_stale_preview(platform: tuple[FastAPI, Async
     )
     assert canceled.status_code == 200
     assert (await account(client, owner))["planChange"] is None
-    assert (await client.get("/api/me/billing")).json()["availablePoints"] == 300
+    assert (await client.get("/api/me/billing")).json()["availablePoints"] == 200
     await operation(client, owner, "renew", "light-1")
 
 
@@ -157,7 +167,7 @@ async def test_unfunded_and_effective_dates(
         and wallet.plan_change.state == "due"
     )
     open_again = await operation(client, owner, "open", "creator-1")
-    assert open_again["quote"]["immediatePoints"] == 800
+    assert open_again["quote"]["immediatePoints"] == 500
     current = await account(client, owner)
     assert current["planSku"] == "creator"
     reject = await client.request(
@@ -216,7 +226,10 @@ async def test_restricted_customer(platform: tuple[FastAPI, AsyncClient]) -> Non
     await client.post(
         "/api/admin/users",
         json=dict(
-            username="switch-test", displayName="合成普通用户", password=pwd, roles=["member"]
+            username="switch-test",
+            displayName="合成普通用户",
+            password=pwd,
+            roles=["member"],
         ),
     )
     restricted = await complete_initial_login(client, "switch-test", pwd)

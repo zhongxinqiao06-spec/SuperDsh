@@ -81,8 +81,8 @@ const title = computed(() =>
               ·
               {{
                 tr(
-                  `验证邮箱后获 ${vm.resource.data.value.registrationGrant.points} 创作点，${vm.resource.data.value.registrationGrant.validDays} 天有效。`,
-                  `Verify your email to receive ${vm.resource.data.value.registrationGrant.points} credits for ${vm.resource.data.value.registrationGrant.validDays} days.`,
+                  `验证邮箱后获一张 ${vm.resource.data.value.registrationGrant.points} 点额度卡，${vm.resource.data.value.registrationGrant.validDays} 天有效。`,
+                  `Verify your email to receive a ${vm.resource.data.value.registrationGrant.points}-credit card valid for ${vm.resource.data.value.registrationGrant.validDays} days.`,
                 )
               }}
             </template>
