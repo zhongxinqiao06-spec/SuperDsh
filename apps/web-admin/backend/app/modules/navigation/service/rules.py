@@ -69,6 +69,12 @@ def validate_items(items: list[dict[str, object]], modules: list[dict[str, objec
         ):
             raise DomainError(422, "groups must be root nodes without a module")
     required = {str(module["id"]) for module in modules if not module.get("contextual")}
+    if (
+        "product.directory" in known
+        and "product.directory" not in pages
+        and not {"product.members", "access.users"} <= pages
+    ):
+        raise DomainError(422, "member directory is required")
     if not required.issubset(pages):
         raise DomainError(422, "registered pages cannot be added or removed")
     by_id = {str(item["id"]): item for item in items}

@@ -18,6 +18,8 @@ import type {
 import {
   consoleTabGroups,
   homeFirst,
+  memberDirectoryItems,
+  memberDirectoryTabs,
   navigationGroups,
 } from '@/utils/console/navigation-display'
 import { productHome, productOf } from '@/utils/studio/products'
@@ -79,11 +81,13 @@ export function useConsole() {
   )
   const items = computed(() =>
     homeFirst(
-      visibleNavigation(
-        navigation.data.value?.items ?? [],
-        auth.session?.permissions ?? [],
-        auth.session?.roles ?? [],
-        product.value,
+      memberDirectoryItems(
+        visibleNavigation(
+          navigation.data.value?.items ?? [],
+          auth.session?.permissions ?? [],
+          auth.session?.roles ?? [],
+          product.value,
+        ),
       ),
     ),
   )
@@ -92,8 +96,16 @@ export function useConsole() {
       group.some(([id]) => id === module.value?.id),
     ),
   )
+  const inDirectory = computed(() => tabGroup.value === memberDirectoryTabs)
   const activeItem = computed(
     () =>
+      (inDirectory.value
+        ? items.value.find(
+            (i) =>
+              i.moduleId === 'product.directory' ||
+              memberDirectoryTabs.some(([id]) => id === i.moduleId),
+          )
+        : undefined) ??
       items.value.find((item) => item.moduleId === module.value?.id) ??
       items.value.find((item) => item.moduleId === tabGroup.value?.[0]?.[0]),
   )
@@ -148,6 +160,8 @@ export function useConsole() {
     const target = consoleModules.find((entry) => entry.id === item.moduleId)
     if (target && target.title === item.title)
       return preferences.tr(target.title, target.englishTitle)
+    if (item.title === '成员与账号')
+      return preferences.tr('成员与账号', 'Members and accounts')
     const group = navigationGroups[item.id]
     if (group && item.title === group[0])
       return preferences.tr(group[0], group[1])
@@ -262,6 +276,7 @@ export function useConsole() {
     parent,
     title,
     tabs,
+    inDirectory,
     label,
     path,
     signOut,

@@ -1,7 +1,8 @@
 <script setup lang="ts">
 import ManagementList from '@/components/management/ManagementList.vue'
-import RowActions from '@/components/management/RowActions.vue'
-import PageHeader from '@/components/layout/PageHeader.vue'
+import MemberActionMenu from '@/components/management/MemberActionMenu.vue'
+import type { RowAction } from '@/types/common/management'
+import type { ManagedUser, UserAction } from '@/types/access/access'
 import FilterBar from '@/components/management/FilterBar.vue'
 import DataTable from '@/components/management/DataTable.vue'
 import ManagementPagination from '@/components/management/ManagementPagination.vue'
@@ -28,6 +29,51 @@ function operate(account: BillingAccount, kind: BillingAction) {
   action.value = kind
   target.value = account
 }
+const roleMode = ref(false)
+function edit(user: ManagedUser | 'new', roles = false) {
+  roleMode.value = roles
+  vm.edit(user)
+}
+function moreActions(user: ManagedUser): RowAction[] {
+  if (!vm.editable.value) return []
+  const self = user.userId === vm.auth.session?.userId
+  if (user.deletedAt)
+    return [
+      {
+        key: 'restore',
+        label: tr('恢复账号', 'Restore account'),
+        disabled: self,
+      },
+    ]
+  const items: RowAction[] = [
+    { key: 'edit', label: tr('编辑资料', 'Edit profile') },
+  ]
+  if (vm.auth.can('roles.manage') && !self)
+    items.push({ key: 'roles', label: tr('分配角色', 'Assign roles') })
+  items.push(
+    { key: 'reset', label: tr('要求用户重置密码', 'Require password reset') },
+    {
+      key: user.disabled ? 'activate' : 'disable',
+      label: user.disabled
+        ? tr('启用账号', 'Enable account')
+        : tr('禁用账号', 'Disable account'),
+      danger: !user.disabled,
+      disabled: self,
+    },
+    {
+      key: 'delete',
+      label: tr('删除账号', 'Delete account'),
+      danger: true,
+      disabled: self,
+    },
+  )
+  return items
+}
+function selectMore(user: ManagedUser, key: string) {
+  if (key === 'edit' || key === 'roles') return edit(user, key === 'roles')
+  if (['activate', 'disable', 'reset', 'delete', 'restore'].includes(key))
+    vm.requestConfirmation(user, key as UserAction)
+}
 const route = useRoute()
 function saved(result: BillingOperation) {
   target.value = null
@@ -38,8 +84,7 @@ const { tr } = usePreferences()
 </script>
 
 <template>
-  <section class="page paged-page management-page">
-    <PageHeader :title="tr('用户管理', 'Users')" />
+  <section class="page paged-page management-page member-directory">
     <FilterBar class="toolbar" @submit="vm.filter">
       <el-input
         v-model="vm.query.value"
@@ -50,8 +95,9 @@ const { tr } = usePreferences()
       <el-button
         v-if="vm.editable.value"
         type="primary"
-        @click="vm.edit('new')"
-        >{{ tr('创建用户', 'Create user') }}</el-button
+        class="member-create"
+        @click="edit('new')"
+        >{{ tr('创建账号', 'Create account') }}</el-button
       >
     </FilterBar>
     <ResourceStatus
@@ -76,7 +122,7 @@ const { tr } = usePreferences()
               {{ tr('会员与额度', 'Membership and credits') }}
             </th>
             <th>{{ tr('状态', 'Status') }}</th>
-            <th>{{ tr('操作', 'Actions') }}</th>
+            <th class="member-action-cell">{{ tr('操作', 'Actions') }}</th>
           </tr>
         </thead>
         <tbody>
@@ -119,29 +165,27 @@ const { tr } = usePreferences()
                     },
                   }"
                   >{{
-                    user.billing.planName ?? tr('未开通', 'Not enrolled')
+                    user.billing.planName ?? tr('未开通会员', 'Not enrolled')
                   }}</router-link
                 >
                 <small v-if="user.billing.endsAt"
                   >{{ tr('到期', 'Expires') }} ·
                   {{ dateTimeLabel(user.billing.endsAt) }}</small
                 >
-                <small
-                  >{{ tr('可用', 'Available') }}
-                  {{
-                    user.billing.unlimited
-                      ? tr('无限额度', 'Unlimited')
-                      : user.billing.availablePoints
-                  }}</small
-                >
-                <AccountGrantActions
-                  :account="user.billing"
-                  @operate="operate"
-                /> </template
+                <small>{{
+                  user.billing.unlimited
+                    ? tr('无限额度', 'Unlimited')
+                    : tr('可用 ', 'Available ') +
+                      user.billing.availablePoints.toLocaleString() +
+                      tr(' 点', ' credits')
+                }}</small> </template
               ><span v-else>—</span>
             </td>
             <td :data-label="tr('状态', 'Status')">
-              <span>
+              <span
+                class="member-status"
+                :class="{ 'is-inactive': user.disabled || user.deletedAt }"
+              >
                 {{
                   user.deletedAt
                     ? tr('已删除', 'Deleted')
@@ -154,57 +198,21 @@ const { tr } = usePreferences()
                 tr('需要本人修改密码', 'Password change required')
               }}</small>
             </td>
-            <td class="actions">
-              <RowActions
-                v-if="vm.editable.value"
-                :busy="vm.mutation.busy.value"
-              >
-                <el-button
-                  v-if="vm.editable.value && !user.deletedAt"
-                  link
-                  @click="vm.edit(user)"
-                >
-                  {{ tr('编辑', 'Edit') }}
-                </el-button>
-                <el-button
-                  v-if="!user.deletedAt"
-                  link
-                  :disabled="user.userId === vm.auth.session?.userId"
-                  @click="
-                    vm.requestConfirmation(
-                      user,
-                      user.disabled ? 'activate' : 'disable',
-                    )
-                  "
-                >
-                  {{
-                    user.disabled ? tr('启用', 'Enable') : tr('禁用', 'Disable')
-                  }}
-                </el-button>
-                <el-button
-                  v-if="!user.deletedAt"
-                  link
-                  @click="vm.requestConfirmation(user, 'reset')"
-                  >{{ tr('本人重置密码', 'Reset own password') }}</el-button
-                >
-                <el-button
-                  link
-                  :class="{ 'danger-action': !user.deletedAt }"
-                  :disabled="user.userId === vm.auth.session?.userId"
-                  @click="
-                    vm.requestConfirmation(
-                      user,
-                      user.deletedAt ? 'restore' : 'delete',
-                    )
-                  "
-                >
-                  {{
-                    user.deletedAt
-                      ? tr('恢复', 'Restore')
-                      : tr('删除', 'Delete')
-                  }}
-                </el-button>
-              </RowActions>
+            <td class="member-action-cell" :data-label="tr('操作', 'Actions')">
+              <div class="member-row-actions">
+                <AccountGrantActions
+                  v-if="user.billing && !user.deletedAt && !user.disabled"
+                  :account="user.billing"
+                  @operate="operate"
+                />
+                <MemberActionMenu
+                  :label="tr('更多', 'More')"
+                  :owner="user.displayName || user.username || ''"
+                  :actions="moreActions(user)"
+                  :busy="vm.mutation.busy.value"
+                  @action="selectMore(user, $event)"
+                />
+              </div>
             </td>
           </tr>
           <tr
@@ -244,8 +252,10 @@ const { tr } = usePreferences()
       :model-value="vm.editing.value !== null"
       :title="
         vm.editing.value === 'new'
-          ? tr('创建用户', 'Create user')
-          : tr('编辑用户', 'Edit user')
+          ? tr('创建账号', 'Create account')
+          : roleMode
+            ? tr('分配角色', 'Assign roles')
+            : tr('编辑资料', 'Edit profile')
       "
       :busy="vm.mutation.busy.value"
       :error="vm.mutation.error.value"
@@ -261,7 +271,7 @@ const { tr } = usePreferences()
             maxlength="100"
             autocomplete="off"
         /></label>
-        <label class="field"
+        <label v-if="!roleMode" class="field"
           >{{ tr('显示名称', 'Display name')
           }}<el-input v-model="vm.draft.displayName" maxlength="100"
         /></label>
@@ -278,7 +288,10 @@ const { tr } = usePreferences()
             autocomplete="new-password"
         /></label>
         <label
-          v-if="vm.auth.can('roles.manage')"
+          v-if="
+            vm.auth.can('roles.manage') &&
+            (roleMode || vm.editing.value === 'new')
+          "
           class="field user-editor-roles"
           >{{ tr('角色（权限取并集）', 'Roles (combined permissions)')
           }}<el-checkbox-group
@@ -303,7 +316,13 @@ const { tr } = usePreferences()
     </ManagementDialog>
     <el-dialog
       :model-value="vm.confirmation.value !== null"
-      :title="tr('确认操作', 'Confirm action')"
+      :title="
+        (vm.confirmation.value &&
+          moreActions(vm.confirmation.value.user).find(
+            (a) => a.key === vm.confirmation.value?.action,
+          )?.label) ||
+        tr('确认操作', 'Confirm action')
+      "
       width="min(440px,94vw)"
       :close-on-click-modal="false"
       @update:model-value="vm.confirmation.value = null"
@@ -317,6 +336,14 @@ const { tr } = usePreferences()
             )
           }}
           <strong>{{ vm.confirmation.value?.user.displayName }}</strong>
+        </p>
+        <p v-if="vm.confirmation.value?.action === 'disable'">
+          {{
+            tr(
+              '禁用后，此账号将无法登录星桥办公和星桥娱乐。',
+              'Disabling this account blocks sign-in to Office and Studio.',
+            )
+          }}
         </p>
         <p v-if="vm.confirmation.value?.action === 'delete'">
           {{

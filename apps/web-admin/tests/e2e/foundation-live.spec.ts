@@ -1,3 +1,4 @@
+import { memberAction } from './member-actions'
 import { expect, test } from '@playwright/test'
 import { createPasswordVerifier } from '../../fronted/src/utils/auth/password-verifier'
 import { loginIsolatedAccount } from './live-auth'
@@ -25,7 +26,7 @@ test('真实新平台：配置初始化后登录、刷新、用户与角色菜�
   await page.getByLabel('用户名或邮箱').fill(username)
   await page.getByLabel('密码', { exact: true }).fill(password)
   await page.getByRole('button', { name: '登录 ↵', exact: true }).click()
-  await page.getByRole('link', { name: /星桥办公/ }).click()
+  await page.getByRole('link', { name: '星桥办公 · 进入办公台' }).click()
   await page.getByRole('link', { name: /管理后台/ }).click()
   await expect(
     page.getByRole('heading', { name: '看板', exact: true }),
@@ -58,14 +59,16 @@ test('真实新平台：配置初始化后登录、刷新、用户与角色菜�
   await expect(roleRow).toContainText('已编辑合成角色')
   await page.reload()
   await expect(
-    page.getByRole('heading', { name: '角色与权限', exact: true }),
+    page
+      .getByRole('navigation', { name: '相关设置' })
+      .getByRole('link', { name: '角色与权限', exact: true }),
   ).toBeVisible()
   await page.goto('/#/access/users')
   await expect(
-    page.getByRole('heading', { name: '用户管理', exact: true }),
+    page.getByRole('heading', { name: '成员与账号', exact: true }),
   ).toBeVisible()
   const createdName = `验收用户-${Date.now()}`
-  await page.getByRole('button', { name: '创建用户', exact: true }).click()
+  await page.getByRole('button', { name: '创建账号', exact: true }).click()
   const editor = page.getByRole('dialog')
   await editor.getByLabel('用户名', { exact: true }).fill(`check-${Date.now()}`)
   await editor.getByLabel('显示名称').fill(createdName)
@@ -75,36 +78,31 @@ test('真实新平台：配置初始化后登录、刷新、用户与角色菜�
     page.getByRole('row', { name: new RegExp(createdName) }),
   ).toBeVisible()
   const createdRow = page.getByRole('row', { name: new RegExp(createdName) })
-  await createdRow.getByRole('button', { name: '禁用', exact: true }).click()
+  await memberAction(page, createdRow, '更多', '禁用账号')
   await page
     .getByRole('dialog')
     .getByRole('button', { name: '确认', exact: true })
     .click()
   await expect(createdRow).toContainText('已禁用')
-  await createdRow.getByRole('button', { name: '启用', exact: true }).click()
+  await memberAction(page, createdRow, '更多', '启用账号')
   await page
     .getByRole('dialog')
     .getByRole('button', { name: '确认', exact: true })
     .click()
   await expect(createdRow).toContainText('已激活')
-  await page
-    .getByRole('row', { name: new RegExp(createdName) })
-    .getByRole('button', { name: '删除', exact: true })
-    .click()
+  await memberAction(page, createdRow, '更多', '删除账号')
   await page
     .getByRole('dialog')
     .getByRole('button', { name: '确认', exact: true })
     .click()
   await expect(createdRow).toContainText('已删除')
-  await createdRow.getByRole('button', { name: '恢复', exact: true }).click()
+  await memberAction(page, createdRow, '更多', '恢复账号')
   await page
     .getByRole('dialog')
     .getByRole('button', { name: '确认', exact: true })
     .click()
   await expect(createdRow).toContainText('已激活')
-  await createdRow
-    .getByRole('button', { name: '本人重置密码', exact: true })
-    .click()
+  await memberAction(page, createdRow, '更多', '要求用户重置密码')
   await page
     .getByRole('dialog')
     .getByRole('button', { name: '确认', exact: true })
@@ -117,7 +115,9 @@ test('真实新平台：配置初始化后登录、刷新、用户与角色菜�
   ).toBeVisible()
   await page.goto('/#/access/roles')
   await expect(
-    page.getByRole('heading', { name: '角色与权限', exact: true }),
+    page
+      .getByRole('navigation', { name: '相关设置' })
+      .getByRole('link', { name: '角色与权限', exact: true }),
   ).toBeVisible()
   const builtinRole = page
     .locator('.role-card')
@@ -183,14 +183,15 @@ test('真实新平台：配置初始化后登录、刷新、用户与角色菜�
   expect(secondLogin.ok()).toBeTruthy()
   await page.goto('/#/account/security')
   await expect(page.getByRole('cell', { name: /当前/ })).toBeVisible()
-  await page.getByRole('button', { name: '撤销', exact: true }).first().click()
+  const revocable = page.getByRole('button', { name: '撤销', exact: true })
+  const beforeRevoke = await revocable.count()
+  expect(beforeRevoke).toBeGreaterThan(0)
+  await revocable.first().click()
   await page
     .getByRole('dialog')
     .getByRole('button', { name: '确认撤销', exact: true })
     .click()
-  await expect(
-    page.getByRole('button', { name: '撤销', exact: true }),
-  ).toHaveCount(0)
+  await expect(revocable).toHaveCount(beforeRevoke - 1)
   await page.getByRole('button', { name: '重置密码', exact: true }).click()
   const changedPassword = `${password}-changed`
   await page
@@ -214,7 +215,7 @@ test('真实新平台：配置初始化后登录、刷新、用户与角色菜�
   // 改密后的登录恢复原安全页深链，再显式进入产品选择。
   await expect(page).toHaveURL(/#\/account\/security$/)
   await page.getByRole('link', { name: '切换产品' }).click()
-  await page.getByRole('link', { name: /星桥办公/ }).click()
+  await page.getByRole('link', { name: '星桥办公 · 进入办公台' }).click()
   await page.getByRole('link', { name: /管理后台/ }).click()
   await expect(
     page.getByRole('heading', { name: '看板', exact: true }),

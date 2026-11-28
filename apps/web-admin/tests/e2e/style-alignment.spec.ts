@@ -77,7 +77,7 @@ for (const theme of ['light', 'dark']) {
       animations: 'disabled',
       path: info.outputPath(`users-${theme}.png`),
     })
-    const create = page.getByRole('button', { name: '创建用户', exact: true })
+    const create = page.getByRole('button', { name: '创建账号', exact: true })
     await expect(create).toHaveCSS('height', '40px')
     await expect(create).toHaveCSS('border-radius', '8px')
     // 深色主题下，框架默认白字不能覆盖浅色主按钮的前景语义。
@@ -148,11 +148,11 @@ for (const theme of ['light', 'dark']) {
     const navigation = page.getByRole('dialog')
     await expect(navigation).toHaveCSS('width', '280px')
     await navigation
-      .getByRole('link', { name: '账号与角色', exact: true })
+      .getByRole('link', { name: '成员与账号', exact: true })
       .click()
     await expect(navigation).toBeHidden()
     await expect(
-      page.getByRole('heading', { name: '用户管理', exact: true }),
+      page.getByRole('heading', { name: '成员与账号', exact: true }),
     ).toBeVisible()
     // 手机导航与退出确认同时存在时，取消必须把焦点归还给原操作。
     await page.getByRole('button', { name: '打开导航', exact: true }).click()

@@ -4,18 +4,41 @@ from copy import deepcopy
 from typing import Any
 
 from app.modules.navigation.entity.bo.navigation import MenuCatalog, Product
+from app.modules.navigation.service.member_directory import merge_member_entries
 
 
 def upgrade_items(
     items: list[dict[str, object]], product: Product, catalog: MenuCatalog, baseline: dict[str, Any]
 ) -> list[dict[str, object]]:
-    if any(i["moduleId"] == "product.members" for i in items):
+    if any(i["moduleId"] in ("product.members", "product.directory") for i in items):
+        items = merge_member_entries(items)
         if product != "entertainment":
             return items
         if not any(i["moduleId"] == "studio.create" for i in items):
             return add_creation_center(items, catalog)
         return upgrade_studio_home(items)
     defaults = {str(i["id"]): deepcopy(i) for i in catalog.defaults}
+    # 早期菜单先恢复两条旧配置的覆盖，再判断是否可以无损合并。
+    if "product.directory" in defaults:
+        defaults = {
+            ("product.members" if key == "product.directory" else key): (
+                {
+                    **item,
+                    "id": "product.members",
+                    "moduleId": "product.members",
+                    "title": "产品成员",
+                }
+                if key == "product.directory"
+                else item
+            )
+            for key, item in defaults.items()
+        }
+        defaults["access.users"] = {
+            **defaults["product.members"],
+            "id": "access.users",
+            "moduleId": "access.users",
+            "title": "账号与角色",
+        }
     source = list(baseline["office"])
     if product == "entertainment":
         source += baseline["entertainmentAdded"]
@@ -83,11 +106,11 @@ def upgrade_items(
         target_parent = defaults[key]["parentId"]
         if target_parent and str(target_parent) not in defaults:
             defaults[str(target_parent)] = deepcopy(previous[str(target_parent)])
+    merged = merge_member_entries(list(defaults.values()))
     if product == "entertainment":
         # 早期目录同样可能限制作品入口；先迁移原字段，再由该入口派生创作中心。
-        del defaults["studio.create"]
-        return add_creation_center(list(defaults.values()), catalog)
-    return list(defaults.values())
+        return add_creation_center([i for i in merged if i["moduleId"] != "studio.create"], catalog)
+    return merged
 
 
 def add_creation_center(

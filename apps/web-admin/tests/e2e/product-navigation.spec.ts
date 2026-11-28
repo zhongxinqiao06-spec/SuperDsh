@@ -1,3 +1,4 @@
+import { memberAction } from './member-actions'
 import { expect, test, type Page } from '@playwright/test'
 import { installFoundationFixture } from './foundation-fixture'
 
@@ -101,17 +102,17 @@ test('办公管理员的产品成员和模型变更仅发送到办公接口', as
     },
   )
   await page.goto('/#/product/members')
-  await page.getByRole('button', { name: '添加成员' }).click()
+  await page.getByRole('button', { name: '添加已有账号' }).click()
   const dialog = page.getByRole('dialog')
   await dialog.getByLabel('现有账号的用户名或邮箱').fill(member.username)
   await dialog.getByRole('button', { name: '添加', exact: true }).click()
   const row = page.getByRole('row', { name: /test-member/ })
   await expect(row).toContainText('办公用户')
-  await row.getByRole('button', { name: '移除成员' }).click()
+  await memberAction(page, row, '更多', '移出办公产品')
   await dialog.getByRole('button', { name: '取消', exact: true }).click()
   expect(joined).toBe(true)
-  await row.getByRole('button', { name: '移除成员' }).click()
-  await dialog.getByRole('button', { name: '确认移除' }).click()
+  await memberAction(page, row, '更多', '移出办公产品')
+  await dialog.getByRole('button', { name: '移出办公产品' }).click()
   await expect(row).toHaveCount(0)
   await page.goto('/#/product/defaults')
   await page.getByRole('button', { name: '选择模型' }).click()
@@ -207,10 +208,10 @@ test('同一登录可切换工作台，娱乐的共享管理和账号链接在�
     .getByRole('button', { name: '用户与权限' })
     .boundingBox()
   const childBounds = await nav
-    .getByRole('link', { name: '账号与角色' })
+    .getByRole('link', { name: '成员与账号' })
     .boundingBox()
   expect(childBounds!.x - groupBounds!.x).toBe(20)
-  await nav.getByRole('link', { name: '账号与角色' }).click()
+  await nav.getByRole('link', { name: '成员与账号' }).click()
   await expect(page).toHaveURL(/#\/access\/users\?product=entertainment$/)
   await expect(page.getByRole('cell', { name: /合成成员/ })).toBeVisible()
   await page.reload()
@@ -353,3 +354,31 @@ test('办公只读菜单管理员可以查看娱乐编排，不能写入或直�
   expect(state.requests).not.toContain('GET /studio/library')
   expect(state.requests).not.toContain('PUT /admin/menus')
 })
+
+for (const [grant, path, view] of [
+  ['products.entertainment.members.manage', '/product/members', '本产品成员'],
+  ['users.read', '/access/users', '全部账号'],
+  ['roles.manage', '/access/roles', '角色与权限'],
+] as const) {
+  test('合并入口按最小授权进入' + view, async ({ page }) => {
+    const state = await installFoundationFixture(page, [
+      'products.entertainment',
+      grant,
+    ])
+    state.signedIn = true
+    await page.goto('/#/product/directory?product=entertainment')
+    await expect(page).toHaveURL(
+      (url) => url.hash === '#' + path + '?product=entertainment',
+    )
+    const tabs = page.getByRole('navigation', { name: '相关设置' })
+    await expect(tabs.getByRole('link')).toHaveCount(1)
+    await expect(tabs.getByRole('link', { name: view })).toHaveAttribute(
+      'aria-current',
+      'page',
+    )
+    const blocked =
+      grant === 'users.read' ? '/product/members' : '/access/users'
+    await page.goto('/#' + blocked + '?product=entertainment')
+    await expect(page.getByRole('heading', { name: '403' })).toBeVisible()
+  })
+}

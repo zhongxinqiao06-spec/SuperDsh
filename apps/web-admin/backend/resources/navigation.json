@@ -40,7 +40,8 @@
       "route": "#/access/users",
       "title": "账号与角色",
       "icon": "users",
-      "permissions": ["users.read"]
+      "permissions": ["users.read"],
+      "contextual": true
     },
     {
       "id": "access.roles",
@@ -258,7 +259,17 @@
       "product": "office"
     },
     {
+      "id": "product.directory",
+      "title": "成员与账号",
+      "route": "#/product/directory",
+      "icon": "users",
+      "permissions": ["users.read", "roles.manage"],
+      "productAction": "members",
+      "contextual": true
+    },
+    {
       "id": "product.members",
+      "contextual": true,
       "title": "产品成员",
       "route": "#/product/members",
       "icon": "users",
@@ -356,9 +367,8 @@
       "title": "产品管理",
       "icon": "users",
       "pages": [
-        "product.members",
+        "product.directory",
         "access.menus",
-        "access.users",
         "billing.subscriptions",
         "billing.cards",
         "billing.plans",

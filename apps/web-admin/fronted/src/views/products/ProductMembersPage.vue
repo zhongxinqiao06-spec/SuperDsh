@@ -1,14 +1,18 @@
 <script setup lang="ts">
-import { ref } from 'vue'
+import { computed, ref } from 'vue'
 import { useAuthStore } from '@/store/modules/auth-store'
 import AccountGrantActions from '@/views/billing/components/AccountGrantActions.vue'
 import OperationDialog from '@/views/billing/components/OperationDialog.vue'
+import type { RowAction } from '@/types/common/management'
+import type { ProductMember } from '@/types/products/management'
 import type {
   BillingAccount,
   BillingAction,
   BillingOperation,
 } from '@/types/billing/operations'
-import PageHeader from '@/components/layout/PageHeader.vue'
+import MemberActionMenu from '@/components/management/MemberActionMenu.vue'
+import { useCurrentProduct } from '@/composables/console/use-current-product'
+import { useRoute, useRouter } from 'vue-router'
 import FilterBar from '@/components/management/FilterBar.vue'
 import DataTable from '@/components/management/DataTable.vue'
 import ManagementList from '@/components/management/ManagementList.vue'
@@ -18,6 +22,33 @@ import ResourceStatus from '@/components/feedback/ResourceStatus.vue'
 import { useProductMembers } from '@/composables/products/use-product-members'
 import { usePreferences } from '@/store/modules/preferences'
 import { roleLabel } from '@/utils/access/role-labels'
+const route = useRoute(),
+  router = useRouter()
+const product = useCurrentProduct()
+const removeLabel = computed(() =>
+  product.value === 'entertainment'
+    ? tr('移出娱乐产品', 'Remove from Studio')
+    : tr('移出办公产品', 'Remove from Office'),
+)
+function memberOptions(member: ProductMember): RowAction[] {
+  const items: RowAction[] = []
+  if (auth.can('billing.read'))
+    items.push({
+      key: 'history',
+      label: tr('查看办理记录', 'View billing records'),
+    })
+  if (member.removable)
+    items.push({ key: 'remove', label: removeLabel.value, danger: true })
+  return items
+}
+function selectOption(member: ProductMember, key: string) {
+  if (key === 'remove') vm.remove(member)
+  if (key === 'history')
+    void router.push({
+      path: '/billing/subscriptions',
+      query: { product: product.value, userId: member.userId },
+    })
+}
 const vm = useProductMembers()
 const auth = useAuthStore()
 const selected = ref<{ account: BillingAccount; action: BillingAction } | null>(
@@ -35,8 +66,7 @@ function saved(result: BillingOperation) {
 const { tr } = usePreferences()
 </script>
 <template>
-  <section class="page paged-page management-page">
-    <PageHeader :title="tr('产品成员', 'Product members')" />
+  <section class="page paged-page management-page member-directory">
     <FilterBar @submit="vm.filter"
       ><el-input
         v-model="vm.query.value"
@@ -45,7 +75,9 @@ const { tr } = usePreferences()
         clearable
         maxlength="120"
       /><el-button native-type="submit">搜索</el-button
-      ><el-button type="primary" @click="vm.add">添加成员</el-button></FilterBar
+      ><el-button type="primary" class="member-create" @click="vm.add"
+        >添加已有账号</el-button
+      ></FilterBar
     >
     <ResourceStatus
       :loading="vm.resource.loading.value"
@@ -63,10 +95,10 @@ const { tr } = usePreferences()
         <thead>
           <tr>
             <th>账号</th>
-            <th>显示名称</th>
             <th>本产品角色</th>
             <th v-if="auth.can('billing.read')">会员与额度</th>
-            <th>操作</th>
+            <th>账号状态</th>
+            <th class="member-action-cell">操作</th>
           </tr>
         </thead>
         <tbody>
@@ -74,38 +106,69 @@ const { tr } = usePreferences()
             v-for="member in vm.resource.data.value?.items"
             :key="member.userId"
           >
-            <td>{{ member.username }}</td>
-            <td data-label="显示名称">{{ member.displayName || '—' }}</td>
+            <td>
+              <strong>{{ member.displayName || member.username }}</strong
+              ><small
+                v-if="
+                  member.displayName && member.displayName !== member.username
+                "
+                >{{ member.username }}</small
+              >
+            </td>
             <td data-label="本产品角色">
               {{ member.roleIds.map((id) => roleLabel(id, tr)).join('、') }}
             </td>
             <td v-if="auth.can('billing.read')" data-label="会员与额度">
               <template v-if="member.billing">
-                {{ member.billing.planName ?? tr('未开通', 'Not enrolled') }}
-                <small
-                  >{{ tr('可用', 'Available') }}
-                  {{
-                    member.billing.unlimited
-                      ? tr('无限额度', 'Unlimited')
-                      : member.billing.availablePoints.toLocaleString()
-                  }}</small
-                > </template
+                <router-link
+                  :to="{
+                    path: '/billing/subscriptions',
+                    query: {
+                      product: route.query.product,
+                      userId: member.userId,
+                    },
+                  }"
+                  >{{
+                    member.billing.planName ?? tr('未开通会员', 'Not enrolled')
+                  }}</router-link
+                >
+                <small>{{
+                  member.billing.unlimited
+                    ? tr('无限额度', 'Unlimited')
+                    : tr('可用 ', 'Available ') +
+                      member.billing.availablePoints.toLocaleString() +
+                      tr(' 点', ' credits')
+                }}</small> </template
               ><span v-else>—</span>
             </td>
-            <td data-label="操作">
-              <div class="toolbar">
+            <td data-label="账号状态">
+              <span
+                class="member-status"
+                :class="{ 'is-inactive': member.disabled }"
+              >
+                {{
+                  member.disabled
+                    ? tr('已禁用', 'Disabled')
+                    : tr('已激活', 'Active')
+                }}
+              </span>
+            </td>
+            <td class="member-action-cell" data-label="操作">
+              <div class="member-row-actions">
                 <AccountGrantActions
                   v-if="member.billing"
                   :account="member.billing"
                   @operate="operate"
                 />
-                <el-button
-                  v-if="member.removable"
-                  link
-                  type="danger"
-                  @click="vm.remove(member)"
-                  >移除成员</el-button
-                ><span v-else class="muted">由角色授权</span>
+                <MemberActionMenu
+                  :owner="member.displayName || member.username"
+                  :label="tr('更多', 'More')"
+                  :actions="memberOptions(member)"
+                  @action="selectOption(member, $event)"
+                />
+                <small v-if="!member.removable && !auth.can('billing.read')">{{
+                  tr('由角色授权', 'Granted by role')
+                }}</small>
               </div>
             </td>
           </tr>
@@ -153,8 +216,8 @@ const { tr } = usePreferences()
     </ManagementDialog>
     <ManagementDialog
       :model-value="!!vm.removing.value"
-      title="移除产品成员"
-      submit-text="确认移除"
+      :title="removeLabel"
+      :submit-text="removeLabel"
       :error="vm.mutation.error.value"
       :busy="vm.mutation.busy.value"
       @update:model-value="vm.removing.value = null"
@@ -163,7 +226,9 @@ const { tr } = usePreferences()
       <p>
         确认移除「{{
           vm.removing.value?.displayName || vm.removing.value?.username
-        }}」的本产品使用资格？账号及作品将保留。
+        }}」在{{
+          product === 'entertainment' ? '星桥娱乐' : '星桥办公'
+        }}的使用资格？账号、作品及其他产品的使用资格将保留。
       </p>
     </ManagementDialog>
   </section>

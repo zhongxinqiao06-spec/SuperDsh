@@ -106,6 +106,7 @@ async def test_product_roles_login_and_membership_boundaries(
     ]
     for item in listed:
         assert set(item) == {
+            "disabled",
             "userId",
             "username",
             "displayName",

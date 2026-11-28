@@ -34,6 +34,17 @@ async def test_move_existing_product_menus(platform_configuration: Settings) -> 
                     for i in menus[product].defaults
                     if i["id"] not in {"billing.cards", "account.cards"}
                 ]
+                # 此测试从旧菜单修订开始，重建当时独立的两个管理入口。
+                directory = next(i for i in items if i["id"] == "product.directory")
+                directory.update(id="product.members", moduleId="product.members", title="产品成员")
+                items.append(
+                    {
+                        **directory,
+                        "id": "access.users",
+                        "moduleId": "access.users",
+                        "title": "账号与角色",
+                    }
+                )
                 by_id = {i["id"]: i for i in items}
                 for n, module in enumerate(moved, 6):
                     by_id[module].update(parentId="platform", order=n)

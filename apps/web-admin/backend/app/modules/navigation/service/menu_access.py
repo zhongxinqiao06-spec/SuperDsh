@@ -21,6 +21,7 @@ def editable_ids(
     # 账号与账务共享两个产品的业务数据；换导航父级不改变平台菜单编排权。
     platform = {i["id"] for i in catalog.defaults if i["parentId"] == "platform"} | {
         "access.users",
+        "product.directory",
         "billing.subscriptions",
         "billing.cards",
         "billing.plans",

@@ -2,6 +2,8 @@
 import { computed, provide, watch } from 'vue'
 import { consoleMenuKey } from '@/layout/console-navigation'
 import { useConsole } from '@/composables/console/use-console'
+import PageHeader from '@/components/layout/PageHeader.vue'
+import '@/assets/styles/member-directory.css'
 import AppIcon from '@/components/base/AppIcon.vue'
 import AnnouncementGate from '@/components/AnnouncementGate.vue'
 import RegistrationCardGate from '@/views/billing/components/RegistrationCardGate.vue'
@@ -190,8 +192,19 @@ function toggleGroup(id: string): void {
             }}</router-link>
           </template>
         </el-alert>
+        <div
+          v-if="vm.permitted.value && vm.inDirectory.value"
+          class="member-directory-heading management-page"
+        >
+          <PageHeader
+            :title="vm.preferences.tr('成员与账号', 'Members and accounts')"
+          />
+        </div>
         <nav
-          v-if="vm.permitted.value && vm.tabs.value.length > 1"
+          v-if="
+            vm.permitted.value &&
+            (vm.tabs.value.length > 1 || vm.inDirectory.value)
+          "
           class="console-context-tabs"
           :aria-label="vm.preferences.tr('相关设置', 'Related settings')"
         >

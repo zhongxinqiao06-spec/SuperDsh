@@ -27,6 +27,7 @@ class ProductMemberships:
             username=user.username,
             displayName=user.display_name,
             roleIds=roles,
+            disabled=user.disabled,
             removable=user.id != actor.user_id and roles == [MEMBER_ROLE[product]],
             revision=user.revision,
         )

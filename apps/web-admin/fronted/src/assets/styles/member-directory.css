@@ -1,0 +1,104 @@
+/* 成员目录各视图共享表格操作、窄屏面板和范围切换。 */
+.member-directory-heading {
+  flex: none;
+  width: min(100%, 1440px);
+  margin: 0 auto;
+  padding: var(--space-6) var(--page-gutter) 0;
+}
+.member-directory-heading + .console-context-tabs {
+  padding: var(--space-3) var(--page-gutter) 0;
+}
+.member-directory-heading + .console-context-tabs a {
+  border: 1px solid var(--border);
+  border-radius: var(--radius-control);
+}
+.member-directory-heading + .console-context-tabs a[aria-current='page'] {
+  background: var(--primary);
+  color: var(--primary-foreground);
+  border-color: var(--primary);
+  box-shadow: none;
+}
+.member-directory .member-status {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2);
+}
+.member-directory .member-status::before {
+  content: '';
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--el-color-success);
+}
+.member-directory .member-status.is-inactive::before {
+  background: var(--muted-foreground);
+}
+.member-directory .filter-bar .member-create {
+  margin-inline-start: auto;
+}
+.member-directory td.member-action-cell,
+.member-directory th.member-action-cell {
+  text-align: end;
+}
+.member-row-actions {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: var(--space-2);
+}
+.member-row-actions .el-button {
+  height: var(--control-height-small);
+  min-height: var(--control-height-small);
+  margin: 0;
+}
+.member-row-actions .el-button .app-icon {
+  margin-inline-start: var(--space-1);
+}
+.member-action-menu .el-dropdown-menu {
+  min-width: 168px;
+}
+.member-action-menu .app-icon {
+  margin-inline-end: var(--space-2);
+}
+.member-row-actions .member-grant-button {
+  color: var(--primary);
+  border-color: var(--primary);
+}
+.member-action-sheet.el-drawer {
+  max-height: 80dvh;
+}
+.member-action-sheet .el-drawer__body {
+  display: grid;
+  padding-block-end: max(var(--space-4), env(safe-area-inset-bottom));
+}
+.member-action-sheet .el-drawer__body button {
+  text-align: start;
+  min-height: 44px;
+  background: transparent;
+  border: 0;
+  border-block-end: 1px solid var(--border);
+  color: var(--foreground);
+}
+.member-action-sheet .el-drawer__body button.danger-action,
+.el-dropdown-menu__item.danger-action {
+  color: var(--el-color-danger);
+}
+.member-action-sheet .el-drawer__body button:disabled {
+  color: var(--el-text-color-disabled);
+}
+@media (max-width: 640px) {
+  .member-directory .filter-bar .member-create {
+    margin-inline-start: 0;
+  }
+  .member-row-actions .el-button {
+    min-height: 44px;
+  }
+}
+
+@media (max-width: 640px) {
+  .member-directory .has-card-rows .member-action-cell {
+    grid-column: 1 / -1;
+    border-block-start: 1px solid var(--border);
+    padding-block-start: var(--space-2);
+  }
+}

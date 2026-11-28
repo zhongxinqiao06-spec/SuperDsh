@@ -18,5 +18,6 @@ class ProductMember(TypedDict):
     username: str
     displayName: str | None
     roleIds: list[str]
+    disabled: bool
     removable: bool
     revision: int

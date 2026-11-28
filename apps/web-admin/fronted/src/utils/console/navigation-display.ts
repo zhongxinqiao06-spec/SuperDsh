@@ -39,14 +39,37 @@ export const navigationGroups: Readonly<
   account: ['个人中心', 'Account'],
 }
 
+/** 旧深链仍打开原视图，目录默认优先进入当前产品。 */
+export const memberDirectoryTabs = [
+  ['product.members', '本产品成员', 'Product members'],
+  ['access.users', '全部账号', 'All accounts'],
+  ['access.roles', '角色与权限', 'Roles and permissions'],
+] as const
+
+/** 旧配置若给两个入口设置了不同权限，先按授权过滤，再折叠可见项。 */
+export function memberDirectoryItems(items: MenuNode[]): MenuNode[] {
+  const legacy = memberDirectoryTabs.flatMap(([id]) =>
+    items.filter((i) => i.moduleId === id),
+  )
+  if (!legacy.length) return items
+  const anchor =
+    items.find((i) => i.moduleId === 'product.directory') ?? legacy[0]!
+  const result = items
+    .filter((i) => !legacy.includes(i) || i === anchor)
+    .map((i) =>
+      i === anchor && legacy.includes(i) ? { ...i, title: '成员与账号' } : i,
+    )
+  return result.filter(
+    (i) =>
+      i.kind !== 'group' || result.some((child) => child.parentId === i.id),
+  )
+}
+
 /** 平台子页沿用旧链接；侧栏只保留一个二级入口，页内切换相关设置。 */
 export const consoleTabGroups: ReadonlyArray<
   ReadonlyArray<readonly [string, string, string]>
 > = [
-  [
-    ['access.users', '账号', 'Accounts'],
-    ['access.roles', '角色与权限', 'Roles and permissions'],
-  ],
+  memberDirectoryTabs,
   [
     ['models', '聊天配置', 'Chat models'],
     ['models.multimodal', '多模态配置', 'Multimodal models'],

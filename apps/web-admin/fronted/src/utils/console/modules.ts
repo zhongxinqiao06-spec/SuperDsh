@@ -67,6 +67,16 @@ export const consoleModules: readonly ConsoleModule[] = [
     implemented: true,
   },
   {
+    id: 'product.directory',
+    path: '/product/directory',
+    title: '成员与账号',
+    englishTitle: 'Members and accounts',
+    icon: 'users',
+    productAction: 'members',
+    permissions: ['users.read', 'roles.manage'],
+    implemented: true,
+  },
+  {
     id: 'product.members',
     path: '/product/members',
     title: '产品成员',

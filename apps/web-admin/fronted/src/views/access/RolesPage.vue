@@ -2,7 +2,6 @@
 import RowActions from '@/components/management/RowActions.vue'
 import FilterBar from '@/components/management/FilterBar.vue'
 import ManagementList from '@/components/management/ManagementList.vue'
-import PageHeader from '@/components/layout/PageHeader.vue'
 import ManagementPagination from '@/components/management/ManagementPagination.vue'
 import { useRoles } from '@/composables/access/use-roles'
 import { usePreferences } from '@/store/modules/preferences'
@@ -14,8 +13,7 @@ const { tr } = usePreferences()
 </script>
 
 <template>
-  <section class="page paged-page management-page">
-    <PageHeader :title="tr('角色与权限', 'Roles and permissions')" />
+  <section class="page paged-page management-page member-directory">
     <FilterBar>
       <el-input
         v-model="vm.search.value"

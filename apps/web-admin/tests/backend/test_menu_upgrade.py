@@ -40,7 +40,7 @@ def test_custom_menu_collision_and_restricted_parent() -> None:
     result = upgrade_items(legacy, "office", catalog, baseline)
     validate_items(result, catalog.modules)
     by_id = {i["id"]: i for i in result}
-    assert by_id["product.members"]["moduleId"] == "product.members"
+    assert by_id["product.directory"]["moduleId"] == "product.directory"
     assert by_id["agents"]["title"] == "办公助手"
     assert by_id[by_id["agents"]["parentId"]]["roleIds"] == ["office_admin"]
     assert upgrade_items(result, "office", catalog, baseline) == result
@@ -117,3 +117,30 @@ def test_legacy_props_icon_survives_creation_center_upgrade(icon: str) -> None:
     assert next(i for i in upgraded if i["moduleId"] == "studio.props") == props
     assert upgrade_items(upgraded, "entertainment", catalog, {}) == upgraded
     assert previous == original
+
+
+def test_merge_members_preserves_menu_visibility() -> None:
+    from app.modules.navigation.service.member_directory import merge_member_entries
+
+    members = dict(
+        id="product.members",
+        moduleId="product.members",
+        parentId="product-management",
+        title="产品成员",
+        roleIds=[],
+        visible=True,
+    )
+    users = {**members, "id": "access.users", "moduleId": "access.users", "title": "账号与角色"}
+    source = [members, users]
+    merged = merge_member_entries(source)
+    assert [item["id"] for item in merged] == ["product.directory"]
+    assert merge_member_entries(merged) == merged
+    assert members["id"] == "product.members"
+    for custom in [
+        {"visible": False},
+        {"roleIds": ["admin"]},
+        {"parentId": "platform"},
+        {"title": "我的目录"},
+    ]:
+        restricted = [members, {**users, **custom}]
+        assert merge_member_entries(restricted) == restricted

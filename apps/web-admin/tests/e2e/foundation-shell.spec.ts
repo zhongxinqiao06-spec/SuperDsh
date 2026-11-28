@@ -1,3 +1,4 @@
+import { memberAction } from './member-actions'
 import { expect, test, type Page } from '@playwright/test'
 import { installFoundationFixture } from './foundation-fixture'
 
@@ -14,15 +15,15 @@ test('官网进入登录，后台用户CRUD失败保稿，不准备DSH', async (
   const state = await installFoundationFixture(page)
   await page.goto('/')
   await expect(page.getByRole('heading', { level: 1 })).toContainText(
-    '做成短片',
+    '有声有色地发生',
   )
   await login(page)
   await page
     .getByRole('navigation')
-    .getByRole('link', { name: '账号与角色' })
+    .getByRole('link', { name: '成员与账号' })
     .click()
   await expect(page.getByRole('cell', { name: /合成成员/ })).toBeVisible()
-  await page.getByRole('button', { name: '创建用户', exact: true }).click()
+  await page.getByRole('button', { name: '创建账号', exact: true }).click()
   const editor = page.getByRole('dialog')
   await editor.getByLabel('用户名', { exact: true }).fill('created-user')
   await editor.getByLabel('显示名称').fill('新增合成用户')
@@ -30,10 +31,12 @@ test('官网进入登录，后台用户CRUD失败保稿，不准备DSH', async (
   await editor.getByRole('button', { name: '保存', exact: true }).click()
   await expect(page.getByRole('cell', { name: /新增合成用户/ })).toBeVisible()
   state.userConflict = true
-  await page
-    .getByRole('row', { name: /新增合成用户/ })
-    .getByRole('button', { name: '编辑' })
-    .click()
+  await memberAction(
+    page,
+    page.getByRole('row', { name: /新增合成用户/ }),
+    '更多',
+    '编辑资料',
+  )
   await editor.getByLabel('显示名称').fill('冲突草稿保留')
   await editor.getByRole('button', { name: '保存', exact: true }).click()
   await expect(editor.getByText('用户已被修改，请重新加载')).toBeVisible()
@@ -137,10 +140,10 @@ test('语言主题保存，窄屏导航切换后关闭且内容不横向溢出',
     .click()
   await page
     .getByRole('navigation')
-    .getByRole('link', { name: 'Users', exact: true })
+    .getByRole('link', { name: 'Members and accounts', exact: true })
     .click()
   await expect(
-    page.getByRole('heading', { name: 'Users', exact: true }),
+    page.getByRole('heading', { name: 'Members and accounts', exact: true }),
   ).toBeVisible()
   await expect(
     page.getByRole('navigation', { name: 'Platform navigation' }),

@@ -4,7 +4,7 @@ import {
   type RouteRecordRaw,
 } from 'vue-router'
 import { useAuthStore } from '@/store/modules/auth-store'
-import { consoleModules } from '@/utils/console/modules'
+import { canOpenModule, consoleModules } from '@/utils/console/modules'
 import { productHome, productOf } from '@/utils/studio/products'
 import { canonicalPath } from '@/utils/console/routes'
 import { signedInDestination } from '@/utils/auth/native-oauth'
@@ -13,6 +13,7 @@ import { workspacePreviewContinuation } from '@/utils/file-preview/preview-locat
 const pages: Record<string, RouteRecordRaw['component']> = {
   'office.history': () => import('@/views/workbench/HistoryPage.vue'),
   'office.devices': () => import('@/views/devices/MyDevicesPage.vue'),
+  'product.directory': () => import('@/views/products/ProductMembersPage.vue'),
   'product.members': () => import('@/views/products/ProductMembersPage.vue'),
   'product.defaults': () => import('@/views/products/ProductDefaultsPage.vue'),
   'platform.extensions': () => import('@/views/tools/ExtensionsPage.vue'),
@@ -239,6 +240,17 @@ router.beforeEach(async (to, from) => {
         replace: true,
       }
     }
+  }
+  if (to.meta.moduleId === 'product.directory') {
+    const product =
+      productOf(to.query.product) ??
+      (auth.can('products.office') ? 'office' : undefined)
+    const first = ['product.members', 'access.users', 'access.roles']
+      .map((id) => consoleModules.find((m) => m.id === id))
+      .find(
+        (m) => m && canOpenModule(m, auth.session?.permissions ?? [], product),
+      )
+    if (first) return { path: first.path, query: to.query, replace: true }
   }
   if (
     auth.authenticated &&

@@ -256,7 +256,9 @@ for (const theme of ['light', 'dark']) {
     const headings: Record<string, string> = {
       'studio.create': '创作中心',
       overview: '看板',
-      'access.users': '用户管理',
+      'access.users': '成员与账号',
+      'access.roles': '成员与账号',
+      'product.members': '成员与账号',
       'access.menus': '菜单管理',
       agents: '智能体列表',
       skills: '技能管理',

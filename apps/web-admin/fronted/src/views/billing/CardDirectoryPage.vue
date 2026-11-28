@@ -85,7 +85,7 @@ async function saved() {
     >
       {{ tr('发放额度卡请前往', 'To issue a card, visit') }}
       <router-link :to="{ path: '/product/members', query: { product } }">{{
-        tr('产品成员', 'Product members')
+        tr('成员与账号', 'Members and accounts')
       }}</router-link>
     </footer>
     <CardTypeEditor

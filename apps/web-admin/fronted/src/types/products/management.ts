@@ -8,6 +8,7 @@ export interface ProductMember {
   username: string
   displayName: string | null
   roleIds: string[]
+  disabled: boolean
   billing?: BillingAccount | null
   removable: boolean
   revision: number

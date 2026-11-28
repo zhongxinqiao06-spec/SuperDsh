@@ -74,11 +74,9 @@ async function checkWorkspace(
   if (manager) {
     sections['能力管理'] = ['智能体', '知识库', '技能', '工具', '默认模型']
     sections['产品管理'] = [
-      '产品成员',
+      '成员与账号',
       '菜单配置',
-      ...(platform
-        ? ['账号与角色', '会员记录与办理', '套餐版本管理', '模型扣点价目']
-        : []),
+      ...(platform ? ['会员记录与办理', '套餐版本管理', '模型扣点价目'] : []),
     ]
   }
   if (platform)
@@ -280,9 +278,9 @@ test('五类角色真实登录和跨产品组合授权', async ({ browser, reque
           const management = members.getByRole('button', { name: '产品管理' })
           if ((await management.getAttribute('aria-expanded')) !== 'true')
             await management.click()
-          await members.getByRole('link', { name: '产品成员' }).click()
+          await members.getByRole('link', { name: '成员与账号' }).click()
           await expect(
-            page.getByRole('heading', { name: '产品成员', exact: true }),
+            page.getByRole('heading', { name: '成员与账号', exact: true }),
           ).toBeVisible()
         }
       } finally {

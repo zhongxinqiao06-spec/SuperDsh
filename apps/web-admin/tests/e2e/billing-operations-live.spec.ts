@@ -1,3 +1,4 @@
+import { memberAction } from './member-actions'
 import { randomUUID } from 'node:crypto'
 import { expect, test } from '@playwright/test'
 import { loginIsolatedAccount } from './live-auth'
@@ -44,17 +45,20 @@ test('运营开通、续期和加额在本人账本生效', async ({
     await page.goto('/#/product/members?product=' + product)
     const member = page.getByRole('row').filter({ hasText: username })
     await expect(
-      member.getByRole('button', { name: '加额度', exact: true }),
+      member.getByRole('button', { name: '办理权益', exact: true }),
     ).toBeVisible()
     await expect(
-      member.getByRole('button', { name: '发额度卡', exact: true }),
+      page.getByRole('heading', { name: '成员与账号' }),
     ).toBeVisible()
     await expect(
-      member.getByRole('button', { name: '发放会员', exact: true }),
-    ).toBeVisible()
+      page.getByRole('link', { name: '本产品成员', exact: true }),
+    ).toHaveAttribute('aria-current', 'page')
   }
   const row = page.getByRole('row').filter({ hasText: username })
-  await row.getByRole('button', { name: '发放会员', exact: true }).click()
+  await row.getByRole('button', { name: '办理权益' }).click()
+  await expect(page.getByRole('menuitem', { name: '开通会员' })).toBeVisible()
+  await captureDesign(page, 'member-actions-desktop.png')
+  await page.getByRole('menuitem', { name: '开通会员' }).click()
   let dialog = page.getByRole('dialog', { name: '会员办理' })
   await expect(dialog.getByLabel('办理方式')).toHaveValue('complimentary')
   await dialog.getByLabel('办理商品').selectOption({
@@ -73,8 +77,12 @@ test('运营开通、续期和加额在本人账本生效', async ({
   await page.setViewportSize({ width: 390, height: 844 })
   await captureDesign(page, 'manual-preview-390.png')
   await dialog.getByRole('button', { name: '确认办理' }).click()
-  await expect(row.getByText('可用 200', { exact: true })).toBeVisible()
-  await row.getByRole('button', { name: '续期', exact: true }).click()
+  await expect(row.getByText('可用 200 点', { exact: true })).toBeVisible()
+  await row.getByRole('button', { name: '办理权益' }).click()
+  const sheet = page.getByRole('dialog', { name: /会员联调账号.*办理权益/ })
+  await expect(sheet).toBeVisible()
+  await captureDesign(page, 'member-actions-mobile.png')
+  await sheet.getByRole('button', { name: '续期会员' }).click()
   await dialog.getByLabel('办理原因').fill('提前续期')
   await dialog.getByRole('button', { name: '预览办理' }).click()
   await expect(dialog.getByText('200 → 200')).toBeVisible()
@@ -99,9 +107,9 @@ test('运营开通、续期和加额在本人账本生效', async ({
   await page.goto('/#/access/users')
   await page.getByRole('textbox', { name: '搜索用户' }).fill(username)
   await page.getByRole('button', { name: '搜索', exact: true }).click()
-  await expect(row.getByRole('button', { name: '加额度' })).toBeVisible()
+  await expect(row.getByRole('button', { name: '办理权益' })).toBeVisible()
   await page.goto('/#/product/members?product=office')
-  await row.getByRole('button', { name: '加额度' }).click()
+  await memberAction(page, row, '办理权益', '加普通额度')
   dialog = page.getByRole('dialog', { name: '人工加额' })
   await dialog.getByRole('spinbutton').first().fill('100')
   await dialog.getByLabel('办理原因').fill('样例补额')
@@ -173,7 +181,7 @@ test('运营开通、续期和加额在本人账本生效', async ({
   const issuedImage = await managedCard.locator('img').getAttribute('src')
   expect(issuedImage).toMatch(/^\/api\/billing\/card-images\/[0-9a-f]{64}$/)
   await page.goto('/#/product/members?product=entertainment')
-  await row.getByRole('button', { name: '发额度卡', exact: true }).click()
+  await memberAction(page, row, '办理权益', '发额度卡')
   dialog = page.getByRole('dialog', { name: '发放额度卡' })
   await dialog
     .getByLabel('卡面额')
@@ -205,7 +213,7 @@ test('运营开通、续期和加额在本人账本生效', async ({
     issuedImage,
   )
   await page.goto('/#/product/members?product=entertainment')
-  await row.getByRole('button', { name: '发额度卡', exact: true }).click()
+  await memberAction(page, row, '办理权益', '发额度卡')
   dialog = page.getByRole('dialog', { name: '发放额度卡' })
   await expect(dialog.getByLabel('卡面额').locator('option')).toHaveCount(5)
   await expect(
