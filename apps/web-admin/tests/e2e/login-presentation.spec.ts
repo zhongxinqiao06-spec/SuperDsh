@@ -76,7 +76,7 @@ test('登录胶片与表单适配窄屏、字距、键盘和减少动态偏好',
   ).toBeVisible()
   await expect(
     page.getByRole('link', { name: 'Privacy notice' }),
-  ).toHaveAttribute('href', /#\/privacy$/)
+  ).toHaveAttribute('href', /#\/privacy\?product=office$/)
 })
 
 test('开放注册和授权入口随服务器配置展开并保留返回地址', async ({ page }) => {
@@ -106,8 +106,14 @@ test('开放注册和授权入口随服务器配置展开并保留返回地址',
   await expect(page.getByLabel('用户名或邮箱')).toBeVisible()
 })
 
-test('娱乐邮箱注册保留错误草稿并可重新验证', async ({ page }, testInfo) => {
-  await installFoundationFixture(page)
+test('娱乐工作台退出后注册仍提交娱乐产品，错误草稿可重新验证', async ({
+  page,
+}, testInfo) => {
+  const session = await installFoundationFixture(page, [
+    'products.office',
+    'products.entertainment',
+  ])
+  session.signedIn = true
   await page.route('**/api/auth/config', (route) =>
     route.fulfill({
       json: {
@@ -155,9 +161,13 @@ test('娱乐邮箱注册保留错误草稿并可重新验证', async ({ page }, 
       },
     })
   })
-  await page.goto('/#/register?product=entertainment', {
-    waitUntil: 'domcontentloaded',
-  })
+  await page.goto('/#/account/profile?product=entertainment')
+  await page.getByRole('button', { name: '退出登录', exact: true }).click()
+  await page.getByRole('button', { name: '确认退出', exact: true }).click()
+  await page.getByRole('link', { name: '去注册', exact: true }).click()
+  await expect(page.locator('.login-intro--registration')).toContainText(
+    '星桥娱乐',
+  )
   const send = page.getByRole('button', { name: '发送验证码' })
   await expect(page.getByText(/验证邮箱后获一张 200 点额度卡/)).toBeVisible()
   for (const colorScheme of ['light', 'dark'] as const) {

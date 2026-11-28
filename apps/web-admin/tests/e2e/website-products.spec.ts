@@ -4,6 +4,39 @@ import { installFoundationFixture } from './foundation-fixture'
 
 const products = ['products.office', 'products.entertainment']
 
+for (const product of ['entertainment', 'office'] as const) {
+  test(`从 ${product} 官网经选择工作台或隐私说明注册保留入口`, async ({
+    page,
+  }) => {
+    await installFoundationFixture(page)
+    await page.route('**/api/auth/config', (route) =>
+      route.fulfill({
+        json: { registrationOpen: true, registrationEmailAvailable: true },
+      }),
+    )
+    for (const entry of ['选择工作台', '隐私说明']) {
+      await page.goto(
+        product === 'entertainment' ? '/#/' : '/#/?product=office',
+      )
+      if (product === 'entertainment' || entry === '隐私说明')
+        await page.getByRole('button', { name: '打开导航' }).click()
+      await page
+        .locator('.masthead')
+        .getByRole('link', { name: entry, exact: true })
+        .click()
+      if (entry === '隐私说明')
+        await page.getByRole('link', { name: '返回登录' }).click()
+      await page.getByRole('link', { name: '去注册', exact: true }).click()
+      await page.reload()
+      await expect(page.locator('.login-intro--registration')).toContainText(
+        product === 'entertainment'
+          ? '星桥娱乐 · 创作者账号'
+          : '星桥办公 · 办公账号',
+      )
+    }
+  })
+}
+
 for (const theme of ['light', 'dark']) {
   test(`娱乐五屏在 ${theme} 下可翻页、预览，并完整容纳各档内容`, async ({
     page,

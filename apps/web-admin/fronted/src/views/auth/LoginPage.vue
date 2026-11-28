@@ -253,7 +253,7 @@ const title = computed(() =>
                   ...(route.query.returnTo
                     ? { returnTo: route.query.returnTo }
                     : {}),
-                  ...(route.query.product ? { product: vm.product.value } : {}),
+                  product: vm.product.value,
                 },
               }"
             >
@@ -269,9 +269,10 @@ const title = computed(() =>
                   'By continuing, you acknowledge the',
                 )
               }}
-              <router-link to="/privacy">{{
-                tr('隐私说明', 'Privacy notice')
-              }}</router-link>
+              <router-link
+                :to="{ path: '/privacy', query: { product: vm.product.value } }"
+                >{{ tr('隐私说明', 'Privacy notice') }}</router-link
+              >
             </p>
           </div>
         </form>

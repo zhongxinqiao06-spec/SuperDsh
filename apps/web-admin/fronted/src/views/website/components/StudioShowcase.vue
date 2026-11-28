@@ -234,12 +234,12 @@ defineExpose({ jump, active })
             <router-link :to="{ query: { product: 'office' } }">{{
               tr('星桥办公', 'Starbridge Office')
             }}</router-link
-            ><router-link to="/privacy">{{
-              tr('隐私说明', 'Privacy notice')
-            }}</router-link
-            ><router-link to="/products">{{
-              tr('选择工作台', 'Workspaces')
-            }}</router-link
+            ><router-link
+              :to="{ path: '/privacy', query: { product: 'entertainment' } }"
+              >{{ tr('隐私说明', 'Privacy notice') }}</router-link
+            ><router-link
+              :to="{ path: '/products', query: { product: 'entertainment' } }"
+              >{{ tr('选择工作台', 'Workspaces') }}</router-link
             ><button @click="jump('studio-intro')">
               {{ tr('回到开场', 'Back to top') }} ↑
             </button>

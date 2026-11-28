@@ -1,11 +1,16 @@
 <script setup lang="ts">
+import { computed } from 'vue'
+import { useRoute } from 'vue-router'
 import { usePreferences } from '@/store/modules/preferences'
+import { productOf } from '@/utils/studio/products'
 /** 基础隐私说明公开可读，不要求登录或准备Agent。 */
 const { tr } = usePreferences()
+const route = useRoute()
+const query = computed(() => ({ product: productOf(route.query.product) }))
 </script>
 <template>
   <main class="page legal-page">
-    <router-link to="/">← 星桥智能平台</router-link>
+    <router-link :to="{ path: '/', query }">← 星桥智能平台</router-link>
     <h1>{{ tr('隐私说明', 'Privacy notice') }}</h1>
     <p>
       {{
@@ -23,7 +28,7 @@ const { tr } = usePreferences()
         )
       }}
     </p>
-    <router-link to="/login">{{
+    <router-link :to="{ path: '/login', query }">{{
       tr('返回登录', 'Back to sign in')
     }}</router-link>
   </main>

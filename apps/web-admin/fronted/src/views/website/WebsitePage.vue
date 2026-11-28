@@ -164,7 +164,10 @@ onBeforeUnmount(() => document.removeEventListener('pointerdown', outside))
               }}<AppIcon class="diagonal-arrow" name="arrow-right"
             /></router-link>
           </template>
-          <router-link v-else class="mast-cta" to="/products"
+          <router-link
+            v-else
+            class="mast-cta"
+            :to="{ path: '/products', query: { product } }"
             ><AppIcon name="panel-left" /><span>{{
               tr('选择工作台', 'Workspaces')
             }}</span></router-link
@@ -200,7 +203,7 @@ onBeforeUnmount(() => document.removeEventListener('pointerdown', outside))
                   @click="closeMenu()"
                   >{{ tr('星桥办公', 'Starbridge Office') }}</router-link
                 >
-                <router-link to="/products">{{
+                <router-link :to="{ path: '/products', query: { product } }">{{
                   tr('选择工作台', 'Workspaces')
                 }}</router-link>
               </template>
@@ -211,7 +214,7 @@ onBeforeUnmount(() => document.removeEventListener('pointerdown', outside))
                 @click.prevent="jump(id)"
                 >{{ tr(zh, en) }}</a
               >
-              <router-link to="/privacy">{{
+              <router-link :to="{ path: '/privacy', query: { product } }">{{
                 tr('隐私说明', 'Privacy notice')
               }}</router-link>
               <button
@@ -237,10 +240,10 @@ onBeforeUnmount(() => document.removeEventListener('pointerdown', outside))
     <footer v-if="product === 'office'" class="site-footer wrap">
       <b>{{ tr('星桥', 'Starbridge') }} <span>STARBRIDGE</span></b>
       <div>
-        <router-link to="/privacy">{{
+        <router-link :to="{ path: '/privacy', query: { product } }">{{
           tr('隐私说明', 'Privacy notice')
         }}</router-link>
-        <router-link to="/products"
+        <router-link :to="{ path: '/products', query: { product } }"
           >{{ tr('选择工作台', 'Workspaces') }} <AppIcon name="arrow-right"
         /></router-link>
       </div>

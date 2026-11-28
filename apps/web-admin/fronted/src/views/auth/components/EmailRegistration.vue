@@ -313,7 +313,7 @@ watch(verifying, async () => {
       >
       <p class="login-legal">
         {{ tr('继续操作即表示你已了解', 'By continuing, you acknowledge the') }}
-        <router-link to="/privacy">{{
+        <router-link :to="{ path: '/privacy', query: { product } }">{{
           tr('隐私说明', 'Privacy notice')
         }}</router-link>
       </p>

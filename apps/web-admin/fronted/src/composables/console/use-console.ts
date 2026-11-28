@@ -232,9 +232,11 @@ export function useConsole() {
   async function signOut(): Promise<void> {
     if (signingOut) return
     signingOut = true
+    // 退出会立即清除身份；先记下当前工作台，让下一位注册者沿用这个入口。
+    const entryProduct = product.value
     try {
       await mutation.run(() => auth.signOut())
-      await router.replace('/login')
+      await router.replace({ path: '/login', query: { product: entryProduct } })
     } finally {
       signingOut = false
     }
