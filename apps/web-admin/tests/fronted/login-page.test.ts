@@ -3,12 +3,14 @@ import { flushPromises, mount, type VueWrapper } from '@vue/test-utils'
 import { createPinia } from 'pinia'
 import ElementPlus from 'element-plus'
 import LoginPage from '@/views/auth/LoginPage.vue'
+import { router } from '@/router'
 import type { AuthConfig, AuthResponse } from '@/types/auth/auth'
 
 const mocks = vi.hoisted(() => ({
   config: vi.fn<() => Promise<AuthConfig>>(),
   login: vi.fn<() => Promise<AuthResponse>>(),
   register: vi.fn<() => Promise<AuthResponse>>(),
+  emailCode: vi.fn(),
   accept: vi.fn(),
   replace: vi.fn(),
   route: { path: '/login', query: {} },
@@ -21,15 +23,19 @@ vi.mock('@/api/auth/auth-api', () => ({
     register: mocks.register,
   },
 }))
+vi.mock('@/api/account/account-api', () => ({
+  accountApi: { emailCode: mocks.emailCode },
+}))
 vi.mock('@/store/modules/auth-store', () => ({
   useAuthStore: () => ({ generation: 0, session: null }),
 }))
 vi.mock('@/store/session-controller', () => ({
   sessionController: { generation: 0, accept: mocks.accept },
 }))
-vi.mock('vue-router', () => ({
+vi.mock('vue-router', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('vue-router')>()),
   useRoute: () => mocks.route,
-  useRouter: () => ({ replace: mocks.replace }),
+  useRouter: () => ({ resolve: router.resolve, replace: mocks.replace }),
 }))
 
 const identity: AuthResponse = {
@@ -65,11 +71,13 @@ async function renderLogin() {
 }
 
 beforeEach(() => {
+  sessionStorage.clear()
   mocks.route.path = '/login'
   mocks.route.query = {}
   mocks.config.mockResolvedValue({ ...config })
   mocks.login.mockResolvedValue(identity)
   mocks.register.mockResolvedValue(identity)
+  mocks.emailCode.mockResolvedValue({ serverTime: new Date().toISOString() })
 })
 afterEach(() => {
   wrapper?.unmount()
@@ -151,17 +159,25 @@ describe('管理员配置初始化后的认证入口', () => {
       registrationEmailAvailable: true,
     })
     const page = await renderLogin()
-    const inputs = page.findAll('input')
-    expect(inputs).toHaveLength(4)
+    expect(page.get('.login-intro--registration').text()).toContain(
+      product === 'entertainment' ? '星桥娱乐' : '星桥办公',
+    )
     await page
       .get('input[autocomplete="email"]')
       .setValue('fixture@example.invalid')
-    for (const input of page.findAll('input[autocomplete="new-password"]')) {
-      await input.setValue('Synthetic-register-password!')
-    }
     await page.get('form').trigger('submit')
+    await flushPromises()
+    expect(mocks.emailCode).toHaveBeenCalledWith(
+      'fixture@example.invalid',
+      'register',
+      '',
+      expect.any(AbortSignal),
+    )
     expect(mocks.register).not.toHaveBeenCalled()
     await page.get('input[autocomplete="one-time-code"]').setValue('123456')
+    await page
+      .get('input[autocomplete="new-password"]')
+      .setValue('Synthetic-register-password!')
     await page.get('form').trigger('submit')
     await flushPromises()
     expect(mocks.register).toHaveBeenCalledWith(
@@ -183,11 +199,12 @@ describe('管理员配置初始化后的认证入口', () => {
       registrationEmailAvailable: false,
     })
     const page = await renderLogin()
-    expect(page.text()).toContain('暂时无法发送验证邮件')
-    expect(
-      page.get('button[type="submit"]').attributes('disabled'),
-    ).toBeDefined()
+    expect(page.get('[role="status"]').text()).toContain(
+      '注册邮件服务暂时不可用',
+    )
+    expect(page.find('button[type="submit"]').exists()).toBe(false)
     await page.get('form').trigger('submit')
+    expect(mocks.emailCode).not.toHaveBeenCalled()
     expect(mocks.register).not.toHaveBeenCalled()
   })
 })
